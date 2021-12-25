@@ -52,14 +52,9 @@ Install dependencies
 ./docker-compose-wrapper run --rm cli composer install -o
 ```
 
-Install assets
-```bash
-./docker-compose-wrapper run --rm cli php bin/console oro:assets:install
-```
-
 Install the application
 ```bash
-./docker-compose-wrapper run --rm cli bin/console oro:install -vvv
+./docker-compose-wrapper run --rm cli bin/console oro:install -vvv --language=en --formatting-code=en_US --organization-name='Acme Inc.'  --user-name=admin --user-email=admin@example.com --user-firstname=John --user-lastname=Doe --user-password='$ecretPassw0rd' --application-url='http://localhost:8000/' --sample-data=y
 ```
 
 Stop the stack
