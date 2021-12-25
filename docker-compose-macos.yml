@@ -1,0 +1,49 @@
+version: '3.4'
+
+services:
+  fpm:
+    volumes:
+      - 'orocommerce-fpm-appcode:/var/www'
+      - 'orocommerce-fpm-appcache:/var/www/var/cache'
+      - 'orocommerce-fpm-npm:/var/www/.npm'
+      - 'orocommerce-fpm-composer:/var/www/.composer'
+      - 'orocommerce-fpm-vendor:/var/www/vendor'
+      - 'orocommerce-fpm-node_modules:/var/www/node_modules'
+      - './fpm/php-fpm.ini:/home/linuxbrew/.linuxbrew/etc/php/${PHP_VERSION-8.0}/php-fpm.conf:ro'
+      - './fpm/php.ini:/home/linuxbrew/.linuxbrew/etc/php/${PHP_VERSION-8.0}/php.ini:ro'
+      - './fpm/prepend.php:/home/linuxbrew/.linuxbrew/etc/php/${PHP_VERSION-8.0}/prepend.php:ro'
+      - './fpm/entrypoint.sh:/entrypoint.sh:ro'
+      - './fpm/msmtprc:/home/linuxbrew/.msmtprc:ro'
+  cli:
+    volumes:
+      - 'orocommerce-fpm-appcode:/var/www'
+      - 'orocommerce-fpm-appcache:/var/www/var/cache'
+      - 'orocommerce-fpm-npm:/var/www/.npm'
+      - 'orocommerce-fpm-composer:/var/www/.composer'
+      - 'orocommerce-fpm-vendor:/var/www/vendor'
+      - 'orocommerce-fpm-node_modules:/var/www/node_modules'
+      - './fpm/php-fpm.ini:/home/linuxbrew/.linuxbrew/etc/php/${PHP_VERSION-8.0}/php-fpm.conf:ro'
+      - './fpm/php.ini:/home/linuxbrew/.linuxbrew/etc/php/${PHP_VERSION-8.0}/php.ini:ro'
+      - './fpm/prepend.php:/home/linuxbrew/.linuxbrew/etc/php/${PHP_VERSION-8.0}/prepend.php:ro'
+      - './fpm/entrypoint.sh:/entrypoint.sh:ro'
+      - './fpm/msmtprc:/home/linuxbrew/.msmtprc:ro'
+
+volumes:
+  orocommerce-fpm-appcode:
+    driver: local
+    driver_opts:
+      type: nfs
+      o: addr=host.docker.internal,rw,nolock,hard,nointr,nfsvers=3
+      device: ":${PWD}/www"
+  orocommerce-fpm-appcache:
+    driver: local
+  orocommerce-fpm-npm:
+    driver: local
+  orocommerce-fpm-composer:
+    driver: local
+  orocommerce-fpm-node_modules:
+    driver: local
+  orocommerce-fpm-vendor:
+    driver: local
+  orocommerce-database-data:
+    driver: local

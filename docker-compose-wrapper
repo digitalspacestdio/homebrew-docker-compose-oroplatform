@@ -1,0 +1,17 @@
+#!/bin/bash
+set -e
+#set -x
+cd $(dirname $0)
+DOCKER_COMPOSE_BIN=${DOCKER_COMPOSE_BIN-$(which docker-compose)};
+if [[ "$OSTYPE" == "darwin"* ]]; then
+  if ps aux | grep -v 'grep' | grep nfsd > /dev/null 2>&1; then
+    if [[ -f "docker-compose.yml" ]] && [[ -f "docker-compose-macos.yml" ]]; then
+      DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f docker-compose.yml -f docker-compose-macos.yml"
+    fi
+  else
+    echo "WARNING: nfsd was not started, using bind mounts..."docke
+  fi
+
+fi
+
+exec ${DOCKER_COMPOSE_BIN} "$@"

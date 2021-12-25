@@ -5,7 +5,7 @@ services:
     image: "digitalspacestudio/orophp:${PHP_VERSION-8.0}"
     user: root
     volumes:
-      - './www:/var/www'
+      - 'orocommerce-fpm-appcode:/var/www'
       - 'orocommerce-fpm-appcache:/var/www/var/cache'
       - 'orocommerce-fpm-npm:/var/www/.npm'
       - 'orocommerce-fpm-composer:/var/www/.composer'
@@ -42,7 +42,7 @@ services:
   cli:
     image: "digitalspacestudio/orophp:${PHP_VERSION-8.0}"
     volumes:
-      - './www:/var/www'
+      - 'orocommerce-fpm-appcode:/var/www'
       - 'orocommerce-fpm-appcache:/var/www/var/cache'
       - 'orocommerce-fpm-npm:/var/www/.npm'
       - 'orocommerce-fpm-composer:/var/www/.composer'
@@ -176,6 +176,12 @@ networks:
   orocommerce:
 
 volumes:
+  orocommerce-fpm-appcode:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: "${PWD}/www"
   orocommerce-fpm-appcache:
     driver: local
   orocommerce-fpm-npm:
