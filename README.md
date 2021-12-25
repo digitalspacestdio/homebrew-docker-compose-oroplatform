@@ -1,6 +1,9 @@
 # OroCommerce Development Environment
 
 Put your code to the `www` folder
+```bash
+git clone git@github.com:oroinc/orocommerce-application.git www
+```
 
 Build the stack
 ```bash
