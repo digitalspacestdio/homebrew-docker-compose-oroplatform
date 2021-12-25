@@ -2,8 +2,7 @@ version: '3.4'
 
 services:
   fpm:
-    build: fpm
-    image: "orocommerce/php:${PHP_VERSION-8.0}"
+    image: "digitalspacestudio/orophp:${PHP_VERSION-8.0}"
     user: root
     volumes:
       - './www:/var/www'
@@ -41,8 +40,7 @@ services:
       test: /bin/bash -c "</dev/tcp/localhost/9000"
 
   cli:
-    build: fpm
-    image: "orocommerce/php:${PHP_VERSION-8.0}"
+    image: "digitalspacestudio/orophp:${PHP_VERSION-8.0}"
     volumes:
       - './www:/var/www'
       - 'orocommerce-fpm-appcache:/var/www/var/cache'
@@ -171,6 +169,8 @@ services:
       - './nginx/pagespeed.conf:/etc/nginx/pagespeed.conf:ro'
     networks:
       - 'orocommerce'
+    healthcheck:
+      test: /bin/bash -c "</dev/tcp/localhost/80"
 
 networks:
   orocommerce:
