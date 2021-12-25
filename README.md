@@ -5,8 +5,9 @@ Put your code to the `www` folder
 git clone git@github.com:oroinc/orocommerce-application.git www
 ```
 
+Export your composer auth tokens
 ```bash
-export COMPOSER_AUTH={"github-oauth": {"github.com": "xxxxxxxxxxxx"}}
+export COMPOSER_AUTH='{"github-oauth": {"github.com": "xxxxxxxxxxxx"}, "gitlab-token": {"example.org": "xxxxxxxxxxxx"}}
 ```
 
 Build the stack
