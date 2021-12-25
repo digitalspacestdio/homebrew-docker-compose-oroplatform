@@ -15,6 +15,11 @@ Start the stack
 docker-compose up
 ```
 
+Install the application
+```bash
+docker-compose run cli bin/console oro:install -vvv
+```
+
 Stop the stack
 ```bash
 docker-compose down
