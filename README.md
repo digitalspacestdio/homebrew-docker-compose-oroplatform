@@ -44,7 +44,7 @@ Start the stack in the detached mode
 
 Start with specific php version:
 ```bash
-PHP_VERSION=7.4 docker-compose up
+PHP_VERSION=7.4 ./docker-compose-wrapper up
 ```
 
 Install dependencies
