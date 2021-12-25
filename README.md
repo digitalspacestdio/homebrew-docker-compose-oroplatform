@@ -5,6 +5,10 @@ Put your code to the `www` folder
 git clone git@github.com:oroinc/orocommerce-application.git www
 ```
 
+```bash
+export COMPOSER_AUTH={"github-oauth": {"github.com": "xxxxxxxxxxxx"}}
+```
+
 Build the stack
 ```bash
 docker-compose build

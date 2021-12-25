@@ -22,9 +22,10 @@ services:
     networks:
       - 'orocommerce'
     environment:
-      - XHGUI_MONGO_HOSTNAME=mongodb
-      - XHGUI_MONGO_DATABASE=xhprof
-      - COMPOSER_HOME=/var/www/.composer
+      - 'XHGUI_MONGO_HOSTNAME=mongodb'
+      - 'XHGUI_MONGO_DATABASE=xhprof'
+      - 'COMPOSER_HOME=/var/www/.composer'
+      - 'COMPOSER_AUTH=$COMPOSER_AUTH'
     env_file:
       - .env
     networks:
@@ -56,9 +57,10 @@ services:
     networks:
       - 'orocommerce'
     environment:
-      - XHGUI_MONGO_HOSTNAME=mongodb
-      - XHGUI_MONGO_DATABASE=xhprof
-      - COMPOSER_HOME=/var/www/.composer
+      - 'XHGUI_MONGO_HOSTNAME=mongodb'
+      - 'XHGUI_MONGO_DATABASE=xhprof'
+      - 'COMPOSER_HOME=/var/www/.composer'
+      - 'COMPOSER_AUTH=$COMPOSER_AUTH'
     env_file:
       - .env
     networks:
