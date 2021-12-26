@@ -38,6 +38,8 @@ services:
         condition: service_healthy
     healthcheck:
       test: /bin/bash -c "</dev/tcp/localhost/9000"
+      start_period: 5s
+      interval: 5s
 
   cli:
     image: "digitalspacestudio/orophp:${PHP_VERSION-8.0}"
@@ -88,6 +90,8 @@ services:
       - 'orocommerce'
     healthcheck:
       test: nc -vz -w 1 localhost 80
+      start_period: 5s
+      interval: 5s
 
   mail:
     image: "mailhog/mailhog"
@@ -124,12 +128,13 @@ services:
       discovery.type: 'single-node'
     ports:
       - '9200'
+    networks:
+      - 'orocommerce'
     healthcheck:
       test: /bin/bash -c "</dev/tcp/localhost/9200"
       start_period: 5s
       interval: 5s
-    networks:
-      - 'orocommerce'
+
 
   nginx:
     image: 'crunchgeek/nginx-pagespeed'
@@ -153,6 +158,8 @@ services:
       - 'orocommerce'
     healthcheck:
       test: /bin/bash -c "</dev/tcp/localhost/80"
+      start_period: 5s
+      interval: 5s
 
 networks:
   orocommerce:
