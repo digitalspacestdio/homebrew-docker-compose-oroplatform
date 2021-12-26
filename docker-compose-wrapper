@@ -27,7 +27,7 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
       DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f docker-compose-macos.yml"
     fi
   else
-    echo "WARNING: nfsd was not started, using bind mounts..."docke
+    echo "WARNING: nfsd was not started, using bind mounts..."
   fi
 fi
 

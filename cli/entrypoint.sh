@@ -22,6 +22,9 @@ chown linuxbrew:linuxbrew /var/www/var/cache 2> /dev/null || true
 if [[ -f /var/www/config/parameters.yml ]]; then
   sed -i 's/database_driver:.*/database_driver: '${ORO_DB_DRIVER}'/g' /var/www/config/parameters.yml
 fi
+for i in "$@"; do
+    i="${i//\\/\\\\}"
+    C="$C \"${i//\"/\\\"}\""
+done
 
-echo "[$(date +'%F %T')] ==> Staring fpm"
-HOME=/var/www su -p linuxbrew -c "exec /home/linuxbrew/.linuxbrew/sbin/php-fpm --nodaemonize --fpm-config /home/linuxbrew/.linuxbrew/etc/php/current/php-fpm.conf"
+HOME=/var/www su -p linuxbrew -- -c "exec $C"

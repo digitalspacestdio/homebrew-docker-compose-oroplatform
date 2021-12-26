@@ -6,18 +6,15 @@ services:
     user: root
     volumes:
       - 'orocommerce-fpm-appcode:/var/www'
-      - 'orocommerce-fpm-appcache:/var/www/var/cache'
       - 'orocommerce-fpm-npm:/var/www/.npm'
       - 'orocommerce-fpm-composer:/var/www/.composer'
-      - 'orocommerce-fpm-vendor:/var/www/vendor'
-      - 'orocommerce-fpm-node_modules:/var/www/node_modules'
       - './fpm/php-fpm.ini:/home/linuxbrew/.linuxbrew/etc/php/${PHP_VERSION-8.0}/php-fpm.conf:ro'
       - './fpm/php.ini:/home/linuxbrew/.linuxbrew/etc/php/${PHP_VERSION-8.0}/php.ini:ro'
       - './fpm/prepend.php:/home/linuxbrew/.linuxbrew/etc/php/${PHP_VERSION-8.0}/prepend.php:ro'
-      - './fpm/entrypoint.sh:/entrypoint.sh:ro'
       - './fpm/msmtprc:/home/linuxbrew/.msmtprc:ro'
+      - './fpm/entrypoint.sh:/entrypoint.sh:ro'
+    entrypoint: '/entrypoint.sh'
     working_dir: '/var/www'
-    command: '/bin/bash /entrypoint.sh'
     networks:
       - 'orocommerce'
     environment:
@@ -44,16 +41,16 @@ services:
 
   cli:
     image: "digitalspacestudio/orophp:${PHP_VERSION-8.0}"
+    user: root
     volumes:
       - 'orocommerce-fpm-appcode:/var/www'
-      - 'orocommerce-fpm-appcache:/var/www/var/cache'
       - 'orocommerce-fpm-npm:/var/www/.npm'
       - 'orocommerce-fpm-composer:/var/www/.composer'
-      - 'orocommerce-fpm-vendor:/var/www/vendor'
-      - 'orocommerce-fpm-node_modules:/var/www/node_modules'
       - './fpm/php.ini:/home/linuxbrew/.linuxbrew/etc/php/${PHP_VERSION-8.0}/php.ini:ro'
       - './fpm/prepend.php:/home/linuxbrew/.linuxbrew/etc/php/${PHP_VERSION-8.0}/prepend.php:ro'
       - './fpm/msmtprc:/home/linuxbrew/.msmtprc:ro'
+      - './cli/entrypoint.sh:/entrypoint.sh:ro'
+    entrypoint: '/entrypoint.sh'
     working_dir: '/var/www'
     networks:
       - 'orocommerce'
@@ -127,8 +124,10 @@ services:
 
   elasticsearch:
     image: 'docker.elastic.co/elasticsearch/elasticsearch-oss:7.10.2'
+    volumes:
+      - "orocommerce-elasticsearch-data:/usr/share/elasticsearch/data"
     environment:
-      ES_JAVA_OPTS: '${ES_JAVA_OPTS:--Xms512m -Xmx1024m}'
+      ES_JAVA_OPTS: '${ES_JAVA_OPTS:--Xms256m -Xmx2048m}'
       discovery.type: 'single-node'
     ports:
       - '9200'
@@ -178,13 +177,9 @@ volumes:
       type: none
       o: bind
       device: "${PWD}/www"
-  orocommerce-fpm-appcache:
-    driver: local
   orocommerce-fpm-npm:
     driver: local
   orocommerce-fpm-composer:
     driver: local
-  orocommerce-fpm-node_modules:
-    driver: local
-  orocommerce-fpm-vendor:
+  orocommerce-elasticsearch-data:
     driver: local
