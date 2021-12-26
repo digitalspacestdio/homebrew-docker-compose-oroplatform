@@ -1,0 +1,25 @@
+version: '3.4'
+
+services:
+  database:
+    image: 'postgres:9.6.24'
+    environment:
+      LANG: 'C.UTF-8'
+      POSTGRES_USER: '${ORO_DB_USER}'
+      POSTGRES_PASSWORD: '${ORO_DB_PASSWORD}'
+      POSTGRES_DB: '${ORO_DB_NAME}'
+    volumes:
+      - './pgsql/initdb.d:/docker-entrypoint-initdb.d:ro'
+      - 'orocommerce-postgresql-data:/var/lib/postgresql/data'
+    ports:
+      - '${DOCKER_DATABASE:-15432}:5432'
+    networks:
+      - 'orocommerce'
+    healthcheck:
+      test: "pg_isready -U orocommerce"
+      start_period: 5s
+      interval: 5s
+
+volumes:
+  orocommerce-postgresql-data:
+    driver: local

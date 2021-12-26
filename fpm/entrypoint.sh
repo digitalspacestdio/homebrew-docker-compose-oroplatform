@@ -15,5 +15,10 @@ chown linuxbrew:linuxbrew /var/www/var/cache
 #echo "[$(date +'%F %T')] ==> Installing dependencies"
 #su -p linuxbrew -c "cd $(pwd); HOME=/var/www composer install --optimize-autoloader --no-progress --dev --no-interaction"
 
+if [[ -f /var/www/config/parameters.yml ]]; then
+  sed -i 's/database_driver:.*/database_driver: '${ORO_DB_DRIVER}'/g' /var/www/config/parameters.yml
+  rm -rf /var/www/var/cache/*
+fi
+
 echo "[$(date +'%F %T')] ==> Staring fpm"
 su -p linuxbrew -c "cd $(pwd); exec /home/linuxbrew/.linuxbrew/sbin/php-fpm --nodaemonize --fpm-config /home/linuxbrew/.linuxbrew/etc/php/current/php-fpm.conf"

@@ -117,24 +117,6 @@ services:
       start_period: 5s
       interval: 5s
 
-  database:
-    image: 'postgres:9.6.24'
-    environment:
-      LANG: 'C.UTF-8'
-      POSTGRES_USER: 'orocommerce'
-      POSTGRES_PASSWORD: 'orocommerce'
-      POSTGRES_DB: 'orocommerce'
-    volumes:
-      - './pgsql/pgsql.initdb.d:/docker-entrypoint-initdb.d:ro'
-    ports:
-      - '${DOCKER_PORT_MYSQL:-15432}:5432'
-    networks:
-      - 'orocommerce'
-    healthcheck:
-      test: "pg_isready -U orocommerce"
-      start_period: 5s
-      interval: 5s
-
   elasticsearch:
     image: 'docker.elastic.co/elasticsearch/elasticsearch-oss:7.10.2'
     environment:
@@ -191,6 +173,4 @@ volumes:
   orocommerce-fpm-node_modules:
     driver: local
   orocommerce-fpm-vendor:
-    driver: local
-  orocommerce-database-data:
     driver: local

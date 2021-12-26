@@ -16,6 +16,23 @@ sudo nfsd restart
 
 ## Usage
 
+Export your composer auth tokens
+If you use github only
+```bash
+export COMPOSER_AUTH='{"github-oauth": {"github.com": "xxxxxxxxxxxx"}}'
+````
+
+If you use github and gitlab
+```bash
+export COMPOSER_AUTH='{"github-oauth": {"github.com": "xxxxxxxxxxxx"}, "gitlab-token": {"example.org": "xxxxxxxxxxxx"}}'
+```
+
+
+Start use specific php version just export environment variable:
+```bash
+export PHP_VERSION=7.4
+```
+
 Clone this repo
 ```bash
 git clone git@github.com:digitalspacestdio/docker-orocommerce-dev.git
@@ -31,17 +48,6 @@ Put your code to the `www` folder
 git clone --single-branch --branch 4.2.7 git@github.com:oroinc/orocommerce-application.git www
 ```
 
-Export your composer auth tokens
-If you use github only
-```bash
-export COMPOSER_AUTH='{"github-oauth": {"github.com": "xxxxxxxxxxxx"}}'
-````
-
-If you use github and gitlab
-```bash
-export COMPOSER_AUTH='{"github-oauth": {"github.com": "xxxxxxxxxxxx"}, "gitlab-token": {"example.org": "xxxxxxxxxxxx"}}'
-```
-
 Start the stack
 ```bash
 ./docker-compose-wrapper up
@@ -50,11 +56,6 @@ Start the stack
 Start the stack in the detached mode
 ```bash
 ./docker-compose-wrapper up -d
-```
-
-Start use specific php version just export environment variable:
-```bash
-export PHP_VERSION=7.4
 ```
 
 Install dependencies

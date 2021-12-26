@@ -1,0 +1,30 @@
+version: '3.4'
+
+services:
+  database:
+    image: 'mysql:8'
+    command: '--default-authentication-plugin=mysql_native_password'
+    cap_add:
+      - SYS_NICE # CAP_SYS_NICE
+    environment:
+      LANG: 'C.UTF-8'
+      MYSQL_ROOT_PASSWORD: 'root'
+      MYSQL_USER: '${ORO_DB_USER}'
+      MYSQL_PASSWORD: '${ORO_DB_PASSWORD}'
+      MYSQL_DATABASE: '${ORO_DB_NAME}'
+    volumes:
+      - './mysql/initdb.d:/docker-entrypoint-initdb.d:ro'
+      - './mysql/my.cnf:/etc/mysql/conf.d/oro.cnf:ro'
+      - 'orocommerce-mysql-data:/var/lib/mysql'
+    ports:
+      - '${DOCKER_PORT_MYSQL:-13306}:3306'
+    networks:
+      - 'orocommerce'
+    healthcheck:
+      test: "mysqladmin ping --silent -u$${MYSQL_USER} -p$${MYSQL_PASSWORD}"
+      start_period: 5s
+      interval: 5s
+
+volumes:
+  orocommerce-mysql-data:
+    driver: local

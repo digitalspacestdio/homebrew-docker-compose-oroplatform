@@ -1,17 +1,34 @@
 #!/bin/bash
 set -e
-#set -x
+set -x
 cd $(dirname $0)
-DOCKER_COMPOSE_BIN=${DOCKER_COMPOSE_BIN-$(which docker-compose)};
+
+if [[ ! -f .env ]]; then
+  echo "The .env file not found, please create it first."
+  exit 1
+fi
+
+set -o allexport
+source .env
+set +o allexport
+
+DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN-$(which docker-compose)}";
+DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f docker-compose.yml"
+
+if [[ $ORO_DB_DRIVER = "pdo_pgsql" ]];then
+  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f docker-compose-pgsql.yml"
+else
+  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f docker-compose-mysql.yml"
+fi
+
 if [[ "$OSTYPE" == "darwin"* ]]; then
   if ps aux | grep -v 'grep' | grep nfsd > /dev/null 2>&1; then
     if [[ -f "docker-compose.yml" ]] && [[ -f "docker-compose-macos.yml" ]]; then
-      DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f docker-compose.yml -f docker-compose-macos.yml"
+      DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f docker-compose-macos.yml"
     fi
   else
     echo "WARNING: nfsd was not started, using bind mounts..."docke
   fi
-
 fi
 
 exec ${DOCKER_COMPOSE_BIN} "$@"

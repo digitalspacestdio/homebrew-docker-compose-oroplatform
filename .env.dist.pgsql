@@ -1,3 +1,4 @@
+ORO_DB_DRIVER=pdo_pgsql
 ORO_DB_HOST=database
 ORO_DB_PORT=5432
 ORO_DB_NAME=orocommerce
