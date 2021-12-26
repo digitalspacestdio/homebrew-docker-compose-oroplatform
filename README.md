@@ -23,7 +23,7 @@ git clone git@github.com:digitalspacestdio/docker-orocommerce-dev.git
 
 Go to the working dir
 ```bash
-docker-orocommerce-dev
+cd docker-orocommerce-dev
 ```
 
 Put your code to the `www` folder
