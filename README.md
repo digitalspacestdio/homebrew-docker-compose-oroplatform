@@ -16,9 +16,19 @@ sudo nfsd restart
 
 ## Usage
 
+Clone this repo
+```bash
+git clone git@github.com:digitalspacestdio/docker-orocommerce-dev.git
+```
+
+Go to the working dir
+```bash
+docker-orocommerce-dev
+```
+
 Put your code to the `www` folder
 ```bash
-git clone git@github.com:oroinc/orocommerce-application.git www
+git clone --single-branch --branch 4.2.6 git@github.com:oroinc/orocommerce-application.git www
 ```
 
 Export your composer auth tokens
