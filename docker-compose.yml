@@ -36,6 +36,7 @@ services:
         condition: service_healthy
       mail:
         condition: service_healthy
+    restart: on-failure:3
     healthcheck:
       test: /bin/bash -c "</dev/tcp/localhost/9000"
       start_period: 10s
@@ -88,6 +89,7 @@ services:
         condition: service_healthy
     networks:
       - 'orocommerce'
+    restart: on-failure:3
     healthcheck:
       test: nc -vz -w 1 localhost 80
       start_period: 10s
@@ -99,6 +101,7 @@ services:
       - "${DOCKER_PORT_MAIL_HTTP:-8125}:8025"
     networks:
       - 'orocommerce'
+    restart: on-failure:3
     healthcheck:
       test: "nc -vz -w 1 localhost 8025"
       start_period: 5s
@@ -116,6 +119,7 @@ services:
       - "27017"
     networks:
       - 'orocommerce'
+    restart: on-failure:3
     healthcheck:
       test: mongo --quiet --eval 'db.runCommand("ping").ok' xhgui
       start_period: 10s
@@ -130,6 +134,7 @@ services:
       - '9200'
     networks:
       - 'orocommerce'
+    restart: on-failure:3
     healthcheck:
       test: /bin/bash -c "</dev/tcp/localhost/9200"
       start_period: 15s
@@ -157,6 +162,7 @@ services:
       - './nginx/pagespeed.conf:/etc/nginx/pagespeed.conf:ro'
     networks:
       - 'orocommerce'
+    restart: on-failure:3
     healthcheck:
       test: /bin/bash -c "</dev/tcp/localhost/80"
       start_period: 10s

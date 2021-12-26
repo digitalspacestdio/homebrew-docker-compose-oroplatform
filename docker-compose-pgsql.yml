@@ -15,6 +15,7 @@ services:
       - '${DOCKER_DATABASE:-15432}:5432'
     networks:
       - 'orocommerce'
+    restart: on-failure:3
     healthcheck:
       test: "pg_isready -U ${ORO_DB_USER}"
       start_period: 15s
