@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-#set -x
+set -x
 
 cd /var/www
 
@@ -24,6 +24,7 @@ if [[ -f /var/www/config/parameters.yml ]]; then
 fi
 for i in "$@"; do
     i="${i//\\/\\\\}"
+    i="${i//$/\\$}"
     C="$C \"${i//\"/\\\"}\""
 done
 
