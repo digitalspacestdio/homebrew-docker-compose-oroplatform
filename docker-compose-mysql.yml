@@ -23,7 +23,7 @@ services:
     restart: on-failure:3
     healthcheck:
       test: "mysqladmin ping --silent -u$${MYSQL_USER} -p$${MYSQL_PASSWORD}"
-      start_period: 15s
+      start_period: 60s
       interval: 5s
       retries: 5
 

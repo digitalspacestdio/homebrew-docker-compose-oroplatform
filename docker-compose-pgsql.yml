@@ -18,7 +18,7 @@ services:
     restart: on-failure:3
     healthcheck:
       test: "pg_isready -U ${ORO_DB_USER}"
-      start_period: 15s
+      start_period: 60s
       interval: 5s
       retries: 5
 
