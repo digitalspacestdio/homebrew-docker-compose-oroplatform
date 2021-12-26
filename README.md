@@ -1,4 +1,4 @@
-# OroCommerce Development Environment
+# OroCommerce|OroCRM|OroPlatform Docker Environment
 
 ## Pre-requirements (MacOs only)
 Configure and start nfs
@@ -33,7 +33,7 @@ export PHP_VERSION=7.4
 
 Clone this repo
 ```bash
-git clone git@github.com:digitalspacestdio/docker-orocommerce-dev.git
+git clone git@github.com:digitalspacestdio/docker-env-oroplatform.git
 ```
 
 Go to the working dir
