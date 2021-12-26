@@ -28,7 +28,7 @@ cd docker-orocommerce-dev
 
 Put your code to the `www` folder
 ```bash
-git clone --single-branch --branch 4.2.6 git@github.com:oroinc/orocommerce-application.git www
+git clone --single-branch --branch 4.2.7 git@github.com:oroinc/orocommerce-application.git www
 ```
 
 Export your composer auth tokens
@@ -52,9 +52,9 @@ Start the stack in the detached mode
 ./docker-compose-wrapper up -d
 ```
 
-Start with specific php version:
+Start use specific php version just export environment variable:
 ```bash
-PHP_VERSION=7.4 ./docker-compose-wrapper up
+export PHP_VERSION=7.4
 ```
 
 Install dependencies
