@@ -16,9 +16,10 @@ services:
     networks:
       - 'orocommerce'
     healthcheck:
-      test: "pg_isready -U orocommerce"
-      start_period: 5s
+      test: "pg_isready -U ${ORO_DB_USER}"
+      start_period: 15s
       interval: 5s
+      retries: 5
 
 volumes:
   orocommerce-postgresql-data:

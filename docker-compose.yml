@@ -38,7 +38,7 @@ services:
         condition: service_healthy
     healthcheck:
       test: /bin/bash -c "</dev/tcp/localhost/9000"
-      start_period: 5s
+      start_period: 10s
       interval: 5s
 
   cli:
@@ -90,7 +90,7 @@ services:
       - 'orocommerce'
     healthcheck:
       test: nc -vz -w 1 localhost 80
-      start_period: 5s
+      start_period: 10s
       interval: 5s
 
   mail:
@@ -118,7 +118,7 @@ services:
       - 'orocommerce'
     healthcheck:
       test: mongo --quiet --eval 'db.runCommand("ping").ok' xhgui
-      start_period: 5s
+      start_period: 10s
       interval: 5s
 
   elasticsearch:
@@ -132,8 +132,9 @@ services:
       - 'orocommerce'
     healthcheck:
       test: /bin/bash -c "</dev/tcp/localhost/9200"
-      start_period: 5s
+      start_period: 15s
       interval: 5s
+      retries: 5
 
 
   nginx:
@@ -158,7 +159,7 @@ services:
       - 'orocommerce'
     healthcheck:
       test: /bin/bash -c "</dev/tcp/localhost/80"
-      start_period: 5s
+      start_period: 10s
       interval: 5s
 
 networks:
