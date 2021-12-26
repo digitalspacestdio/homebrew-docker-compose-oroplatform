@@ -59,7 +59,7 @@ export PHP_VERSION=7.4
 
 Install dependencies
 ```bash
-./docker-compose-wrapper run --rm cli composer install -o
+./docker-compose-wrapper run --rm cli composer install -o --no-interaction
 ```
 
 Install the application
