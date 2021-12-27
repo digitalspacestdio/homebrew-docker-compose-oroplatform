@@ -24,4 +24,4 @@ if [[ -f /var/www/config/parameters.yml ]]; then
 fi
 
 echo "[$(date +'%F %T')] ==> Staring fpm"
-HOME=/var/www su -p linuxbrew -c "exec /home/linuxbrew/.linuxbrew/sbin/php-fpm -d clear_env=no --nodaemonize --fpm-config /home/linuxbrew/.linuxbrew/etc/php/current/php-fpm.conf"
+HOME=/var/www su -p linuxbrew -c "exec /home/linuxbrew/.linuxbrew/sbin/php-fpm --nodaemonize --fpm-config /home/linuxbrew/.linuxbrew/etc/php/current/php-fpm.conf"
