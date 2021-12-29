@@ -8,7 +8,7 @@ services:
       - 'orocommerce-fpm-appcode:/var/www'
       - 'orocommerce-fpm-npm:/var/www/.npm'
       - 'orocommerce-fpm-composer:/var/www/.composer'
-      - './fpm/php-fpm.ini:/home/linuxbrew/.linuxbrew/etc/php/${PHP_VERSION-8.0}/php-fpm.conf:ro'
+      - './fpm/php-fpm.conf:/home/linuxbrew/.linuxbrew/etc/php/${PHP_VERSION-8.0}/php-fpm.conf:ro'
       - './fpm/php.ini:/home/linuxbrew/.linuxbrew/etc/php/${PHP_VERSION-8.0}/php.ini:ro'
       - './fpm/prepend.php:/home/linuxbrew/.linuxbrew/etc/php/${PHP_VERSION-8.0}/prepend.php:ro'
       - './fpm/msmtprc:/home/linuxbrew/.msmtprc:ro'
@@ -46,7 +46,8 @@ services:
       - 'orocommerce-fpm-appcode:/var/www'
       - 'orocommerce-fpm-npm:/var/www/.npm'
       - 'orocommerce-fpm-composer:/var/www/.composer'
-      - './fpm/php.ini:/home/linuxbrew/.linuxbrew/etc/php/${PHP_VERSION-8.0}/php.ini:ro'
+      - './cli/php.ini:/home/linuxbrew/.linuxbrew/etc/php/${PHP_VERSION-8.0}/php.ini:ro'
+      - './cli/ext-xdebug.ini:/home/linuxbrew/.linuxbrew/etc/php/${PHP_VERSION-8.0}/conf.d/ext-xdebug.ini:ro'
       - './fpm/prepend.php:/home/linuxbrew/.linuxbrew/etc/php/${PHP_VERSION-8.0}/prepend.php:ro'
       - './fpm/msmtprc:/home/linuxbrew/.msmtprc:ro'
       - './cli/entrypoint.sh:/entrypoint.sh:ro'
@@ -80,7 +81,7 @@ services:
       - XHGUI_MONGO_HOSTNAME=mongodb
       - XHGUI_MONGO_DATABASE=xhprof
     ports:
-      - "${DOCKER_PORT_XHGUI:-8142}:80"
+      - "${DOCKER_PORT_XHGUI:-30081}:80"
     depends_on:
       mongodb:
         condition: service_healthy
@@ -95,7 +96,7 @@ services:
   mail:
     image: "mailhog/mailhog"
     ports:
-      - "${DOCKER_PORT_MAIL_HTTP:-8125}:8025"
+      - "${DOCKER_PORT_MAIL_HTTP:-38025}:8025"
     networks:
       - 'orocommerce'
     restart: on-failure:3
@@ -154,7 +155,7 @@ services:
       fpm:
         condition: service_healthy
     ports:
-      - '${DOCKER_PORT_HTTP:-8000}:80'
+      - '${DOCKER_PORT_HTTP:-30080}:80'
     volumes:
       - './www:/var/www:ro'
       - './nginx/nginx.conf:/etc/nginx/nginx.conf:ro'

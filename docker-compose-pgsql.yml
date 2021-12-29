@@ -12,7 +12,7 @@ services:
       - './pgsql/initdb.d:/docker-entrypoint-initdb.d:ro'
       - 'orocommerce-postgresql-data:/var/lib/postgresql/data'
     ports:
-      - '${DOCKER_DATABASE:-15432}:5432'
+      - '${DOCKER_DATABASE:-35432}:5432'
     networks:
       - 'orocommerce'
     restart: on-failure:3

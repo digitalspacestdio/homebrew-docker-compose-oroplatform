@@ -17,7 +17,7 @@ services:
       - './mysql/my.cnf:/etc/mysql/conf.d/oro.cnf:ro'
       - 'orocommerce-mysql-data:/var/lib/mysql'
     ports:
-      - '${DOCKER_PORT_MYSQL:-13306}:3306'
+      - '${DOCKER_PORT_MYSQL:-33306}:3306'
     networks:
       - 'orocommerce'
     restart: on-failure:3

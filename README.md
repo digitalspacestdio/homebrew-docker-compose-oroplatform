@@ -62,7 +62,7 @@ Install dependencies
 
 Install the application
 ```bash
-./docker-compose-wrapper run --rm cli bin/console --timeout=1800 oro:install --language=en --formatting-code=en_US --organization-name='Acme Inc.'  --user-name=admin --user-email=admin@example.com --user-firstname=John --user-lastname=Doe --user-password='$ecretPassw0rd' --application-url='http://localhost:8000/' --sample-data=y
+./docker-compose-wrapper run --rm cli bin/console --timeout=1800 oro:install --language=en --formatting-code=en_US --organization-name='Acme Inc.'  --user-name=admin --user-email=admin@example.com --user-firstname=John --user-lastname=Doe --user-password='$ecretPassw0rd' --application-url='http://localhost:30080/' --sample-data=y
 ```
 
 Start the stack
@@ -75,7 +75,7 @@ Also you can start the stack in the background mode
 ./docker-compose-wrapper up -d
 ```
 
-> Application should be available by following link: http://localhost:8000/
+> Application should be available by following link: http://localhost:30080/
 
 Stop the stack
 ```bash

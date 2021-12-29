@@ -5,5 +5,5 @@ volumes:
     driver: local
     driver_opts:
       type: nfs
-      o: addr=host.docker.internal,rw,nolock,hard,nointr,nfsvers=3
+      o: addr=host.docker.internal,rw,noacl,hard,intr,nfsvers=3
       device: ":${PWD}/www"
