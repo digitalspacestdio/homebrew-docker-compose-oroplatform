@@ -15,7 +15,7 @@ services:
     volumes:
       - './mysql/initdb.d:/docker-entrypoint-initdb.d:ro'
       - './mysql/my.cnf:/etc/mysql/conf.d/oro.cnf:ro'
-      - 'mysql-data:/var/lib/mysql'
+      - 'mysql-data:/var/lib/mysql:delegated'
     ports:
       - '${COMPOSE_PROJECT_PORT_MYSQL:-3306}:3306'
     networks:
