@@ -1,0 +1,21 @@
+version: '3.4'
+
+services:
+  mutagen:
+    image: "digitalspacestudio/orophp:${COMPOSE_PROJECT_PHP_VERSION-8.0}"
+    user: linuxbrew
+    volumes:
+      - 'appcode:/var/www'
+    command: sleep infinity
+    working_dir: '/var/www'
+    networks:
+      - 'appnet'
+  cli:
+    depends_on:
+      mutagen:
+        condition: service_started
+
+volumes:
+  appcode:
+    driver: local
+    driver_opts: {}

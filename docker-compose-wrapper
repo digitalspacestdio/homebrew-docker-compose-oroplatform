@@ -3,14 +3,21 @@ set -e
 #set -x
 cd $(dirname $0)
 
-if [[ ! -f .env ]]; then
-  echo "The .env file not found, please create it first."
-  exit 1
+if [[ -f .env ]]; then
+  set -o allexport
+  source .env
+  set +o allexport
 fi
 
-set -o allexport
-source .env
-set +o allexport
+export COMPOSE_PROJECT_MODE=${COMPOSE_PROJECT_MODE-default}
+export COMPOSE_PROJECT_PHP_VERSION=${COMPOSE_PROJECT_PHP_VERSION-7.4}
+export COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME-$(basename $(pwd))}
+export COMPOSE_PROJECT_PORT_HTTP=${COMPOSE_PROJECT_PORT_HTTP-30280}
+export COMPOSE_PROJECT_PORT_XHGUI=${COMPOSE_PROJECT_PORT_XHGUI-30281}
+export COMPOSE_PROJECT_PORT_MYSQL=${COMPOSE_PROJECT_PORT_MYSQL-30206}
+export COMPOSE_PROJECT_PORT_ELASTICSEARCH=${COMPOSE_PROJECT_PORT_ELASTICSEARCH-30292}
+export COMPOSE_PROJECT_PORT_MAIL_WEBGUI=${COMPOSE_PROJECT_PORT_MAIL_WEBGUI-30225}
+export COMPOSE_PROJECT_COMPOSER_AUTH=${COMPOSE_PROJECT_COMPOSER_AUTH-${COMPOSER_AUTH-""}}
 
 DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN-$(which docker-compose)}";
 DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f docker-compose.yml"
@@ -21,14 +28,67 @@ else
   DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f docker-compose-mysql.yml"
 fi
 
-if [[ "$OSTYPE" == "darwin"* ]]; then
-  if ps aux | grep -v 'grep' | grep nfsd > /dev/null 2>&1; then
-    if [[ -f "docker-compose.yml" ]] && [[ -f "docker-compose-macos.yml" ]]; then
-      DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f docker-compose-macos.yml"
+if [[ "$COMPOSE_PROJECT_MODE" == "mutagen" ]]; then
+  if [[ -f "docker-compose-mutagen.yml" ]]; then
+      DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f docker-compose-mutagen.yml"
+  fi
+else
+  if [[ "$OSTYPE" == "darwin"* ]]; then
+    if ps aux | grep -v 'grep' | grep nfsd > /dev/null 2>&1; then
+      if [[ -f "docker-compose.yml" ]] && [[ -f "docker-compose-macos.yml" ]]; then
+        DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f docker-compose-macos.yml"
+      fi
+    else
+      echo "WARNING: nfsd was not started, using bind mounts..."
+    fi
+  fi
+fi
+
+if [[ ! -d www ]]; then
+  mkdir www
+fi
+
+if [[ "$COMPOSE_PROJECT_MODE" == "mutagen" ]]; then
+  WAIT_SYNC=""
+  if docker volume ls | grep "^${COMPOSE_PROJECT_NAME}_appcode$" > /dev/null 2>&1; then
+    if [[ $(docker volume inspect -f '{{ .Options.type }}' ${COMPOSE_PROJECT_NAME}_appcode) == "nfs" ]]; then
+      docker volume rm ${COMPOSE_PROJECT_NAME}_appcode
     fi
   else
-    echo "WARNING: nfsd was not started, using bind mounts..."
+    WAIT_SYNC="1"
   fi
+  if [[ -f "docker-compose-mutagen.yml" ]]; then
+      DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f docker-compose-mutagen.yml"
+  fi
+
+  if [[ $1 != "down" ]]; then
+    if ! ${DOCKER_COMPOSE_BIN} ps -q mutagen > /dev/null 2>&1; then
+      ${DOCKER_COMPOSE_BIN} up -d mutagen
+    fi
+    DOCKER_CONTAINER_NAME_MUTAGEN=$(docker inspect -f '{{.Name}}' $(${DOCKER_COMPOSE_BIN} ps -q mutagen) | cut -c2-)
+    if ! mutagen sync list | grep -i "Name: ${COMPOSE_PROJECT_NAME}-appcode" > /dev/null 2>&1; then
+      mutagen sync create --sync-mode=two-way-resolved --ignore-vcs --symlink-mode=ignore --name=${COMPOSE_PROJECT_NAME}-appcode $(pwd)/www docker://linuxbrew@${DOCKER_CONTAINER_NAME_MUTAGEN}/var/www
+      WAIT_SYNC="1"
+    fi
+
+    if [[ $WAIT_SYNC == "1" ]]; then
+      until mutagen sync list docker-env-magento2-appcode | grep 'Status:' | grep 'Watching for changes' > /dev/null 2>&1; do
+        if which tput > /dev/null 2>&1; then
+          tput cuu 1 && tput el
+        fi
+        mutagen sync list docker-env-magento2-appcode | grep 'Status:' | echo $(awk -F: '{ print $2 }')
+        sleep 1
+      done
+    fi
+  fi
+fi
+
+if [[ $1 == "up" ]]; then
+  printf "\033[0;37m[${COMPOSE_PROJECT_NAME}] Application URL: http://localhost:${COMPOSE_PROJECT_PORT_HTTP}/\033[0m\n"
+  printf "\033[0;37m[${COMPOSE_PROJECT_NAME}] XHGUI URL: http://localhost:${COMPOSE_PROJECT_PORT_XHGUI}/\033[0m\n"
+  printf "\033[0;37m[${COMPOSE_PROJECT_NAME}] Mailhog URL: http://localhost:${COMPOSE_PROJECT_PORT_MAIL_WEBGUI}/\033[0m\n"
+  printf "\033[0;37m[${COMPOSE_PROJECT_NAME}] Elasticsearch URL: http://localhost:${COMPOSE_PROJECT_PORT_ELASTICSEARCH}/\033[0m\n"
+  printf "\033[0;37m[${COMPOSE_PROJECT_NAME}] Mysql address: 127.0.0.1:${COMPOSE_PROJECT_PORT_MYSQL}/\033[0m\n"
 fi
 
 exec ${DOCKER_COMPOSE_BIN} "$@"

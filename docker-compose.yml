@@ -2,30 +2,27 @@ version: '3.4'
 
 services:
   fpm:
-    image: "digitalspacestudio/orophp:${PHP_VERSION-8.0}"
+    image: "digitalspacestudio/orophp:${COMPOSE_PROJECT_PHP_VERSION-8.0}"
     user: root
     volumes:
-      - 'orocommerce-fpm-appcode:/var/www'
-      - 'orocommerce-fpm-npm:/var/www/.npm'
-      - 'orocommerce-fpm-composer:/var/www/.composer'
-      - './fpm/php-fpm.conf:/home/linuxbrew/.linuxbrew/etc/php/${PHP_VERSION-8.0}/php-fpm.conf:ro'
-      - './fpm/php.ini:/home/linuxbrew/.linuxbrew/etc/php/${PHP_VERSION-8.0}/php.ini:ro'
-      - './fpm/prepend.php:/home/linuxbrew/.linuxbrew/etc/php/${PHP_VERSION-8.0}/prepend.php:ro'
+      - 'appcode:/var/www'
+      - 'npm:/home/linuxbrew/.npm'
+      - 'composer:/home/linuxbrew/.composer'
+      - './fpm/php-fpm.conf:/home/linuxbrew/.linuxbrew/etc/php/${COMPOSE_PROJECT_PHP_VERSION-8.0}/php-fpm.conf:ro'
+      - './fpm/php.ini:/home/linuxbrew/.linuxbrew/etc/php/${COMPOSE_PROJECT_PHP_VERSION-8.0}/php.ini:ro'
+      - './fpm/prepend.php:/home/linuxbrew/.linuxbrew/etc/php/${COMPOSE_PROJECT_PHP_VERSION-8.0}/prepend.php:ro'
       - './fpm/msmtprc:/home/linuxbrew/.msmtprc:ro'
       - './fpm/entrypoint.sh:/entrypoint.sh:ro'
     entrypoint: '/entrypoint.sh'
     working_dir: '/var/www'
     networks:
-      - 'orocommerce'
+      - 'appnet'
     environment:
       - 'XHGUI_MONGO_HOSTNAME=mongodb'
       - 'XHGUI_MONGO_DATABASE=xhprof'
-      - 'COMPOSER_HOME=/var/www/.composer'
-      - 'COMPOSER_AUTH=$COMPOSER_AUTH'
+      - 'COMPOSER_AUTH=$COMPOSE_PROJECT_COMPOSER_AUTH'
     env_file:
       - .env
-    networks:
-      - 'orocommerce'
     depends_on:
       database:
         condition: service_healthy
@@ -40,30 +37,29 @@ services:
       interval: 5s
 
   cli:
-    image: "digitalspacestudio/orophp:${PHP_VERSION-8.0}"
+    image: "digitalspacestudio/orophp:${COMPOSE_PROJECT_PHP_VERSION-8.0}"
     user: root
     volumes:
-      - 'orocommerce-fpm-appcode:/var/www'
-      - 'orocommerce-fpm-npm:/var/www/.npm'
-      - 'orocommerce-fpm-composer:/var/www/.composer'
-      - './cli/php.ini:/home/linuxbrew/.linuxbrew/etc/php/${PHP_VERSION-8.0}/php.ini:ro'
-      - './cli/ext-xdebug.ini:/home/linuxbrew/.linuxbrew/etc/php/${PHP_VERSION-8.0}/conf.d/ext-xdebug.ini:ro'
-      - './fpm/prepend.php:/home/linuxbrew/.linuxbrew/etc/php/${PHP_VERSION-8.0}/prepend.php:ro'
+      - 'appcode:/var/www'
+      - 'npm:/home/linuxbrew/.npm'
+      - 'composer:/home/linuxbrew/.composer'
+      - './cli/php.ini:/home/linuxbrew/.linuxbrew/etc/php/${COMPOSE_PROJECT_PHP_VERSION-8.0}/php.ini:ro'
+      - './cli/ext-xdebug.ini:/home/linuxbrew/.linuxbrew/etc/php/${COMPOSE_PROJECT_PHP_VERSION-8.0}/conf.d/ext-xdebug.ini:ro'
+      - './fpm/prepend.php:/home/linuxbrew/.linuxbrew/etc/php/${COMPOSE_PROJECT_PHP_VERSION-8.0}/prepend.php:ro'
       - './fpm/msmtprc:/home/linuxbrew/.msmtprc:ro'
       - './cli/entrypoint.sh:/entrypoint.sh:ro'
     entrypoint: '/entrypoint.sh'
     working_dir: '/var/www'
     networks:
-      - 'orocommerce'
+      - 'appnet'
     environment:
       - 'XHGUI_MONGO_HOSTNAME=mongodb'
       - 'XHGUI_MONGO_DATABASE=xhprof'
-      - 'COMPOSER_HOME=/var/www/.composer'
-      - 'COMPOSER_AUTH=$COMPOSER_AUTH'
+      - 'COMPOSER_AUTH=$COMPOSE_PROJECT_COMPOSER_AUTH'
     env_file:
       - .env
     networks:
-      - 'orocommerce'
+      - 'appnet'
     depends_on:
       database:
         condition: service_healthy
@@ -81,12 +77,12 @@ services:
       - XHGUI_MONGO_HOSTNAME=mongodb
       - XHGUI_MONGO_DATABASE=xhprof
     ports:
-      - "${DOCKER_PORT_XHGUI:-30081}:80"
+      - "${COMPOSE_PROJECT_PORT_XHGUI:-81}:80"
     depends_on:
       mongodb:
         condition: service_healthy
     networks:
-      - 'orocommerce'
+      - 'appnet'
     restart: on-failure:3
     healthcheck:
       test: nc -vz -w 1 localhost 80
@@ -96,9 +92,9 @@ services:
   mail:
     image: "mailhog/mailhog"
     ports:
-      - "${DOCKER_PORT_MAIL_HTTP:-38025}:8025"
+      - "${COMPOSE_PROJECT_PORT_MAIL_WEBGUI:-8025}:8025"
     networks:
-      - 'orocommerce'
+      - 'appnet'
     restart: on-failure:3
     healthcheck:
       test: "nc -vz -w 1 localhost 8025"
@@ -113,10 +109,8 @@ services:
       - MONGO_INITDB_DATABASE=xhprof
     volumes:
       - ./mongo/initdb.d:/docker-entrypoint-initdb.d
-    ports:
-      - "27017"
     networks:
-      - 'orocommerce'
+      - 'appnet'
     restart: on-failure:3
     healthcheck:
       test: mongo --quiet --eval 'db.runCommand("ping").ok' xhgui
@@ -126,14 +120,14 @@ services:
   elasticsearch:
     image: 'docker.elastic.co/elasticsearch/elasticsearch-oss:7.10.2'
     volumes:
-      - "orocommerce-elasticsearch-data:/usr/share/elasticsearch/data"
+      - "elasticsearch-data:/usr/share/elasticsearch/data"
     environment:
       ES_JAVA_OPTS: '${ES_JAVA_OPTS:--Xms256m -Xmx2048m}'
       discovery.type: 'single-node'
     ports:
-      - '9200'
+      - "${COMPOSE_PROJECT_PORT_ELASTICSEARCH:-9200}:9200"
     networks:
-      - 'orocommerce'
+      - 'appnet'
     restart: on-failure:3
     healthcheck:
       test: /bin/bash -c "</dev/tcp/localhost/9200"
@@ -155,13 +149,13 @@ services:
       fpm:
         condition: service_healthy
     ports:
-      - '${DOCKER_PORT_HTTP:-30080}:80'
+      - '${COMPOSE_PROJECT_PORT_HTTP:-80}:80'
     volumes:
       - './www:/var/www:ro'
       - './nginx/nginx.conf:/etc/nginx/nginx.conf:ro'
       - './nginx/pagespeed.conf:/etc/nginx/pagespeed.conf:ro'
     networks:
-      - 'orocommerce'
+      - 'appnet'
     restart: on-failure:3
     healthcheck:
       test: /bin/bash -c "</dev/tcp/localhost/80"
@@ -169,18 +163,18 @@ services:
       interval: 5s
 
 networks:
-  orocommerce:
+  appnet:
 
 volumes:
-  orocommerce-fpm-appcode:
+  appcode:
     driver: local
     driver_opts:
       type: none
       o: bind
       device: "${PWD}/www"
-  orocommerce-fpm-npm:
+  npm:
     driver: local
-  orocommerce-fpm-composer:
+  composer:
     driver: local
-  orocommerce-elasticsearch-data:
+  elasticsearch-data:
     driver: local
