@@ -79,7 +79,7 @@ if [[ $COMPOSE_PROJECT_MODE == "mutagen" ]] && [[ -f "docker-compose-mutagen.yml
           tput cuu 1 && tput el
         fi
         mutagen sync list "${COMPOSE_PROJECT_NAME}-appcode" | grep 'Status:' | echo $(awk -F: '{ print $2 }')
-        sleep 1
+        sleep 3
       done
     fi
   fi
