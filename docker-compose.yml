@@ -137,14 +137,7 @@ services:
 
 
   nginx:
-    image: 'crunchgeek/nginx-pagespeed'
-    environment:
-      NGINX_GEOIP: 'off'
-      NGINX_PAGESPEED: 'on'
-      NGINX_PAGESPEED_IMG: 'on'
-      NGINX_PAGESPEED_JS: 'on'
-      NGINX_PAGESPEED_CSS: 'on'
-      NGINX_PAGESPEED_STORAGE: 'files'
+    image: 'nginx'
     depends_on:
       fpm:
         condition: service_healthy
@@ -153,7 +146,6 @@ services:
     volumes:
       - './www:/var/www:ro'
       - './nginx/nginx.conf:/etc/nginx/nginx.conf:ro'
-      - './nginx/pagespeed.conf:/etc/nginx/pagespeed.conf:ro'
     networks:
       - 'appnet'
     restart: on-failure:3

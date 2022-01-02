@@ -10,11 +10,11 @@ services:
       POSTGRES_DB: '${ORO_DB_NAME}'
     volumes:
       - './pgsql/initdb.d:/docker-entrypoint-initdb.d:ro'
-      - 'orocommerce-postgresql-data:/var/lib/postgresql/data'
+      - 'postgresql-data:/var/lib/postgresql/data'
     ports:
-      - '${DOCKER_DATABASE:-35432}:5432'
+      - '${COMPOSE_PROJECT_PORT_PGSQL:-5432}:5432'
     networks:
-      - 'orocommerce'
+      - 'appnet'
     restart: on-failure:3
     healthcheck:
       test: "pg_isready -U ${ORO_DB_USER}"
@@ -23,5 +23,5 @@ services:
       retries: 5
 
 volumes:
-  orocommerce-postgresql-data:
+  postgresql-data:
     driver: local

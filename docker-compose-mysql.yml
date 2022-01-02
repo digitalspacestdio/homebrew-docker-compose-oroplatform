@@ -15,11 +15,11 @@ services:
     volumes:
       - './mysql/initdb.d:/docker-entrypoint-initdb.d:ro'
       - './mysql/my.cnf:/etc/mysql/conf.d/oro.cnf:ro'
-      - 'orocommerce-mysql-data:/var/lib/mysql'
+      - 'mysql-data:/var/lib/mysql'
     ports:
-      - '${DOCKER_PORT_MYSQL:-33306}:3306'
+      - '${COMPOSE_PROJECT_PORT_MYSQL:-3306}:3306'
     networks:
-      - 'orocommerce'
+      - 'appnet'
     restart: on-failure:3
     healthcheck:
       test: "mysqladmin ping --silent -u$${MYSQL_USER} -p$${MYSQL_PASSWORD}"
@@ -28,5 +28,5 @@ services:
       retries: 5
 
 volumes:
-  orocommerce-mysql-data:
+  mysql-data:
     driver: local

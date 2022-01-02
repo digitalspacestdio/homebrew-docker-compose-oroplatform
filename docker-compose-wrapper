@@ -8,15 +8,16 @@ if [[ -f .env ]]; then
   source .env
   set +o allexport
 fi
-
 export COMPOSE_PROJECT_MODE=${COMPOSE_PROJECT_MODE-default}
 export COMPOSE_PROJECT_PHP_VERSION=${COMPOSE_PROJECT_PHP_VERSION-7.4}
 export COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME-$(basename $(pwd))}
-export COMPOSE_PROJECT_PORT_HTTP=${COMPOSE_PROJECT_PORT_HTTP-30280}
-export COMPOSE_PROJECT_PORT_XHGUI=${COMPOSE_PROJECT_PORT_XHGUI-30281}
-export COMPOSE_PROJECT_PORT_MYSQL=${COMPOSE_PROJECT_PORT_MYSQL-30206}
-export COMPOSE_PROJECT_PORT_ELASTICSEARCH=${COMPOSE_PROJECT_PORT_ELASTICSEARCH-30292}
-export COMPOSE_PROJECT_PORT_MAIL_WEBGUI=${COMPOSE_PROJECT_PORT_MAIL_WEBGUI-30225}
+export COMPOSE_PROJECT_PORT_PREFIX=${COMPOSE_PROJECT_PORT_PREFIX-"301"}
+export COMPOSE_PROJECT_PORT_HTTP=${COMPOSE_PROJECT_PORT_HTTP-"${COMPOSE_PROJECT_PORT_PREFIX}80"}
+export COMPOSE_PROJECT_PORT_XHGUI=${COMPOSE_PROJECT_PORT_XHGUI-"${COMPOSE_PROJECT_PORT_PREFIX}81"}
+export COMPOSE_PROJECT_PORT_MYSQL=${COMPOSE_PROJECT_PORT_MYSQL-"${COMPOSE_PROJECT_PORT_PREFIX}06"}
+export COMPOSE_PROJECT_PORT_PGSQL=${COMPOSE_PROJECT_PORT_PGSQL-"${COMPOSE_PROJECT_PORT_PREFIX}32"}
+export COMPOSE_PROJECT_PORT_ELASTICSEARCH=${COMPOSE_PROJECT_PORT_ELASTICSEARCH-"${COMPOSE_PROJECT_PORT_PREFIX}92"}
+export COMPOSE_PROJECT_PORT_MAIL_WEBGUI=${COMPOSE_PROJECT_PORT_MAIL_WEBGUI-"${COMPOSE_PROJECT_PORT_PREFIX}25"}
 export COMPOSE_PROJECT_COMPOSER_AUTH=${COMPOSE_PROJECT_COMPOSER_AUTH-${COMPOSER_AUTH-""}}
 
 DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN-$(which docker-compose)}";
@@ -48,35 +49,41 @@ if [[ ! -d www ]]; then
   mkdir www
 fi
 
-if [[ "$COMPOSE_PROJECT_MODE" == "mutagen" ]]; then
-  WAIT_SYNC=""
+if [[ $COMPOSE_PROJECT_MODE == "mutagen" ]]; then
+  WAIT_SYNC="1"
   if docker volume ls | grep "^${COMPOSE_PROJECT_NAME}_appcode$" > /dev/null 2>&1; then
     if [[ $(docker volume inspect -f '{{ .Options.type }}' ${COMPOSE_PROJECT_NAME}_appcode) == "nfs" ]]; then
       docker volume rm ${COMPOSE_PROJECT_NAME}_appcode
     fi
-  else
-    WAIT_SYNC="1"
   fi
   if [[ -f "docker-compose-mutagen.yml" ]]; then
-      DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f docker-compose-mutagen.yml"
+    DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f docker-compose-mutagen.yml"
+  else
+    WAIT_SYNC=""
   fi
 
-  if [[ $1 != "down" ]]; then
+  if [[ $1 == "down" ]]; then
+    if mutagen sync list | grep -i "Name: ${COMPOSE_PROJECT_NAME}-appcode" > /dev/null 2>&1; then
+      mutagen sync terminate "${COMPOSE_PROJECT_NAME}-appcode"
+    fi
+    WAIT_SYNC=""
+  else
     if ! ${DOCKER_COMPOSE_BIN} ps -q mutagen > /dev/null 2>&1; then
       ${DOCKER_COMPOSE_BIN} up -d mutagen
     fi
     DOCKER_CONTAINER_NAME_MUTAGEN=$(docker inspect -f '{{.Name}}' $(${DOCKER_COMPOSE_BIN} ps -q mutagen) | cut -c2-)
     if ! mutagen sync list | grep -i "Name: ${COMPOSE_PROJECT_NAME}-appcode" > /dev/null 2>&1; then
       mutagen sync create --sync-mode=two-way-resolved --ignore-vcs --symlink-mode=ignore --name=${COMPOSE_PROJECT_NAME}-appcode $(pwd)/www docker://linuxbrew@${DOCKER_CONTAINER_NAME_MUTAGEN}/var/www
-      WAIT_SYNC="1"
+    else
+      WAIT_SYNC=""
     fi
 
     if [[ $WAIT_SYNC == "1" ]]; then
-      until mutagen sync list docker-env-magento2-appcode | grep 'Status:' | grep 'Watching for changes' > /dev/null 2>&1; do
+      until mutagen sync list "${COMPOSE_PROJECT_NAME}-appcode" | grep 'Status:' | grep 'Watching for changes' > /dev/null 2>&1; do
         if which tput > /dev/null 2>&1; then
           tput cuu 1 && tput el
         fi
-        mutagen sync list docker-env-magento2-appcode | grep 'Status:' | echo $(awk -F: '{ print $2 }')
+        mutagen sync list "${COMPOSE_PROJECT_NAME}-appcode" | grep 'Status:' | echo $(awk -F: '{ print $2 }')
         sleep 1
       done
     fi
@@ -88,7 +95,8 @@ if [[ $1 == "up" ]]; then
   printf "\033[0;37m[${COMPOSE_PROJECT_NAME}] XHGUI URL: http://localhost:${COMPOSE_PROJECT_PORT_XHGUI}/\033[0m\n"
   printf "\033[0;37m[${COMPOSE_PROJECT_NAME}] Mailhog URL: http://localhost:${COMPOSE_PROJECT_PORT_MAIL_WEBGUI}/\033[0m\n"
   printf "\033[0;37m[${COMPOSE_PROJECT_NAME}] Elasticsearch URL: http://localhost:${COMPOSE_PROJECT_PORT_ELASTICSEARCH}/\033[0m\n"
-  printf "\033[0;37m[${COMPOSE_PROJECT_NAME}] Mysql address: 127.0.0.1:${COMPOSE_PROJECT_PORT_MYSQL}/\033[0m\n"
+  printf "\033[0;37m[${COMPOSE_PROJECT_NAME}] MySql Address: 127.0.0.1:${COMPOSE_PROJECT_PORT_MYSQL}\033[0m\n"
+  printf "\033[0;37m[${COMPOSE_PROJECT_NAME}] PgSql Address: 127.0.0.1:${COMPOSE_PROJECT_PORT_PGSQL}\033[0m\n"
 fi
 
 exec ${DOCKER_COMPOSE_BIN} "$@"
