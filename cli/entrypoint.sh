@@ -17,4 +17,4 @@ for i in "$@"; do
     C="$C \"${i//\"/\\\"}\""
 done
 
-HOME=/var/www su -p linuxbrew -- -c "exec $C"
+HOME=/home/linuxbrew su -p linuxbrew -- -c "exec $C"

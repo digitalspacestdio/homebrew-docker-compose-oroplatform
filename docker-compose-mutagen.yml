@@ -3,10 +3,10 @@ version: '3.4'
 services:
   mutagen:
     image: "digitalspacestudio/orophp:${COMPOSE_PROJECT_PHP_VERSION-8.0}"
-    user: linuxbrew
+    user: root
     volumes:
       - 'appcode:/var/www'
-    command: sleep infinity
+    command: "bash -c 'chown linuxbrew:linuxbrew /var/www; sleep infinity'"
     working_dir: '/var/www'
     networks:
       - 'appnet'
