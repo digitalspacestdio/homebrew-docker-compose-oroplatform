@@ -63,7 +63,7 @@ if [[ $COMPOSE_PROJECT_MODE == "mutagen" ]] && [[ -f "docker-compose-mutagen.yml
     fi
     WAIT_SYNC=""
   else
-    if [[ "0" -eq $(${DOCKER_COMPOSE_BIN} ps -q mutagen  2> /dev/null | wc -l > /dev/null) ; then
+    if [[ "0" -eq $(${DOCKER_COMPOSE_BIN} ps -q mutagen  2> /dev/null | wc -l > /dev/null) ]]; then
       ${DOCKER_COMPOSE_BIN} up -d mutagen
     fi
     DOCKER_CONTAINER_NAME_MUTAGEN=$(docker inspect -f '{{.Name}}' $(${DOCKER_COMPOSE_BIN} ps -q mutagen) | cut -c2-)
