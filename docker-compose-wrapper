@@ -49,17 +49,12 @@ if [[ ! -d www ]]; then
   mkdir www
 fi
 
-if [[ $COMPOSE_PROJECT_MODE == "mutagen" ]]; then
+if [[ $COMPOSE_PROJECT_MODE == "mutagen" ]] && [[ -f "docker-compose-mutagen.yml" ]]; then
   WAIT_SYNC="1"
   if docker volume ls | grep "^${COMPOSE_PROJECT_NAME}_appcode$" > /dev/null 2>&1; then
     if [[ $(docker volume inspect -f '{{ .Options.type }}' ${COMPOSE_PROJECT_NAME}_appcode) == "nfs" ]]; then
       docker volume rm ${COMPOSE_PROJECT_NAME}_appcode
     fi
-  fi
-  if [[ -f "docker-compose-mutagen.yml" ]]; then
-    DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f docker-compose-mutagen.yml"
-  else
-    WAIT_SYNC=""
   fi
 
   if [[ $1 == "down" ]]; then
