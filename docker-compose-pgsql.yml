@@ -9,7 +9,7 @@ services:
       POSTGRES_PASSWORD: '${ORO_DB_PASSWORD}'
       POSTGRES_DB: '${ORO_DB_NAME}'
     volumes:
-      - './pgsql/initdb.d:/docker-entrypoint-initdb.d:ro'
+      - '${COMPOSE_PROJECT_CONFIG_DIR:-.}/docker/pgsql/initdb.d:/docker-entrypoint-initdb.d:ro'
       - 'postgresql-data:/var/lib/postgresql/data:delegated'
     ports:
       - '${COMPOSE_PROJECT_PORT_PGSQL:-5432}:5432'

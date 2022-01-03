@@ -13,8 +13,8 @@ services:
       MYSQL_PASSWORD: '${ORO_DB_PASSWORD}'
       MYSQL_DATABASE: '${ORO_DB_NAME}'
     volumes:
-      - './mysql/initdb.d:/docker-entrypoint-initdb.d:ro'
-      - './mysql/my.cnf:/etc/mysql/conf.d/oro.cnf:ro'
+      - '${COMPOSE_PROJECT_CONFIG_DIR:-.}/docker/mysql/initdb.d:/docker-entrypoint-initdb.d:ro'
+      - '${COMPOSE_PROJECT_CONFIG_DIR:-.}/docker/mysql/my.cnf:/etc/mysql/conf.d/oro.cnf:ro'
       - 'mysql-data:/var/lib/mysql:delegated'
     ports:
       - '${COMPOSE_PROJECT_PORT_MYSQL:-3306}:3306'

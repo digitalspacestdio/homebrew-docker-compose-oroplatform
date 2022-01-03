@@ -1,0 +1,11 @@
+version: '3.4'
+
+services:
+  database:
+    image: 'busybox'
+    command: sleep infinity
+    networks:
+      - 'appnet'
+    restart: on-failure:3
+    healthcheck:
+      test: "sh -c 'exit 0'"

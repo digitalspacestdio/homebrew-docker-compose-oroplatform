@@ -1,0 +1,152 @@
+#!/bin/bash
+set -e
+#set -x
+
+DIR=$(dirname $0)
+export PWD=$(pwd)
+
+find-up () {
+  path=${2-$PWD}
+  while [[ "$path" != "" && ! -e "$path/$1" ]]; do
+    path=${path%/*}
+  done
+  echo "$path"
+}
+
+
+if [[ -z $COMPOSE_PROJECT_APPDIR ]]; then
+  export COMPOSE_PROJECT_APPDIR=$(find-up composer.json "$PWD/www")
+fi
+
+if [[ -z $COMPOSE_PROJECT_APPDIR ]]; then
+  if [ -z "$(ls -A $PWD)" ]; then
+    export COMPOSE_PROJECT_APPDIR="$PWD"
+  else
+    echo "Application root folder not found, and current directory is not empty, terminating..."
+    exit 1
+  fi
+fi
+
+if [[ ! -d "$COMPOSE_PROJECT_APPDIR" ]]; then
+  mkdir -p "$COMPOSE_PROJECT_APPDIR"
+fi
+
+cd "$COMPOSE_PROJECT_APPDIR"
+
+if [[ -f .dockenv ]]; then
+  set -o allexport
+  source .dockenv
+  set +o allexport
+fi
+
+if [[ -f .env ]]; then
+  set -o allexport
+  source .env
+  set +o allexport
+fi
+
+export COMPOSE_PROJECT_MODE=${COMPOSE_PROJECT_MODE-default}
+export COMPOSE_PROJECT_PHP_VERSION=${COMPOSE_PROJECT_PHP_VERSION-8.0}
+export COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME-$(basename $(pwd))}
+export COMPOSE_PROJECT_PORT_PREFIX=${COMPOSE_PROJECT_PORT_PREFIX-"301"}
+export COMPOSE_PROJECT_PORT_HTTP=${COMPOSE_PROJECT_PORT_HTTP-"${COMPOSE_PROJECT_PORT_PREFIX}80"}
+export COMPOSE_PROJECT_PORT_XHGUI=${COMPOSE_PROJECT_PORT_XHGUI-"${COMPOSE_PROJECT_PORT_PREFIX}81"}
+export COMPOSE_PROJECT_PORT_MYSQL=${COMPOSE_PROJECT_PORT_MYSQL-"${COMPOSE_PROJECT_PORT_PREFIX}06"}
+export COMPOSE_PROJECT_PORT_PGSQL=${COMPOSE_PROJECT_PORT_PGSQL-"${COMPOSE_PROJECT_PORT_PREFIX}32"}
+export COMPOSE_PROJECT_PORT_ELASTICSEARCH=${COMPOSE_PROJECT_PORT_ELASTICSEARCH-"${COMPOSE_PROJECT_PORT_PREFIX}92"}
+export COMPOSE_PROJECT_PORT_MAIL_WEBGUI=${COMPOSE_PROJECT_PORT_MAIL_WEBGUI-"${COMPOSE_PROJECT_PORT_PREFIX}25"}
+export COMPOSE_PROJECT_COMPOSER_AUTH=${COMPOSE_PROJECT_COMPOSER_AUTH-${COMPOSER_AUTH-""}}
+export COMPOSE_PROJECT_CONFIG_DIR="$HOME/.$(basename $0)/${COMPOSE_PROJECT_NAME}"
+
+export ORO_DB_HOST=${ORO_DB_HOST-database}
+export ORO_DB_PORT=${ORO_DB_PORT-3306}
+export ORO_DB_NAME=${ORO_DB_NAME-application}
+export ORO_DB_USER=${ORO_DB_USER-application}
+export ORO_DB_PASSWORD=${ORO_DB_PASSWORD-application}
+export ORO_MAILER_DRIVER=${ORO_MAILER_DRIVER-smtp}
+export ORO_MAILER_HOST=${ORO_MAILER_HOST-mail}
+export ORO_MAILER_PORT=${ORO_MAILER_PORT-1025}
+export ORO_SECRET=${ORO_SECRET-ThisTokenIsNotSoSecretChangeIt}
+
+
+if [[ ! -d "${COMPOSE_PROJECT_CONFIG_DIR}" ]];then
+    mkdir -p "${COMPOSE_PROJECT_CONFIG_DIR}"
+fi
+
+rsync -r "${DIR}/" "${COMPOSE_PROJECT_CONFIG_DIR}/"
+
+DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN-$(which docker-compose)}";
+if [[ -f "${COMPOSE_PROJECT_CONFIG_DIR}/docker-compose.yml" ]]; then
+  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${COMPOSE_PROJECT_CONFIG_DIR}/docker-compose.yml"
+fi
+
+if [[ -z $ORO_DB_DRIVER ]] && [[ -f "$COMPOSE_PROJECT_APPDIR/config/parameters.yml" ]]; then
+  export ORO_DB_DRIVER=$(echo $(cat "$COMPOSE_PROJECT_APPDIR/config/parameters.yml" | grep 'database_driver:' | awk -F: '{ print $2 }'))
+fi
+
+if [[ $ORO_DB_DRIVER = "pdo_pgsql" ]];then
+  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f docker-compose-pgsql.yml"
+else if [[ $ORO_DB_DRIVER = "pdo_mysql" ]];
+  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f docker-compose-mysql.yml"
+else
+  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f docker-compose-dummy.yml"
+fi
+
+if [[ "$COMPOSE_PROJECT_MODE" == "mutagen" ]]; then
+  if [[ -f "${COMPOSE_PROJECT_CONFIG_DIR}/docker-compose-mutagen.yml" ]]; then
+      DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${COMPOSE_PROJECT_CONFIG_DIR}/docker-compose-mutagen.yml"
+  fi
+else
+  if [[ "$OSTYPE" == "darwin"* ]] && ps aux | grep -v 'grep' | grep nfsd > /dev/null 2>&1; then
+    if [[ -f "${COMPOSE_PROJECT_CONFIG_DIR}/docker-compose-macos.yml" ]]; then
+      DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${COMPOSE_PROJECT_CONFIG_DIR}/docker-compose-macos.yml"
+    fi
+  fi
+fi
+
+if [[ $COMPOSE_PROJECT_MODE == "mutagen" ]] && [[ -f "${COMPOSE_PROJECT_CONFIG_DIR}/docker-compose-mutagen.yml" ]]; then
+  WAIT_SYNC="1"
+  if docker volume ls | grep "^${COMPOSE_PROJECT_NAME}_appcode$" > /dev/null 2>&1; then
+    if [[ $(docker volume inspect -f '{{ .Options.type }}' ${COMPOSE_PROJECT_NAME}_appcode) == "nfs" ]]; then
+      docker volume rm ${COMPOSE_PROJECT_NAME}_appcode
+    fi
+  fi
+  MUTAGEN_SESSION_NAME=$(echo ${COMPOSE_PROJECT_NAME}-appcode | awk '{print tolower($0)}' | sed 's/[^0-9a-z]/-/g')
+  if [[ $1 == "down" ]]; then
+    if mutagen sync list | grep -i "Name: ${MUTAGEN_SESSION_NAME}" > /dev/null 2>&1; then
+      mutagen sync terminate "${MUTAGEN_SESSION_NAME}"
+    fi
+    WAIT_SYNC=""
+  else
+    if [[ "0" -eq $(${DOCKER_COMPOSE_BIN} ps -q mutagen  2> /dev/null | wc -l > /dev/null) ]]; then
+      ${DOCKER_COMPOSE_BIN} up -d mutagen
+    fi
+    DOCKER_CONTAINER_NAME_MUTAGEN=$(docker inspect -f '{{.Name}}' $(${DOCKER_COMPOSE_BIN} ps -q mutagen) | cut -c2-)
+    if ! mutagen sync list | grep -i "Name: ${MUTAGEN_SESSION_NAME}" > /dev/null 2>&1; then
+      mutagen sync create --sync-mode=two-way-resolved --ignore-vcs --symlink-mode=ignore --name=${MUTAGEN_SESSION_NAME} "$COMPOSE_PROJECT_APPDIR" docker://linuxbrew@${DOCKER_CONTAINER_NAME_MUTAGEN}/var/www
+    else
+      WAIT_SYNC=""
+    fi
+
+    if [[ $WAIT_SYNC == "1" ]]; then
+      until mutagen sync list "${MUTAGEN_SESSION_NAME}" | grep 'Status:' | grep 'Watching for changes' > /dev/null 2>&1; do
+        if which tput > /dev/null 2>&1; then
+          tput cuu 1 && tput el
+        fi
+        mutagen sync list "${MUTAGEN_SESSION_NAME}" | grep 'Status:' | echo $(awk -F: '{ print $2 }')
+        sleep 3
+      done
+    fi
+  fi
+fi
+
+if [[ $1 == "up" ]]; then
+  printf "\033[0;37m[${COMPOSE_PROJECT_NAME}] Application URL: http://localhost:${COMPOSE_PROJECT_PORT_HTTP}/\033[0m\n"
+  printf "\033[0;37m[${COMPOSE_PROJECT_NAME}] XHGUI URL: http://localhost:${COMPOSE_PROJECT_PORT_XHGUI}/\033[0m\n"
+  printf "\033[0;37m[${COMPOSE_PROJECT_NAME}] Mailhog URL: http://localhost:${COMPOSE_PROJECT_PORT_MAIL_WEBGUI}/\033[0m\n"
+  printf "\033[0;37m[${COMPOSE_PROJECT_NAME}] Elasticsearch URL: http://localhost:${COMPOSE_PROJECT_PORT_ELASTICSEARCH}/\033[0m\n"
+  printf "\033[0;37m[${COMPOSE_PROJECT_NAME}] MySql Address: 127.0.0.1:${COMPOSE_PROJECT_PORT_MYSQL}\033[0m\n"
+  printf "\033[0;37m[${COMPOSE_PROJECT_NAME}] PgSql Address: 127.0.0.1:${COMPOSE_PROJECT_PORT_PGSQL}\033[0m\n"
+fi
+
+exec ${DOCKER_COMPOSE_BIN} "$@"

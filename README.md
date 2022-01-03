@@ -33,7 +33,7 @@ export PHP_VERSION=7.4
 
 Clone this repo
 ```bash
-git clone git@github.com:digitalspacestdio/docker-env-oroplatform.git
+brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform
 ```
 
 Go to the working dir
@@ -57,42 +57,37 @@ cp .env.dist.pgsql .env
 
 Install dependencies
 ```bash
-./docker-compose-wrapper run --rm cli composer install -o --no-interaction
+docker-compose-oroplatform run --rm cli composer install -o --no-interaction
 ```
 
 Install the application
 ```bash
-./docker-compose-wrapper run --rm cli bin/console --env=prod --timeout=1800 oro:install --language=en --formatting-code=en_US --organization-name='Acme Inc.'  --user-name=admin --user-email=admin@example.com --user-firstname=John --user-lastname=Doe --user-password='$ecretPassw0rd' --application-url='http://localhost:30180/' --sample-data=y
+docker-compose-oroplatform run --rm cli bin/console --env=prod --timeout=1800 oro:install --language=en --formatting-code=en_US --organization-name='Acme Inc.'  --user-name=admin --user-email=admin@example.com --user-firstname=John --user-lastname=Doe --user-password='$ecretPassw0rd' --application-url='http://localhost:30180/' --sample-data=y
 ```
 
 Start the stack
 ```bash
-./docker-compose-wrapper up
+docker-compose-oroplatform up
 ```
 
 Also you can start the stack in the background mode
 ```bash
-./docker-compose-wrapper up -d
+docker-compose-oroplatform up -d
 ```
 
 > Application should be available by following link: http://localhost:30180/
 
 Stop the stack
 ```bash
-./docker-compose-wrapper down
+docker-compose-oroplatform down
 ```
 
 Destroy the whole data
 ```bash
-./docker-compose-wrapper down -v
+docker-compose-oroplatform down -v
 ```
 
 ## Mutagen Integration
-Install the Mutagen
-```bash
-brew install mutagen-io/mutagen/mutagen
-```
-
 
 To use mutagen integration just define environment variable
 ```bash
