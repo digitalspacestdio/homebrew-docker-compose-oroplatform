@@ -12,7 +12,7 @@ class DockerComposeOroplatform < Formula
   def install
     #bin.install "docker-compose-oroplatform"
     libexec.install Dir["*"]
-    bin.write_exec_script libexec/"docker-compose-oroplatform"
+    bin.write_exec_script libexec/"dc-oro"
   end
 
   def caveats
