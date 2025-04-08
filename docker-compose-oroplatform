@@ -1,6 +1,8 @@
 #!/bin/bash
-set -e
-set -x
+set -eu
+if [[ -n $DEBUG ]]; then 
+  set -x
+fi
 
 DIR=$(dirname $0)
 export PWD=$(pwd)
