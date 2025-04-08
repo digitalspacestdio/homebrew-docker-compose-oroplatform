@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-#set -x
+set -x
 
 DIR=$(dirname $0)
 export PWD=$(pwd)
