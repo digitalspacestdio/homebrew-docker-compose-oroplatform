@@ -1,13 +1,11 @@
-version: '3.4'
-
 services:
   fpm:
-    container_name: "${COMPOSE_PROJECT_NAME:-unnamed}_fpm_${COMPOSE_PROJECT_PHP_VERSION:-8.1}-${COMPOSE_PROJECT_NODE_VERSION:-18}-${COMPOSE_PROJECT_COMPOSER_VERSION:-2}"
+    container_name: "${COMPOSE_PROJECT_NAME:-unnamed}_fpm_${COMPOSE_PROJECT_PHP_VERSION:-8.3}-${COMPOSE_PROJECT_NODE_VERSION:-20}-${COMPOSE_PROJECT_COMPOSER_VERSION:-2}"
     build:
       context: "${COMPOSE_PROJECT_CONFIG_DIR:-.}/docker/php-node-symfony"
       args:
-        PHP_VERSION: "${COMPOSE_PROJECT_PHP_VERSION:-8.2}"
-        NODE_VERSION: "${COMPOSE_PROJECT_NODE_VERSION:-18}"
+        PHP_VERSION: "${COMPOSE_PROJECT_PHP_VERSION:-8.3}"
+        NODE_VERSION: "${COMPOSE_PROJECT_NODE_VERSION:-20}"
         PHP_USER_NAME: "${COMPOSE_PROJECT_PHP_USER_NAME:-developer}"
         PHP_USER_GROUP: "${COMPOSE_PROJECT_PHP_USER_GROUP:-developer}"
         PHP_UID: "${COMPOSE_PROJECT_PHP_UID:-1000}"
@@ -62,12 +60,12 @@ services:
         max-size: "10m"
 
   cli:
-    container_name: "${COMPOSE_PROJECT_NAME:-unnamed}_cli_${COMPOSE_PROJECT_PHP_VERSION:-8.1}-${COMPOSE_PROJECT_NODE_VERSION:-18}-${COMPOSE_PROJECT_COMPOSER_VERSION:-2}"
+    container_name: "${COMPOSE_PROJECT_NAME:-unnamed}_cli_${COMPOSE_PROJECT_PHP_VERSION:-8.3}-${COMPOSE_PROJECT_NODE_VERSION:-20}-${COMPOSE_PROJECT_COMPOSER_VERSION:-2}"
     build:
       context: "${COMPOSE_PROJECT_CONFIG_DIR:-.}/docker/php-node-symfony"
       args:
-        PHP_VERSION: "${COMPOSE_PROJECT_PHP_VERSION:-8.2}"
-        NODE_VERSION: "${COMPOSE_PROJECT_NODE_VERSION:-18}"
+        PHP_VERSION: "${COMPOSE_PROJECT_PHP_VERSION:-8.3}"
+        NODE_VERSION: "${COMPOSE_PROJECT_NODE_VERSION:-20}"
         PHP_USER_NAME: "${COMPOSE_PROJECT_PHP_USER_NAME:-developer}"
         PHP_USER_GROUP: "${COMPOSE_PROJECT_PHP_USER_GROUP:-developer}"
         PHP_UID: "${COMPOSE_PROJECT_PHP_UID:-1000}"
@@ -113,13 +111,13 @@ services:
         max-size: "10m"
 
   consumer:
-    container_name: "${COMPOSE_PROJECT_NAME:-unnamed}_consumer_${COMPOSE_PROJECT_PHP_VERSION:-8.2}-${COMPOSE_PROJECT_NODE_VERSION:-18}-${COMPOSE_PROJECT_COMPOSER_VERSION:-2}"
+    container_name: "${COMPOSE_PROJECT_NAME:-unnamed}_consumer_${COMPOSE_PROJECT_PHP_VERSION:-8.3}-${COMPOSE_PROJECT_NODE_VERSION:-20}-${COMPOSE_PROJECT_COMPOSER_VERSION:-2}"
     profiles: ["consumer"]
     build:
       context: "${COMPOSE_PROJECT_CONFIG_DIR:-.}/docker/php-node-symfony"
       args:
-        PHP_VERSION: "${COMPOSE_PROJECT_PHP_VERSION:-8.2}"
-        NODE_VERSION: "${COMPOSE_PROJECT_NODE_VERSION:-18}"
+        PHP_VERSION: "${COMPOSE_PROJECT_PHP_VERSION:-8.3}"
+        NODE_VERSION: "${COMPOSE_PROJECT_NODE_VERSION:-20}"
         PHP_USER_NAME: "${COMPOSE_PROJECT_PHP_USER_NAME:-developer}"
         PHP_USER_GROUP: "${COMPOSE_PROJECT_PHP_USER_GROUP:-developer}"
         PHP_UID: "${COMPOSE_PROJECT_PHP_UID:-1000}"
@@ -167,12 +165,12 @@ services:
         max-size: "10m"
 
   websocket:
-    container_name: "${COMPOSE_PROJECT_NAME:-unnamed}_websocket_${COMPOSE_PROJECT_PHP_VERSION:-8.1}-${COMPOSE_PROJECT_NODE_VERSION:-18}-${COMPOSE_PROJECT_COMPOSER_VERSION:-2}"
+    container_name: "${COMPOSE_PROJECT_NAME:-unnamed}_websocket_${COMPOSE_PROJECT_PHP_VERSION:-8.3}-${COMPOSE_PROJECT_NODE_VERSION:-20}-${COMPOSE_PROJECT_COMPOSER_VERSION:-2}"
     build:
       context: "${COMPOSE_PROJECT_CONFIG_DIR:-.}/docker/php-node-symfony"
       args:
-        PHP_VERSION: "${COMPOSE_PROJECT_PHP_VERSION:-8.1}"
-        NODE_VERSION: "${COMPOSE_PROJECT_NODE_VERSION:-18}"
+        PHP_VERSION: "${COMPOSE_PROJECT_PHP_VERSION:-8.3}"
+        NODE_VERSION: "${COMPOSE_PROJECT_NODE_VERSION:-20}"
         PHP_USER_NAME: "${COMPOSE_PROJECT_PHP_USER_NAME:-developer}"
         PHP_USER_GROUP: "${COMPOSE_PROJECT_PHP_USER_GROUP:-developer}"
         PHP_UID: "${COMPOSE_PROJECT_PHP_UID:-1000}"
@@ -231,7 +229,7 @@ services:
       interval: 2s
 
   xhgui:
-    image: "xhgui/xhgui:0.18.1"
+    image: "xhgui/xhgui:0.18.3"
     profiles: ["profiler"]
     volumes:
       - '${COMPOSE_PROJECT_CONFIG_DIR:-.}/docker/xhgui/config:/var/www/xhgui/config'
@@ -317,6 +315,26 @@ services:
     networks:
       - 'appnet'
     restart: always
+    labels:
+      "traefik.enable": "true"
+      "traefik.http.middlewares.compress-${COMPOSE_PROJECT_NAME:-unnamed}.compress": "true"
+      "traefik.http.middlewares.cors-${COMPOSE_PROJECT_NAME:-unnamed}.headers.accessControlAllowCredentials": "true"
+      "traefik.http.middlewares.cors-${COMPOSE_PROJECT_NAME:-unnamed}.headers.accessControlAllowHeaders": "*"
+      "traefik.http.middlewares.cors-${COMPOSE_PROJECT_NAME:-unnamed}.headers.accessControlAllowMethods": "PUT,GET,POST,HEAD,PATCH,DELETE"
+      "traefik.http.middlewares.cors-${COMPOSE_PROJECT_NAME:-unnamed}.headers.accessControlAllowOriginList": "*"
+      "traefik.http.middlewares.resp-headers-${COMPOSE_PROJECT_NAME:-unnamed}.headers.customResponseHeaders.X-Project-Name": "${COMPOSE_PROJECT_NAME:-unnamed}"
+      "traefik.http.routers.${COMPOSE_PROJECT_NAME:-unnamed}_dev.entrypoints": "default"
+      "traefik.http.routers.${COMPOSE_PROJECT_NAME:-unnamed}_dev.middlewares": "compress-${COMPOSE_PROJECT_NAME:-unnamed},cors-${COMPOSE_PROJECT_NAME:-unnamed},resp-headers-${COMPOSE_PROJECT_NAME:-unnamed}"
+      "traefik.http.routers.${COMPOSE_PROJECT_NAME:-unnamed}_dev.rule": "Host(`${COMPOSE_PROJECT_NAME:-unnamed}.docker.local`)"
+      "traefik.http.routers.${COMPOSE_PROJECT_NAME:-unnamed}_dev.service": "${COMPOSE_PROJECT_NAME:-unnamed}"
+      "traefik.http.routers.${COMPOSE_PROJECT_NAME:-unnamed}_dev.tls.domains[0].main": "${COMPOSE_PROJECT_NAME:-unnamed}.docker.local"
+      "traefik.http.routers.${COMPOSE_PROJECT_NAME:-unnamed}_dev_docker.entrypoints": "default"
+      "traefik.http.routers.${COMPOSE_PROJECT_NAME:-unnamed}_dev_docker.middlewares": "xff-${COMPOSE_PROJECT_NAME:-unnamed},compress-${COMPOSE_PROJECT_NAME:-unnamed},cors-${COMPOSE_PROJECT_NAME:-unnamed},headers-${COMPOSE_PROJECT_NAME:-unnamed}"
+      "traefik.http.routers.${COMPOSE_PROJECT_NAME:-unnamed}_dev_docker.rule": "Host(`${COMPOSE_PROJECT_NAME:-unnamed}.docker.local`)"
+      "traefik.http.routers.${COMPOSE_PROJECT_NAME:-unnamed}_dev_docker.service": "${COMPOSE_PROJECT_NAME:-unnamed}"
+      "traefik.http.routers.${COMPOSE_PROJECT_NAME:-unnamed}_dev_docker.tls.domains[0].main": "${COMPOSE_PROJECT_NAME:-unnamed}.docker.local"
+      "traefik.http.services.${COMPOSE_PROJECT_NAME:-unnamed}.loadbalancer.server.port": "80"
+      "traefik.http.services.${COMPOSE_PROJECT_NAME:-unnamed}.loadbalancer.server.scheme": "http"
     healthcheck:
       test: /bin/bash -c "</dev/tcp/localhost/80"
       start_period: 30s

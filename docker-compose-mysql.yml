@@ -1,5 +1,3 @@
-version: '3.4'
-
 services:
   database:
     image: '${COMPOSE_PROJECT_MYSQL_IMAGE:-mysql:8.0-oracle}'
