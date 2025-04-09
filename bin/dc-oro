@@ -76,8 +76,6 @@ fi
 
 rsync -r "${DIR}/compose/" "${DC_ORO_CONFIG_DIR}/"
 
-docker info > /dev/null
-
 DOCKER_BIN="${DOCKER_BIN-$(which docker)}";
 DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN-$(which docker) compose}";
 DOCKER_COMPOSE_VERSION=$($DOCKER_COMPOSE_BIN version | grep '[0-9]\+\.[0-9]\+\.[0-9]\+' -o | awk -F. '{ print $1 }')
@@ -85,7 +83,7 @@ if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose.yml" ]]; then
   DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose.yml"
 fi
 
-if docker system info --format '{{.SecurityOptions}}' | grep "name=rootless" > /dev/null 2>&1; then
+if ${DOCKER_BIN} system info --format '{{.SecurityOptions}}' | grep "name=rootless" > /dev/null 2>&1; then
   # Use root user in the rootless mode
   export DC_ORO_USER_NAME="root"
 else
@@ -113,9 +111,9 @@ if [[ $DC_ORO_MODE == "mutagen" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose
   DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-mutagen.yml"
   MUTAGEN_SESSION_NAME=$(echo ${DC_ORO_NAME}-appcode | awk '{print tolower($0)}' | sed 's/[^0-9a-z]/-/g')
   WAIT_SYNC="1"
-  if docker volume ls | awk '{ print $2 }' | tail +2 | grep "^${DC_ORO_NAME}_appcode$" > /dev/null 2>&1; then
-    if [[ $(docker volume inspect -f '{{ .Options.type }}' ${DC_ORO_NAME}_appcode) == "nfs" ]]; then
-      docker volume rm ${DC_ORO_NAME}_appcode
+  if ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep "^${DC_ORO_NAME}_appcode$" > /dev/null 2>&1; then
+    if [[ $(${DOCKER_BIN} volume inspect -f '{{ .Options.type }}' ${DC_ORO_NAME}_appcode) == "nfs" ]]; then
+      ${DOCKER_BIN} volume rm ${DC_ORO_NAME}_appcode
     fi
   fi
 
@@ -128,7 +126,7 @@ if [[ $DC_ORO_MODE == "mutagen" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose
     if [[ "0" -eq $(${DOCKER_COMPOSE_BIN} ps -q mutagen  2> /dev/null | wc -l > /dev/null) ]]; then
       ${DOCKER_COMPOSE_BIN} up -d mutagen
     fi
-    DOCKER_CONTAINER_NAME_MUTAGEN=$(docker inspect -f '{{.Name}}' $(${DOCKER_COMPOSE_BIN} ps -q mutagen) | cut -c2-)
+    DOCKER_CONTAINER_NAME_MUTAGEN=$(${DOCKER_BIN} inspect -f '{{.Name}}' $(${DOCKER_COMPOSE_BIN} ps -q mutagen) | cut -c2-)
     if ! mutagen sync list | grep -i "Name: ${MUTAGEN_SESSION_NAME}" > /dev/null 2>&1; then
       mutagen sync create --sync-mode=two-way-resolved \
       --scan-mode=accelerated \
@@ -161,7 +159,7 @@ if [[ $DC_ORO_MODE == "mutagen" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose
 fi
 
 if [[ $DC_ORO_MODE == "ssh" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-ssh.yml" ]]; then
-  ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' || {
+  ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1; || {
     ${DOCKER_BIN} volume create "${DC_ORO_NAME}_appcode"
   }
   DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-ssh.yml"
@@ -181,7 +179,7 @@ if [[ $ORO_DB_DRIVER == "pdo_pgsql" ]] || [[ $ORO_DB_DRIVER == "pdo_mysql" ]] ||
   fi
   if ${DOCKER_COMPOSE_BIN} ps --services | grep database > /dev/null; then
     SERVICE_DATABASE_ID=$(${DOCKER_COMPOSE_BIN} ps -q database)
-    if [[ "" != $SERVICE_DATABASE_ID ]] && docker inspect -f '{{ .Config.Image }}' "$SERVICE_DATABASE_ID" | grep 'busybox'; then
+    if [[ "" != $SERVICE_DATABASE_ID ]] && ${DOCKER_BIN} inspect -f '{{ .Config.Image }}' "$SERVICE_DATABASE_ID" | grep 'busybox'; then
       ${DOCKER_COMPOSE_BIN} stop database
       ${DOCKER_COMPOSE_BIN} rm -f database
     fi
@@ -191,7 +189,7 @@ else
 fi
 
 if [[ -f "$DC_ORO_APPDIR/.docker-compose.user.yml" ]]; then
-  >&2 echo "==> Additional docker compose config will be used: $DC_ORO_APPDIR/.docker-compose.user.yml"
+  >&2 echo "==> Additional ${DOCKER_BIN} compose config will be used: $DC_ORO_APPDIR/.docker-compose.user.yml"
   DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f $DC_ORO_APPDIR/.docker-compose.user.yml"
 fi
 
@@ -216,7 +214,7 @@ else
   DOCKER_COMPOSE_RUN_CMD="${DOCKER_COMPOSE_BIN} run --rm"
 fi
 
-if docker system info --format '{{.SecurityOptions}}' | grep "name=rootless" > /dev/null; then
+if ${DOCKER_BIN} system info --format '{{.SecurityOptions}}' | grep "name=rootless" > /dev/null; then
   DOCKER_COMPOSE_RUN_CMD="${DOCKER_COMPOSE_RUN_CMD} --user root"
 fi
 
