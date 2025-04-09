@@ -34,7 +34,9 @@ ARG EXT_MONGODB_VERSION=1.14.0
 ARG EXT_XDEBUG_VERSION=3.4.2
 
 # persistent / runtime deps
-RUN apk add --no-cache \
+RUN echo http://dl-2.alpinelinux.org/alpine/edge/main >> /etc/apk/repositories \
+    && echo http://dl-2.alpinelinux.org/alpine/edge/community >> /etc/apk/repositories \
+    apk add --no-cache \
     acl \
     fcgi \
     file \
@@ -50,6 +52,8 @@ RUN apk add --no-cache \
     optipng \
     gifsicle \
     libstdc++ \
+    shadow \
+    rsync \
   ;
 
 RUN set -eux; \
@@ -178,11 +182,6 @@ ENV XDEBUG_MODE=off
 ENV COMPOSER_ALLOW_SUPERUSER=1
 ENV PATH="${PATH}:/root/.composer/vendor/bin"
 COPY --from=composer_app /usr/bin/composer /usr/bin/composer
-
-# Install shadow
-RUN echo http://dl-2.alpinelinux.org/alpine/edge/main >> /etc/apk/repositories \
-    && echo http://dl-2.alpinelinux.org/alpine/edge/community >> /etc/apk/repositories \
-    && apk --no-cache add shadow
 
 # Install Symfony cli
 RUN curl -1sLf 'https://dl.cloudsmith.io/public/symfony/stable/setup.alpine.sh' | bash \
