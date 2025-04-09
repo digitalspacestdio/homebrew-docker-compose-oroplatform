@@ -17,6 +17,7 @@ if [[ -n $ORO_SSH_PUBLIC_KEY ]]; then
 		mkdir -p ${PHP_USER_HOME}/.ssh
 		echo "${ORO_SSH_PUBLIC_KEY}" > ${PHP_USER_HOME}/.ssh/authorized_keys
 		chmod -R 0600 ${PHP_USER_HOME}/.ssh
+		chown -R $PHP_USER_NAME ${PHP_USER_HOME}
 		usermod -s /bin/bash $PHP_USER_NAME
 	fi
 fi
