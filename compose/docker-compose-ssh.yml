@@ -44,13 +44,6 @@ services:
       - 'SYMFONY_ENV=${SYMFONY_ENV:-dev}'
       - 'XDEBUG_MODE=${XDEBUG_MODE_CLI:-off}'
       - 'ORO_SSH_PUBLIC_KEY=${ORO_SSH_PUBLIC_KEY:-null}'
-    depends_on:
-      database:
-        condition: service_healthy
-      elasticsearch:
-        condition: service_healthy
-      mail:
-        condition: service_healthy
     logging:
       driver: "json-file"
       options:
