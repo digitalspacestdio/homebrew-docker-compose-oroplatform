@@ -11,7 +11,7 @@ class DockerComposeOroplatform < Formula
 
   def install
     libexec.install "bin/dc-oro"
-    bin.write_exec_script libexec/"bin/dc-oro"
+    bin.write_exec_script libexec/"dc-oro"
 
     pkgshare.install "compose"
   end
