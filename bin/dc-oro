@@ -104,44 +104,6 @@ if [[ -z $ORO_DB_DRIVER ]] && [[ -f "$DC_ORO_APPDIR/.env-app" ]]; then
   export ORO_DB_DRIVER=$(cat "$DC_ORO_APPDIR/.env-app" | grep 'ORO_DB_URL=' | awk -F= '{ print $2 }' | awk -F: '{ print $1 }')
 fi
 
-if [[ $ORO_DB_DRIVER == "pdo_pgsql" ]] || [[ $ORO_DB_DRIVER == "pdo_mysql" ]] || [[ $ORO_DB_DRIVER == "postgres" ]] || [[ $ORO_DB_DRIVER == "mysql" ]] ;then
-  if [[ $ORO_DB_DRIVER == "pdo_pgsql" ]] || [[ $ORO_DB_DRIVER == "postgres" ]];then
-    export DC_ORO_DATABASE_PORT=${DC_ORO_DATABASE_PORT:-5432}
-    DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-pgsql.yml"
-  elif [[ $ORO_DB_DRIVER == "pdo_mysql" ]] || [[ $ORO_DB_DRIVER == "mysql" ]];then
-    export DC_ORO_DATABASE_PORT=${DC_ORO_DATABASE_PORT:-3306}
-    DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-mysql.yml"
-  fi
-  if ${DOCKER_COMPOSE_BIN} ps --services | grep database > /dev/null; then
-    SERVICE_DATABASE_ID=$(${DOCKER_COMPOSE_BIN} ps -q database)
-    if [[ "" != $SERVICE_DATABASE_ID ]] && docker inspect -f '{{ .Config.Image }}' "$SERVICE_DATABASE_ID" | grep 'busybox'; then
-      ${DOCKER_COMPOSE_BIN} stop database
-      ${DOCKER_COMPOSE_BIN} rm -f database
-    fi
-  fi
-else
-  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-dummy.yml"
-fi
-
-if [[ -f "$DC_ORO_APPDIR/.docker-compose.user.yml" ]]; then
-  >&2 echo "==> Additional docker compose config will be used: $DC_ORO_APPDIR/.docker-compose.user.yml"
-  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f $DC_ORO_APPDIR/.docker-compose.user.yml"
-fi
-
-if [[ -f "$DC_ORO_APPDIR/.php-version" ]] && [[ -z $DC_ORO_PHP_VERSION ]]; then
-  export DC_ORO_PHP_VERSION=$(cat $DC_ORO_APPDIR/.php-version | head -n1)
-  >&2 echo "==> Found .php-version with following version: $DC_ORO_PHP_VERSION"
-fi
-
-if [[ -f "$DC_ORO_APPDIR/.phprc" ]] && [[ -z $DC_ORO_PHP_VERSION ]]; then
-  export DC_ORO_PHP_VERSION=$(cat $DC_ORO_APPDIR/.phprc | head -n1)
-  >&2 echo "==> Found .phprc with following version: $DC_ORO_PHP_VERSION"
-fi
-
-if [[ -f "$DC_ORO_APPDIR/.nvmrc" ]] && [[ -z $DC_ORO_NODE_VERSION ]]; then
-  export DC_ORO_NODE_VERSION=$(cat $DC_ORO_APPDIR/.nvmrc | head -n1)
-  >&2 echo "==> Found .nvmrc with following version: $DC_ORO_NODE_VERSION"
-fi
 
 if [[ -x $DC_ORO_MODE ]] && [[ "$OSTYPE" == "darwin"* ]]; then
   export DC_ORO_MODE="mutagen"
@@ -207,6 +169,45 @@ fi
 
 if [[ $DC_ORO_MODE == "default" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-default.yml" ]]; then
   DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-default.yml"
+fi
+
+if [[ $ORO_DB_DRIVER == "pdo_pgsql" ]] || [[ $ORO_DB_DRIVER == "pdo_mysql" ]] || [[ $ORO_DB_DRIVER == "postgres" ]] || [[ $ORO_DB_DRIVER == "mysql" ]] ;then
+  if [[ $ORO_DB_DRIVER == "pdo_pgsql" ]] || [[ $ORO_DB_DRIVER == "postgres" ]];then
+    export DC_ORO_DATABASE_PORT=${DC_ORO_DATABASE_PORT:-5432}
+    DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-pgsql.yml"
+  elif [[ $ORO_DB_DRIVER == "pdo_mysql" ]] || [[ $ORO_DB_DRIVER == "mysql" ]];then
+    export DC_ORO_DATABASE_PORT=${DC_ORO_DATABASE_PORT:-3306}
+    DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-mysql.yml"
+  fi
+  if ${DOCKER_COMPOSE_BIN} ps --services | grep database > /dev/null; then
+    SERVICE_DATABASE_ID=$(${DOCKER_COMPOSE_BIN} ps -q database)
+    if [[ "" != $SERVICE_DATABASE_ID ]] && docker inspect -f '{{ .Config.Image }}' "$SERVICE_DATABASE_ID" | grep 'busybox'; then
+      ${DOCKER_COMPOSE_BIN} stop database
+      ${DOCKER_COMPOSE_BIN} rm -f database
+    fi
+  fi
+else
+  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-dummy.yml"
+fi
+
+if [[ -f "$DC_ORO_APPDIR/.docker-compose.user.yml" ]]; then
+  >&2 echo "==> Additional docker compose config will be used: $DC_ORO_APPDIR/.docker-compose.user.yml"
+  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f $DC_ORO_APPDIR/.docker-compose.user.yml"
+fi
+
+if [[ -f "$DC_ORO_APPDIR/.php-version" ]] && [[ -z $DC_ORO_PHP_VERSION ]]; then
+  export DC_ORO_PHP_VERSION=$(cat $DC_ORO_APPDIR/.php-version | head -n1)
+  >&2 echo "==> Found .php-version with following version: $DC_ORO_PHP_VERSION"
+fi
+
+if [[ -f "$DC_ORO_APPDIR/.phprc" ]] && [[ -z $DC_ORO_PHP_VERSION ]]; then
+  export DC_ORO_PHP_VERSION=$(cat $DC_ORO_APPDIR/.phprc | head -n1)
+  >&2 echo "==> Found .phprc with following version: $DC_ORO_PHP_VERSION"
+fi
+
+if [[ -f "$DC_ORO_APPDIR/.nvmrc" ]] && [[ -z $DC_ORO_NODE_VERSION ]]; then
+  export DC_ORO_NODE_VERSION=$(cat $DC_ORO_APPDIR/.nvmrc | head -n1)
+  >&2 echo "==> Found .nvmrc with following version: $DC_ORO_NODE_VERSION"
 fi
 
 if [[ $DOCKER_COMPOSE_VERSION -gt 1 ]]; then
