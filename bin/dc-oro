@@ -166,8 +166,11 @@ if [[ ${DC_ORO_MODE} == "ssh" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-s
     ${DOCKER_BIN} volume create "${DC_ORO_NAME}_appcode"  > /dev/null
     ${DOCKER_COMPOSE_BIN} up -d ssh
     SSH_HOST=$(docker inspect $(${DOCKER_COMPOSE_BIN} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Networks | to_entries[0].value.IPAddress')
+    sleep 3
+    until ${RSYNC_BIN} --contimeout=3 --info=progress2 -r "${DC_ORO_APPDIR}/" ${DC_ORO_USER_NAME}@${SSH_HOST}:"${DC_ORO_APPDIR}/"; do
+      sleep 5
+    done
     
-    ${RSYNC_BIN} --info=progress2 -r "${DC_ORO_APPDIR}/" ${DC_ORO_USER_NAME}@${SSH_HOST}:"${DC_ORO_APPDIR}/"
   }
 fi
 
