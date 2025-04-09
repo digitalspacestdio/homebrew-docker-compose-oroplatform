@@ -82,7 +82,7 @@ if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose.yml" ]]; then
   DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose.yml"
 fi
 
-${RSYNC_BIN} -r "${DIR}/compose/" "${DC_ORO_CONFIG_DIR}/"
+${RSYNC_BIN} --exclude vendor --exclude node_modules -r "${DIR}/compose/" "${DC_ORO_CONFIG_DIR}/"
 
 if ${DOCKER_BIN} system info --format '{{.SecurityOptions}}' | grep "name=rootless" > /dev/null 2>&1; then
   # Use root user in the rootless mode

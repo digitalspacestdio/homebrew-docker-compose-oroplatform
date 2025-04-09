@@ -200,5 +200,5 @@ RUN chown ${PHP_USER_NAME}:${PHP_USER_GROUP} /var/www
 
 WORKDIR ${APP_DIR}
 USER ${PHP_USER_NAME}
-VOLUME ["/home/php" "/root" "${APP_DIR}"]
+VOLUME "/home/${PHP_USER_NAME}" "/root" "${APP_DIR}"
 CMD [ "bash" ]
