@@ -4,7 +4,7 @@ if [[ -n $DEBUG ]]; then
   set -x
 fi
 
-DIR=$(dirname $0)
+DIR=$(brew --prefix)/lib/dc-oro
 export PWD=$(pwd)
 
 find-up () {
@@ -74,7 +74,8 @@ if [[ ! -d "${DC_ORO_CONFIG_DIR}" ]];then
     mkdir -p "${DC_ORO_CONFIG_DIR}"
 fi
 
-rsync -r "${DIR}/" "${DC_ORO_CONFIG_DIR}/"
+rsync -r "${DIR}/compose" "${DC_ORO_CONFIG_DIR}/"
+rsync -r "${DIR}/docker" "${DC_ORO_CONFIG_DIR}/docker"
 
 docker info > /dev/null
 
