@@ -19,6 +19,7 @@ if [[ -n $ORO_SSH_PUBLIC_KEY ]]; then
 		chmod -R 0600 ${PHP_USER_HOME}/.ssh
 		chown -R $PHP_USER_NAME ${PHP_USER_HOME}
 		usermod -s /bin/bash $PHP_USER_NAME
+		echo "${PHP_USER_HOME}:${PHP_USER_HOME}" | sudo chpasswd
 	fi
 fi
 
