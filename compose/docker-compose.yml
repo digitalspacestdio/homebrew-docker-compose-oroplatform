@@ -348,12 +348,6 @@ networks:
   appnet:
 
 volumes:
-  appcode:
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: "${DC_ORO_APPDIR:-$PWD}"
   home-php:
     driver: local
   home-root:
