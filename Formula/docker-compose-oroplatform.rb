@@ -23,8 +23,8 @@ class DockerComposeOroplatform < Formula
     (dc_oro_compose).mkpath
     (dc_oro_docker).mkpath
   
-    cp_r buildpath/"compose", dc_oro_compose
-    cp_r buildpath/"docker", dc_oro_docker
+    cp_r "#{buildpath}/compose", dc_oro_compose
+    cp_r "#{buildpath}/docker", dc_oro_docker
   end
 
   def caveats
