@@ -23,5 +23,5 @@ if [[ -n $ORO_SSH_PUBLIC_KEY ]]; then
 		usermod -p '*' $PHP_USER_NAME
 	fi
 fi
-
+chmod 0777 ${APP_DIR:-/var/www}
 exec /usr/sbin/sshd -D -e
