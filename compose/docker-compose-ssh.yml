@@ -15,7 +15,7 @@ services:
     user: "root"
     command: docker-ssh
     volumes:
-      - "appcode:${DC_ORO_APPDIR:-/var/www}:ro"
+      - "appcode:${DC_ORO_APPDIR:-/var/www}"
       - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
       - "home-root:/root"
       - "ssh-hostkeys:/etc/ssh/hostkeys"
