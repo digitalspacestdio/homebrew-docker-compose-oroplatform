@@ -14,4 +14,4 @@ ENV APP_DIR=${APP_DIR}
 # The -o switch allows reusing an existing user id
 RUN usermod -u $nginx_uid -o www-data && groupmod -g $nginx_gid -o www-data
 ADD nginx.conf /etc/nginx/nginx.conf
-RUN sed -i 's|/var/www|$APP_DIR|g' /etc/nginx/nginx.conf
+RUN sed -i "s|/var/www|$APP_DIR|g" /etc/nginx/nginx.conf

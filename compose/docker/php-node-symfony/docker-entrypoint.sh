@@ -11,4 +11,6 @@ if [ "${1#-}" != "$1" ]; then
 	set -- php-fpm "$@"
 fi
 
+chmod 0777 ${APP_DIR:-/var/www}
+
 exec docker-php-entrypoint "$@"

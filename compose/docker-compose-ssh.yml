@@ -4,6 +4,7 @@ services:
     build:
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony"
       args:
+        APP_DIR: "${DC_ORO_APPDIR:-/var/www}"
         PHP_VERSION: "${DC_ORO_PHP_VERSION:-8.3}"
         NODE_VERSION: "${DC_ORO_NODE_VERSION:-20}"
         PHP_USER_NAME: "${DC_ORO_PHP_USER_NAME:-developer}"
@@ -14,12 +15,12 @@ services:
     user: "root"
     command: docker-ssh
     volumes:
-      - 'appcode:/var/www:consistent'
-      - 'home-php:/home/php'
-      - 'home-root:/root'
-      - 'ssh-hostkeys:/etc/ssh/hostkeys'
-      - '${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro'
-    working_dir: '/var/www'
+      - appcode:${DC_ORO_APPDIR:-/var/www}:ro
+      - home-php:/home/php
+      - home-root:/root
+      - ssh-hostkeys:/etc/ssh/hostkeys
+      - ${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro
+    working_dir: "${DC_ORO_APPDIR:-/var/www}"
     networks:
       - 'appnet'
     ports:

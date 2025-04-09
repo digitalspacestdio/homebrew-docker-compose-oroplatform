@@ -4,6 +4,7 @@ services:
     build:
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony"
       args:
+        APP_DIR: "${DC_ORO_APPDIR:-/var/www}"
         PHP_VERSION: ${DC_ORO_PHP_VERSION:-8.1}
         NODE_VERSION: ${DC_ORO_NODE_VERSION:-16}
         PHP_USER_NAME: ${DC_ORO_PHP_USER_NAME:-developer}
@@ -12,9 +13,9 @@ services:
         PHP_GID: ${DC_ORO_PHP_GID:-1000}
         COMPOSER_VERSION: "${DC_ORO_COMPOSER_VERSION:-2}"
     volumes:
-      - 'appcode:/var/www:consistent'
-    command: "bash -c 'chmod 0777 /var/www; sleep infinity'"
-    working_dir: '/var/www'
+      - appcode:${DC_ORO_APPDIR:-/var/www}:consistent
+    command: "sleep infinity'"
+    working_dir: "${DC_ORO_APPDIR:-/var/www}"
     cap_add:
       - SYS_ADMIN
       - DAC_READ_SEARCH
