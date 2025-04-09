@@ -20,4 +20,4 @@ if [[ -n $ORO_SSH_PUBLIC_KEY ]]; then
 	fi
 fi
 
-exec /usr/sbin/sshd -D
+exec /usr/sbin/sshd -D -e
