@@ -143,6 +143,9 @@ RUN chmod +x /usr/local/bin/docker-healthcheck
 COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint
 RUN chmod +x /usr/local/bin/docker-entrypoint
 
+COPY docker-ssh.sh /usr/local/bin/docker-ssh
+RUN chmod +x /usr/local/bin/docker-ssh
+
 ENTRYPOINT ["docker-entrypoint"]
 
 RUN rm -f $PHP_INI_DIR/conf.d/app.prod.ini; \
