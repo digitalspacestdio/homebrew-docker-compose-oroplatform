@@ -16,10 +16,11 @@ if [[ -n $ORO_SSH_PUBLIC_KEY ]]; then
 		PHP_USER_HOME=$(eval echo "~$PHP_USER_NAME")
 		mkdir -p ${PHP_USER_HOME}/.ssh
 		echo "${ORO_SSH_PUBLIC_KEY}" > ${PHP_USER_HOME}/.ssh/authorized_keys
-		chmod -R 0600 ${PHP_USER_HOME}/.ssh
-		chown -R $PHP_USER_NAME ${PHP_USER_HOME}
+		chmod 0700 ${PHP_USER_HOME}/.ssh
+		chmod -R 0600 ${PHP_USER_HOME}/.ssh/*
+		chown -R "${PHP_USER_NAME}" ${PHP_USER_HOME}
 		usermod -s /bin/bash $PHP_USER_NAME
-		# echo "${PHP_USER_HOME}:${PHP_USER_HOME}" | chpasswd
+		usermod -p '*' $PHP_USER_NAME
 	fi
 fi
 
