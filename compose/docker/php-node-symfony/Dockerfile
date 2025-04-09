@@ -182,7 +182,7 @@ COPY --from=composer_app /usr/bin/composer /usr/bin/composer
 # Install shadow
 RUN echo http://dl-2.alpinelinux.org/alpine/edge/main >> /etc/apk/repositories \
     && echo http://dl-2.alpinelinux.org/alpine/edge/community >> /etc/apk/repositories \
-    && apk --no-cache add shadow linux-pam
+    && apk --no-cache add shadow
 
 # Install Symfony cli
 RUN curl -1sLf 'https://dl.cloudsmith.io/public/symfony/stable/setup.alpine.sh' | bash \
@@ -190,7 +190,12 @@ RUN curl -1sLf 'https://dl.cloudsmith.io/public/symfony/stable/setup.alpine.sh' 
 
 COPY msmtprc /.msmtprc
 
-WORKDIR /var/www
+ARG APP_DIR="/var/www"
+ENV APP_DIR=${APP_DIR}
+
+RUN chown ${PHP_USER_NAME}:${PHP_USER_GROUP} /var/www
+
+WORKDIR ${APP_DIR}
 USER ${PHP_USER_NAME}
-VOLUME "/home/php" "/root" '/var/www'
+VOLUME ["/home/php" "/root" "${APP_DIR}"]
 CMD [ "bash" ]

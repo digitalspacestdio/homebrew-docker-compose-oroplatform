@@ -4,6 +4,7 @@ services:
     build:
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony"
       args:
+        APP_DIR: "${DC_ORO_APPDIR:-/var/www}"
         PHP_VERSION: "${DC_ORO_PHP_VERSION:-8.3}"
         NODE_VERSION: "${DC_ORO_NODE_VERSION:-20}"
         PHP_USER_NAME: "${DC_ORO_PHP_USER_NAME:-developer}"
@@ -14,17 +15,18 @@ services:
     user: "${DC_ORO_USER_NAME:-developer}"
     command: php-fpm -R
     volumes:
-      - 'appcode:/var/www:consistent'
-      - 'home-php:/home/php'
-      - 'home-root:/root'
-      - '${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/msmtprc:/home/php/.msmtprc:ro'
-      - '${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro'
-    working_dir: '/var/www'
+      - appcode:${DC_ORO_APPDIR:-/var/www}:consistent
+      - home-php:/home/php
+      - home-root:/root
+      - ${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/msmtprc:/home/php/.msmtprc:ro
+      - ${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro
+    working_dir: "${DC_ORO_APPDIR:-/var/www}"
     networks:
       - 'appnet'
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
+      - 'APP_DIR=${DC_ORO_APPDIR:-/var/www}'
       - 'ORO_DB_HOST=${DC_ORO_DATABASE_HOST:-database}'
       - 'ORO_DB_PORT=${DC_ORO_DATABASE_PORT:-3306}'
       - 'ORO_DB_NAME=${DC_ORO_DATABASE_NAME:-application}'
@@ -62,6 +64,7 @@ services:
     build:
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony"
       args:
+        APP_DIR: "${DC_ORO_APPDIR:-/var/www}"
         PHP_VERSION: "${DC_ORO_PHP_VERSION:-8.3}"
         NODE_VERSION: "${DC_ORO_NODE_VERSION:-20}"
         PHP_USER_NAME: "${DC_ORO_PHP_USER_NAME:-developer}"
@@ -71,11 +74,11 @@ services:
         COMPOSER_VERSION: "${DC_ORO_COMPOSER_VERSION:-2}"
     user: "${DC_ORO_USER_NAME:-developer}"
     volumes:
-      - 'appcode:/var/www:consistent'
-      - 'home-php:/home/php'
-      - 'home-root:/root'
-      - '${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro'
-    working_dir: '/var/www'
+      - appcode:${DC_ORO_APPDIR:-/var/www}:consistent
+      - home-php:/home/php
+      - home-root:/root
+      - ${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro
+    working_dir: "${DC_ORO_APPDIR:-/var/www}"
     networks:
       - 'appnet'
     extra_hosts:
@@ -114,6 +117,7 @@ services:
     build:
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony"
       args:
+        APP_DIR: "${DC_ORO_APPDIR:-/var/www}"
         PHP_VERSION: "${DC_ORO_PHP_VERSION:-8.3}"
         NODE_VERSION: "${DC_ORO_NODE_VERSION:-20}"
         PHP_USER_NAME: "${DC_ORO_PHP_USER_NAME:-developer}"
@@ -124,11 +128,11 @@ services:
     user: "${DC_ORO_USER_NAME:-developer}"
     command: until [ -f bin/console ]; do sleep 1; done; php bin/console oro:message-queue:consume -vv
     volumes:
-      - 'appcode:/var/www:consistent'
+      - appcode:${DC_ORO_APPDIR:-/var/www}:consistent
       - 'home-php:/home/php'
       - 'home-root:/root'
       - '${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro'
-    working_dir: '/var/www'
+    working_dir: "${DC_ORO_APPDIR:-/var/www}"
     networks:
       - 'appnet'
     restart: always
@@ -168,6 +172,7 @@ services:
     build:
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony"
       args:
+        APP_DIR: "${DC_ORO_APPDIR:-/var/www}"
         PHP_VERSION: "${DC_ORO_PHP_VERSION:-8.3}"
         NODE_VERSION: "${DC_ORO_NODE_VERSION:-20}"
         PHP_USER_NAME: "${DC_ORO_PHP_USER_NAME:-developer}"
@@ -178,11 +183,11 @@ services:
     user: "${DC_ORO_USER_NAME:-developer}"
     command: until [ -f bin/console ]; do sleep 1; done; php bin/console gos:websocket:server
     volumes:
-      - 'appcode:/var/www:consistent'
-      - 'home-php:/home/php'
-      - 'home-root:/root'
-      - '${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro'
-    working_dir: '/var/www'
+      - appcode:${DC_ORO_APPDIR:-/var/www}:consistent
+      - home-php:/home/php
+      - home-root:/root
+      - ${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro
+    working_dir: "${DC_ORO_APPDIR:-/var/www}"
     networks:
       - 'appnet'
     restart: always
@@ -301,7 +306,10 @@ services:
 
   nginx:
     image: ${DC_ORO_NAME:-unnamed}_nginx
-    build: "${DC_ORO_CONFIG_DIR:-.}/docker/nginx"
+    build:
+      context: "${DC_ORO_CONFIG_DIR:-.}/docker/nginx"
+      args:
+        APP_DIR: "${DC_ORO_APPDIR:-/var/www}"
     container_name: ${DC_ORO_NAME:-unnamed}_nginx
     depends_on:
       fpm:
@@ -309,11 +317,13 @@ services:
     ports:
       - '${DC_ORO_NGINX_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_PREFIX}80:80'
     volumes:
-      - 'appcode:/var/www:ro'
-      - '${DC_ORO_CONFIG_DIR:-.}/docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro'
+      - appcode:${DC_ORO_APPDIR:-/var/www}:ro
+    working_dir: "${DC_ORO_APPDIR:-/var/www}"
     networks:
       - 'appnet'
     restart: always
+    environment:
+      - 'APP_DIR=${DC_ORO_APPDIR:-/var/www}'
     labels:
       "traefik.enable": "true"
       "traefik.http.middlewares.compress-${DC_ORO_NAME:-unnamed}.compress": "true"
