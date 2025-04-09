@@ -161,16 +161,18 @@ fi
 
 if [[ ${DC_ORO_MODE} == "ssh" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-ssh.yml" ]]; then
   DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-ssh.yml"
-  [[ $1 == "up" ]] && ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
-    >&2 echo "==> Copying source code to the '${DC_ORO_NAME}_appcode' docker valume"
-    ${DOCKER_BIN} volume create "${DC_ORO_NAME}_appcode"  > /dev/null
-    ${DOCKER_COMPOSE_BIN} up -d ssh
-    SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
-    SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
-    sleep 3
-    until ${RSYNC_BIN} -e "ssh -o StrictHostKeyChecking=no -p $SSH_PORT" --timeout=3 --info=progress2 -r "${DC_ORO_APPDIR}/" ${DC_ORO_USER_NAME}@${SSH_HOST}:"${DC_ORO_APPDIR}/"; do
-      sleep 5
-    done
+  ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
+    [[ $1 == "up" ]] && {
+      >&2 echo "==> Copying source code to the '${DC_ORO_NAME}_appcode' docker valume"
+      ${DOCKER_BIN} volume create "${DC_ORO_NAME}_appcode"  > /dev/null
+      ${DOCKER_COMPOSE_BIN} up -d ssh
+      SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
+      SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
+      sleep 3
+      until ${RSYNC_BIN} -e "ssh -o StrictHostKeyChecking=no -p $SSH_PORT" --timeout=3 --info=progress2 -r "${DC_ORO_APPDIR}/" ${DC_ORO_USER_NAME}@${SSH_HOST}:"${DC_ORO_APPDIR}/"; do
+        sleep 5
+      done
+    }
   }
 fi
 
