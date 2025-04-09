@@ -182,7 +182,7 @@ COPY --from=composer_app /usr/bin/composer /usr/bin/composer
 # Install shadow
 RUN echo http://dl-2.alpinelinux.org/alpine/edge/main >> /etc/apk/repositories \
     && echo http://dl-2.alpinelinux.org/alpine/edge/community >> /etc/apk/repositories \
-    && apk --no-cache add shadow
+    && apk --no-cache add shadow pam-config linux-pam
 
 # Install Symfony cli
 RUN curl -1sLf 'https://dl.cloudsmith.io/public/symfony/stable/setup.alpine.sh' | bash \
