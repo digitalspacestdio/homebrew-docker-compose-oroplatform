@@ -11,7 +11,7 @@ services:
         PHP_UID: "${DC_ORO_PHP_UID:-1000}"
         PHP_GID: "${DC_ORO_PHP_GID:-1000}"
         COMPOSER_VERSION: "${DC_ORO_COMPOSER_VERSION:-2}"
-    user: "${DC_ORO_USER_NAME:-developer}"
+    user: "root"
     command: docker-ssh
     volumes:
       - 'appcode:/var/www:consistent'
