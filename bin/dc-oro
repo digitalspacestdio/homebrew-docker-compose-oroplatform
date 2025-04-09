@@ -159,10 +159,14 @@ if [[ $DC_ORO_MODE == "mutagen" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose
 fi
 
 if [[ $DC_ORO_MODE == "ssh" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-ssh.yml" ]]; then
-  ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
-    ${DOCKER_BIN} volume create "${DC_ORO_NAME}_appcode"
-  }
   DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-ssh.yml"
+  ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
+    >&2 echo "==> Copying source code to the '${DC_ORO_NAME}_appcode' docker valume"
+    ${DOCKER_BIN} volume create "${DC_ORO_NAME}_appcode"
+    ${DOCKER_COMPOSE_BIN} up -d ssh
+    ${DOCKER_COMPOSE_BIN} cp ${DC_ORO_APPDIR} ssh:${DC_ORO_APPDIR}
+    ${DOCKER_COMPOSE_BIN} down -v
+  }
 fi
 
 if [[ $DC_ORO_MODE == "default" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-default.yml" ]]; then
