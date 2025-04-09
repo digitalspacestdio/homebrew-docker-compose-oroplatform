@@ -11,21 +11,23 @@ class DockerComposeOroplatform < Formula
 
   def install
     bin.write_exec_script libexec/"dc-oro"
+
+    pkgshare.install "compose"
   end
 
-  def post_install
-    dc_oro_compose = var/"lib/dc-oro/compose"
-    dc_oro_docker = var/"lib/dc-oro/docker"
+  # def post_install
+  #   dc_oro_compose = var/"lib/dc-oro/compose"
+  #   dc_oro_docker = var/"lib/dc-oro/docker"
     
-    rm_rf dc_oro_compose if dc_oro_compose.exist?
-    rm_rf dc_oro_docker if dc_oro_docker.exist?
+  #   rm_rf dc_oro_compose if dc_oro_compose.exist?
+  #   rm_rf dc_oro_docker if dc_oro_docker.exist?
   
-    (dc_oro_compose).mkpath
-    (dc_oro_docker).mkpath
+  #   (dc_oro_compose).mkpath
+  #   (dc_oro_docker).mkpath
   
-    cp_r "#{buildpath}/compose", dc_oro_compose
-    cp_r "#{buildpath}/docker", dc_oro_docker
-  end
+  #   cp_r "#{buildpath}/compose", dc_oro_compose
+  #   cp_r "#{buildpath}/docker", dc_oro_docker
+  # end
 
   def caveats
     s = <<~EOS

@@ -74,8 +74,7 @@ if [[ ! -d "${DC_ORO_CONFIG_DIR}" ]];then
     mkdir -p "${DC_ORO_CONFIG_DIR}"
 fi
 
-rsync -r "${DIR}/compose" "${DC_ORO_CONFIG_DIR}/"
-rsync -r "${DIR}/docker" "${DC_ORO_CONFIG_DIR}/docker"
+rsync -r "${DIR}/compose/" "${DC_ORO_CONFIG_DIR}/"
 
 docker info > /dev/null
 
