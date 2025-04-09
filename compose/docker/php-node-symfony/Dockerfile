@@ -34,8 +34,8 @@ ARG EXT_MONGODB_VERSION=1.14.0
 ARG EXT_XDEBUG_VERSION=3.4.2
 
 # persistent / runtime deps
-RUN echo http://dl-2.alpinelinux.org/alpine/edge/main >> /etc/apk/repositories \
-    && echo http://dl-2.alpinelinux.org/alpine/edge/community >> /etc/apk/repositories \
+RUN echo http://dl-2.alpinelinux.org/alpine/edge/main >> /etc/apk/repositories; \
+    echo http://dl-2.alpinelinux.org/alpine/edge/community >> /etc/apk/repositories; \
     apk add --no-cache \
     acl \
     fcgi \
