@@ -12,11 +12,19 @@ services:
         PHP_GID: "${DC_ORO_PHP_GID:-1000}"
         COMPOSER_VERSION: "${DC_ORO_COMPOSER_VERSION:-2}"
     user: "${DC_ORO_USER_NAME:-developer}"
-    command: /usr/sbin/sshd
+    command: |
+      [ -f /etc/ssh/hostkeys/ssh_host_rsa_key ] || ssh-keygen -t rsa -f /etc/ssh/hostkeys/ssh_host_rsa_key -N ''; \
+      [ -f /etc/ssh/hostkeys/ssh_host_ecdsa_key ] || ssh-keygen -t ecdsa -f /etc/ssh/hostkeys/ssh_host_ecdsa_key -N ''; \
+      [ -f /etc/ssh/hostkeys/ssh_host_ed25519_key ] || ssh-keygen -t ed25519 -f /etc/ssh/hostkeys/ssh_host_ed25519_key -N ''; \
+      sed -i 's|^HostKey .*rsa.*|HostKey /etc/ssh/hostkeys/ssh_host_rsa_key|' /etc/ssh/sshd_config; \
+      sed -i 's|^HostKey .*ecdsa.*|HostKey /etc/ssh/hostkeys/ssh_host_ecdsa_key|' /etc/ssh/sshd_config; \
+      sed -i 's|^HostKey .*ed25519.*|HostKey /etc/ssh/hostkeys/ssh_host_ed25519_key|' /etc/ssh/sshd_config; \
+      exec /usr/sbin/sshd
     volumes:
       - 'appcode:/var/www:consistent'
       - 'home-php:/home/php'
       - 'home-root:/root'
+      - 'ssh-hostkeys:/etc/ssh/hostkeys'
       - '${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro'
     working_dir: '/var/www'
     networks:
@@ -56,3 +64,5 @@ volumes:
   appcode:
     external: true
     name: ${DC_ORO_NAME:-unnamed}_appcode
+  ssh-hostkeys:
+    driver: local
