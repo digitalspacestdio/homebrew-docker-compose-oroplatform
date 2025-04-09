@@ -1,8 +1,8 @@
 #!/bin/bash
-set -eu
 if [[ -n $DEBUG ]]; then 
   set -x
 fi
+set -eu
 
 DIR=$(brew --prefix docker-compose-oroplatform)/share/docker-compose-oroplatform
 export PWD=$(pwd)
