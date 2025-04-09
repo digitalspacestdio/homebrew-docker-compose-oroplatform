@@ -12,7 +12,7 @@ services:
         PHP_GID: "${DC_ORO_PHP_GID:-1000}"
         COMPOSER_VERSION: "${DC_ORO_COMPOSER_VERSION:-2}"
     user: "${DC_ORO_USER_NAME:-developer}"
-    command: sshd
+    command: /usr/sbin/sshd
     volumes:
       - 'appcode:/var/www:consistent'
       - 'home-php:/home/php'

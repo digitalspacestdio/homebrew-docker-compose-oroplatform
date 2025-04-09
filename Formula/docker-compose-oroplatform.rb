@@ -3,7 +3,7 @@ require 'formula'
 class DockerComposeOroplatform < Formula
   url "https://github.com/digitalspacestdio/homebrew-docker-compose-oroplatform.git", :using => :git
   version "0.6.0"
-  revision 11
+  revision 12
 
   depends_on 'coreutils'
   depends_on 'rsync'
