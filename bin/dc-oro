@@ -164,7 +164,10 @@ if [[ ${DC_ORO_MODE} == "ssh" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-s
     >&2 echo "==> Copying source code to the '${DC_ORO_NAME}_appcode' docker valume"
     ${DOCKER_BIN} volume create "${DC_ORO_NAME}_appcode"
     ${DOCKER_COMPOSE_BIN} up -d ssh
-    ${DOCKER_COMPOSE_BIN} cp ${DC_ORO_APPDIR} ssh:${DC_ORO_APPDIR}
+    # ${DOCKER_COMPOSE_BIN} cp ${DC_ORO_APPDIR} ssh:${DC_ORO_APPDIR}
+    SSH_HOST=$(docker inspect $(${DOCKER_COMPOSE_BIN} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Networks | to_entries[0].value.IPAddress')
+    rsync -r "${DC_ORO_APPDIR}/" ${DC_ORO_USER_NAME}@${SSH_HOST}:"${DC_ORO_APPDIR}/"
+
     ${DOCKER_COMPOSE_BIN} down -v
   }
 fi
