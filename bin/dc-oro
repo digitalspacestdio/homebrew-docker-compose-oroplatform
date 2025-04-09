@@ -168,10 +168,9 @@ if [[ ${DC_ORO_MODE} == "ssh" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-s
     SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
     SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
     sleep 3
-    until ${RSYNC_BIN} -e "ssh -p $SSH_PORT" --timeout=3 --info=progress2 -r "${DC_ORO_APPDIR}/" ${DC_ORO_USER_NAME}@${SSH_HOST}:"${DC_ORO_APPDIR}/"; do
+    until ${RSYNC_BIN} -e "ssh -o StrictHostKeyChecking=no -p $SSH_PORT" --timeout=3 --info=progress2 -r "${DC_ORO_APPDIR}/" ${DC_ORO_USER_NAME}@${SSH_HOST}:"${DC_ORO_APPDIR}/"; do
       sleep 5
     done
-    
   }
 fi
 
