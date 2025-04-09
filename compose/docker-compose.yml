@@ -166,6 +166,7 @@ services:
 
   websocket:
     container_name: "${DC_ORO_NAME:-unnamed}_websocket_${DC_ORO_PHP_VERSION:-8.3}-${DC_ORO_NODE_VERSION:-20}-${DC_ORO_COMPOSER_VERSION:-2}"
+    profiles: ["websocket"]
     build:
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony"
       args:
@@ -230,7 +231,7 @@ services:
 
   xhgui:
     image: "xhgui/xhgui:0.18.3"
-    profiles: ["profiler"]
+    profiles: ["xhprof"]
     volumes:
       - '${DC_ORO_CONFIG_DIR:-.}/docker/xhgui/config:/var/www/xhgui/config'
       - '${DC_ORO_CONFIG_DIR:-.}/docker/xhgui/nginx.conf:/etc/nginx/conf.d/default.conf:ro'
@@ -257,7 +258,7 @@ services:
   mongodb:
     image: percona/percona-server-mongodb:4.4
     container_name: ${DC_ORO_NAME:-unnamed}_mongodb
-    profiles: ["profiler"]
+    profiles: ["xhprof"]
     # (case sensitive) engine: mmapv1, rocksdb, wiredTiger, inMemory
     command: --storageEngine=wiredTiger
     environment:
