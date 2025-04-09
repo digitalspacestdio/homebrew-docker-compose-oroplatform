@@ -78,6 +78,7 @@ rsync -r "${DIR}/compose/" "${DC_ORO_CONFIG_DIR}/"
 
 docker info > /dev/null
 
+DOCKER_BIN="${DOCKER_BIN-$(which docker)}";
 DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN-$(which docker) compose}";
 DOCKER_COMPOSE_VERSION=$($DOCKER_COMPOSE_BIN version | grep '[0-9]\+\.[0-9]\+\.[0-9]\+' -o | awk -F. '{ print $1 }')
 if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose.yml" ]]; then
@@ -194,10 +195,13 @@ if [[ $DC_ORO_MODE == "mutagen" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose
         sleep 3
       done
     fi
-  fiz
+  fi
 fi
 
 if [[ $DC_ORO_MODE == "ssh" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-ssh.yml" ]]; then
+  ${DOCKER_BIN} volume ls | grep '^'${DC_ORO_NAME}'_appcode$' || {
+    ${DOCKER_BIN} volume create "${DC_ORO_NAME}'_appcode"
+  }
   DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-ssh.yml"
 fi
 
