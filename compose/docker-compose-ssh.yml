@@ -24,7 +24,7 @@ services:
     networks:
       - 'appnet'
     ports:
-      - "${DC_ORO_MAIL_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_PREFIX}22:22"
+      - "${DC_ORO_SSH_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_PREFIX}22:22"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
