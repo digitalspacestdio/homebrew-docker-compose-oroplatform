@@ -55,3 +55,4 @@ services:
 volumes:
   appcode:
     external: true
+    name: ${DC_ORO_NAME:-unnamed}_appcode
