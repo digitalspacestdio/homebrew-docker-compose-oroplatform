@@ -40,6 +40,7 @@ services:
       - 'NODE_OPTIONS="--max-old-space-size=1024"'
       - 'SYMFONY_ENV=${SYMFONY_ENV:-dev}'
       - 'XDEBUG_MODE=${XDEBUG_MODE_CLI:-off}'
+      - 'ORO_SSH_PUBLIC_KEY=${ORO_SSH_PUBLIC_KEY:-null}'
     depends_on:
       database:
         condition: service_healthy
