@@ -15,11 +15,11 @@ services:
     user: "${DC_ORO_USER_NAME:-developer}"
     command: php-fpm -R
     volumes:
-      - appcode:${DC_ORO_APPDIR:-/var/www}:consistent
-      - home-php:/home/php
-      - home-root:/root
-      - ${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/msmtprc:/home/php/.msmtprc:ro
-      - ${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro
+      - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
+      - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
+      - "home-root:/root"
+      - "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/msmtprc:/home/php/.msmtprc:ro"
+      - "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     networks:
       - 'appnet'
@@ -74,10 +74,10 @@ services:
         COMPOSER_VERSION: "${DC_ORO_COMPOSER_VERSION:-2}"
     user: "${DC_ORO_USER_NAME:-developer}"
     volumes:
-      - appcode:${DC_ORO_APPDIR:-/var/www}:consistent
-      - home-php:/home/php
-      - home-root:/root
-      - ${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro
+      - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
+      - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
+      - "home-root:/root"
+      - "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     networks:
       - 'appnet'
@@ -128,10 +128,10 @@ services:
     user: "${DC_ORO_USER_NAME:-developer}"
     command: until [ -f bin/console ]; do sleep 1; done; php bin/console oro:message-queue:consume -vv
     volumes:
-      - appcode:${DC_ORO_APPDIR:-/var/www}:consistent
-      - 'home-php:/home/php'
-      - 'home-root:/root'
-      - '${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro'
+      - "appcode:${DC_ORO_APPDIR:-/var/www}:consisten"
+      - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
+      - "home-root:/root"
+      - "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     networks:
       - 'appnet'
@@ -183,10 +183,10 @@ services:
     user: "${DC_ORO_USER_NAME:-developer}"
     command: until [ -f bin/console ]; do sleep 1; done; php bin/console gos:websocket:server
     volumes:
-      - appcode:${DC_ORO_APPDIR:-/var/www}:consistent
-      - home-php:/home/php
-      - home-root:/root
-      - ${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro
+      - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
+      - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
+      - "home-root:/root"
+      - "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     networks:
       - 'appnet'
@@ -236,8 +236,8 @@ services:
     image: "xhgui/xhgui:0.18.3"
     profiles: ["xhprof"]
     volumes:
-      - '${DC_ORO_CONFIG_DIR:-.}/docker/xhgui/config:/var/www/xhgui/config'
-      - '${DC_ORO_CONFIG_DIR:-.}/docker/xhgui/nginx.conf:/etc/nginx/conf.d/default.conf:ro'
+      - "${DC_ORO_CONFIG_DIR:-.}/docker/xhgui/config:/var/www/xhgui/config"
+      - "${DC_ORO_CONFIG_DIR:-.}/docker/xhgui/nginx.conf:/etc/nginx/conf.d/default.conf:ro"
     environment:
       - XHGUI_MONGO_HOSTNAME=mongodb
       - XHGUI_MONGO_DATABASE=xhprof
@@ -317,7 +317,7 @@ services:
     ports:
       - '${DC_ORO_NGINX_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_PREFIX}80:80'
     volumes:
-      - appcode:${DC_ORO_APPDIR:-/var/www}:ro
+      - "appcode:${DC_ORO_APPDIR:-/var/www}:ro"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     networks:
       - 'appnet'
@@ -357,7 +357,7 @@ networks:
   appnet:
 
 volumes:
-  home-php:
+  home-user:
     driver: local
   home-root:
     driver: local

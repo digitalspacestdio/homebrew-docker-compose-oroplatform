@@ -15,11 +15,11 @@ services:
     user: "root"
     command: docker-ssh
     volumes:
-      - appcode:${DC_ORO_APPDIR:-/var/www}:ro
-      - home-php:/home/php
-      - home-root:/root
-      - ssh-hostkeys:/etc/ssh/hostkeys
-      - ${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro
+      - "appcode:${DC_ORO_APPDIR:-/var/www}:ro"
+      - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
+      - "home-root:/root"
+      - "ssh-hostkeys:/etc/ssh/hostkeys"
+      - "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     networks:
       - 'appnet'
