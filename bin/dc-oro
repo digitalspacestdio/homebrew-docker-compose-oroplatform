@@ -158,7 +158,7 @@ if [[ $DC_ORO_MODE == "mutagen" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose
   fi
 fi
 
-if [[ $DC_ORO_MODE == "ssh" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-ssh.yml" ]]; then
+if [[ ${DC_ORO_MODE} == "ssh" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-ssh.yml" ]]; then
   DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-ssh.yml"
   ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
     >&2 echo "==> Copying source code to the '${DC_ORO_NAME}_appcode' docker valume"
@@ -188,8 +188,8 @@ if [[ $ORO_DB_DRIVER == "pdo_pgsql" ]] || [[ $ORO_DB_DRIVER == "pdo_mysql" ]] ||
       ${DOCKER_COMPOSE_BIN} rm -f database
     fi
   fi
-else
-  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-dummy.yml"
+  #else
+  # DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-dummy.yml"
 fi
 
 if [[ -f "$DC_ORO_APPDIR/.docker-compose.user.yml" ]]; then

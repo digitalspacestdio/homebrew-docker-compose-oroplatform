@@ -1,4 +1,13 @@
 services:
+  database:
+    image: 'busybox'
+    container_name: ${DC_ORO_NAME:-unnamed}_database
+    command: sleep infinity
+    networks:
+      - 'appnet'
+    restart: always
+    healthcheck:
+      test: "sh -c 'exit 0'"
   fpm:
     container_name: "${DC_ORO_NAME:-unnamed}_fpm_${DC_ORO_PHP_VERSION:-8.3}-${DC_ORO_NODE_VERSION:-20}-${DC_ORO_COMPOSER_VERSION:-2}"
     build:
