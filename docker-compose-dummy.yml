@@ -1,7 +1,7 @@
 services:
   database:
     image: 'busybox'
-    container_name: ${COMPOSE_PROJECT_NAME:-unnamed}_database
+    container_name: ${DC_ORO_NAME:-unnamed}_database
     command: sleep infinity
     networks:
       - 'appnet'

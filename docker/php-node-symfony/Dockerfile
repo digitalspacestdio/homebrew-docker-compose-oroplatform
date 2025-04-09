@@ -33,6 +33,7 @@ RUN apk add --no-cache \
     file \
     gettext \
     git \
+    openssh \
     bash \
     curl \
     msmtp-openrc \

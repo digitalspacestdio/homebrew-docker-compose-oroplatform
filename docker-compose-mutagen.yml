@@ -1,16 +1,16 @@
 services:
   mutagen:
-    container_name: "${COMPOSE_PROJECT_NAME:-unnamed}_mutagen_${COMPOSE_PROJECT_PHP_VERSION:-8.1}-${COMPOSE_PROJECT_NODE_VERSION:-16}-${COMPOSE_PROJECT_COMPOSER_VERSION:-2}"
+    container_name: "${DC_ORO_NAME:-unnamed}_mutagen_${DC_ORO_PHP_VERSION:-8.1}-${DC_ORO_NODE_VERSION:-16}-${DC_ORO_COMPOSER_VERSION:-2}"
     build:
-      context: "${COMPOSE_PROJECT_CONFIG_DIR:-.}/docker/php-node-symfony"
+      context: "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony"
       args:
-        PHP_VERSION: ${COMPOSE_PROJECT_PHP_VERSION:-8.1}
-        NODE_VERSION: ${COMPOSE_PROJECT_NODE_VERSION:-16}
-        PHP_USER_NAME: ${COMPOSE_PROJECT_PHP_USER_NAME:-developer}
-        PHP_USER_GROUP: ${COMPOSE_PROJECT_PHP_USER_GROUP:-developer}
-        PHP_UID: ${COMPOSE_PROJECT_PHP_UID:-1000}
-        PHP_GID: ${COMPOSE_PROJECT_PHP_GID:-1000}
-        COMPOSER_VERSION: "${COMPOSE_PROJECT_COMPOSER_VERSION:-2}"
+        PHP_VERSION: ${DC_ORO_PHP_VERSION:-8.1}
+        NODE_VERSION: ${DC_ORO_NODE_VERSION:-16}
+        PHP_USER_NAME: ${DC_ORO_PHP_USER_NAME:-developer}
+        PHP_USER_GROUP: ${DC_ORO_PHP_USER_GROUP:-developer}
+        PHP_UID: ${DC_ORO_PHP_UID:-1000}
+        PHP_GID: ${DC_ORO_PHP_GID:-1000}
+        COMPOSER_VERSION: "${DC_ORO_COMPOSER_VERSION:-2}"
     volumes:
       - 'appcode:/var/www:consistent'
     command: "bash -c 'chmod 0777 /var/www; sleep infinity'"

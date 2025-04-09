@@ -20,10 +20,10 @@ Follow this guide: https://docs.docker.com/desktop/windows/wsl/
 ### Homebrew (MacOs/Linux/Windows)
 Install Homebrew by following guide https://docs.brew.sh/Installation
 
-### Configure Composer Credentials
-You need to export following variable or add it to the `.bashrc` or `.zshrc` file
+### Configure COMPOSER Credentials (optional)
+If no local composer setup exists you will need to export following variable or add it to the `.bashrc` or `.zshrc` file
 ```bash
-export COMPOSE_PROJECT_COMPOSER_AUTH='{
+export DC_ORO_COMPOSER_AUTH='{
     "http-basic": {
         "repo.example.com": {
             "username": "xxxxxxxxxxxx",
@@ -39,11 +39,10 @@ export COMPOSE_PROJECT_COMPOSER_AUTH='{
 }'
 ```
 
-To get the command from local machine use following command:
+Also you can user the command to obtain the value from any machine:
 ```bash
-echo "export COMPOSE_PROJECT_COMPOSER_AUTH='"$(cat $(php -d display_errors=0 $(which composer) config --no-interaction --global home 2>/dev/null)/auth.json)"'"
+echo "export DC_ORO_COMPOSER_AUTH='"$(cat $(php -d display_errors=0 $(which composer) config --no-interaction --global home 2>/dev/null)/auth.json)"'"
 ```
-
 
 ## Installation
 Install via homebrew by following command
@@ -62,29 +61,29 @@ cd ~/orocommerce-application
 ```
 3. Build docker images
 ```bash
-docker-compose-oroplatform build
+dc-oro build
 ```
 4. Install composer dependencies
 ```bash
-docker-compose-oroplatform composer install -o --no-interaction
+dc-oro composer install -o --no-interaction
 ```
 5. Optionally: Change the database driver in the `config/parameters.yml` (or .env-app) file.
 > example: `ORO_DB_URL=postgres://application:application@database:5432/application?sslmode=disable&charset=utf8&serverVersion=13.7`
 7. Install the application by following command
 ```bash
-docker-compose-oroplatform bin/console --env=prod --timeout=1800 oro:install --language=en --formatting-code=en_US --organization-name='Acme Inc.' --user-name=admin --user-email=admin@example.com --user-firstname=John --user-lastname=Doe --user-password='$ecretPassw0rd' --application-url='http://localhost:30180/' --sample-data=y
+dc-oro bin/console --env=prod --timeout=1800 oro:install --language=en --formatting-code=en_US --organization-name='Acme Inc.' --user-name=admin --user-email=admin@example.com --user-firstname=John --user-lastname=Doe --user-password='$ecretPassw0rd' --application-url='http://localhost:30180/' --sample-data=y
 ```
 7. Optional: import database dump (supports `*.sql` and `*.sql.gz` files)
 ```bash
-docker-compose-oroplatform import-database /path/to/dump.sql.gz
+dc-oro import-database /path/to/dump.sql.gz
 ```
 8. Warmup cache
 ```bash
-docker-compose-oroplatform bin/console cache:warmup
+dc-oro bin/console cache:warmup
 ```
 9. Start the stack in the background mode
 ```bash
-docker-compose-oroplatform up -d
+dc-oro up -d
 ```
 
 > Application should be available by following link: http://localhost:30180/
@@ -94,23 +93,23 @@ docker-compose-oroplatform up -d
 
 Stop containers
 ```bash
-docker-compose-oroplatform down
+dc-oro down
 ```
 
 Destroy containers and persistent data
 ```bash
-docker-compose-oroplatform down -v
+dc-oro down -v
 ```
 
 ## Extra tools
 Connecting to the cli container
 ```bash
-docker-compose-oroplatform bash
+dc-oro bash
 ```
 
 Generate compose config and run directly without this tool
 ```bash
-docker-compose-oroplatform config > docker-compose.yml
+dc-oro config > docker-compose.yml
 ```
 ```bash
 docker compose up
@@ -118,17 +117,17 @@ docker compose up
 
 ## Environment Variables
 > Can be stored in the `.dockenv`, `.dockerenv` or `.env` file in the project root
-* `COMPOSE_PROJECT_MODE` - (`mutagen`|`default`)
-* `COMPOSE_PROJECT_COMPOSER_VERSION` - (`1|2` )
-* `COMPOSE_PROJECT_PHP_VERSION` - (`7.4`|`8.0`|`8.1`|`8.2`), the image will be built from a corresponding `fpm-alpine` image, see https://hub.docker.com/_/php/?tab=tags&page=1&name=fpm-alpine&ordering=name for more versions
-* `COMPOSE_PROJECT_NODE_VERSION` - (`12`|`14`|`16`) the image will be built from a corresponding `alpine` image, see https://hub.docker.com/_/node/tags?page=1&name=alpine3.16 for more versions
-* `COMPOSE_PROJECT_MYSQL_IMAGE` - `mysql:8.0-oracle` see https://hub.docker.com/_/mysql/?tab=tags for more versions
-* `COMPOSE_PROJECT_PGSQL_VERSION` - `13.8` see https://hub.docker.com/_/postgres/?tab=tags for more versions
-* `COMPOSE_PROJECT_ELASTICSEARCH_VERSION` - `7.10.2` see https://www.docker.elastic.co/r/elasticsearch/elasticsearch-oss for more versions
-* `COMPOSE_PROJECT_NAME` - by default the working directory name will be used
-* `COMPOSE_PROJECT_PORT_PREFIX` - `302` by default
+* `DC_ORO_MODE` - (`default`|`ssh`|`mutagen`)
+* `DC_ORO_COMPOSER_VERSION` - (`1|2` )
+* `DC_ORO_PHP_VERSION` - (`8.2`|`8.3`|`8.4`), the image will be built from a corresponding `fpm-alpine` image, see https://hub.docker.com/_/php/?tab=tags&page=1&name=fpm-alpine&ordering=name for more versions
+* `DC_ORO_NODE_VERSION` - (`18`|`20`|`22`) the image will be built from a corresponding `alpine` image, see https://hub.docker.com/_/node/tags?page=1&name=alpine3.16 for more versions
+* `DC_ORO_MYSQL_IMAGE` - `mysql:8.0-oracle` see https://hub.docker.com/_/mysql/?tab=tags for more versions
+* `DC_ORO_PGSQL_VERSION` - `15.1` see https://hub.docker.com/_/postgres/?tab=tags for more versions
+* `DC_ORO_ELASTICSEARCH_VERSION` - `8.9.1` see https://www.docker.elastic.co/r/elasticsearch/elasticsearch-oss for more versions
+* `DC_ORO_NAME` - by default the working directory name will be used
+* `DC_ORO_PORT_PREFIX` - `302` by default
 
 ## Custom Database Credentials 
-* `COMPOSE_PROJECT_DATABASE_USER="custom"`
-* `COMPOSE_PROJECT_DATABASE_PASSWORD="custom"`
-* `COMPOSE_PROJECT_DATABASE_NAME="custom"`
+* `DC_ORO_DATABASE_USER="custom"`
+* `DC_ORO_DATABASE_PASSWORD="custom"`
+* `DC_ORO_DATABASE_NAME="custom"`

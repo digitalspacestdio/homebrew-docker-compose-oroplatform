@@ -15,101 +15,101 @@ find-up () {
   echo "$path"
 }
 
-if [[ -z $COMPOSE_PROJECT_APPDIR ]]; then
-  export COMPOSE_PROJECT_APPDIR=$(find-up composer.json "$PWD/www")
+if [[ -z $DC_ORO_APPDIR ]]; then
+  export DC_ORO_APPDIR=$(find-up composer.json "$PWD/www")
 fi
 
-if [[ -z $COMPOSE_PROJECT_APPDIR ]]; then
+if [[ -z $DC_ORO_APPDIR ]]; then
   if [ -z "$(ls -A $PWD)" ]; then
-    export COMPOSE_PROJECT_APPDIR="$PWD"
+    export DC_ORO_APPDIR="$PWD"
   else
     echo "Application root folder not found, and current directory is not empty, terminating..."
     exit 1
   fi
 fi
 
-if [[ ! -d "$COMPOSE_PROJECT_APPDIR" ]]; then
-  mkdir -p "$COMPOSE_PROJECT_APPDIR"
+if [[ ! -d "$DC_ORO_APPDIR" ]]; then
+  mkdir -p "$DC_ORO_APPDIR"
 fi
 
-cd "$COMPOSE_PROJECT_APPDIR"
+cd "$DC_ORO_APPDIR"
 
-if [[ -f "$COMPOSE_PROJECT_APPDIR/.dockenv" ]]; then
+if [[ -f "$DC_ORO_APPDIR/.dockenv" ]]; then
   set -o allexport
-  source "$COMPOSE_PROJECT_APPDIR/.dockenv"
+  source "$DC_ORO_APPDIR/.dockenv"
   set +o allexport
 fi
 
-if [[ -f "$COMPOSE_PROJECT_APPDIR/.dockerenv" ]]; then
+if [[ -f "$DC_ORO_APPDIR/.dockerenv" ]]; then
   set -o allexport
-  source "$COMPOSE_PROJECT_APPDIR/.dockerenv"
+  source "$DC_ORO_APPDIR/.dockerenv"
   set +o allexport
 fi
 
-if [[ -f "$COMPOSE_PROJECT_APPDIR/.env" ]]; then
+if [[ -f "$DC_ORO_APPDIR/.env" ]]; then
   set -o allexport
-  source "$COMPOSE_PROJECT_APPDIR/.env"
+  source "$DC_ORO_APPDIR/.env"
   set +o allexport
 fi
 
-if [[ -z $COMPOSE_PROJECT_COMPOSER_AUTH ]] && [[ -z $COMPOSER_AUTH ]] && which php > /dev/null 2>&1 && which composer > /dev/null 2>&1; then
+if [[ -z $DC_ORO_COMPOSER_AUTH ]] && [[ -z $COMPOSER_AUTH ]] && which php > /dev/null 2>&1 && which composer > /dev/null 2>&1; then
   COMPOSER_AUTH_JSON=$(php -d display_startup_errors=0 $(which composer) config --working-dir=/tmp --no-interaction --global home 2> /dev/null)/auth.json
   if [[ -f "${COMPOSER_AUTH_JSON}" ]]; then
-    COMPOSE_PROJECT_COMPOSER_AUTH=$(cat "${COMPOSER_AUTH_JSON}")
+    DC_ORO_COMPOSER_AUTH=$(cat "${COMPOSER_AUTH_JSON}")
   fi
 fi
 
-export COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME-$(basename $(pwd))}
-export COMPOSE_PROJECT_PORT_PREFIX=${COMPOSE_PROJECT_PORT_PREFIX-"301"}
-export COMPOSE_PROJECT_PORT_HTTP="${COMPOSE_PROJECT_PORT_PREFIX}80"
-export COMPOSE_PROJECT_PORT_XHGUI="${COMPOSE_PROJECT_PORT_PREFIX}81"
-export COMPOSE_PROJECT_PORT_MYSQL="${COMPOSE_PROJECT_PORT_PREFIX}06"
-export COMPOSE_PROJECT_PORT_PGSQL="${COMPOSE_PROJECT_PORT_PREFIX}32"
-export COMPOSE_PROJECT_PORT_ELASTICSEARCH="${COMPOSE_PROJECT_PORT_PREFIX}92"
-export COMPOSE_PROJECT_PORT_MAIL_WEBGUI="${COMPOSE_PROJECT_PORT_PREFIX}25"
-export COMPOSE_PROJECT_COMPOSER_AUTH=${COMPOSE_PROJECT_COMPOSER_AUTH-${COMPOSER_AUTH-""}}
-export COMPOSE_PROJECT_CONFIG_DIR="$HOME/.$(basename $0)/${COMPOSE_PROJECT_NAME}"
+export DC_ORO_NAME=${DC_ORO_NAME-$(basename $(pwd))}
+export DC_ORO_PORT_PREFIX=${DC_ORO_PORT_PREFIX-"301"}
+export DC_ORO_PORT_HTTP="${DC_ORO_PORT_PREFIX}80"
+export DC_ORO_PORT_XHGUI="${DC_ORO_PORT_PREFIX}81"
+export DC_ORO_PORT_MYSQL="${DC_ORO_PORT_PREFIX}06"
+export DC_ORO_PORT_PGSQL="${DC_ORO_PORT_PREFIX}32"
+export DC_ORO_PORT_ELASTICSEARCH="${DC_ORO_PORT_PREFIX}92"
+export DC_ORO_PORT_MAIL_WEBGUI="${DC_ORO_PORT_PREFIX}25"
+export DC_ORO_COMPOSER_AUTH=${DC_ORO_COMPOSER_AUTH-${COMPOSER_AUTH-""}}
+export DC_ORO_CONFIG_DIR="$HOME/.$(basename $0)/${DC_ORO_NAME}"
 
-if [[ ! -d "${COMPOSE_PROJECT_CONFIG_DIR}" ]];then
-    mkdir -p "${COMPOSE_PROJECT_CONFIG_DIR}"
+if [[ ! -d "${DC_ORO_CONFIG_DIR}" ]];then
+    mkdir -p "${DC_ORO_CONFIG_DIR}"
 fi
 
-rsync -r "${DIR}/" "${COMPOSE_PROJECT_CONFIG_DIR}/"
+rsync -r "${DIR}/" "${DC_ORO_CONFIG_DIR}/"
 
 docker info > /dev/null
 
 DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN-$(which docker) compose}";
 DOCKER_COMPOSE_VERSION=$($DOCKER_COMPOSE_BIN version | grep '[0-9]\+\.[0-9]\+\.[0-9]\+' -o | awk -F. '{ print $1 }')
-if [[ -f "${COMPOSE_PROJECT_CONFIG_DIR}/docker-compose.yml" ]]; then
-  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${COMPOSE_PROJECT_CONFIG_DIR}/docker-compose.yml"
+if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose.yml" ]]; then
+  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose.yml"
 fi
 
 if docker system info --format '{{.SecurityOptions}}' | grep "name=rootless" > /dev/null 2>&1; then
   # Use root user in the rootless mode
-  export COMPOSE_PROJECT_USER_NAME="root"
+  export DC_ORO_USER_NAME="root"
 else
-  export COMPOSE_PROJECT_USER_NAME="developer"
+  export DC_ORO_USER_NAME="developer"
 fi
 
-if [[ -z $ORO_DB_DRIVER ]] && [[ -f "$COMPOSE_PROJECT_APPDIR/config/parameters.yml" ]]; then
-  export ORO_DB_DRIVER=$(cat "$COMPOSE_PROJECT_APPDIR/config/parameters.yml" | grep 'database_driver:' | awk -F: '{ print $2 }')
+if [[ -z $ORO_DB_DRIVER ]] && [[ -f "$DC_ORO_APPDIR/config/parameters.yml" ]]; then
+  export ORO_DB_DRIVER=$(cat "$DC_ORO_APPDIR/config/parameters.yml" | grep 'database_driver:' | awk -F: '{ print $2 }')
 fi
 
-if [[ -z $ORO_DB_DRIVER ]] && [[ -f "$COMPOSE_PROJECT_APPDIR/.env-app.local" ]]; then
-  export ORO_DB_DRIVER=$(cat "$COMPOSE_PROJECT_APPDIR/.env-app.local" | grep 'ORO_DB_URL=' | awk -F= '{ print $2 }' | awk -F: '{ print $1 }')
+if [[ -z $ORO_DB_DRIVER ]] && [[ -f "$DC_ORO_APPDIR/.env-app.local" ]]; then
+  export ORO_DB_DRIVER=$(cat "$DC_ORO_APPDIR/.env-app.local" | grep 'ORO_DB_URL=' | awk -F= '{ print $2 }' | awk -F: '{ print $1 }')
 fi
 
-if [[ -z $ORO_DB_DRIVER ]] && [[ -f "$COMPOSE_PROJECT_APPDIR/.env-app" ]]; then
-  export ORO_DB_DRIVER=$(cat "$COMPOSE_PROJECT_APPDIR/.env-app" | grep 'ORO_DB_URL=' | awk -F= '{ print $2 }' | awk -F: '{ print $1 }')
+if [[ -z $ORO_DB_DRIVER ]] && [[ -f "$DC_ORO_APPDIR/.env-app" ]]; then
+  export ORO_DB_DRIVER=$(cat "$DC_ORO_APPDIR/.env-app" | grep 'ORO_DB_URL=' | awk -F= '{ print $2 }' | awk -F: '{ print $1 }')
 fi
 
 if [[ $ORO_DB_DRIVER == "pdo_pgsql" ]] || [[ $ORO_DB_DRIVER == "pdo_mysql" ]] || [[ $ORO_DB_DRIVER == "postgres" ]] || [[ $ORO_DB_DRIVER == "mysql" ]] ;then
   if [[ $ORO_DB_DRIVER == "pdo_pgsql" ]] || [[ $ORO_DB_DRIVER == "postgres" ]];then
-    export COMPOSE_PROJECT_DATABASE_PORT=${COMPOSE_PROJECT_DATABASE_PORT:-5432}
-    DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${COMPOSE_PROJECT_CONFIG_DIR}/docker-compose-pgsql.yml"
+    export DC_ORO_DATABASE_PORT=${DC_ORO_DATABASE_PORT:-5432}
+    DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-pgsql.yml"
   elif [[ $ORO_DB_DRIVER == "pdo_mysql" ]] || [[ $ORO_DB_DRIVER == "mysql" ]];then
-    export COMPOSE_PROJECT_DATABASE_PORT=${COMPOSE_PROJECT_DATABASE_PORT:-3306}
-    DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${COMPOSE_PROJECT_CONFIG_DIR}/docker-compose-mysql.yml"
+    export DC_ORO_DATABASE_PORT=${DC_ORO_DATABASE_PORT:-3306}
+    DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-mysql.yml"
   fi
   if ${DOCKER_COMPOSE_BIN} ps --services | grep database > /dev/null; then
     SERVICE_DATABASE_ID=$(${DOCKER_COMPOSE_BIN} ps -q database)
@@ -119,40 +119,40 @@ if [[ $ORO_DB_DRIVER == "pdo_pgsql" ]] || [[ $ORO_DB_DRIVER == "pdo_mysql" ]] ||
     fi
   fi
 else
-  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${COMPOSE_PROJECT_CONFIG_DIR}/docker-compose-dummy.yml"
+  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-dummy.yml"
 fi
 
-if [[ -f "$COMPOSE_PROJECT_APPDIR/.docker-compose.user.yml" ]]; then
-  >&2 echo "==> Additional docker compose config will be used: $COMPOSE_PROJECT_APPDIR/.docker-compose.user.yml"
-  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f $COMPOSE_PROJECT_APPDIR/.docker-compose.user.yml"
+if [[ -f "$DC_ORO_APPDIR/.docker-compose.user.yml" ]]; then
+  >&2 echo "==> Additional docker compose config will be used: $DC_ORO_APPDIR/.docker-compose.user.yml"
+  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f $DC_ORO_APPDIR/.docker-compose.user.yml"
 fi
 
-if [[ -f "$COMPOSE_PROJECT_APPDIR/.php-version" ]] && [[ -z $COMPOSE_PROJECT_PHP_VERSION ]]; then
-  export COMPOSE_PROJECT_PHP_VERSION=$(cat $COMPOSE_PROJECT_APPDIR/.php-version | head -n1)
-  >&2 echo "==> Found .php-version with following version: $COMPOSE_PROJECT_PHP_VERSION"
+if [[ -f "$DC_ORO_APPDIR/.php-version" ]] && [[ -z $DC_ORO_PHP_VERSION ]]; then
+  export DC_ORO_PHP_VERSION=$(cat $DC_ORO_APPDIR/.php-version | head -n1)
+  >&2 echo "==> Found .php-version with following version: $DC_ORO_PHP_VERSION"
 fi
 
-if [[ -f "$COMPOSE_PROJECT_APPDIR/.phprc" ]] && [[ -z $COMPOSE_PROJECT_PHP_VERSION ]]; then
-  export COMPOSE_PROJECT_PHP_VERSION=$(cat $COMPOSE_PROJECT_APPDIR/.phprc | head -n1)
-  >&2 echo "==> Found .phprc with following version: $COMPOSE_PROJECT_PHP_VERSION"
+if [[ -f "$DC_ORO_APPDIR/.phprc" ]] && [[ -z $DC_ORO_PHP_VERSION ]]; then
+  export DC_ORO_PHP_VERSION=$(cat $DC_ORO_APPDIR/.phprc | head -n1)
+  >&2 echo "==> Found .phprc with following version: $DC_ORO_PHP_VERSION"
 fi
 
-if [[ -f "$COMPOSE_PROJECT_APPDIR/.nvmrc" ]] && [[ -z $COMPOSE_PROJECT_NODE_VERSION ]]; then
-  export COMPOSE_PROJECT_NODE_VERSION=$(cat $COMPOSE_PROJECT_APPDIR/.nvmrc | head -n1)
-  >&2 echo "==> Found .nvmrc with following version: $COMPOSE_PROJECT_NODE_VERSION"
+if [[ -f "$DC_ORO_APPDIR/.nvmrc" ]] && [[ -z $DC_ORO_NODE_VERSION ]]; then
+  export DC_ORO_NODE_VERSION=$(cat $DC_ORO_APPDIR/.nvmrc | head -n1)
+  >&2 echo "==> Found .nvmrc with following version: $DC_ORO_NODE_VERSION"
 fi
 
-if [[ "$OSTYPE" == "darwin"* ]]; then
-  export COMPOSE_PROJECT_MODE="mutagen"
+if [[ -x $DC_ORO_MODE ]] && [[ "$OSTYPE" == "darwin"* ]]; then
+  export DC_ORO_MODE="mutagen"
 fi
 
-if [[ $COMPOSE_PROJECT_MODE == "mutagen" ]] && [[ -f "${COMPOSE_PROJECT_CONFIG_DIR}/docker-compose-mutagen.yml" ]]; then
-  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${COMPOSE_PROJECT_CONFIG_DIR}/docker-compose-mutagen.yml"
-  MUTAGEN_SESSION_NAME=$(echo ${COMPOSE_PROJECT_NAME}-appcode | awk '{print tolower($0)}' | sed 's/[^0-9a-z]/-/g')
+if [[ $DC_ORO_MODE == "mutagen" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-mutagen.yml" ]]; then
+  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-mutagen.yml"
+  MUTAGEN_SESSION_NAME=$(echo ${DC_ORO_NAME}-appcode | awk '{print tolower($0)}' | sed 's/[^0-9a-z]/-/g')
   WAIT_SYNC="1"
-  if docker volume ls | grep "^${COMPOSE_PROJECT_NAME}_appcode$" > /dev/null 2>&1; then
-    if [[ $(docker volume inspect -f '{{ .Options.type }}' ${COMPOSE_PROJECT_NAME}_appcode) == "nfs" ]]; then
-      docker volume rm ${COMPOSE_PROJECT_NAME}_appcode
+  if docker volume ls | grep "^${DC_ORO_NAME}_appcode$" > /dev/null 2>&1; then
+    if [[ $(docker volume inspect -f '{{ .Options.type }}' ${DC_ORO_NAME}_appcode) == "nfs" ]]; then
+      docker volume rm ${DC_ORO_NAME}_appcode
     fi
   fi
 
@@ -180,7 +180,7 @@ if [[ $COMPOSE_PROJECT_MODE == "mutagen" ]] && [[ -f "${COMPOSE_PROJECT_CONFIG_D
       --ignore-vcs \
       --symlink-mode=ignore \
       --name=${MUTAGEN_SESSION_NAME} \
-      "$COMPOSE_PROJECT_APPDIR" docker://${COMPOSE_PROJECT_USER_NAME}@${DOCKER_CONTAINER_NAME_MUTAGEN}/var/www
+      "$DC_ORO_APPDIR" docker://${DC_ORO_USER_NAME}@${DOCKER_CONTAINER_NAME_MUTAGEN}/var/www
     else
       WAIT_SYNC=""
     fi
@@ -197,6 +197,10 @@ if [[ $COMPOSE_PROJECT_MODE == "mutagen" ]] && [[ -f "${COMPOSE_PROJECT_CONFIG_D
   fi
 fi
 
+if [[ $DC_ORO_MODE == "ssh" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-ssh.yml" ]]; then
+  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-ssh.yml"
+fi
+
 if [[ $DOCKER_COMPOSE_VERSION -gt 1 ]]; then
   DOCKER_COMPOSE_RUN_CMD="${DOCKER_COMPOSE_BIN} run -i --rm"
 else
@@ -208,12 +212,12 @@ if docker system info --format '{{.SecurityOptions}}' | grep "name=rootless" > /
 fi
 
 if [[ $1 == "up" ]]; then
-  printf "\033[0;37m[${COMPOSE_PROJECT_NAME}] Application URL: http://localhost:${COMPOSE_PROJECT_PORT_HTTP}/\033[0m\n"
-  printf "\033[0;37m[${COMPOSE_PROJECT_NAME}] XHGUI URL: http://localhost:${COMPOSE_PROJECT_PORT_XHGUI}/\033[0m\n"
-  printf "\033[0;37m[${COMPOSE_PROJECT_NAME}] Mailhog URL: http://localhost:${COMPOSE_PROJECT_PORT_MAIL_WEBGUI}/\033[0m\n"
-  printf "\033[0;37m[${COMPOSE_PROJECT_NAME}] Elasticsearch URL: http://localhost:${COMPOSE_PROJECT_PORT_ELASTICSEARCH}/\033[0m\n"
-  printf "\033[0;37m[${COMPOSE_PROJECT_NAME}] MySql Address: 127.0.0.1:${COMPOSE_PROJECT_PORT_MYSQL}\033[0m\n"
-  printf "\033[0;37m[${COMPOSE_PROJECT_NAME}] PgSql Address: 127.0.0.1:${COMPOSE_PROJECT_PORT_PGSQL}\033[0m\n"
+  printf "\033[0;37m[${DC_ORO_NAME}] Application URL: http://localhost:${DC_ORO_PORT_HTTP}/\033[0m\n"
+  printf "\033[0;37m[${DC_ORO_NAME}] XHGUI URL: http://localhost:${DC_ORO_PORT_XHGUI}/\033[0m\n"
+  printf "\033[0;37m[${DC_ORO_NAME}] Mailhog URL: http://localhost:${DC_ORO_PORT_MAIL_WEBGUI}/\033[0m\n"
+  printf "\033[0;37m[${DC_ORO_NAME}] Elasticsearch URL: http://localhost:${DC_ORO_PORT_ELASTICSEARCH}/\033[0m\n"
+  printf "\033[0;37m[${DC_ORO_NAME}] MySql Address: 127.0.0.1:${DC_ORO_PORT_MYSQL}\033[0m\n"
+  printf "\033[0;37m[${DC_ORO_NAME}] PgSql Address: 127.0.0.1:${DC_ORO_PORT_PGSQL}\033[0m\n"
 fi
 
 if echo $1 | grep -i 'import' | grep -i 'db\|database' > /dev/null; then
@@ -223,8 +227,8 @@ if echo $1 | grep -i 'import' | grep -i 'db\|database' > /dev/null; then
   fi
   if [[ -r $2 ]]; then
     DB_DUMP=$(realpath $2)
-  elif [[ -r "$COMPOSE_PROJECT_APPDIR/$2" ]]; then
-    DB_DUMP=$(realpath "$COMPOSE_PROJECT_APPDIR/$2")
+  elif [[ -r "$DC_ORO_APPDIR/$2" ]]; then
+    DB_DUMP=$(realpath "$DC_ORO_APPDIR/$2")
   fi
 
   if [[ -z $DB_DUMP ]] || [[ ! -r $DB_DUMP ]]; then
@@ -249,7 +253,7 @@ if echo $1 | grep -i 'import' | grep -i 'db\|database' > /dev/null; then
 fi
 
 if echo $1 | grep -i 'export\|dump' | grep -i 'db\|database' > /dev/null; then
-  DB_DUMP=$COMPOSE_PROJECT_APPDIR/database-$(date +'%Y%m%d%H%M%S').sql.gz
+  DB_DUMP=$DC_ORO_APPDIR/database-$(date +'%Y%m%d%H%M%S').sql.gz
   DB_DUMP_BASENAME=$(echo "${DB_DUMP##*/}")
   touch "${DB_DUMP}"
   if [[ $ORO_DB_DRIVER == "pdo_pgsql" ]] || [[ $ORO_DB_DRIVER == "postgres" ]];then

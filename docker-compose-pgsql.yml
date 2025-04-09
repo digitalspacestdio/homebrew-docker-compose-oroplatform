@@ -1,24 +1,24 @@
 services:
   database:
-    image: '${COMPOSE_PROJECT_PGSQL_IMAGE:-postgres}:${COMPOSE_PROJECT_PGSQL_VERSION:-15.1}'
-    container_name: ${COMPOSE_PROJECT_NAME:-unnamed}_database
+    image: '${DC_ORO_PGSQL_IMAGE:-postgres}:${DC_ORO_PGSQL_VERSION:-15.1}'
+    container_name: ${DC_ORO_NAME:-unnamed}_database
     command: postgres -c max_locks_per_transaction=10000 -c shared_buffers=512MB
     shm_size: 512m
     environment:
       LANG: 'C.UTF-8'
-      POSTGRES_USER: '${COMPOSE_PROJECT_DATABASE_USER:-application}'
-      POSTGRES_PASSWORD: '${COMPOSE_PROJECT_DATABASE_PASSWORD:-application}'
-      POSTGRES_DB: '${COMPOSE_PROJECT_DATABASE_NAME:-application}'
+      POSTGRES_USER: '${DC_ORO_DATABASE_USER:-application}'
+      POSTGRES_PASSWORD: '${DC_ORO_DATABASE_PASSWORD:-application}'
+      POSTGRES_DB: '${DC_ORO_DATABASE_NAME:-application}'
     volumes:
-      - '${COMPOSE_PROJECT_CONFIG_DIR:-.}/docker/pgsql/initdb.d:/docker-entrypoint-initdb.d:ro'
+      - '${DC_ORO_CONFIG_DIR:-.}/docker/pgsql/initdb.d:/docker-entrypoint-initdb.d:ro'
       - 'postgresql-data:/var/lib/postgresql/data:delegated'
     ports:
-      - '${COMPOSE_PROJECT_PGSQL_BIND_HOST:-127.0.0.1}:${COMPOSE_PROJECT_PORT_PREFIX:-54}32:5432'
+      - '${DC_ORO_PGSQL_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_PREFIX:-54}32:5432'
     networks:
       - 'appnet'
     restart: always
     healthcheck:
-      test: "pg_isready -U ${COMPOSE_PROJECT_DATABASE_USER:-application}"
+      test: "pg_isready -U ${DC_ORO_DATABASE_USER:-application}"
       start_period: 60s
       interval: 5s
       retries: 15
@@ -28,18 +28,18 @@ services:
         max-size: "10m"
 
   database-cli:
-    image: '${COMPOSE_PROJECT_PGSQL_IMAGE:-postgres}:${COMPOSE_PROJECT_PGSQL_VERSION:-15.1}'
-    container_name: ${COMPOSE_PROJECT_NAME:-unnamed}_database_cli
+    image: '${DC_ORO_PGSQL_IMAGE:-postgres}:${DC_ORO_PGSQL_VERSION:-15.1}'
+    container_name: ${DC_ORO_NAME:-unnamed}_database_cli
     command: /bin/true
     labels:
-      - 'project.name=${COMPOSE_PROJECT_NAME}'
+      - 'project.name=${DC_ORO_NAME}'
     environment:
       - 'LANG=C.UTF-8'
-      - 'DATABASE_HOST=${COMPOSE_PROJECT_DATABASE_HOST:-database}'
-      - 'DATABASE_PORT=${COMPOSE_PROJECT_DATABASE_PORT:-5432}'
-      - 'DATABASE_USER=${COMPOSE_PROJECT_DATABASE_USER:-application}'
-      - 'DATABASE_PASSWORD=${COMPOSE_PROJECT_DATABASE_PASSWORD:-application}'
-      - 'DATABASE_NAME=${COMPOSE_PROJECT_DATABASE_NAME:-application}'
+      - 'DATABASE_HOST=${DC_ORO_DATABASE_HOST:-database}'
+      - 'DATABASE_PORT=${DC_ORO_DATABASE_PORT:-5432}'
+      - 'DATABASE_USER=${DC_ORO_DATABASE_USER:-application}'
+      - 'DATABASE_PASSWORD=${DC_ORO_DATABASE_PASSWORD:-application}'
+      - 'DATABASE_NAME=${DC_ORO_DATABASE_NAME:-application}'
     networks:
       - 'appnet'
     depends_on:
