@@ -70,6 +70,10 @@ export DC_ORO_PORT_MAIL_WEBGUI="${DC_ORO_PORT_PREFIX}25"
 export DC_ORO_COMPOSER_AUTH=${DC_ORO_COMPOSER_AUTH-${COMPOSER_AUTH-""}}
 export DC_ORO_CONFIG_DIR="$HOME/.$(basename $0)/${DC_ORO_NAME}"
 
+if [[ -z $COMPOSER_AUTH ]]; then
+  export COMPOSER_AUTH=${DC_ORO_COMPOSER_AUTH}
+fi
+
 if [[ ! -d "${DC_ORO_CONFIG_DIR}" ]];then
     mkdir -p "${DC_ORO_CONFIG_DIR}"
 fi
@@ -286,23 +290,24 @@ if echo $1 | grep -i 'export\|dump' | grep -i 'db\|database' > /dev/null; then
 fi
 
 if echo $1 | grep -i '^mysql' > /dev/null; then
-  for i in "$@"; do
-      i="${i//\\/\\\\}"
-      i="${i//$/\\$}"
-      C="$C \"${i//\"/\\\"}\""
-  done
   MYSQL_CMD="MYSQL_PWD=\$DATABASE_PASSWORD mysql -h\$DATABASE_HOST -P\$DATABASE_PORT -u\$DATABASE_USER \$DATABASE_NAME"
   exec ${DOCKER_COMPOSE_RUN_CMD} database-cli bash -c "$MYSQL_CMD"
 fi
 
 if echo $1 | grep -i '^psql' > /dev/null; then
+  PSQL_CMD="PGPASSWORD=\$DATABASE_PASSWORD psql -h \$DATABASE_HOST -p \$DATABASE_PORT -U \$DATABASE_USER -d \$DATABASE_NAME"
+  exec ${DOCKER_COMPOSE_RUN_CMD} database-cli bash -c "$PSQL_CMD"
+fi
+
+if echo $1 | grep -i '^ssh' > /dev/null; then
   for i in "$@"; do
       i="${i//\\/\\\\}"
       i="${i//$/\\$}"
       C="$C \"${i//\"/\\\"}\""
   done
-  PSQL_CMD="PGPASSWORD=\$DATABASE_PASSWORD psql -h \$DATABASE_HOST -p \$DATABASE_PORT -U \$DATABASE_USER -d \$DATABASE_NAME"
-  exec ${DOCKER_COMPOSE_RUN_CMD} database-cli bash -c "$PSQL_CMD"
+  SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
+  SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
+  exec bash -c "ssh -p $SSH_PORT ${DC_ORO_USER_NAME}@${SSH_HOST} $C"
 fi
 
 if echo $1 | grep -i '^composer\|bin/\|npm\|php\|node\|yarn\|bash\|symfony' > /dev/null; then
