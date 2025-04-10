@@ -28,8 +28,16 @@ if [[ -n $ORO_SSH_PUBLIC_KEY ]]; then
 		Match User ${PHP_USER_NAME}
 			ForceCommand bash -c 'cd ${APP_DIR:-/var/www} && exec bash'
 		EOM
+
+		if [[ -d "${APP_DIR:-/var/www}/.git" ]]; then
+			su - $PHP_USER_NAME -c 'git config --global --add safe.directory "'${APP_DIR:-/var/www}'/.git"'
+		fi
 	fi
 fi
 
 chmod 0777 ${APP_DIR:-/var/www}
+if [[ -d "${APP_DIR:-/var/www}/.git" ]]; then
+	git config --global --add safe.directory "${APP_DIR:-/var/www}/.git"
+fi
+
 exec /usr/sbin/sshd -D -e

@@ -11,4 +11,8 @@ if [ "${1#-}" != "$1" ]; then
 	set -- php-fpm "$@"
 fi
 
+if [[ -d "${APP_DIR:-/var/www}/.git" ]]; then
+	git config --global --add safe.directory "${APP_DIR:-/var/www}/.git"
+fi
+
 exec docker-php-entrypoint "$@"
