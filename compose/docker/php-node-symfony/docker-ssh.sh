@@ -26,7 +26,7 @@ if [[ -n $ORO_SSH_PUBLIC_KEY ]]; then
 		chmod +x "${PHP_USER_HOME}/.bashrc"
 		cat >> /etc/ssh/sshd_config <<- EOM
 		Match User ${PHP_USER_NAME}
-			ForceCommand bash -c 'cd ${APP_DIR:-/var/www} && exec bash'
+			ForceCommand bash -c 'if [ -n "$SSH_ORIGINAL_COMMAND" ]; then exec $SSH_ORIGINAL_COMMAND; else cd ${APP_DIR:-/var/www} && exec bash; fi'
 		EOM
 
 		if [[ -d "${APP_DIR:-/var/www}/.git" ]]; then
