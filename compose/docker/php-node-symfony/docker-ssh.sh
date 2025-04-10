@@ -23,6 +23,7 @@ if [[ -n $ORO_SSH_PUBLIC_KEY ]]; then
 		usermod -s /bin/bash $PHP_USER_NAME
 		usermod -p '*' $PHP_USER_NAME
 		echo "cd ${APP_DIR:-/var/www}" >> "${PHP_USER_HOME}/.bashrc"
+		chmod +x "${PHP_USER_HOME}/.bashrc"
 	fi
 fi
 
