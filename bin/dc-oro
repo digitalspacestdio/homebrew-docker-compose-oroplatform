@@ -300,14 +300,15 @@ if echo $1 | grep -i '^psql' > /dev/null; then
 fi
 
 if echo $1 | grep -i '^ssh' > /dev/null; then
-  for i in "$@"; do
+  for i in "${@:2}"; do
       i="${i//\\/\\\\}"
       i="${i//$/\\$}"
       C="$C \"${i//\"/\\\"}\""
   done
   SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
   SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
-  exec bash -c "ssh -p $SSH_PORT ${DC_ORO_USER_NAME}@${SSH_HOST} $C"
+  set -x
+  exec bash -c "ssh -o StrictHostKeyChecking=no -p $SSH_PORT ${DC_ORO_USER_NAME}@${SSH_HOST} $C"
 fi
 
 if echo $1 | grep -i '^composer\|bin/\|npm\|php\|node\|yarn\|bash\|symfony' > /dev/null; then
