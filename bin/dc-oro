@@ -34,6 +34,12 @@ fi
 
 cd "$DC_ORO_APPDIR"
 
+if [[ -f "$DC_ORO_APPDIR/.dc-env" ]]; then
+  set -o allexport
+  source "$DC_ORO_APPDIR/.dc-env"
+  set +o allexport
+fi
+
 if [[ -f "$DC_ORO_APPDIR/.dockenv" ]]; then
   set -o allexport
   source "$DC_ORO_APPDIR/.dockenv"
