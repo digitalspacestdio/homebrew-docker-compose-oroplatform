@@ -346,11 +346,6 @@ services:
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}_dev.rule=Host(`${DC_ORO_NAME:-unnamed}.docker.local`)"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}_dev.service=${DC_ORO_NAME:-unnamed}"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}_dev.tls.domains[0].main=${DC_ORO_NAME:-unnamed}.docker.local"
-      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}_dev_docker.entrypoints=default"
-      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}_dev_docker.middlewares=xff-${DC_ORO_NAME:-unnamed},compress-${DC_ORO_NAME:-unnamed},cors-${DC_ORO_NAME:-unnamed},headers-${DC_ORO_NAME:-unnamed}"
-      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}_dev_docker.rule=Host(`${DC_ORO_NAME:-unnamed}.docker.local`)"
-      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}_dev_docker.service=${DC_ORO_NAME:-unnamed}"
-      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}_dev_docker.tls.domains[0].main=${DC_ORO_NAME:-unnamed}.docker.local"
       - "traefik.http.services.${DC_ORO_NAME:-unnamed}.loadbalancer.server.port=80"
       - "traefik.http.services.${DC_ORO_NAME:-unnamed}.loadbalancer.server.scheme=http"
     healthcheck:
