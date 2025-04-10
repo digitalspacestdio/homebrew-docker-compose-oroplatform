@@ -3,7 +3,7 @@ require 'formula'
 class DockerComposeOroplatform < Formula
   url "https://github.com/digitalspacestdio/homebrew-docker-compose-oroplatform.git", :using => :git
   version "0.6.1"
-  revision 19
+  revision 20
 
   depends_on 'jq'
   depends_on 'coreutils'
