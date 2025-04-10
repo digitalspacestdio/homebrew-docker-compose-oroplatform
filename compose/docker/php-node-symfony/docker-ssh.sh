@@ -22,7 +22,9 @@ if [[ -n $ORO_SSH_PUBLIC_KEY ]]; then
 		chown -R "${PHP_USER_NAME}" ${PHP_USER_HOME}
 		usermod -s /bin/bash $PHP_USER_NAME
 		usermod -p '*' $PHP_USER_NAME
+		echo "cd ${APP_DIR:-/var/www}" >> "${PHP_USER_HOME}/.bashrc"
 	fi
 fi
+
 chmod 0777 ${APP_DIR:-/var/www}
 exec /usr/sbin/sshd -D -e
