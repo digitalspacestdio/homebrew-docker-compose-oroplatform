@@ -50,6 +50,13 @@ RUN apk add --no-cache \
     optipng \
     gifsicle \
     libstdc++ \
+    libxext \
+    libxrender \
+    libxtst \
+    libxi \
+    freetype \
+    procps \
+    gcompat \
   ;
 
 RUN set -eux; \
