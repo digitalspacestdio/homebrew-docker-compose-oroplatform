@@ -7,9 +7,6 @@ sed -i '/^#HostKey \/etc\/ssh\/ssh_host_rsa_key/a HostKey /etc/ssh/hostkeys/ssh_
 sed -i '/^#HostKey \/etc\/ssh\/ssh_host_ecdsa_key/a HostKey /etc/ssh/hostkeys/ssh_host_ecdsa_key' /etc/ssh/sshd_config
 sed -i '/^#HostKey \/etc\/ssh\/ssh_host_ed25519_key/a HostKey /etc/ssh/hostkeys/ssh_host_ed25519_key' /etc/ssh/sshd_config
 echo 'AcceptEnv COMPOSER_AUTH' | tee -a /etc/ssh/sshd_config
-echo 'AllowTcpForwarding yes' | tee -a /etc/ssh/sshd_config
-echo 'PermitTunnel yes' | tee -a /etc/ssh/sshd_config
-echo 'GatewayPorts yes ' | tee -a /etc/ssh/sshd_config
 
 if [[ -n $ORO_SSH_PUBLIC_KEY ]]; then
 	mkdir -p /root/.ssh
@@ -28,7 +25,10 @@ if [[ -n $ORO_SSH_PUBLIC_KEY ]]; then
 		echo "cd ${APP_DIR:-/var/www}" >> "${PHP_USER_HOME}/.bashrc"
 		chmod +x "${PHP_USER_HOME}/.bashrc"
 		cat >> /etc/ssh/sshd_config <<- EOM
-		#Match User ${PHP_USER_NAME}
+		Match User ${PHP_USER_NAME}
+			AllowTcpForwarding yes
+			PermitTunnel yes
+			GatewayPorts yes
 		#	ForceCommand bash -c 'if [ -n "$SSH_ORIGINAL_COMMAND" ]; then exec "$SSH_ORIGINAL_COMMAND"; else cd ${APP_DIR:-/var/www} && exec bash; fi'
 		EOM
 
