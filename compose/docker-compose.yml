@@ -349,8 +349,8 @@ services:
 
   search:
     image: '${DC_ORO_ELASTICSEARCH_IMAGE:-docker.elastic.co/elasticsearch/elasticsearch}:${DC_ORO_ELASTICSEARCH_VERSION:-8.9.1}'
-    hostname: elasticsearch.${DC_ORO_NAME:-unnamed}.docker.local
-    container_name: ${DC_ORO_NAME:-unnamed}_elasticsearch
+    hostname: search.${DC_ORO_NAME:-unnamed}.docker.local
+    container_name: ${DC_ORO_NAME:-unnamed}_search
     volumes:
       - "search-data:/usr/share/elasticsearch/data:delegated"
     environment:
@@ -375,11 +375,11 @@ services:
   nginx:
     image: ${DC_ORO_NAME:-unnamed}_nginx
     hostname: nginx.${DC_ORO_NAME:-unnamed}.docker.local
+    container_name: ${DC_ORO_NAME:-unnamed}_nginx
     build:
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/nginx"
       args:
         APP_DIR: "${DC_ORO_APPDIR:-/var/www}"
-    container_name: ${DC_ORO_NAME:-unnamed}_nginx
     depends_on:
       fpm:
         condition: service_healthy
@@ -421,6 +421,8 @@ services:
 
   mq:
     image: oroinc/rabbitmq:3.9-1-management-alpine
+    hostname: mq.${DC_ORO_NAME:-unnamed}.docker.local
+    container_name: ${DC_ORO_NAME:-unnamed}_mq
     ports:
       - "${DC_ORO_ES_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_RABBITMQ:-${DC_ORO_PORT_PREFIX}72}:15672"
     environment:
@@ -438,8 +440,9 @@ services:
 
   redis:
     image: redis:6.2
+    hostname: redis.${DC_ORO_NAME:-unnamed}.docker.local
+    container_name: ${DC_ORO_NAME:-unnamed}_mq
     restart: always
-    container_name: redis
     healthcheck:
       test: nc -vz -w 1 localhost 6379
       start_period: 5s
