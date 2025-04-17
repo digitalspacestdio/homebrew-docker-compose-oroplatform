@@ -441,7 +441,7 @@ services:
   redis:
     image: redis:6.2
     hostname: redis.${DC_ORO_NAME:-unnamed}.docker.local
-    container_name: ${DC_ORO_NAME:-unnamed}_mq
+    container_name: ${DC_ORO_NAME:-unnamed}_redis
     restart: always
     healthcheck:
       test: nc -vz -w 1 localhost 6379
