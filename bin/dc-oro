@@ -1,0 +1,427 @@
+#!/bin/bash
+set -e
+
+load_env_safe() {
+  local env_file="$1"
+
+  # if the file exists
+  if [[ -f "$env_file" ]]; then
+    # Read the file line by line
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      # Trim leading/trailing whitespace (safe)
+      line="${line#"${line%%[![:space:]]*}"}"
+      line="${line%"${line##*[![:space:]]}"}"
+
+      # Skip empty lines and comments
+      [[ -z "$line" || "$line" == \#* ]] && continue
+
+      # Skip lines without =
+      [[ "$line" != *=* ]] && continue
+
+      local key="${line%%=*}"
+      local value="${line#*=}"
+
+      # Trim key and value safely
+      key="${key#"${key%%[![:space:]]*}"}"
+      key="${key%"${key##*[![:space:]]}"}"
+      value="${value#"${value%%[![:space:]]*}"}"
+      value="${value%"${value##*[![:space:]]}"}"
+
+      # Strip existing quotes from value
+      value="${value%\"}"
+      value="${value#\"}"
+      value="${value%\'}"
+      value="${value#\'}"
+
+      # Export the variable safely
+      eval "export $key=\"${value}\""
+    done < "$env_file"
+  fi
+}
+
+if [[ -n $DEBUG ]]; then 
+  set -x
+fi
+
+DIR=$(brew --prefix docker-compose-oroplatform)/share/docker-compose-oroplatform
+export PWD=$(pwd)
+
+find-up () {
+  path=${2-$PWD}
+  while [[ "$path" != "" && ! -e "$path/$1" ]]; do
+    path=${path%/*}
+  done
+  echo "$path"
+}
+
+if [[ -z $DC_ORO_APPDIR ]]; then
+  export DC_ORO_APPDIR=$(find-up composer.json "$PWD/www")
+fi
+
+if [[ -z $DC_ORO_APPDIR ]]; then
+  if [ -z "$(ls -A $PWD)" ]; then
+    export DC_ORO_APPDIR="$PWD"
+  else
+    echo "Application root folder not found, and current directory is not empty, terminating..."
+    exit 1
+  fi
+fi
+
+if [[ ! -d "$DC_ORO_APPDIR" ]]; then
+  mkdir -p "$DC_ORO_APPDIR"
+fi
+
+find_free_port()
+{
+  local SERVICE_NAME="$1"
+  local PORT="$2"
+  local SELECTED_PORT=$([[ -f "${DC_ORO_APPDIR}/compose.yml" ]] && yq '.services["'${SERVICE_NAME}'"].ports[] | select(.published) | .published' "${DC_ORO_APPDIR}/compose.yml" || echo "")
+  if [[ -n $SELECTED_PORT ]]; then
+    echo $SELECTED_PORT
+  fi
+
+  while [ $PORT -le 65535 ] && lsof -t -i tcp:$PORT > /dev/null; do
+    PORT=$((PORT+1));
+  done;
+
+  echo $PORT
+}
+
+if [[ -z $DC_ORO_COMPOSER_AUTH ]] && [[ -z $COMPOSER_AUTH ]]; then
+  cd "${DC_ORO_CONFIG_DIR}"
+  if which php > /dev/null 2>&1 && which composer > /dev/null 2>&1; then
+    COMPOSER_HOME=$(php -d display_startup_errors=0 $(which composer) config --working-dir=/tmp --no-interaction --global home 2> /dev/null) || {
+      >&2 echo "==> Can't resolve required php and(or) composer versions"
+    }
+  fi
+
+  if [[ -n ${COMPOSER_HOME} ]] && [[ -f "${COMPOSER_HOME}/auth.json" ]]; then
+    DC_ORO_COMPOSER_AUTH=$(cat "${COMPOSER_HOME}/auth.json")
+  fi
+fi
+
+cd "$DC_ORO_APPDIR"
+
+
+load_env_safe "$DC_ORO_APPDIR/.env"
+load_env_safe "$DC_ORO_APPDIR/.env-app"
+load_env_safe "$DC_ORO_APPDIR/.env-app.local"
+load_env_safe "$DC_ORO_APPDIR/.env.dc"
+
+DC_ORO_DB_URL="${ORO_DB_URL:-${ORO_DB_DSN}}"
+
+# Schema
+DC_ORO_DB_SCHEMA="${DC_ORO_DB_URL%%://*}"
+
+# Remove schema postgres://
+DC_ORO_DB_URL_NO_SCHEMA="${DC_ORO_DB_URL#*://}"
+
+# Extract query string
+DC_ORO_DB_URL_MAIN="${DC_ORO_DB_URL_NO_SCHEMA%%\?*}"
+
+# Extract login
+export DC_ORO_DB_USER="${DC_ORO_DB_URL_MAIN%%:*}"
+
+# Extract login extra
+DC_ORO_DB_REMAINDER="${DC_ORO_DB_URL_MAIN#*:}"
+
+# Extract password
+export DC_ORO_DB_PASSWORD="${DC_ORO_DB_REMAINDER%%@*}"
+
+# Extract login AT
+DC_ORO_DB_REMAINDER="${DC_ORO_DB_REMAINDER#*@}"
+
+# Extract host
+export DC_ORO_DB_HOST="${DC_ORO_DB_REMAINDER%%:*}"
+
+if [[ ${DC_ORO_DB_HOST} = "localhost" ]] || [[ ${DC_ORO_DB_HOST} = "127.0.0.1" ]]; then
+  export DC_ORO_DB_HOST="database"
+fi
+
+# Extract host extra
+DC_ORO_DB_REMAINDER="${DC_ORO_DB_REMAINDER#*:}"
+
+# Extract port
+export DC_ORO_DB_PORT="${DC_ORO_DB_REMAINDER%%/*}"
+
+# Extract port extra
+DC_ORO_DB_REMAINDER="${DC_ORO_DB_REMAINDER#*/}"
+
+# Extract database name
+DC_ORO_DB_DBNAME="$DC_ORO_DB_REMAINDER"
+
+# Remove query string from dbname
+export DC_ORO_DB_DBNAME="${DC_ORO_DB_DBNAME%%\?*}"
+
+# Build new db url
+export DC_ORO_DB_URL="${DC_ORO_DB_SCHEMA:-postgres}://${DC_ORO_DB_USER:-oro_db_user}:${DC_ORO_DB_PASSWORD:-oro_db_pass}@${DC_ORO_DB_HOST:-database}:${DC_ORO_DB_PORT:-5432}/${DC_ORO_DB_DBNAME:-oro_db}?sslmode=disable&charset=utf8&serverVersion=13.7"
+
+export DC_ORO_NAME=${DC_ORO_NAME-$(basename $(pwd))}
+export DC_ORO_PORT_PREFIX=${DC_ORO_PORT_PREFIX-"301"}
+export DC_ORO_PORT_NGINX=$(find_free_port nginx ${DC_ORO_PORT_PREFIX}80)
+export DC_ORO_PORT_XHGUI=$(find_free_port xhgui "${DC_ORO_PORT_PREFIX}81")
+export DC_ORO_PORT_MYSQL=$(find_free_port database "${DC_ORO_PORT_PREFIX}06")
+export DC_ORO_PORT_PGSQL=$(find_free_port database "${DC_ORO_PORT_PREFIX}32")
+export DC_ORO_PORT_ELASTICSEARCH=$(find_free_port elasticsearch "${DC_ORO_PORT_PREFIX}92")
+export DC_ORO_PORT_MAIL_WEBGUI=$(find_free_port mail "${DC_ORO_PORT_PREFIX}25")
+export DC_ORO_PORT_SSH=$(find_free_port ssh "${DC_ORO_PORT_PREFIX}22")
+
+export DC_ORO_COMPOSER_AUTH=${DC_ORO_COMPOSER_AUTH-${COMPOSER_AUTH-""}}
+export DC_ORO_CONFIG_DIR="$HOME/.$(basename $0)/${DC_ORO_NAME}"
+
+if [[ -z $COMPOSER_AUTH ]]; then
+  export COMPOSER_AUTH=${DC_ORO_COMPOSER_AUTH}
+fi
+
+if [[ ! -d "${DC_ORO_CONFIG_DIR}" ]];then
+    mkdir -p "${DC_ORO_CONFIG_DIR}"
+fi
+
+RSYNC_BIN=$(brew --prefix rsync)/bin/rsync
+DOCKER_BIN="${DOCKER_BIN-$(which docker)}";
+DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN-$(which docker) compose}";
+DOCKER_COMPOSE_VERSION=$($DOCKER_COMPOSE_BIN version | grep '[0-9]\+\.[0-9]\+\.[0-9]\+' -o | awk -F. '{ print $1 }')
+if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose.yml" ]]; then
+  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose.yml"
+fi
+
+${RSYNC_BIN} -r "${DIR}/compose/" "${DC_ORO_CONFIG_DIR}/"
+
+if ${DOCKER_BIN} system info --format '{{.SecurityOptions}}' | grep "name=rootless" > /dev/null 2>&1; then
+  # Use root user in the rootless mode
+  export DC_ORO_USER_NAME="root"
+else
+  export DC_ORO_USER_NAME="developer"
+fi
+
+NETWORK_NAME="dc_shared_net"
+# Check if the Docker network already exists
+if ! docker network ls --format '{{.Name}}' | grep -qw "$NETWORK_NAME"; then
+  >&2 echo "Creating Docker network: $NETWORK_NAME"
+  docker network create "$NETWORK_NAME"
+else
+  >&2 echo "Docker network '$NETWORK_NAME' already exists"
+fi
+
+if [[ -z $DC_ORO_MODE ]] && [[ "$OSTYPE" == "darwin"* ]]; then
+  export DC_ORO_MODE="mutagen"
+elif [[ -z $DC_ORO_MODE ]]; then
+  export DC_ORO_MODE="default"
+fi
+
+if [[ $DC_ORO_MODE == "mutagen" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-mutagen.yml" ]]; then
+  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-mutagen.yml"
+  MUTAGEN_SESSION_NAME=$(echo ${DC_ORO_NAME}-appcode | awk '{print tolower($0)}' | sed 's/[^0-9a-z]/-/g')
+  WAIT_SYNC="1"
+  if ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep "^${DC_ORO_NAME}_appcode$" > /dev/null 2>&1; then
+    if [[ $(${DOCKER_BIN} volume inspect -f '{{ .Options.type }}' ${DC_ORO_NAME}_appcode) == "nfs" ]]; then
+      ${DOCKER_BIN} volume rm ${DC_ORO_NAME}_appcode
+    fi
+  fi
+
+  if [[ $1 == "down" ]]; then
+    if mutagen sync list | grep -i "Name: ${MUTAGEN_SESSION_NAME}" > /dev/null 2>&1; then
+      mutagen sync terminate "${MUTAGEN_SESSION_NAME}"
+    fi
+    WAIT_SYNC=""
+  elif echo $1 | grep -v -i '^build\|pull' > /dev/null; then
+    if [[ "0" -eq $(${DOCKER_COMPOSE_BIN} ps -q mutagen  2> /dev/null | wc -l > /dev/null) ]]; then
+      ${DOCKER_COMPOSE_BIN} up -d mutagen
+    fi
+    DOCKER_CONTAINER_NAME_MUTAGEN=$(${DOCKER_BIN} inspect -f '{{.Name}}' $(${DOCKER_COMPOSE_BIN} ps -q mutagen) | cut -c2-)
+    if ! mutagen sync list | grep -i "Name: ${MUTAGEN_SESSION_NAME}" > /dev/null 2>&1; then
+      mutagen sync create --sync-mode=two-way-resolved \
+      --scan-mode=accelerated \
+      --watch-mode-alpha=portable \
+      --watch-mode-beta=force-poll \
+      --watch-polling-interval-beta=30 \
+      --ignore=".idea" \
+      --ignore=".history" \
+      --ignore=".mysql.initdb.d" \
+      --ignore=".psql.initdb.d" \
+      --ignore=".git" \
+      --ignore-vcs \
+      --symlink-mode=ignore \
+      --name=${MUTAGEN_SESSION_NAME} \
+      "$DC_ORO_APPDIR" docker://${DC_ORO_USER_NAME}@${DOCKER_CONTAINER_NAME_MUTAGEN}/var/www
+    else
+      WAIT_SYNC=""
+    fi
+
+    if [[ $WAIT_SYNC == "1" ]]; then
+      until mutagen sync list "${MUTAGEN_SESSION_NAME}" | grep 'Status:' | grep 'Watching for changes' > /dev/null 2>&1; do
+        if which tput > /dev/null 2>&1; then
+          tput cuu 1 && tput el
+        fi
+        mutagen sync list "${MUTAGEN_SESSION_NAME}" | grep 'Status:' | echo $(awk -F: '{ print $2 }')
+        sleep 3
+      done
+    fi
+  fi
+fi
+
+if [[ ${DC_ORO_MODE} == "ssh" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-ssh.yml" ]]; then
+  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-ssh.yml"
+  ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
+    [[ $1 == "up" ]] && {
+      >&2 echo "==> Copying source code to the '${DC_ORO_NAME}_appcode' docker valume"
+      ${DOCKER_BIN} volume create "${DC_ORO_NAME}_appcode"  > /dev/null
+      ${DOCKER_COMPOSE_BIN} up -d ssh
+      SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
+      SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
+      sleep 3
+      until ${RSYNC_BIN} --exclude vendor --exclude node_modules --links -e "ssh -o StrictHostKeyChecking=no -p $SSH_PORT" --timeout=3 --info=progress2 -r "${DC_ORO_APPDIR}/" ${DC_ORO_USER_NAME}@${SSH_HOST}:"${DC_ORO_APPDIR}/"; do
+        sleep 5
+      done
+    }
+  }
+fi
+
+if [[ $DC_ORO_MODE == "default" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-default.yml" ]]; then
+  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-default.yml"
+fi
+
+if [[ $DC_ORO_DB_SCHEMA == "pgsql" ]] || [[ $DC_ORO_DB_SCHEMA == "postgres" ]];then
+  export DC_ORO_DC_ORO_DB_PORT=${DC_ORO_DC_ORO_DB_PORT:-5432}
+  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-pgsql.yml"
+elif [[ $DC_ORO_DB_SCHEMA == "mariadb" ]] || [[ $DC_ORO_DB_SCHEMA == "mysql" ]];then
+  export DC_ORO_DC_ORO_DB_PORT=${DC_ORO_DC_ORO_DB_PORT:-3306}
+  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-mysql.yml"
+fi
+if ${DOCKER_COMPOSE_BIN} ps --services | grep database > /dev/null; then
+  SERVICE_DATABASE_ID=$(${DOCKER_COMPOSE_BIN} ps -q database)
+  if [[ "" != $SERVICE_DATABASE_ID ]] && ${DOCKER_BIN} inspect -f '{{ .Config.Image }}' "$SERVICE_DATABASE_ID" | grep 'busybox'; then
+    ${DOCKER_COMPOSE_BIN} stop database
+    ${DOCKER_COMPOSE_BIN} rm -f database
+  fi
+fi
+
+if [[ -f "$DC_ORO_APPDIR/.docker-compose.user.yml" ]]; then
+  >&2 echo "==> Additional ${DOCKER_BIN} compose config will be used: $DC_ORO_APPDIR/.docker-compose.user.yml"
+  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f $DC_ORO_APPDIR/.docker-compose.user.yml"
+fi
+
+if [[ -f "$DC_ORO_APPDIR/.php-version" ]] && [[ -z $DC_ORO_PHP_VERSION ]]; then
+  export DC_ORO_PHP_VERSION=$(cat $DC_ORO_APPDIR/.php-version | head -n1)
+  >&2 echo "==> Found .php-version with following version: $DC_ORO_PHP_VERSION"
+fi
+
+if [[ -f "$DC_ORO_APPDIR/.phprc" ]] && [[ -z $DC_ORO_PHP_VERSION ]]; then
+  export DC_ORO_PHP_VERSION=$(cat $DC_ORO_APPDIR/.phprc | head -n1)
+  >&2 echo "==> Found .phprc with following version: $DC_ORO_PHP_VERSION"
+fi
+
+if [[ -f "$DC_ORO_APPDIR/.nvmrc" ]] && [[ -z $DC_ORO_NODE_VERSION ]]; then
+  export DC_ORO_NODE_VERSION=$(cat $DC_ORO_APPDIR/.nvmrc | head -n1)
+  >&2 echo "==> Found .nvmrc with following version: $DC_ORO_NODE_VERSION"
+fi
+
+if [[ $DOCKER_COMPOSE_VERSION -gt 1 ]]; then
+  DOCKER_COMPOSE_RUN_CMD="${DOCKER_COMPOSE_BIN} run -i --rm"
+else
+  DOCKER_COMPOSE_RUN_CMD="${DOCKER_COMPOSE_BIN} run --rm"
+fi
+
+if ${DOCKER_BIN} system info --format '{{.SecurityOptions}}' | grep "name=rootless" > /dev/null; then
+  DOCKER_COMPOSE_RUN_CMD="${DOCKER_COMPOSE_RUN_CMD} --user root"
+fi
+
+if [[ $1 == "up" ]]; then
+  printf "\033[0;37m[${DC_ORO_NAME}] Application URL: http://localhost:${DC_ORO_PORT_NGINX}/\033[0m\n"
+  printf "\033[0;37m[${DC_ORO_NAME}] XHGUI URL: http://localhost:${DC_ORO_PORT_XHGUI}/\033[0m\n"
+  printf "\033[0;37m[${DC_ORO_NAME}] Mailhog URL: http://localhost:${DC_ORO_PORT_MAIL_WEBGUI}/\033[0m\n"
+  printf "\033[0;37m[${DC_ORO_NAME}] Elasticsearch URL: http://localhost:${DC_ORO_PORT_ELASTICSEARCH}/\033[0m\n"
+  printf "\033[0;37m[${DC_ORO_NAME}] MySql Address: 127.0.0.1:${DC_ORO_PORT_MYSQL}\033[0m\n"
+  printf "\033[0;37m[${DC_ORO_NAME}] PgSql Address: 127.0.0.1:${DC_ORO_PORT_PGSQL}\033[0m\n"
+fi
+
+if echo $1 | grep -i 'import' | grep -i 'db\|database' > /dev/null; then
+  if [[ -z $2 ]]; then
+    >&2 echo "Data file was not provided"
+    exit 1
+  fi
+  if [[ -r $2 ]]; then
+    DB_DUMP=$(realpath $2)
+  elif [[ -r "$DC_ORO_APPDIR/$2" ]]; then
+    DB_DUMP=$(realpath "$DC_ORO_APPDIR/$2")
+  fi
+
+  if [[ -z $DB_DUMP ]] || [[ ! -r $DB_DUMP ]]; then
+    >&2 echo "Data file '$2' does not readable"
+    exit 1
+  fi
+
+  DB_DUMP_BASENAME=$(echo "${DB_DUMP##*/}")
+  if [[ $DC_ORO_DB_SCHEMA == "pdo_pgsql" ]] || [[ $DC_ORO_DB_SCHEMA == "postgres" ]];then
+    DB_IMPORT_CMD="PGPASSWORD=\$DC_ORO_DB_PASSWORD psql --set ON_ERROR_STOP=on -h \$DC_ORO_DB_HOST -p \$DC_ORO_DB_PORT -U \$DC_ORO_DB_USER -d \$DC_ORO_DB_DBNAME -1 >/dev/null"
+  elif [[ $DC_ORO_DB_SCHEMA == "pdo_mysql" ]] || [[ $DC_ORO_DB_SCHEMA == "mysql" ]];then
+    DB_IMPORT_CMD="sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/DEFINER=CURRENT_USER \*/' | MYSQL_PWD=\$DC_ORO_DB_PASSWORD mysql -h\$DC_ORO_DB_HOST -P\$DC_ORO_DB_PORT -u\$DC_ORO_DB_USER \$DC_ORO_DB_DBNAME"
+  fi
+
+  if echo ${DB_DUMP_BASENAME} | grep -i 'sql\.gz$' > /dev/null; then
+    DB_IMPORT_CMD="gunzip | ${DB_IMPORT_CMD}"
+  fi
+  DB_IMPORT_CMD="cat /${DB_DUMP_BASENAME} | ${DB_IMPORT_CMD}"
+
+  >&2 echo "Starting import of the database dump..."
+  exec ${DOCKER_COMPOSE_RUN_CMD} -v "${DB_DUMP}:/${DB_DUMP_BASENAME}" database-cli bash -c "$DB_IMPORT_CMD"
+fi
+
+if echo $1 | grep -i 'export\|dump' | grep -i 'db\|database' > /dev/null; then
+  DB_DUMP=$DC_ORO_APPDIR/database-$(date +'%Y%m%d%H%M%S').sql.gz
+  DB_DUMP_BASENAME=$(echo "${DB_DUMP##*/}")
+  touch "${DB_DUMP}"
+  if [[ $DC_ORO_DB_SCHEMA == "pgsql" ]] || [[ $DC_ORO_DB_SCHEMA == "postgres" ]];then
+    DB_EXPORT_CMD="PGPASSWORD=\$DC_ORO_DB_PASSWORD pg_dump -Fp --clean --if-exists -h \$DC_ORO_DB_HOST -p \$DC_ORO_DB_PORT -U \$DC_ORO_DB_USER -d \$DC_ORO_DB_DBNAME"
+  elif [[ $DC_ORO_DB_SCHEMA == "mariadb" ]] || [[ $DC_ORO_DB_SCHEMA == "mysql" ]];then
+    DB_EXPORT_CMD="MYSQL_PWD=\$DC_ORO_DB_PASSWORD mysqldump --no-tablespaces --column-statistics=0 --set-gtid-purged=OFF --quick --max-allowed-packet=16M --disable-keys --hex-blob --no-autocommit --insert-ignore --skip-lock-tables --single-transaction -h\$DC_ORO_DB_HOST -P\$DC_ORO_DB_PORT -u\$DC_ORO_DB_USER \$DC_ORO_DB_DBNAME | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/DEFINER=CURRENT_USER \*/'"
+  fi
+
+  >&2 echo "/* Starting export of the database... */"
+  >&2 echo "/* Dumping database to: $DB_DUMP */"
+  exec ${DOCKER_COMPOSE_RUN_CMD} -v "${DB_DUMP}:/${DB_DUMP_BASENAME}" database-cli bash -c "$DB_EXPORT_CMD | gzip > /${DB_DUMP_BASENAME}"
+fi
+
+if echo $1 | grep -i '^mysql' > /dev/null; then
+  MYSQL_CMD="MYSQL_PWD=\$DC_ORO_DB_PASSWORD mysql -h\$DC_ORO_DB_HOST -P\$DC_ORO_DB_PORT -u\$DC_ORO_DB_USER \$DC_ORO_DB_DBNAME"
+  exec ${DOCKER_COMPOSE_RUN_CMD} database-cli bash -c "$MYSQL_CMD"
+fi
+
+if echo $1 | grep -i '^psql' > /dev/null; then
+  PSQL_CMD="PGPASSWORD=\$DC_ORO_DB_PASSWORD psql -h \$DC_ORO_DB_HOST -p \$DC_ORO_DB_PORT -U \$DC_ORO_DB_USER -d \$DC_ORO_DB_DBNAME"
+  exec ${DOCKER_COMPOSE_RUN_CMD} database-cli bash -c "$PSQL_CMD"
+fi
+
+if echo $1 | grep -i '^ssh' > /dev/null; then
+  for i in "${@:2}"; do
+      i="${i//\\/\\\\}"
+      i="${i//$/\\$}"
+      C="$C \"${i//\"/\\\"}\""
+  done
+  SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
+  SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
+  set -x
+  exec bash -c "ssh -o 'SendEnv COMPOSER_AUTH' -o StrictHostKeyChecking=no -p $SSH_PORT ${DC_ORO_USER_NAME}@${SSH_HOST} $C"
+fi
+
+if echo $1 | grep -i '^composer\|bin/\|npm\|php\|node\|yarn\|bash\|symfony' > /dev/null; then
+  for i in "$@"; do
+      i="${i//\\/\\\\}"
+      i="${i//$/\\$}"
+      C="$C \"${i//\"/\\\"}\""
+  done
+  exec ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "exec $C"
+fi
+
+if echo $1 | grep -i '^install' > /dev/null; then
+  export XDEBUG_MODE=off
+  exec ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "exec php bin/console --env=prod --timeout=1800 oro:install --language=en --formatting-code=en_US --organization-name='Acme Inc.' --user-name=admin --user-email=admin@example.com --user-firstname=John --user-lastname=Doe --user-password='\$ecretPassw0rd' --application-url='https://${DC_ORO_NAME:-unnamed}.docker.local/' --sample-data=y"
+fi
+
+if [[ $1 == "down" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
+  rm -f "${DC_ORO_CONFIG_DIR}/compose.yml"
+else
+  ${DOCKER_COMPOSE_BIN} config > "${DC_ORO_CONFIG_DIR}/compose.yml"
+fi
+
+exec ${DOCKER_COMPOSE_BIN} "$@"

@@ -1,0 +1,11 @@
+services:
+  database:
+    image: 'busybox'
+    container_name: ${DC_ORO_NAME:-unnamed}_database
+    hostname: database.${DC_ORO_NAME:-unnamed}.docker.local
+    command: sleep infinity
+    networks:
+      - 'app'
+    restart: always
+    healthcheck:
+      test: "sh -c 'exit 0'"

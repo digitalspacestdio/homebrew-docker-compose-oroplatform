@@ -1,0 +1,74 @@
+services:
+  ssh:
+    container_name: "${DC_ORO_NAME:-unnamed}_ssh_${DC_ORO_PHP_VERSION:-8.3}-${DC_ORO_NODE_VERSION:-20}-${DC_ORO_COMPOSER_VERSION:-2}"
+    hostname: ssh.${DC_ORO_NAME:-unnamed}.docker.local
+    build:
+      context: "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony"
+      dockerfile: Dockerfile.${DC_ORO_PHP_VERSION:-8.3}.${DC_ORO_PHP_DIST:-alpine}
+      args:
+        APP_DIR: "${DC_ORO_APPDIR:-/var/www}"
+        PHP_VERSION: "${DC_ORO_PHP_VERSION:-8.3}"
+        NODE_VERSION: "${DC_ORO_NODE_VERSION:-20}"
+        PHP_USER_NAME: "${DC_ORO_PHP_USER_NAME:-developer}"
+        PHP_USER_GROUP: "${DC_ORO_PHP_USER_GROUP:-developer}"
+        PHP_UID: "${DC_ORO_PHP_UID:-1000}"
+        PHP_GID: "${DC_ORO_PHP_GID:-1000}"
+        COMPOSER_VERSION: "${DC_ORO_COMPOSER_VERSION:-2}"
+    user: "root"
+    command: docker-sshd
+    volumes:
+      - "appcode:${DC_ORO_APPDIR:-/var/www}"
+      - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
+      - "home-root:/root"
+      - "ssh-hostkeys:/etc/ssh/hostkeys"
+      - "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro"
+    working_dir: "${DC_ORO_APPDIR:-/var/www}"
+    networks:
+      - 'app'
+    ports:
+      - "${DC_ORO_SSH_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_SSH:-${DC_ORO_PORT_PREFIX}22}:22"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - 'APP_DIR=${DC_ORO_APPDIR:-/var/www}'
+      - 'DC_ORO_APPDIR=${DC_ORO_APPDIR:-/var/www}'
+      - 'DC_ORO_DB_HOST=${DC_ORO_DB_HOST:-database}'
+      - 'DC_ORO_DB_PORT=${DC_ORO_DB_PORT:-3306}'
+      - 'DC_ORO_DB_USER=${DC_ORO_DB_USER:-app}'
+      - 'DC_ORO_DB_PASSWORD=${DC_ORO_DB_PASSWORD:-app}'
+      - 'DC_ORO_DB_DBNAME=${DC_ORO_DB_DBNAME:-app}'
+      - 'ORO_DB_URL=${DC_ORO_DB_URL}'
+      - 'ORO_DB_DSN=${DC_ORO_DB_URL}'
+      - 'ORO_DB_HOST=${DC_ORO_DB_HOST:-database}'
+      - 'ORO_DB_PORT=${DC_ORO_DB_PORT:-3306}'
+      - 'ORO_DB_NAME=${DC_ORO_DB_DBNAME:-app}'
+      - 'ORO_DB_USER=${DC_ORO_DB_USER:-app}'
+      - 'ORO_DB_PASSWORD=${DC_ORO_DB_PASSWORD:-app}'
+      - 'ORO_MAILER_DRIVER=${ORO_MAILER_DRIVER-smtp}'
+      - 'ORO_MAILER_HOST=${ORO_MAILER_HOST-mail}'
+      - 'ORO_MAILER_PORT=${ORO_MAILER_PORT-1025}'
+      - 'ORO_SECRET=${ORO_SECRET-ThisTokenIsNotSoSecretChangeIt}'
+      - 'XHGUI_MONGO_HOSTNAME=mongodb'
+      - 'XHGUI_MONGO_DATABASE=xhprof'
+      - 'COMPOSER_AUTH=${DC_ORO_COMPOSER_AUTH:-null}'
+      - 'NODE_OPTIONS="--max-old-space-size=1024"'
+      - 'SYMFONY_ENV=${SYMFONY_ENV:-dev}'
+      - 'XDEBUG_MODE=${XDEBUG_MODE_CLI:-off}'
+      - 'ORO_SSH_PUBLIC_KEY=${ORO_SSH_PUBLIC_KEY:-null}'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+    healthcheck:
+      test: "nc -vz -w 1 localhost 22"
+      start_period: 5s
+      interval: 5s
+      retries: 18
+    restart: always
+
+volumes:
+  appcode:
+    external: true
+    name: ${DC_ORO_NAME:-unnamed}_appcode
+  ssh-hostkeys:
+    driver: local
