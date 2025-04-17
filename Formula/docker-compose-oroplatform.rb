@@ -5,6 +5,7 @@ class DockerComposeOroplatform < Formula
   version "0.6.8"
   revision 1
 
+  depends_on 'yq'
   depends_on 'jq'
   depends_on 'coreutils'
   depends_on 'rsync'
