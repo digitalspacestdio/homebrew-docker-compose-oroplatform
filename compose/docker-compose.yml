@@ -444,7 +444,7 @@ services:
     container_name: ${DC_ORO_NAME:-unnamed}_redis
     restart: always
     healthcheck:
-      test: nc -vz -w 1 localhost 6379
+      test: /bin/bash -c "</dev/tcp/localhost/6379"
       start_period: 5s
       interval: 5s
       retries: 18
