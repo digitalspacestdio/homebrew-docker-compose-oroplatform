@@ -1,6 +1,11 @@
 #!/bin/bash
 set -e
 
+if [[ -n $DEBUG ]]; then 
+  set -x
+fi
+
+
 load_env_safe() {
   local env_file="$1"
 
@@ -39,9 +44,60 @@ load_env_safe() {
   fi
 }
 
-if [[ -n $DEBUG ]]; then 
-  set -x
-fi
+parse_dsn_uri() {
+  local uri="$1"
+  local name="$2"
+  local prefix="$3"
+
+  [[ -n "$uri" && -n "$name" ]] || return 1
+
+  # Lowercase for host alias
+  local host_alias="${name,,}"
+
+  # Uppercase for variable prefix (PREFIX_NAME_)
+  local var_prefix=""
+  [[ -n "$prefix" ]] && var_prefix="${prefix^^}_"
+  var_prefix+="${name^^}_"
+
+  # Extract schema
+  local schema="${uri%%://*}"
+  local rest="${uri#*://}"
+
+  # Extract query string
+  local query="${rest#*\?}"
+  [[ "$rest" == "$query" ]] && query=""
+  local main="${rest%%\?*}"
+
+  # Extract user and password
+  local user="${main%%:*}"
+  local remainder="${main#*:}"
+  local password="${remainder%%@*}"
+  remainder="${remainder#*@}"
+
+  # Extract host
+  local host="${remainder%%:*}"
+  [[ "$host" == "localhost" || "$host" == "127.0.0.1" ]] && host="$host_alias"
+
+  # Extract port and dbname
+  remainder="${remainder#*:}"
+  local port="${remainder%%/*}"
+  remainder="${remainder#*/}"
+  local dbname="${remainder%%\?*}"
+
+  # Reconstruct normalized URI
+  local clean_uri="${schema}://${user}:${password}@${host}:${port}/${dbname}"
+  [[ -n "$query" ]] && clean_uri+="?$query"
+
+  # Export variables
+  eval "export ${var_prefix}SCHEMA=\"\$schema\""
+  eval "export ${var_prefix}USER=\"\$user\""
+  eval "export ${var_prefix}PASSWORD=\"\$password\""
+  eval "export ${var_prefix}HOST=\"\$host\""
+  eval "export ${var_prefix}PORT=\"\$port\""
+  eval "export ${var_prefix}DBNAME=\"\$dbname\""
+  eval "export ${var_prefix}QUERY=\"\$query\""
+  eval "export ${var_prefix}URI=\"\$clean_uri\""
+}
 
 DIR=$(brew --prefix docker-compose-oroplatform)/share/docker-compose-oroplatform
 export PWD=$(pwd)
@@ -108,53 +164,58 @@ load_env_safe "$DC_ORO_APPDIR/.env-app"
 load_env_safe "$DC_ORO_APPDIR/.env-app.local"
 load_env_safe "$DC_ORO_APPDIR/.env.dc"
 
-DC_ORO_DB_URL="${ORO_DB_URL:-${ORO_DB_DSN}}"
+# DC_ORO_DB_URL="${ORO_DB_URL:-${ORO_DB_DSN}}"
 
-# Schema
-DC_ORO_DB_SCHEMA="${DC_ORO_DB_URL%%://*}"
+# # Schema
+# DC_ORO_DB_SCHEMA="${DC_ORO_DB_URL%%://*}"
 
-# Remove schema postgres://
-DC_ORO_DB_URL_NO_SCHEMA="${DC_ORO_DB_URL#*://}"
+# # Remove schema postgres://
+# DC_ORO_DB_URL_NO_SCHEMA="${DC_ORO_DB_URL#*://}"
 
-# Extract query string
-DC_ORO_DB_URL_MAIN="${DC_ORO_DB_URL_NO_SCHEMA%%\?*}"
+# # Extract query string
+# DC_ORO_DB_URL_MAIN="${DC_ORO_DB_URL_NO_SCHEMA%%\?*}"
 
-# Extract login
-export DC_ORO_DB_USER="${DC_ORO_DB_URL_MAIN%%:*}"
+# # Extract login
+# export DC_ORO_DB_USER="${DC_ORO_DB_URL_MAIN%%:*}"
 
-# Extract login extra
-DC_ORO_DB_REMAINDER="${DC_ORO_DB_URL_MAIN#*:}"
+# # Extract login extra
+# DC_ORO_DB_REMAINDER="${DC_ORO_DB_URL_MAIN#*:}"
 
-# Extract password
-export DC_ORO_DB_PASSWORD="${DC_ORO_DB_REMAINDER%%@*}"
+# # Extract password
+# export DC_ORO_DB_PASSWORD="${DC_ORO_DB_REMAINDER%%@*}"
 
-# Extract login AT
-DC_ORO_DB_REMAINDER="${DC_ORO_DB_REMAINDER#*@}"
+# # Extract login AT
+# DC_ORO_DB_REMAINDER="${DC_ORO_DB_REMAINDER#*@}"
 
-# Extract host
-export DC_ORO_DB_HOST="${DC_ORO_DB_REMAINDER%%:*}"
+# # Extract host
+# export DC_ORO_DB_HOST="${DC_ORO_DB_REMAINDER%%:*}"
 
-if [[ ${DC_ORO_DB_HOST} = "localhost" ]] || [[ ${DC_ORO_DB_HOST} = "127.0.0.1" ]]; then
-  export DC_ORO_DB_HOST="database"
-fi
+# if [[ ${DC_ORO_DB_HOST} = "localhost" ]] || [[ ${DC_ORO_DB_HOST} = "127.0.0.1" ]]; then
+#   export DC_ORO_DB_HOST="database"
+# fi
 
-# Extract host extra
-DC_ORO_DB_REMAINDER="${DC_ORO_DB_REMAINDER#*:}"
+# # Extract host extra
+# DC_ORO_DB_REMAINDER="${DC_ORO_DB_REMAINDER#*:}"
 
-# Extract port
-export DC_ORO_DB_PORT="${DC_ORO_DB_REMAINDER%%/*}"
+# # Extract port
+# export DC_ORO_DB_PORT="${DC_ORO_DB_REMAINDER%%/*}"
 
-# Extract port extra
-DC_ORO_DB_REMAINDER="${DC_ORO_DB_REMAINDER#*/}"
+# # Extract port extra
+# DC_ORO_DB_REMAINDER="${DC_ORO_DB_REMAINDER#*/}"
 
-# Extract database name
-DC_ORO_DB_DBNAME="$DC_ORO_DB_REMAINDER"
+# # Extract database name
+# DC_ORO_DB_DBNAME="$DC_ORO_DB_REMAINDER"
 
-# Remove query string from dbname
-export DC_ORO_DB_DBNAME="${DC_ORO_DB_DBNAME%%\?*}"
+# # Remove query string from dbname
+# export DC_ORO_DB_DBNAME="${DC_ORO_DB_DBNAME%%\?*}"
+
+parse_dsn_uri "$ORO_DB_URL" "database" "DC_ORO"
+parse_dsn_uri "$ORO_SEARCH_URL" "search" "DC_ORO"
+parse_dsn_uri "$ORO_MQ_DSN" "mq" "DC_ORO"
+parse_dsn_uri "$ORO_REDIS_URL" "redis" "DC_ORO"
 
 # Build new db url
-export DC_ORO_DB_URL="${DC_ORO_DB_SCHEMA:-postgres}://${DC_ORO_DB_USER:-oro_db_user}:${DC_ORO_DB_PASSWORD:-oro_db_pass}@${DC_ORO_DB_HOST:-database}:${DC_ORO_DB_PORT:-5432}/${DC_ORO_DB_DBNAME:-oro_db}?sslmode=disable&charset=utf8&serverVersion=13.7"
+#export DC_ORO_DB_URL="${DC_ORO_DB_SCHEMA:-postgres}://${DC_ORO_DB_USER:-oro_db_user}:${DC_ORO_DB_PASSWORD:-oro_db_pass}@${DC_ORO_DB_HOST:-database}:${DC_ORO_DB_PORT:-5432}/${DC_ORO_DB_DBNAME:-oro_db}?sslmode=disable&charset=utf8&serverVersion=13.7"
 
 export DC_ORO_NAME=${DC_ORO_NAME-$(basename $(pwd))}
 export DC_ORO_PORT_PREFIX=${DC_ORO_PORT_PREFIX-"301"}
@@ -162,7 +223,9 @@ export DC_ORO_PORT_NGINX=$(find_free_port nginx ${DC_ORO_PORT_PREFIX}80)
 export DC_ORO_PORT_XHGUI=$(find_free_port xhgui "${DC_ORO_PORT_PREFIX}81")
 export DC_ORO_PORT_MYSQL=$(find_free_port database "${DC_ORO_PORT_PREFIX}06")
 export DC_ORO_PORT_PGSQL=$(find_free_port database "${DC_ORO_PORT_PREFIX}32")
-export DC_ORO_PORT_ELASTICSEARCH=$(find_free_port elasticsearch "${DC_ORO_PORT_PREFIX}92")
+export DC_ORO_PORT_ELASTICSEARCH=$(find_free_port search "${DC_ORO_PORT_PREFIX}92")
+export DC_ORO_PORT_MQ=$(find_free_port mq "${DC_ORO_PORT_PREFIX}72")
+export DC_ORO_PORT_REDIS=$(find_free_port redis "${DC_ORO_PORT_PREFIX}72")
 export DC_ORO_PORT_MAIL_WEBGUI=$(find_free_port mail "${DC_ORO_PORT_PREFIX}25")
 export DC_ORO_PORT_SSH=$(find_free_port ssh "${DC_ORO_PORT_PREFIX}22")
 

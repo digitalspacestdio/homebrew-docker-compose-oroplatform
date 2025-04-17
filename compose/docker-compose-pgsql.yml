@@ -7,14 +7,14 @@ services:
     shm_size: 512m
     environment:
       LANG: 'C.UTF-8'
-      POSTGRES_USER: '${DC_ORO_DB_USER:-app}'
-      POSTGRES_PASSWORD: '${DC_ORO_DB_PASSWORD:-app}'
-      POSTGRES_DB: '${DC_ORO_DB_DBNAME:-app}'
+      POSTGRES_USER: '${DC_ORO_DATABASE_USER:-app}'
+      POSTGRES_PASSWORD: '${DC_ORO_DATABASE_PASSWORD:-app}'
+      POSTGRES_DB: '${DC_ORO_DATABASE_DBNAME:-app}'
     volumes:
       - '${DC_ORO_CONFIG_DIR:-.}/docker/pgsql/initdb.d:/docker-entrypoint-initdb.d:ro'
       - 'postgresql-data:/var/lib/postgresql/data:delegated'
     ports:
-      - '${DC_ORO_DB_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_PGSQL:-${DC_ORO_PORT_PREFIX}32}:5432'
+      - '${DC_ORO_DATABASE_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_PGSQL:-${DC_ORO_PORT_PREFIX}32}:5432'
     networks:
       - 'app'
     restart: always
@@ -37,16 +37,16 @@ services:
       - 'project.name=${DC_ORO_NAME}'
     environment:
       LANG: 'C.UTF-8'
-      DC_ORO_DB_HOST: '${DC_ORO_DB_HOST:-database}'
-      DC_ORO_DB_PORT: '${DC_ORO_DB_PORT:-5432}'
-      DC_ORO_DB_USER: '${DC_ORO_DB_USER:-app}'
-      DC_ORO_DB_PASSWORD: '${DC_ORO_DB_PASSWORD:-app}'
-      DC_ORO_DB_DBNAME: '${DC_ORO_DB_DBNAME:-app}'
-      DATABASE_HOST: '${DC_ORO_DB_HOST:-database}'
-      DATABASE_PORT: '${DC_ORO_DB_PORT:-5432}'
-      DATABASE_USER: '${DC_ORO_DB_USER:-app}'
-      DATABASE_PASSWORD: '${DC_ORO_DB_PASSWORD:-app}'
-      DATABASE_NAME: '${DC_ORO_DB_DBNAME:-app}'
+      DC_ORO_DATABASE_HOST: '${DC_ORO_DATABASE_HOST:-database}'
+      DC_ORO_DATABASE_PORT: '${DC_ORO_DATABASE_PORT:-5432}'
+      DC_ORO_DATABASE_USER: '${DC_ORO_DATABASE_USER:-app}'
+      DC_ORO_DATABASE_PASSWORD: '${DC_ORO_DATABASE_PASSWORD:-app}'
+      DC_ORO_DATABASE_DBNAME: '${DC_ORO_DATABASE_DBNAME:-app}'
+      DATABASE_HOST: '${DC_ORO_DATABASE_HOST:-database}'
+      DATABASE_PORT: '${DC_ORO_DATABASE_PORT:-5432}'
+      DATABASE_USER: '${DC_ORO_DATABASE_USER:-app}'
+      DATABASE_PASSWORD: '${DC_ORO_DATABASE_PASSWORD:-app}'
+      DATABASE_NAME: '${DC_ORO_DATABASE_DBNAME:-app}'
     networks:
       - 'app'
     depends_on:
