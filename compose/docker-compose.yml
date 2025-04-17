@@ -13,7 +13,7 @@ services:
     container_name: "${DC_ORO_NAME:-unnamed}_fpm_${DC_ORO_PHP_VERSION:-8.3}-${DC_ORO_NODE_VERSION:-20}-${DC_ORO_COMPOSER_VERSION:-2}"
     hostname: fpm.${DC_ORO_NAME:-unnamed}.docker.local
     build:
-      dockerfile: Dockerfile.${DC_ORO_PHP_VERSION:-8.3}.${DC_ORO_PHP_DIST:-alpine}.${DC_ORO_PHP_DIST:-alpine}
+      dockerfile: Dockerfile.${DC_ORO_PHP_VERSION:-8.3}.${DC_ORO_PHP_DIST:-alpine}
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony"
       args:
         APP_DIR: "${DC_ORO_APPDIR:-/var/www}"
