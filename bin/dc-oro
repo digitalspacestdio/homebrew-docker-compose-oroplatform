@@ -52,12 +52,15 @@ parse_dsn_uri() {
   [[ -n "$uri" && -n "$name" ]] || return 1
 
   # Lowercase for host alias
-  local host_alias="${name,,}"
+  local host_alias
+  host_alias=$(echo "$name" | tr '[:upper:]' '[:lower:]')
 
-  # Uppercase for variable prefix (PREFIX_NAME_)
+  # Uppercase for variable prefix
   local var_prefix=""
-  [[ -n "$prefix" ]] && var_prefix="${prefix^^}_"
-  var_prefix+="${name^^}_"
+  if [[ -n "$prefix" ]]; then
+    var_prefix="$(echo "$prefix" | tr '[:lower:]' '[:upper:]')_"
+  fi
+  var_prefix+=$(echo "$name" | tr '[:lower:]' '[:upper:]')_
 
   # Extract schema
   local schema="${uri%%://*}"
@@ -76,7 +79,9 @@ parse_dsn_uri() {
 
   # Extract host
   local host="${remainder%%:*}"
-  [[ "$host" == "localhost" || "$host" == "127.0.0.1" ]] && host="$host_alias"
+  if [[ "$host" == "localhost" || "$host" == "127.0.0.1" ]]; then
+    host="$host_alias"
+  fi
 
   # Extract port and dbname
   remainder="${remainder#*:}"
