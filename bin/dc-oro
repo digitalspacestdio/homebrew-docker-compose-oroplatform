@@ -5,6 +5,16 @@ if [[ -n $DEBUG ]]; then
   set -x
 fi
 
+DIR=$(brew --prefix docker-compose-oroplatform)/share/docker-compose-oroplatform
+export PWD=$(pwd)
+RSYNC_BIN=$(brew --prefix rsync)/bin/rsync
+DOCKER_BIN="${DOCKER_BIN-$(which docker)}";
+DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN-$(which docker) compose}";
+DOCKER_COMPOSE_VERSION=$($DOCKER_COMPOSE_BIN version | grep '[0-9]\+\.[0-9]\+\.[0-9]\+' -o | awk -F. '{ print $1 }')
+if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose.yml" ]]; then
+  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose.yml"
+fi
+
 
 load_env_safe() {
   local env_file="$1"
@@ -104,9 +114,6 @@ parse_dsn_uri() {
   eval "export ${var_prefix}URI=\"\$clean_uri\""
 }
 
-DIR=$(brew --prefix docker-compose-oroplatform)/share/docker-compose-oroplatform
-export PWD=$(pwd)
-
 find-up () {
   path=${2-$PWD}
   while [[ "$path" != "" && ! -e "$path/$1" ]]; do
@@ -141,6 +148,14 @@ find_free_port()
     echo $SELECTED_PORT
   fi
 
+  while [ $PORT -le 65535 ]; do
+    # Проверяем, не занят ли порт в любом контейнере, включая остановленные
+    if ! docker ps -a --filter "expose=$PORT" --format '{{.Ports}}' | grep -q ":$PORT"; then
+      break
+    fi
+    PORT=$((PORT+1))
+  done
+
   while [ $PORT -le 65535 ] && lsof -t -i tcp:$PORT > /dev/null; do
     PORT=$((PORT+1));
   done;
@@ -162,7 +177,6 @@ if [[ -z $DC_ORO_COMPOSER_AUTH ]] && [[ -z $COMPOSER_AUTH ]]; then
 fi
 
 cd "$DC_ORO_APPDIR"
-
 
 load_env_safe "$DC_ORO_APPDIR/.env"
 load_env_safe "$DC_ORO_APPDIR/.env-app"
@@ -245,13 +259,6 @@ if [[ ! -d "${DC_ORO_CONFIG_DIR}" ]];then
     mkdir -p "${DC_ORO_CONFIG_DIR}"
 fi
 
-RSYNC_BIN=$(brew --prefix rsync)/bin/rsync
-DOCKER_BIN="${DOCKER_BIN-$(which docker)}";
-DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN-$(which docker) compose}";
-DOCKER_COMPOSE_VERSION=$($DOCKER_COMPOSE_BIN version | grep '[0-9]\+\.[0-9]\+\.[0-9]\+' -o | awk -F. '{ print $1 }')
-if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose.yml" ]]; then
-  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose.yml"
-fi
 
 ${RSYNC_BIN} -r "${DIR}/compose/" "${DC_ORO_CONFIG_DIR}/"
 
