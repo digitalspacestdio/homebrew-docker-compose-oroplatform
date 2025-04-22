@@ -7,6 +7,8 @@ fi
 
 DIR=$(brew --prefix docker-compose-oroplatform)/share/docker-compose-oroplatform
 export PWD=$(pwd)
+export DC_ORO_NAME=${DC_ORO_NAME-$(basename $(pwd))}
+export DC_ORO_CONFIG_DIR="$HOME/.$(basename $0)/${DC_ORO_NAME}"
 RSYNC_BIN=$(brew --prefix rsync)/bin/rsync
 DOCKER_BIN="${DOCKER_BIN-$(which docker)}";
 DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN-$(which docker) compose}";
@@ -236,7 +238,7 @@ parse_dsn_uri "$ORO_REDIS_URL" "redis" "DC_ORO"
 # Build new db url
 #export DC_ORO_DB_URL="${DC_ORO_DB_SCHEMA:-postgres}://${DC_ORO_DB_USER:-oro_db_user}:${DC_ORO_DB_PASSWORD:-oro_db_pass}@${DC_ORO_DB_HOST:-database}:${DC_ORO_DB_PORT:-5432}/${DC_ORO_DB_DBNAME:-oro_db}?sslmode=disable&charset=utf8&serverVersion=13.7"
 
-export DC_ORO_NAME=${DC_ORO_NAME-$(basename $(pwd))}
+
 export DC_ORO_PORT_PREFIX=${DC_ORO_PORT_PREFIX-"301"}
 export DC_ORO_PORT_NGINX=$(find_free_port nginx ${DC_ORO_PORT_PREFIX}80)
 export DC_ORO_PORT_XHGUI=$(find_free_port xhgui "${DC_ORO_PORT_PREFIX}81")
@@ -249,7 +251,6 @@ export DC_ORO_PORT_MAIL_WEBGUI=$(find_free_port mail "${DC_ORO_PORT_PREFIX}25")
 export DC_ORO_PORT_SSH=$(find_free_port ssh "${DC_ORO_PORT_PREFIX}22")
 
 export DC_ORO_COMPOSER_AUTH=${DC_ORO_COMPOSER_AUTH-${COMPOSER_AUTH-""}}
-export DC_ORO_CONFIG_DIR="$HOME/.$(basename $0)/${DC_ORO_NAME}"
 
 if [[ -z $COMPOSER_AUTH ]]; then
   export COMPOSER_AUTH=${DC_ORO_COMPOSER_AUTH}
