@@ -358,7 +358,7 @@ services:
       ELASTIC_PASSWORD: elastic
       discovery.type: 'single-node'
     ports:
-      - "${DC_ORO_ES_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_ELASTICSEARCH:-${DC_ORO_PORT_PREFIX}92}:9200"
+      - "${DC_ORO_SEARCH_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_SEARCH:-${DC_ORO_PORT_PREFIX}92}:9200"
     networks:
       - 'app'
     restart: always
@@ -424,7 +424,7 @@ services:
     hostname: mq.${DC_ORO_NAME:-unnamed}.docker.local
     container_name: ${DC_ORO_NAME:-unnamed}_mq
     ports:
-      - "${DC_ORO_ES_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_RABBITMQ:-${DC_ORO_PORT_PREFIX}72}:15672"
+      - "${DC_ORO_MQ_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_MQ:-${DC_ORO_PORT_PREFIX}72}:15672"
     environment:
       RABBITMQ_DEFAULT_USER: ${DC_ORO_MQ_USER:-app}
       RABBITMQ_DEFAULT_PASS: ${DC_ORO_MQ_PASSWORD:-app}
