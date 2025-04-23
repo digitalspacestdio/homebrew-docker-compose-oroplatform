@@ -211,7 +211,6 @@ RUN curl -1sLf 'https://dl.cloudsmith.io/public/symfony/stable/setup.alpine.sh' 
       && apk add symfony-cli
 
 COPY msmtprc /.msmtprc
-COPY msmtprc /.msmtprc
 
 ARG APP_DIR="/var/www"
 ENV APP_DIR=${APP_DIR}

@@ -221,7 +221,6 @@ ENV CXXFLAGS="-std=c++14"
 ENV CFLAGS="-std=c++14"
 
 COPY msmtprc /.msmtprc
-COPY msmtprc /.msmtprc
 
 ARG APP_DIR="/var/www"
 ENV APP_DIR=${APP_DIR}
