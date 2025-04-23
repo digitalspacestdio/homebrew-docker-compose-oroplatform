@@ -136,6 +136,10 @@ if [[ -z $DC_ORO_APPDIR ]]; then
   fi
 fi
 
+if [[ ! -d "${DC_ORO_CONFIG_DIR}" ]]; then
+    mkdir -p "${DC_ORO_CONFIG_DIR}"
+fi
+
 if [[ ! -d "$DC_ORO_APPDIR" ]]; then
   mkdir -p "$DC_ORO_APPDIR"
 fi
@@ -202,10 +206,6 @@ export DC_ORO_PORT_SSH=$(find_free_port ssh "${DC_ORO_PORT_PREFIX}22")
 
 export COMPOSER_AUTH=$(echo ${DC_ORO_COMPOSER_AUTH:-${COMPOSER_AUTH}} | jq -c .)
 export DC_ORO_COMPOSER_AUTH=${COMPOSER_AUTH}
-
-if [[ ! -d "${DC_ORO_CONFIG_DIR}" ]];then
-    mkdir -p "${DC_ORO_CONFIG_DIR}"
-fi
 
 
 ${RSYNC_BIN} -r "${DIR}/compose/" "${DC_ORO_CONFIG_DIR}/"
