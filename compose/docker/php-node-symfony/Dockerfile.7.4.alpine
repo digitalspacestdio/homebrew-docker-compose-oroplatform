@@ -229,6 +229,26 @@ ENV APP_DIR=${APP_DIR}
 RUN chmod 0666 /usr/local/etc/php/conf.d/*
 RUN chown ${PHP_USER_NAME}:${PHP_USER_GROUP} /var/www
 
+ENV JBR_VERSION="jbr-21.0.5"
+ENV JBR_BUILD="b631.28"
+
+RUN ARCH=$(uname -m) && \
+    case "$ARCH" in \
+        x86_64) JBR_ARCH="x64";; \
+        aarch64) JBR_ARCH="aarch64";; \
+        *) echo "Unsupported arch: $ARCH" && exit 1;; \
+    esac && \
+    JBR_URL="https://cache-redirector.jetbrains.com/intellij-jbr/${JBR_VERSION}-linux-musl-${JBR_ARCH}-${JBR_BUILD}.tar.gz" && \
+    echo "Downloading JBR from $JBR_URL" && \
+    mkdir -p /opt/jbr && \
+    curl -fSL "$JBR_URL" -o jbr.tar.gz && \
+    tar -xzf jbr.tar.gz -C /opt/jbr --strip-components=1 && \
+    rm jbr.tar.gz
+
+RUN echo 'export JAVA_HOME=/opt/jbr' >> /etc/profile.d/java.sh; \
+    echo 'export PATH=$JAVA_HOME/bin:$PATH' >> /etc/profile.d/java.sh; \
+    ln -s /opt/jbr/bin/java /usr/bin/java
+
 WORKDIR ${APP_DIR}
 USER ${PHP_USER_NAME}
 VOLUME "/home/${PHP_USER_NAME}" "/root" "${APP_DIR}"
