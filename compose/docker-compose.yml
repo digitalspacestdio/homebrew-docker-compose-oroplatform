@@ -402,7 +402,7 @@ services:
         max-size: "10m"
 
   nginx:
-    image: ${DC_ORO_NAME:-unnamed}_nginx
+    image: digitalspacestudio/orodc-nginx
     hostname: nginx.${DC_ORO_NAME:-unnamed}.docker.local
     container_name: ${DC_ORO_NAME:-unnamed}_nginx
     build:
