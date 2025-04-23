@@ -61,7 +61,7 @@ parse_dsn_uri() {
   local name="$2"
   local prefix="$3"
 
-  [[ -n "$uri" && -n "$name" ]] || return 1
+  [[ -n "$uri" && -n "$name" ]] || return 0
 
   # Lowercase for host alias
   local host_alias
