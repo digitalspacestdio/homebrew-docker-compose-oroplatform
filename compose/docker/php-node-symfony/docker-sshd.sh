@@ -1,5 +1,6 @@
 #!/bin/bash
 set -x
+[ -f /etc/ssh/sshd_config.backup ] && cp /etc/ssh/sshd_config.backup /etc/ssh/sshd_config || cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup
 [ -f /etc/ssh/hostkeys/ssh_host_rsa_key ] || ssh-keygen -t rsa -f /etc/ssh/hostkeys/ssh_host_rsa_key -N ''; \
 [ -f /etc/ssh/hostkeys/ssh_host_ecdsa_key ] || ssh-keygen -t ecdsa -f /etc/ssh/hostkeys/ssh_host_ecdsa_key -N ''; \
 [ -f /etc/ssh/hostkeys/ssh_host_ed25519_key ] || ssh-keygen -t ed25519 -f /etc/ssh/hostkeys/ssh_host_ed25519_key -N ''; \

@@ -12,6 +12,7 @@ services:
   fpm:
     container_name: "${DC_ORO_NAME:-unnamed}_fpm_${DC_ORO_PHP_VERSION:-8.3}-${DC_ORO_NODE_VERSION:-20}-${DC_ORO_COMPOSER_VERSION:-2}"
     hostname: fpm.${DC_ORO_NAME:-unnamed}.docker.local
+    image: digitalspacestudio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.3}-${DC_ORO_NODE_VERSION:-20}-${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}
     build:
       dockerfile: Dockerfile.${DC_ORO_PHP_VERSION:-8.3}.${DC_ORO_PHP_DIST:-alpine}
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony"
@@ -45,14 +46,23 @@ services:
       - 'DC_ORO_DATABASE_USER=${DC_ORO_DATABASE_USER:-app}'
       - 'DC_ORO_DATABASE_PASSWORD=${DC_ORO_DATABASE_PASSWORD:-app}'
       - 'DC_ORO_DATABASE_DBNAME=${DC_ORO_DATABASE_DBNAME:-app}'
-      - 'ORO_DB_URL=${DC_ORO_DATABASE_URI}'
-      - 'ORO_DB_DSN=${DC_ORO_DATABASE_URI}'
+      - 'ORO_DB_URL=${DC_ORO_DATABASE_URI:-"postgres://${DC_ORO_DATABASE_USER:-app}:${DC_ORO_DATABASE_PASSWORD:-app}@${DC_ORO_DATABASE_HOST:-database}:${DC_ORO_DATABASE_PORT:-5432}//${DC_ORO_DATABASE_DBNAME:-app}"}'
+      - 'ORO_DB_DSN=${DC_ORO_DATABASE_URI:-"postgres://${DC_ORO_DATABASE_USER:-app}:${DC_ORO_DATABASE_PASSWORD:-app}@${DC_ORO_DATABASE_HOST:-database}:${DC_ORO_DATABASE_PORT:-5432}//${DC_ORO_DATABASE_DBNAME:-app}"}'
       - 'ORO_DB_HOST=${DC_ORO_DATABASE_HOST:-database}'
-      - 'ORO_DB_PORT=${DC_ORO_DATABASE_PORT:-3306}'
+      - 'ORO_DB_PORT=${DC_ORO_DATABASE_PORT:-5432}'
       - 'ORO_DB_NAME=${DC_ORO_DATABASE_DBNAME:-app}'
       - 'ORO_DB_USER=${DC_ORO_DATABASE_USER:-app}'
       - 'ORO_DB_PASSWORD=${DC_ORO_DATABASE_PASSWORD:-app}'
-      - 'ORO_MAILER_DRIVER=${ORO_MAILER_DRIVER-smtp}'
+      - 'ORO_SEARCH_URL=${DC_ORO_SEARCH_URI:-"elasticsearch://search:9200"}'
+      - 'ORO_SEARCH_DSN=${DC_ORO_SEARCH_URI:-"elasticsearch://search:9200"}'
+      - 'ORO_SEARCH_ENGINE_DSN=${DC_ORO_SEARCH_URI:-"elasticsearch://search:9200"}?prefix=oro_search'
+      - 'ORO_WEBSITE_SEARCH_ENGINE_DSN=${DC_ORO_SEARCH_URI:-"elasticsearch://search:9200"}?prefix=oro_website_search'
+      - 'ORO_MQ_DSN=${DC_ORO_MQ_URI:-""}'
+      - 'ORO_REDIS_URL=${DC_ORO_REDIS_URI:-""}'
+      - 'ORO_REDIS_CACHE_DSN=${DC_ORO_REDIS_URI:-""}/1'
+      - 'ORO_REDIS_DOCTRINE_DSN=${DC_ORO_REDIS_URI:-""}/2'
+      - 'ORO_REDIS_LAYOUT_DSN=${DC_ORO_REDIS_URI:-""}/3'
+      - 'ORO_MAILER_DRIVER=${ORO_MAILER_DRIVER:-smtp}'
       - 'ORO_MAILER_HOST=${ORO_MAILER_HOST-mail}'
       - 'ORO_MAILER_PORT=${ORO_MAILER_PORT-1025}'
       - 'ORO_SECRET=${ORO_SECRET-ThisTokenIsNotSoSecretChangeIt}'
@@ -79,6 +89,7 @@ services:
   cli:
     container_name: "${DC_ORO_NAME:-unnamed}_cli_${DC_ORO_PHP_VERSION:-8.3}-${DC_ORO_NODE_VERSION:-20}-${DC_ORO_COMPOSER_VERSION:-2}"
     hostname: cli.${DC_ORO_NAME:-unnamed}.docker.local
+    image: digitalspacestudio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.3}-${DC_ORO_NODE_VERSION:-20}-${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}
     build:
       dockerfile: Dockerfile.${DC_ORO_PHP_VERSION:-8.3}.${DC_ORO_PHP_DIST:-alpine}
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony"
@@ -110,13 +121,22 @@ services:
       - 'DC_ORO_DATABASE_USER=${DC_ORO_DATABASE_USER:-app}'
       - 'DC_ORO_DATABASE_PASSWORD=${DC_ORO_DATABASE_PASSWORD:-app}'
       - 'DC_ORO_DATABASE_DBNAME=${DC_ORO_DATABASE_DBNAME:-app}'
-      - 'ORO_DB_URL=${DC_ORO_DATABASE_URI}'
-      - 'ORO_DB_DSN=${DC_ORO_DATABASE_URI}'
+      - 'ORO_DB_URL=${DC_ORO_DATABASE_URI:-"postgres://${DC_ORO_DATABASE_USER:-app}:${DC_ORO_DATABASE_PASSWORD:-app}@${DC_ORO_DATABASE_HOST:-database}:${DC_ORO_DATABASE_PORT:-5432}//${DC_ORO_DATABASE_DBNAME:-app}"}'
+      - 'ORO_DB_DSN=${DC_ORO_DATABASE_URI:-"postgres://${DC_ORO_DATABASE_USER:-app}:${DC_ORO_DATABASE_PASSWORD:-app}@${DC_ORO_DATABASE_HOST:-database}:${DC_ORO_DATABASE_PORT:-5432}//${DC_ORO_DATABASE_DBNAME:-app}"}'
       - 'ORO_DB_HOST=${DC_ORO_DATABASE_HOST:-database}'
-      - 'ORO_DB_PORT=${DC_ORO_DATABASE_PORT:-3306}'
+      - 'ORO_DB_PORT=${DC_ORO_DATABASE_PORT:-5432}'
       - 'ORO_DB_NAME=${DC_ORO_DATABASE_DBNAME:-app}'
       - 'ORO_DB_USER=${DC_ORO_DATABASE_USER:-app}'
       - 'ORO_DB_PASSWORD=${DC_ORO_DATABASE_PASSWORD:-app}'
+      - 'ORO_SEARCH_URL=${DC_ORO_SEARCH_URI:-"elasticsearch://search:9200"}'
+      - 'ORO_SEARCH_DSN=${DC_ORO_SEARCH_URI:-"elasticsearch://search:9200"}'
+      - 'ORO_SEARCH_ENGINE_DSN=${DC_ORO_SEARCH_URI:-"elasticsearch://search:9200"}?prefix=oro_search'
+      - 'ORO_WEBSITE_SEARCH_ENGINE_DSN=${DC_ORO_SEARCH_URI:-"elasticsearch://search:9200"}?prefix=oro_website_search'
+      - 'ORO_MQ_DSN=${DC_ORO_MQ_URI:-""}'
+      - 'ORO_REDIS_URL=${DC_ORO_REDIS_URI:-""}'
+      - 'ORO_REDIS_CACHE_DSN=${DC_ORO_REDIS_URI:-""}/1'
+      - 'ORO_REDIS_DOCTRINE_DSN=${DC_ORO_REDIS_URI:-""}/2'
+      - 'ORO_REDIS_LAYOUT_DSN=${DC_ORO_REDIS_URI:-""}/3'
       - 'ORO_MAILER_DRIVER=${ORO_MAILER_DRIVER-smtp}'
       - 'ORO_MAILER_HOST=${ORO_MAILER_HOST-mail}'
       - 'ORO_MAILER_PORT=${ORO_MAILER_PORT-1025}'
@@ -147,6 +167,7 @@ services:
     container_name: "${DC_ORO_NAME:-unnamed}_consumer_${DC_ORO_PHP_VERSION:-8.3}-${DC_ORO_NODE_VERSION:-20}-${DC_ORO_COMPOSER_VERSION:-2}"
     hostname: consumer.${DC_ORO_NAME:-unnamed}.docker.local
     profiles: ["consumer"]
+    image: digitalspacestudio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.3}-${DC_ORO_NODE_VERSION:-20}-${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}
     build:
       dockerfile: Dockerfile.${DC_ORO_PHP_VERSION:-8.3}.${DC_ORO_PHP_DIST:-alpine}
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony"
@@ -176,16 +197,25 @@ services:
       - 'DC_ORO_DATABASE_USER=${DC_ORO_DATABASE_USER:-app}'
       - 'DC_ORO_DATABASE_PASSWORD=${DC_ORO_DATABASE_PASSWORD:-app}'
       - 'DC_ORO_DATABASE_DBNAME=${DC_ORO_DATABASE_DBNAME:-app}'
-      - 'ORO_DB_URL=${DC_ORO_DATABASE_URI}'
-      - 'ORO_DB_DSN=${DC_ORO_DATABASE_URI}'
+      - 'ORO_DB_URL=${DC_ORO_DATABASE_URI:-"postgres://${DC_ORO_DATABASE_USER:-app}:${DC_ORO_DATABASE_PASSWORD:-app}@${DC_ORO_DATABASE_HOST:-database}:${DC_ORO_DATABASE_PORT:-5432}//${DC_ORO_DATABASE_DBNAME:-app}"}'
+      - 'ORO_DB_DSN=${DC_ORO_DATABASE_URI:-"postgres://${DC_ORO_DATABASE_USER:-app}:${DC_ORO_DATABASE_PASSWORD:-app}@${DC_ORO_DATABASE_HOST:-database}:${DC_ORO_DATABASE_PORT:-5432}//${DC_ORO_DATABASE_DBNAME:-app}"}'
       - 'ORO_DB_HOST=${DC_ORO_DATABASE_HOST:-database}'
-      - 'ORO_DB_PORT=${DC_ORO_DATABASE_PORT:-3306}'
+      - 'ORO_DB_PORT=${DC_ORO_DATABASE_PORT:-5432}'
       - 'ORO_DB_NAME=${DC_ORO_DATABASE_DBNAME:-app}'
       - 'ORO_DB_USER=${DC_ORO_DATABASE_USER:-app}'
       - 'ORO_DB_PASSWORD=${DC_ORO_DATABASE_PASSWORD:-app}'
-      - 'ORO_MAILER_DRIVER=${ORO_MAILER_DRIVER-smtp}'
-      - 'ORO_MAILER_HOST=${ORO_MAILER_HOST-mail}'
-      - 'ORO_MAILER_PORT=${ORO_MAILER_PORT-1025}'
+      - 'ORO_SEARCH_URL=${DC_ORO_SEARCH_URI:-"elasticsearch://search:9200"}'
+      - 'ORO_SEARCH_DSN=${DC_ORO_SEARCH_URI:-"elasticsearch://search:9200"}'
+      - 'ORO_SEARCH_ENGINE_DSN=${DC_ORO_SEARCH_URI:-"elasticsearch://search:9200"}?prefix=oro_search'
+      - 'ORO_WEBSITE_SEARCH_ENGINE_DSN=${DC_ORO_SEARCH_URI:-"elasticsearch://search:9200"}?prefix=oro_website_search'
+      - 'ORO_MQ_DSN=${DC_ORO_MQ_URI:-""}'
+      - 'ORO_REDIS_URL=${DC_ORO_REDIS_URI:-""}'
+      - 'ORO_REDIS_CACHE_DSN=${DC_ORO_REDIS_URI:-""}/1'
+      - 'ORO_REDIS_DOCTRINE_DSN=${DC_ORO_REDIS_URI:-""}/2'
+      - 'ORO_REDIS_LAYOUT_DSN=${DC_ORO_REDIS_URI:-""}/3'
+      - 'ORO_MAILER_DRIVER=${ORO_MAILER_DRIVER:-smtp}'
+      - 'ORO_MAILER_HOST=${ORO_MAILER_HOST:-mail}'
+      - 'ORO_MAILER_PORT=${ORO_MAILER_PORT:-1025}'
       - 'ORO_SECRET=${ORO_SECRET-ThisTokenIsNotSoSecretChangeIt}'
       - 'XHGUI_MONGO_HOSTNAME=mongodb'
       - 'XHGUI_MONGO_DATABASE=xhprof'
@@ -215,6 +245,7 @@ services:
     container_name: "${DC_ORO_NAME:-unnamed}_websocket_${DC_ORO_PHP_VERSION:-8.3}-${DC_ORO_NODE_VERSION:-20}-${DC_ORO_COMPOSER_VERSION:-2}"
     hostname: websocket.${DC_ORO_NAME:-unnamed}.docker.local
     profiles: ["websocket"]
+    image: digitalspacestudio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.3}-${DC_ORO_NODE_VERSION:-20}-${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}
     build:
       dockerfile: Dockerfile.${DC_ORO_PHP_VERSION:-8.3}.${DC_ORO_PHP_DIST:-alpine}
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony"
@@ -240,31 +271,29 @@ services:
     restart: always
     environment:
       - 'DC_ORO_DATABASE_HOST=${DC_ORO_DATABASE_HOST:-database}'
-      - 'DC_ORO_DATABASE_PORT=${DC_ORO_DATABASE_PORT:-3306}'
+      - 'DC_ORO_DATABASE_PORT=${DC_ORO_DATABASE_PORT:-5432}'
       - 'DC_ORO_DATABASE_USER=${DC_ORO_DATABASE_USER:-app}'
       - 'DC_ORO_DATABASE_PASSWORD=${DC_ORO_DATABASE_PASSWORD:-app}'
       - 'DC_ORO_DATABASE_DBNAME=${DC_ORO_DATABASE_DBNAME:-app}'
-      - 'ORO_DB_URL=${DC_ORO_DATABASE_URI}'
-      - 'ORO_DB_DSN=${DC_ORO_DATABASE_URI}'
-      - 'ORO_DB_URL=${DC_ORO_DATABASE_URI}'
-      - 'ORO_DB_DSN=${DC_ORO_DATABASE_URI}'
+      - 'ORO_DB_URL=${DC_ORO_DATABASE_URI:-"postgres://${DC_ORO_DATABASE_USER:-app}:${DC_ORO_DATABASE_PASSWORD:-app}@${DC_ORO_DATABASE_HOST:-database}:${DC_ORO_DATABASE_PORT:-5432}//${DC_ORO_DATABASE_DBNAME:-app}"}'
+      - 'ORO_DB_DSN=${DC_ORO_DATABASE_URI:-"postgres://${DC_ORO_DATABASE_USER:-app}:${DC_ORO_DATABASE_PASSWORD:-app}@${DC_ORO_DATABASE_HOST:-database}:${DC_ORO_DATABASE_PORT:-5432}//${DC_ORO_DATABASE_DBNAME:-app}"}'
       - 'ORO_DB_HOST=${DC_ORO_DATABASE_HOST:-database}'
-      - 'ORO_DB_PORT=${DC_ORO_DATABASE_PORT:-3306}'
+      - 'ORO_DB_PORT=${DC_ORO_DATABASE_PORT:-5432}'
       - 'ORO_DB_NAME=${DC_ORO_DATABASE_DBNAME:-app}'
       - 'ORO_DB_USER=${DC_ORO_DATABASE_USER:-app}'
       - 'ORO_DB_PASSWORD=${DC_ORO_DATABASE_PASSWORD:-app}'
-      - 'ORO_SEARCH_URL=${DC_ORO_SEARCH_URI}'
-      - 'ORO_SEARCH_DSN=${DC_ORO_SEARCH_URI}'
-      - 'ORO_SEARCH_ENGINE_DSN=${DC_ORO_SEARCH_URI}?prefix=oro_search'
-      - 'ORO_WEBSITE_SEARCH_ENGINE_DSN=${DC_ORO_SEARCH_URI}?prefix=oro_website_search'
-      - 'ORO_MQ_DSN=${DC_ORO_MQ_URI}'
-      - 'ORO_REDIS_URL=${DC_ORO_REDIS_URI}'
-      - 'ORO_REDIS_CACHE_DSN=${DC_ORO_REDIS_URI}/1'
-      - 'ORO_REDIS_DOCTRINE_DSN=${DC_ORO_REDIS_URI}/2'
-      - 'ORO_REDIS_LAYOUT_DSN=${DC_ORO_REDIS_URI}/3'
-      - 'ORO_MAILER_DRIVER=${ORO_MAILER_DRIVER-smtp}'
-      - 'ORO_MAILER_HOST=${ORO_MAILER_HOST-mail}'
-      - 'ORO_MAILER_PORT=${ORO_MAILER_PORT-1025}'
+      - 'ORO_SEARCH_URL=${DC_ORO_SEARCH_URI:-"elasticsearch://search:9200"}'
+      - 'ORO_SEARCH_DSN=${DC_ORO_SEARCH_URI:-"elasticsearch://search:9200"}'
+      - 'ORO_SEARCH_ENGINE_DSN=${DC_ORO_SEARCH_URI:-"elasticsearch://search:9200"}?prefix=oro_search'
+      - 'ORO_WEBSITE_SEARCH_ENGINE_DSN=${DC_ORO_SEARCH_URI:-"elasticsearch://search:9200"}?prefix=oro_website_search'
+      - 'ORO_MQ_DSN=${DC_ORO_MQ_URI:-""}'
+      - 'ORO_REDIS_URL=${DC_ORO_REDIS_URI:-""}'
+      - 'ORO_REDIS_CACHE_DSN=${DC_ORO_REDIS_URI:-""}/1'
+      - 'ORO_REDIS_DOCTRINE_DSN=${DC_ORO_REDIS_URI:-""}/2'
+      - 'ORO_REDIS_LAYOUT_DSN=${DC_ORO_REDIS_URI:-""}/3'
+      - 'ORO_MAILER_DRIVER=${ORO_MAILER_DRIVER:-smtp}'
+      - 'ORO_MAILER_HOST=${ORO_MAILER_HOST:-mail}'
+      - 'ORO_MAILER_PORT=${ORO_MAILER_PORT:-1025}'
       - 'ORO_SECRET=${ORO_SECRET-ThisTokenIsNotSoSecretChangeIt}'
       - 'XHGUI_MONGO_HOSTNAME=mongodb'
       - 'XHGUI_MONGO_DATABASE=xhprof'

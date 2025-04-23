@@ -17,7 +17,6 @@ if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose.yml" ]]; then
   DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose.yml"
 fi
 
-
 load_env_safe() {
   local env_file="$1"
 
@@ -183,61 +182,12 @@ cd "$DC_ORO_APPDIR"
 load_env_safe "$DC_ORO_APPDIR/.env"
 load_env_safe "$DC_ORO_APPDIR/.env-app"
 load_env_safe "$DC_ORO_APPDIR/.env-app.local"
-load_env_safe "$DC_ORO_APPDIR/.env.dc"
-
-# DC_ORO_DATABASE_URL="${ORO_DB_URL:-${ORO_DB_DSN}}"
-
-# # Schema
-# DC_ORO_DATABASE_SCHEMA="${DC_ORO_DATABASE_URL%%://*}"
-
-# # Remove schema postgres://
-# DC_ORO_DATABASE_URL_NO_SCHEMA="${DC_ORO_DATABASE_URL#*://}"
-
-# # Extract query string
-# DC_ORO_DATABASE_URL_MAIN="${DC_ORO_DATABASE_URL_NO_SCHEMA%%\?*}"
-
-# # Extract login
-# export DC_ORO_DATABASE_USER="${DC_ORO_DATABASE_URL_MAIN%%:*}"
-
-# # Extract login extra
-# DC_ORO_DATABASE_REMAINDER="${DC_ORO_DATABASE_URL_MAIN#*:}"
-
-# # Extract password
-# export DC_ORO_DATABASE_PASSWORD="${DC_ORO_DATABASE_REMAINDER%%@*}"
-
-# # Extract login AT
-# DC_ORO_DATABASE_REMAINDER="${DC_ORO_DATABASE_REMAINDER#*@}"
-
-# # Extract host
-# export DC_ORO_DATABASE_HOST="${DC_ORO_DATABASE_REMAINDER%%:*}"
-
-# if [[ ${DC_ORO_DATABASE_HOST} = "localhost" ]] || [[ ${DC_ORO_DATABASE_HOST} = "127.0.0.1" ]]; then
-#   export DC_ORO_DATABASE_HOST="database"
-# fi
-
-# # Extract host extra
-# DC_ORO_DATABASE_REMAINDER="${DC_ORO_DATABASE_REMAINDER#*:}"
-
-# # Extract port
-# export DC_ORO_DATABASE_PORT="${DC_ORO_DATABASE_REMAINDER%%/*}"
-
-# # Extract port extra
-# DC_ORO_DATABASE_REMAINDER="${DC_ORO_DATABASE_REMAINDER#*/}"
-
-# # Extract database name
-# DC_ORO_DATABASE_DBNAME="$DC_ORO_DATABASE_REMAINDER"
-
-# # Remove query string from dbname
-# export DC_ORO_DATABASE_DBNAME="${DC_ORO_DATABASE_DBNAME%%\?*}"
+load_env_safe "$DC_ORO_APPDIR/.env.orodc"
 
 parse_dsn_uri "$ORO_DB_URL" "database" "DC_ORO"
 parse_dsn_uri "$ORO_SEARCH_URL" "search" "DC_ORO"
 parse_dsn_uri "$ORO_MQ_DSN" "mq" "DC_ORO"
 parse_dsn_uri "$ORO_REDIS_URL" "redis" "DC_ORO"
-
-# Build new db url
-#export DC_ORO_DATABASE_URL="${DC_ORO_DATABASE_SCHEMA:-postgres}://${DC_ORO_DATABASE_USER:-oro_db_user}:${DC_ORO_DATABASE_PASSWORD:-oro_db_pass}@${DC_ORO_DATABASE_HOST:-database}:${DC_ORO_DATABASE_PORT:-5432}/${DC_ORO_DATABASE_DBNAME:-oro_db}?sslmode=disable&charset=utf8&serverVersion=13.7"
-
 
 export DC_ORO_PORT_PREFIX=${DC_ORO_PORT_PREFIX-"301"}
 export DC_ORO_PORT_NGINX=$(find_free_port nginx ${DC_ORO_PORT_PREFIX}80)
@@ -250,11 +200,8 @@ export DC_ORO_PORT_REDIS=$(find_free_port redis "${DC_ORO_PORT_PREFIX}72")
 export DC_ORO_PORT_MAIL_WEBGUI=$(find_free_port mail "${DC_ORO_PORT_PREFIX}25")
 export DC_ORO_PORT_SSH=$(find_free_port ssh "${DC_ORO_PORT_PREFIX}22")
 
-export DC_ORO_COMPOSER_AUTH=${DC_ORO_COMPOSER_AUTH-${COMPOSER_AUTH-""}}
-
-if [[ -z $COMPOSER_AUTH ]]; then
-  export COMPOSER_AUTH=${DC_ORO_COMPOSER_AUTH}
-fi
+export COMPOSER_AUTH=$(echo ${DC_ORO_COMPOSER_AUTH:-${COMPOSER_AUTH}} | jq -c .)
+export DC_ORO_COMPOSER_AUTH=${COMPOSER_AUTH}
 
 if [[ ! -d "${DC_ORO_CONFIG_DIR}" ]];then
     mkdir -p "${DC_ORO_CONFIG_DIR}"
