@@ -3,7 +3,13 @@ name: Build & Publish multi-arch images to GHCR
 on:
   push:
     branches: [ master ]
+    paths:
+      - 'compose/docker/php-node-symfony/**'
   workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
 
 jobs:
   build-7-4:
