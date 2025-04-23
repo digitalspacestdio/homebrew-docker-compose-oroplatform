@@ -27,7 +27,7 @@ services:
     networks:
       - 'app'
     ports:
-      - "${DC_ORO_SSH_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_SSH:-${DC_ORO_PORT_PREFIX}22}:22"
+      - "${DC_ORO_SSH_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_SSH:-2222}:22"
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:

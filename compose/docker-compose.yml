@@ -314,7 +314,7 @@ services:
     container_name: ${DC_ORO_NAME:-unnamed}_mail
     hostname: mail.${DC_ORO_NAME:-unnamed}.docker.local
     ports:
-      - "${DC_ORO_MAIL_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_MAIL_WEBGUI:-${DC_ORO_PORT_PREFIX}25}:8025"
+      - "${DC_ORO_MAIL_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_MAIL_WEBGUI:-8025}:8025"
     networks:
       - 'app'
     restart: always
@@ -335,7 +335,7 @@ services:
       - XHGUI_MONGO_HOSTNAME=mongodb
       - XHGUI_MONGO_DATABASE=xhprof
     ports:
-      - "${DC_ORO_XHGUI_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_XHGUI:-${DC_ORO_PORT_PREFIX}81}:80"
+      - "${DC_ORO_XHGUI_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_XHGUI:-80}:80"
     depends_on:
       mongodb:
         condition: service_healthy
@@ -387,7 +387,7 @@ services:
       ELASTIC_PASSWORD: elastic
       discovery.type: 'single-node'
     ports:
-      - "${DC_ORO_SEARCH_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_SEARCH:-${DC_ORO_PORT_PREFIX}92}:9200"
+      - "${DC_ORO_SEARCH_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_SEARCH:-9200}:9200"
     networks:
       - 'app'
     restart: always
@@ -413,7 +413,7 @@ services:
       fpm:
         condition: service_healthy
     ports:
-      - '${DC_ORO_NGINX_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_NGINX:-${DC_ORO_PORT_PREFIX}80}:80'
+      - '${DC_ORO_NGINX_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_NGINX:-80}:80'
     volumes:
       - "appcode:${DC_ORO_APPDIR:-/var/www}:ro"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
@@ -453,7 +453,7 @@ services:
     hostname: mq.${DC_ORO_NAME:-unnamed}.docker.local
     container_name: ${DC_ORO_NAME:-unnamed}_mq
     ports:
-      - "${DC_ORO_MQ_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_MQ:-${DC_ORO_PORT_PREFIX}72}:15672"
+      - "${DC_ORO_MQ_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_MQ:-15672}:15672"
     environment:
       RABBITMQ_DEFAULT_USER: ${DC_ORO_MQ_USER:-app}
       RABBITMQ_DEFAULT_PASS: ${DC_ORO_MQ_PASSWORD:-app}

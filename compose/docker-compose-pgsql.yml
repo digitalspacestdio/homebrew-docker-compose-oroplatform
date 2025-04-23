@@ -14,7 +14,7 @@ services:
       - '${DC_ORO_CONFIG_DIR:-.}/docker/pgsql/initdb.d:/docker-entrypoint-initdb.d:ro'
       - 'postgresql-data:/var/lib/postgresql/data:delegated'
     ports:
-      - '${DC_ORO_DATABASE_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_PGSQL:-${DC_ORO_PORT_PREFIX}32}:5432'
+      - '${DC_ORO_DATABASE_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_PGSQL:-5432}:5432'
     networks:
       - 'app'
     restart: always
