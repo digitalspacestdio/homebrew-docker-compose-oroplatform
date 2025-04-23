@@ -2,7 +2,7 @@ services:
   mutagen:
     container_name: "${DC_ORO_NAME:-unnamed}_mutagen_${DC_ORO_PHP_VERSION:-8.1}-${DC_ORO_NODE_VERSION:-16}-${DC_ORO_COMPOSER_VERSION:-2}"
     hostname: mutagen.${DC_ORO_NAME:-unnamed}.docker.local
-    image: digitalspacestudio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.3}-${DC_ORO_NODE_VERSION:-20}-${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}
+    image: ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.3}-${DC_ORO_NODE_VERSION:-20}-${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}
     build:
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony"
       dockerfile: Dockerfile.${DC_ORO_PHP_VERSION:-8.3}.${DC_ORO_PHP_DIST:-alpine}

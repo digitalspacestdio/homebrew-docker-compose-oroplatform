@@ -1,4 +1,4 @@
-FROM nginx:1.27
+FROM nginx:1.28
 
 # Customization of the nginx user and group ids in the image. It's 101:101 in
 # the base image. Here we use 33 which is the user id and group id for www-data
