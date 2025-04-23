@@ -9,6 +9,7 @@ sed -i '/^#HostKey \/etc\/ssh\/ssh_host_ecdsa_key/a HostKey /etc/ssh/hostkeys/ss
 sed -i '/^#HostKey \/etc\/ssh\/ssh_host_ed25519_key/a HostKey /etc/ssh/hostkeys/ssh_host_ed25519_key' /etc/ssh/sshd_config
 echo 'AcceptEnv COMPOSER_AUTH' | tee -a /etc/ssh/sshd_config
 echo 'PermitUserEnvironment yes' | tee -a /etc/ssh/sshd_config
+echo 'AllowAgentForwarding yes' | tee -a /etc/ssh/sshd_config
 
 if [[ -n $ORO_SSH_PUBLIC_KEY ]]; then
 	mkdir -p /root/.ssh
