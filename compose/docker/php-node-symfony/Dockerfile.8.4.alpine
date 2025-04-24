@@ -252,7 +252,25 @@ RUN apk add --no-cache \
   micro \
   mc
 
+# Zsh + starship
+RUN set -eux && \
+  apk add --no-cache zsh && \
+  ARCH=$(uname -m) && \
+  case "$ARCH" in \
+    x86_64) ARCH="x86_64-unknown-linux-musl" ;; \
+    aarch64) ARCH="aarch64-unknown-linux-musl" ;; \
+    *) echo "Unsupported arch: $ARCH" && exit 1 ;; \
+  esac && \
+  mkdir -p /tmp/starship && cd /tmp/starship && \
+  wget -q "https://github.com/starship/starship/releases/latest/download/starship-${ARCH}.tar.gz" && \
+  tar -xzf "starship-${ARCH}.tar.gz" && \
+  install starship /usr/local/bin/starship && \
+  echo 'eval "$(starship init zsh)"' >> /root/.zshrc && \
+  rm -rf /tmp/starship
+
+COPY zshrc "/home/${PHP_USER_NAME}/.zshrc"
+
 WORKDIR ${APP_DIR}
 USER ${PHP_USER_NAME}
 VOLUME "/home/${PHP_USER_NAME}" "/root" "${APP_DIR}"
-CMD [ "bash" ]
+CMD [ "zsh" ]
