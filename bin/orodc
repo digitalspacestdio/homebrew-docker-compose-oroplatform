@@ -71,34 +71,55 @@ parse_dsn_uri() {
   fi
   var_prefix+=$(echo "$name" | tr '[:lower:]' '[:upper:]')_
 
-  local schema="${uri%%://*}"
-  local rest="${uri#*://}"
+  local schema rest
+  if [[ "$uri" == *"://"* ]]; then
+    schema="${uri%%://*}"
+    rest="${uri#*://}"
+  elif [[ "$uri" == *: ]]; then
+    schema="${uri%:}"
+    rest=""
+  else
+    schema="$uri"
+    rest=""
+  fi
 
-  # Handle query string
   local query=""
   if [[ "$rest" == *\?* ]]; then
     query="${rest#*\?}"
     rest="${rest%%\?*}"
   fi
 
-  # Initialize defaults
   local user="" password="" host="" port="" dbname=""
 
-  # If rest contains '@', parse as userinfo@host
+  # Special case for SQLite memory and paths
+  if [[ "$schema" == "sqlite" ]]; then
+    if [[ "$uri" == "sqlite::memory:" ]]; then
+      dbname=":memory:"
+    else
+      # normalize URI with three slashes (absolute) or two slashes (relative)
+      local sqlite_path="${uri#sqlite://}"
+      dbname="${sqlite_path%%\?*}"
+    fi
+
+    # Export simplified for SQLite
+    eval "export ${var_prefix}SCHEMA=\"\$schema\""
+    eval "export ${var_prefix}DBNAME=\"\$dbname\""
+    eval "export ${var_prefix}QUERY=\"\$query\""
+    eval "export ${var_prefix}URI=\"\$uri\""
+    return
+  fi
+
   if [[ "$rest" == *@* ]]; then
     local userinfo="${rest%%@*}"
     rest="${rest#*@}"
-
     user="${userinfo%%:*}"
     password="${userinfo#*:}"
     [[ "$user" == "$password" ]] && password=""
   fi
 
-  # Extract host and port
   if [[ "$rest" == *:* ]]; then
     host="${rest%%:*}"
     port="${rest#*:}"
-    # If there's a '/', separate port from dbname
     if [[ "$port" == */* ]]; then
       dbname="${port#*/}"
       port="${port%%/*}"
@@ -106,23 +127,24 @@ parse_dsn_uri() {
   elif [[ "$rest" == */* ]]; then
     host="${rest%%/*}"
     dbname="${rest#*/}"
-  else
+  elif [[ -n "$rest" ]]; then
     host="$rest"
   fi
 
   [[ "$host" == "localhost" || "$host" == "127.0.0.1" ]] && host="$host_alias"
 
-  # Reconstruct normalized URI
-  local clean_uri="${schema}://"
-  [[ -n "$user" ]] && clean_uri+="${user}"
-  [[ -n "$password" ]] && clean_uri+=":${password}"
-  [[ -n "$user" || -n "$password" ]] && clean_uri+="@"
-  clean_uri+="${host}"
-  [[ -n "$port" ]] && clean_uri+=":${port}"
-  [[ -n "$dbname" ]] && clean_uri+="/${dbname}"
+  local clean_uri="${schema}"
+  if [[ -n "$user" || -n "$password" || -n "$host" || -n "$port" || -n "$dbname" ]]; then
+    clean_uri+="://"
+    [[ -n "$user" ]] && clean_uri+="${user}"
+    [[ -n "$password" ]] && clean_uri+=":${password}"
+    [[ -n "$user" || -n "$password" ]] && clean_uri+="@"
+    clean_uri+="${host}"
+    [[ -n "$port" ]] && clean_uri+=":${port}"
+    [[ -n "$dbname" ]] && clean_uri+="/${dbname}"
+  fi
   [[ -n "$query" ]] && clean_uri+="?${query}"
 
-  # Export variables
   eval "export ${var_prefix}SCHEMA=\"\$schema\""
   eval "export ${var_prefix}USER=\"\$user\""
   eval "export ${var_prefix}PASSWORD=\"\$password\""
@@ -164,26 +186,37 @@ fi
 
 find_free_port()
 {
+  find_free_port()
+{
   local SERVICE_NAME="$1"
   local PORT="$2"
+  local DC_ORO_APPDIR="$3"
+  local DC_ORO_NAME="$4"
+
+  # Attempt to extract a port from compose.yml
   local SELECTED_PORT=$([[ -f "${DC_ORO_APPDIR}/compose.yml" ]] && yq '.services["'${SERVICE_NAME}'"].ports[] | select(.published) | .published' "${DC_ORO_APPDIR}/compose.yml" || echo "")
-  if [[ -n $SELECTED_PORT ]]; then
+  
+  # If a specific port is defined and there exists a running container that starts with the project name and service name, return that port
+  if [[ -n $SELECTED_PORT ]] && docker ps --filter "name=${DC_ORO_NAME}_${SERVICE_NAME}" --format '{{.Names}}' | grep -q "^${DC_ORO_NAME}_${SERVICE_NAME}"; then
     echo $SELECTED_PORT
+    return
   fi
 
+  # Searching for a free port starting from the specified one
   while [ $PORT -le 65535 ]; do
-    # Проверяем, не занят ли порт в любом контейнере, включая остановленные
+    # Check if the port is not occupied in any container (including stopped ones)
     if ! docker ps -a --filter "expose=$PORT" --format '{{.Ports}}' | grep -q ":$PORT"; then
       break
     fi
     PORT=$((PORT+1))
   done
 
+  # Check if the port is not used by any local process
   while [ $PORT -le 65535 ] && lsof -t -i tcp:$PORT > /dev/null; do
     PORT=$((PORT+1));
   done;
 
-  echo $PORT
+  echo $PORT  # Output the free port found
 }
 
 if [[ -z $DC_ORO_COMPOSER_AUTH ]] && [[ -z $COMPOSER_AUTH ]]; then
@@ -212,15 +245,15 @@ parse_dsn_uri "$ORO_MQ_DSN" "mq" "DC_ORO"
 parse_dsn_uri "$ORO_REDIS_URL" "redis" "DC_ORO"
 
 export DC_ORO_PORT_PREFIX=${DC_ORO_PORT_PREFIX-"301"}
-export DC_ORO_PORT_NGINX=$(find_free_port nginx ${DC_ORO_PORT_PREFIX}80)
-export DC_ORO_PORT_XHGUI=$(find_free_port xhgui "${DC_ORO_PORT_PREFIX}81")
-export DC_ORO_PORT_MYSQL=$(find_free_port database "${DC_ORO_PORT_PREFIX}06")
-export DC_ORO_PORT_PGSQL=$(find_free_port database "${DC_ORO_PORT_PREFIX}32")
-export DC_ORO_PORT_SEARCH=$(find_free_port search "${DC_ORO_PORT_PREFIX}92")
-export DC_ORO_PORT_MQ=$(find_free_port mq "${DC_ORO_PORT_PREFIX}72")
-export DC_ORO_PORT_REDIS=$(find_free_port redis "${DC_ORO_PORT_PREFIX}72")
-export DC_ORO_PORT_MAIL_WEBGUI=$(find_free_port mail "${DC_ORO_PORT_PREFIX}25")
-export DC_ORO_PORT_SSH=$(find_free_port ssh "${DC_ORO_PORT_PREFIX}22")
+export DC_ORO_PORT_NGINX=$(find_free_port nginx ${DC_ORO_PORT_PREFIX}80 $DC_ORO_NAME)
+export DC_ORO_PORT_XHGUI=$(find_free_port xhgui "${DC_ORO_PORT_PREFIX}81" $DC_ORO_NAME)
+export DC_ORO_PORT_MYSQL=$(find_free_port database "${DC_ORO_PORT_PREFIX}06" $DC_ORO_NAME)
+export DC_ORO_PORT_PGSQL=$(find_free_port database "${DC_ORO_PORT_PREFIX}32" $DC_ORO_NAME)
+export DC_ORO_PORT_SEARCH=$(find_free_port search "${DC_ORO_PORT_PREFIX}92" $DC_ORO_NAME)
+export DC_ORO_PORT_MQ=$(find_free_port mq "${DC_ORO_PORT_PREFIX}72" $DC_ORO_NAME)
+export DC_ORO_PORT_REDIS=$(find_free_port redis "${DC_ORO_PORT_PREFIX}72" $DC_ORO_NAME)
+export DC_ORO_PORT_MAIL_WEBGUI=$(find_free_port mail "${DC_ORO_PORT_PREFIX}25" $DC_ORO_NAME)
+export DC_ORO_PORT_SSH=$(find_free_port ssh "${DC_ORO_PORT_PREFIX}22" $DC_ORO_NAME)
 
 export COMPOSER_AUTH=$(echo ${DC_ORO_COMPOSER_AUTH:-${COMPOSER_AUTH}} | jq -c .)
 export DC_ORO_COMPOSER_AUTH=${COMPOSER_AUTH}
