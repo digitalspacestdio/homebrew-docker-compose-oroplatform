@@ -91,17 +91,15 @@ parse_dsn_uri() {
 
   local user="" password="" host="" port="" dbname=""
 
-  # Special case for SQLite memory and paths
+  # Special case: SQLite
   if [[ "$schema" == "sqlite" ]]; then
     if [[ "$uri" == "sqlite::memory:" ]]; then
       dbname=":memory:"
     else
-      # normalize URI with three slashes (absolute) or two slashes (relative)
       local sqlite_path="${uri#sqlite://}"
       dbname="${sqlite_path%%\?*}"
     fi
 
-    # Export simplified for SQLite
     eval "export ${var_prefix}SCHEMA=\"\$schema\""
     eval "export ${var_prefix}DBNAME=\"\$dbname\""
     eval "export ${var_prefix}QUERY=\"\$query\""
@@ -109,6 +107,7 @@ parse_dsn_uri() {
     return
   fi
 
+  # If rest includes @, extract user/password
   if [[ "$rest" == *@* ]]; then
     local userinfo="${rest%%@*}"
     rest="${rest#*@}"
@@ -117,6 +116,7 @@ parse_dsn_uri() {
     [[ "$user" == "$password" ]] && password=""
   fi
 
+  # Extract host, port, dbname
   if [[ "$rest" == *:* ]]; then
     host="${rest%%:*}"
     port="${rest#*:}"
@@ -133,18 +133,23 @@ parse_dsn_uri() {
 
   [[ "$host" == "localhost" || "$host" == "127.0.0.1" ]] && host="$host_alias"
 
-  local clean_uri="${schema}"
-  if [[ -n "$user" || -n "$password" || -n "$host" || -n "$port" || -n "$dbname" ]]; then
-    clean_uri+="://"
-    [[ -n "$user" ]] && clean_uri+="${user}"
-    [[ -n "$password" ]] && clean_uri+=":${password}"
-    [[ -n "$user" || -n "$password" ]] && clean_uri+="@"
-    clean_uri+="${host}"
-    [[ -n "$port" ]] && clean_uri+=":${port}"
-    [[ -n "$dbname" ]] && clean_uri+="/${dbname}"
+  # Reconstruct URI only if it's not a simple scheme:
+  local clean_uri="$uri"
+  if [[ "$uri" != *"://"* && "$uri" != *: ]]; then
+    clean_uri="${schema}"
+    if [[ -n "$user" || -n "$password" || -n "$host" || -n "$port" || -n "$dbname" ]]; then
+      clean_uri+="://"
+      [[ -n "$user" ]] && clean_uri+="${user}"
+      [[ -n "$password" ]] && clean_uri+=":${password}"
+      [[ -n "$user" || -n "$password" ]] && clean_uri+="@"
+      clean_uri+="${host}"
+      [[ -n "$port" ]] && clean_uri+=":${port}"
+      [[ -n "$dbname" ]] && clean_uri+="/${dbname}"
+    fi
+    [[ -n "$query" ]] && clean_uri+="?${query}"
   fi
-  [[ -n "$query" ]] && clean_uri+="?${query}"
 
+  # Export everything
   eval "export ${var_prefix}SCHEMA=\"\$schema\""
   eval "export ${var_prefix}USER=\"\$user\""
   eval "export ${var_prefix}PASSWORD=\"\$password\""
