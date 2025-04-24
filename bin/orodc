@@ -134,15 +134,15 @@ parse_dsn_uri() {
   [[ "$host" == "localhost" || "$host" == "127.0.0.1" ]] && host="$host_alias"
 
   # Reconstruct URI only if it's not a simple scheme:
-  local clean_uri="$uri"
+  local clean_uri=""
   if [[ "$schema" == "sqlite" && "$dbname" == ":memory:" ]]; then
-    clean_uri+="::memory:"
+    clean_uri="sqlite::memory:"
   elif [[ "$schema" == "sqlite" ]]; then
-    clean_uri+="://$dbname"
+    clean_uri="sqlite://$dbname"
   elif [[ "$schema" == "dbal" && -z "$rest" ]]; then
-    clean_uri+=":"
+    clean_uri="${schema}:"
   else
-    clean_uri+="://"
+    clean_uri="${schema}://"
     [[ -n "$user" ]] && clean_uri+="${user}"
     [[ -n "$password" ]] && clean_uri+=":${password}"
     [[ -n "$user" || -n "$password" ]] && clean_uri+="@"
