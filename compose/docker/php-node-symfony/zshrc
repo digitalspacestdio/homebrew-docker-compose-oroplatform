@@ -73,6 +73,6 @@ autoload -Uz compinit
 compinit
 
 zstyle ':completion:*' menu select
-mkdir ~/.config
+mkdir -p ~/.config
 starship preset plain-text-symbols -o ~/.config/starship.toml
 eval "$(starship init zsh)"

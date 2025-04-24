@@ -41,7 +41,7 @@ if [[ -n $ORO_SSH_PUBLIC_KEY ]]; then
 		# Load docker env variables
 		printenv | while IFS='=' read -r name value; do
 			if echo "$name" | grep -v '^\(HOME\|PWD\)' > /dev/null; then
-  				echo "$name=$value"
+  			    echo "$name=$value"
 			fi
 		done > "${PHP_USER_HOME}/.ssh/environment"
 		chown "${PHP_UID}" "${PHP_USER_HOME}/.ssh/environment"

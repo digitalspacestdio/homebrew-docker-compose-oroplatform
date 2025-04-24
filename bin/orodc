@@ -62,47 +62,65 @@ parse_dsn_uri() {
 
   [[ -n "$uri" && -n "$name" ]] || return 0
 
-  # Lowercase for host alias
   local host_alias
   host_alias=$(echo "$name" | tr '[:upper:]' '[:lower:]')
 
-  # Uppercase for variable prefix
   local var_prefix=""
   if [[ -n "$prefix" ]]; then
     var_prefix="$(echo "$prefix" | tr '[:lower:]' '[:upper:]')_"
   fi
   var_prefix+=$(echo "$name" | tr '[:lower:]' '[:upper:]')_
 
-  # Extract schema
   local schema="${uri%%://*}"
   local rest="${uri#*://}"
 
-  # Extract query string
-  local query="${rest#*\?}"
-  [[ "$rest" == "$query" ]] && query=""
-  local main="${rest%%\?*}"
-
-  # Extract user and password
-  local user="${main%%:*}"
-  local remainder="${main#*:}"
-  local password="${remainder%%@*}"
-  remainder="${remainder#*@}"
-
-  # Extract host
-  local host="${remainder%%:*}"
-  if [[ "$host" == "localhost" || "$host" == "127.0.0.1" ]]; then
-    host="$host_alias"
+  # Handle query string
+  local query=""
+  if [[ "$rest" == *\?* ]]; then
+    query="${rest#*\?}"
+    rest="${rest%%\?*}"
   fi
 
-  # Extract port and dbname
-  remainder="${remainder#*:}"
-  local port="${remainder%%/*}"
-  remainder="${remainder#*/}"
-  local dbname="${remainder%%\?*}"
+  # Initialize defaults
+  local user="" password="" host="" port="" dbname=""
+
+  # If rest contains '@', parse as userinfo@host
+  if [[ "$rest" == *@* ]]; then
+    local userinfo="${rest%%@*}"
+    rest="${rest#*@}"
+
+    user="${userinfo%%:*}"
+    password="${userinfo#*:}"
+    [[ "$user" == "$password" ]] && password=""
+  fi
+
+  # Extract host and port
+  if [[ "$rest" == *:* ]]; then
+    host="${rest%%:*}"
+    port="${rest#*:}"
+    # If there's a '/', separate port from dbname
+    if [[ "$port" == */* ]]; then
+      dbname="${port#*/}"
+      port="${port%%/*}"
+    fi
+  elif [[ "$rest" == */* ]]; then
+    host="${rest%%/*}"
+    dbname="${rest#*/}"
+  else
+    host="$rest"
+  fi
+
+  [[ "$host" == "localhost" || "$host" == "127.0.0.1" ]] && host="$host_alias"
 
   # Reconstruct normalized URI
-  local clean_uri="${schema}://${user}:${password}@${host}:${port}/${dbname}"
-  [[ -n "$query" ]] && clean_uri+="?$query"
+  local clean_uri="${schema}://"
+  [[ -n "$user" ]] && clean_uri+="${user}"
+  [[ -n "$password" ]] && clean_uri+=":${password}"
+  [[ -n "$user" || -n "$password" ]] && clean_uri+="@"
+  clean_uri+="${host}"
+  [[ -n "$port" ]] && clean_uri+=":${port}"
+  [[ -n "$dbname" ]] && clean_uri+="/${dbname}"
+  [[ -n "$query" ]] && clean_uri+="?${query}"
 
   # Export variables
   eval "export ${var_prefix}SCHEMA=\"\$schema\""
