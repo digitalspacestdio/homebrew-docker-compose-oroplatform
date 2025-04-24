@@ -135,17 +135,20 @@ parse_dsn_uri() {
 
   # Reconstruct URI only if it's not a simple scheme:
   local clean_uri="$uri"
-  if [[ "$uri" != *"://"* && "$uri" != *: ]]; then
-    clean_uri="${schema}"
-    if [[ -n "$user" || -n "$password" || -n "$host" || -n "$port" || -n "$dbname" ]]; then
-      clean_uri+="://"
-      [[ -n "$user" ]] && clean_uri+="${user}"
-      [[ -n "$password" ]] && clean_uri+=":${password}"
-      [[ -n "$user" || -n "$password" ]] && clean_uri+="@"
-      clean_uri+="${host}"
-      [[ -n "$port" ]] && clean_uri+=":${port}"
-      [[ -n "$dbname" ]] && clean_uri+="/${dbname}"
-    fi
+  if [[ "$schema" == "sqlite" && "$dbname" == ":memory:" ]]; then
+    clean_uri+="::memory:"
+  elif [[ "$schema" == "sqlite" ]]; then
+    clean_uri+="://$dbname"
+  elif [[ "$schema" == "dbal" && -z "$rest" ]]; then
+    clean_uri+=":"
+  else
+    clean_uri+="://"
+    [[ -n "$user" ]] && clean_uri+="${user}"
+    [[ -n "$password" ]] && clean_uri+=":${password}"
+    [[ -n "$user" || -n "$password" ]] && clean_uri+="@"
+    clean_uri+="${host}"
+    [[ -n "$port" ]] && clean_uri+=":${port}"
+    [[ -n "$dbname" ]] && clean_uri+="/${dbname}"
     [[ -n "$query" ]] && clean_uri+="?${query}"
   fi
 
@@ -168,26 +171,6 @@ find-up () {
   echo "$path"
 }
 
-if [[ -z $DC_ORO_APPDIR ]]; then
-  export DC_ORO_APPDIR=$(find-up composer.json "$PWD/www")
-fi
-
-if [[ -z $DC_ORO_APPDIR ]]; then
-  if [ -z "$(ls -A $PWD)" ]; then
-    export DC_ORO_APPDIR="$PWD"
-  else
-    echo "Application root folder not found, and current directory is not empty, terminating..."
-    exit 1
-  fi
-fi
-
-if [[ ! -d "${DC_ORO_CONFIG_DIR}" ]]; then
-    mkdir -p "${DC_ORO_CONFIG_DIR}"
-fi
-
-if [[ ! -d "$DC_ORO_APPDIR" ]]; then
-  mkdir -p "$DC_ORO_APPDIR"
-fi
 
 find_free_port()
 {
@@ -222,6 +205,27 @@ find_free_port()
   echo $PORT  # Output the free port found
 }
 
+if [[ -z $DC_ORO_APPDIR ]]; then
+  export DC_ORO_APPDIR=$(find-up composer.json "$PWD/www")
+fi
+
+if [[ -z $DC_ORO_APPDIR ]]; then
+  if [ -z "$(ls -A $PWD)" ]; then
+    export DC_ORO_APPDIR="$PWD"
+  else
+    echo "Application root folder not found, and current directory is not empty, terminating..."
+    exit 1
+  fi
+fi
+
+if [[ ! -d "${DC_ORO_CONFIG_DIR}" ]]; then
+    mkdir -p "${DC_ORO_CONFIG_DIR}"
+fi
+
+if [[ ! -d "$DC_ORO_APPDIR" ]]; then
+  mkdir -p "$DC_ORO_APPDIR"
+fi
+
 if [[ -z $DC_ORO_COMPOSER_AUTH ]] && [[ -z $COMPOSER_AUTH ]]; then
   cd "${DC_ORO_CONFIG_DIR}"
   if which php > /dev/null 2>&1 && which composer > /dev/null 2>&1; then
@@ -248,15 +252,15 @@ parse_dsn_uri "$ORO_MQ_DSN" "mq" "DC_ORO"
 parse_dsn_uri "$ORO_REDIS_URL" "redis" "DC_ORO"
 
 export DC_ORO_PORT_PREFIX=${DC_ORO_PORT_PREFIX-"301"}
-export DC_ORO_PORT_NGINX=$(find_free_port nginx ${DC_ORO_PORT_PREFIX}80 $DC_ORO_NAME)
-export DC_ORO_PORT_XHGUI=$(find_free_port xhgui "${DC_ORO_PORT_PREFIX}81" $DC_ORO_NAME)
-export DC_ORO_PORT_MYSQL=$(find_free_port database "${DC_ORO_PORT_PREFIX}06" $DC_ORO_NAME)
-export DC_ORO_PORT_PGSQL=$(find_free_port database "${DC_ORO_PORT_PREFIX}32" $DC_ORO_NAME)
-export DC_ORO_PORT_SEARCH=$(find_free_port search "${DC_ORO_PORT_PREFIX}92" $DC_ORO_NAME)
-export DC_ORO_PORT_MQ=$(find_free_port mq "${DC_ORO_PORT_PREFIX}72" $DC_ORO_NAME)
-export DC_ORO_PORT_REDIS=$(find_free_port redis "${DC_ORO_PORT_PREFIX}72" $DC_ORO_NAME)
-export DC_ORO_PORT_MAIL_WEBGUI=$(find_free_port mail "${DC_ORO_PORT_PREFIX}25" $DC_ORO_NAME)
-export DC_ORO_PORT_SSH=$(find_free_port ssh "${DC_ORO_PORT_PREFIX}22" $DC_ORO_NAME)
+export DC_ORO_PORT_NGINX=$(find_free_port nginx ${DC_ORO_PORT_PREFIX}80 $DC_ORO_APPDIR $DC_ORO_NAME)
+export DC_ORO_PORT_XHGUI=$(find_free_port xhgui "${DC_ORO_PORT_PREFIX}81" $DC_ORO_APPDIR $DC_ORO_NAME)
+export DC_ORO_PORT_MYSQL=$(find_free_port database "${DC_ORO_PORT_PREFIX}06" $DC_ORO_APPDIR $DC_ORO_NAME)
+export DC_ORO_PORT_PGSQL=$(find_free_port database "${DC_ORO_PORT_PREFIX}32" $DC_ORO_APPDIR $DC_ORO_NAME)
+export DC_ORO_PORT_SEARCH=$(find_free_port search "${DC_ORO_PORT_PREFIX}92" $DC_ORO_APPDIR $DC_ORO_NAME)
+export DC_ORO_PORT_MQ=$(find_free_port mq "${DC_ORO_PORT_PREFIX}72" $DC_ORO_APPDIR $DC_ORO_NAME)
+export DC_ORO_PORT_REDIS=$(find_free_port redis "${DC_ORO_PORT_PREFIX}72" $DC_ORO_APPDIR $DC_ORO_NAME)
+export DC_ORO_PORT_MAIL_WEBGUI=$(find_free_port mail "${DC_ORO_PORT_PREFIX}25" $DC_ORO_APPDIR $DC_ORO_NAME)
+export DC_ORO_PORT_SSH=$(find_free_port ssh "${DC_ORO_PORT_PREFIX}22" $DC_ORO_APPDIR $DC_ORO_NAME)
 
 export COMPOSER_AUTH=$(echo ${DC_ORO_COMPOSER_AUTH:-${COMPOSER_AUTH}} | jq -c .)
 export DC_ORO_COMPOSER_AUTH=${COMPOSER_AUTH}
