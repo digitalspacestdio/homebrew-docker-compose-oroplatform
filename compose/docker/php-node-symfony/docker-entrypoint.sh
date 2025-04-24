@@ -24,7 +24,7 @@ if [[ -f /.zshrc ]]; then
 	cp /.zshrc ${PHP_USER_HOME}/.zshrc
 	if [[ -f ${APP_DIR:-/var/www}/bin/console ]]; then
 		php ${APP_DIR:-/var/www}/bin/console completion bash >> ${PHP_USER_HOME}/.zshrc 2>/dev/null
-	if
+	fi
 fi
 
 exec docker-php-entrypoint "$@"
