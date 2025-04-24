@@ -399,12 +399,15 @@ if ${DOCKER_BIN} system info --format '{{.SecurityOptions}}' | grep "name=rootle
 fi
 
 if [[ $1 == "up" ]]; then
-  printf "\033[0;37m[${DC_ORO_NAME}] Application URL: http://localhost:${DC_ORO_PORT_NGINX}/\033[0m\n"
-  printf "\033[0;37m[${DC_ORO_NAME}] XHGUI URL: http://localhost:${DC_ORO_PORT_XHGUI}/\033[0m\n"
-  printf "\033[0;37m[${DC_ORO_NAME}] Mailhog URL: http://localhost:${DC_ORO_PORT_MAIL_WEBGUI}/\033[0m\n"
-  printf "\033[0;37m[${DC_ORO_NAME}] Elasticsearch URL: http://localhost:${DC_ORO_PORT_ELASTICSEARCH}/\033[0m\n"
-  printf "\033[0;37m[${DC_ORO_NAME}] MySql Address: 127.0.0.1:${DC_ORO_PORT_MYSQL}\033[0m\n"
-  printf "\033[0;37m[${DC_ORO_NAME}] PgSql Address: 127.0.0.1:${DC_ORO_PORT_PGSQL}\033[0m\n"
+  printf "\033[0;37m[${DC_ORO_NAME}] Application: http://localhost:${DC_ORO_PORT_NGINX}\033[0m\n"
+  printf "\033[0;37m[${DC_ORO_NAME}] Mailhog: http://localhost:${DC_ORO_PORT_MAIL_WEBGUI}\033[0m\n"
+  printf "\033[0;37m[${DC_ORO_NAME}] Elasticsearch: http://localhost:${DC_ORO_PORT_SEARCH}\033[0m\n"
+  printf "\033[0;37m[${DC_ORO_NAME}] Mq: http://localhost:${DC_ORO_PORT_MQ}\033[0m\n"
+  if [[ $DC_ORO_DATABASE_SCHEMA == "pdo_pgsql" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgres" ]];then
+    printf "\033[0;37m[${DC_ORO_NAME}] Database: 127.0.0.1:${DC_ORO_PORT_PGSQL}\033[0m\n"
+  elif [[ $DC_ORO_DATABASE_SCHEMA == "pdo_mysql" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "mysql" ]];then
+    printf "\033[0;37m[${DC_ORO_NAME}] Database: 127.0.0.1:${DC_ORO_PORT_MYSQL}\033[0m\n"
+  fi
 fi
 
 if echo $1 | grep -i 'import' | grep -i 'db\|database' > /dev/null; then
