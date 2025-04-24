@@ -16,6 +16,9 @@ if [[ -n $ORO_SSH_PUBLIC_KEY ]]; then
 	mkdir -p /root/.ssh
 	echo "${ORO_SSH_PUBLIC_KEY}" > /root/.ssh/authorized_keys
 	chmod -R 0600 /root/.ssh
+	if which zsh; then
+		chsh zsh
+	fi
 
 	if [[ -n $PHP_UID ]]; then
 		PHP_USER_HOME=$(eval echo "~$PHP_USER_NAME")
@@ -46,6 +49,10 @@ if [[ -n $ORO_SSH_PUBLIC_KEY ]]; then
 
 		if [[ -d "${APP_DIR:-/var/www}/.git" ]]; then
 			su - $PHP_USER_NAME -c 'git config --global --add safe.directory "'${APP_DIR:-/var/www}'/.git"'
+		fi
+
+		if which zsh; then
+			chsh zsh $PHP_UID
 		fi
 	fi
 fi
