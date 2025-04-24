@@ -445,13 +445,17 @@ if echo $1 | grep -i '^ssh' > /dev/null; then
   exec bash -c "ssh -o 'SendEnv COMPOSER_AUTH' -o StrictHostKeyChecking=no -p $SSH_PORT ${DC_ORO_USER_NAME}@${SSH_HOST} $C"
 fi
 
-if echo $1 | grep -i '^composer\|bin/\|npm\|php\|node\|yarn\|bash\|symfony' > /dev/null; then
+if echo $1 | grep -i '^composer\|bin/\|npm\|php\|node\|yarn\|bash\|symfony\|symfony' > /dev/null; then
   for i in "$@"; do
       i="${i//\\/\\\\}"
       i="${i//$/\\$}"
       C="$C \"${i//\"/\\\"}\""
   done
   exec ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "exec $C"
+fi
+
+if echo $1 | grep -i '^cli$' > /dev/null; then
+  exec ${DOCKER_COMPOSE_RUN_CMD} cli
 fi
 
 if echo $1 | grep -i '^install' > /dev/null; then
