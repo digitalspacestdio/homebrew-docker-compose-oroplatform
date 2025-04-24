@@ -26,12 +26,6 @@ if [[ -n $ORO_SSH_PUBLIC_KEY ]]; then
 		chown -R "${PHP_USER_NAME}" ${PHP_USER_HOME}
 		usermod -s /bin/bash $PHP_USER_NAME
 		usermod -p '*' $PHP_USER_NAME
-
-		# cat > ${PHP_USER_HOME}/.profile <<- EOM
-		# cd ${APP_DIR:-/var/www}
-		# EOM
-
-		# chmod +x "${PHP_USER_HOME}/.profile"
 		
 		cat >> /etc/ssh/sshd_config <<- EOM
 		Match User ${PHP_USER_NAME}
@@ -39,7 +33,6 @@ if [[ -n $ORO_SSH_PUBLIC_KEY ]]; then
 			AllowTcpForwarding yes
 			PermitTunnel yes
 			GatewayPorts yes
-		#	ForceCommand bash -c 'if [ -n "$SSH_ORIGINAL_COMMAND" ]; then exec "$SSH_ORIGINAL_COMMAND"; else cd ${APP_DIR:-/var/www} && exec bash; fi'
 		EOM
 
 		# Load docker env variables

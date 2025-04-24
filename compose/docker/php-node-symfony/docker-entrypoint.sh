@@ -18,7 +18,10 @@ PHP_USER_HOME=$(eval echo "~$PHP_USER_NAME")
 cat > ${PHP_USER_HOME}/.profile <<- EOM
 	cd \${APP_DIR:-/var/www}
 EOM
-
 chmod +x ${PHP_USER_HOME}/.profile
+
+if [[ -f /.zshrc ]]; then
+	cp /.zshrc ${PHP_USER_HOME}/.zshrc
+fi
 
 exec docker-php-entrypoint "$@"

@@ -268,7 +268,7 @@ RUN set -eux && \
   echo 'eval "$(starship init zsh)"' >> /root/.zshrc && \
   rm -rf /tmp/starship
 
-COPY zshrc "/home/${PHP_USER_NAME}/.zshrc"
+COPY zshrc "/.zshrc"
 
 WORKDIR ${APP_DIR}
 USER ${PHP_USER_NAME}
