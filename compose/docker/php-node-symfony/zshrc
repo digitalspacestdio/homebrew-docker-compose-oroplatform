@@ -1,73 +1,73 @@
 clear
 
-# Colors
-HDR="\033[90m"       # (headers)
-LBL="\033[1;36m"     # (labels)
-RST="\033[0m"        # reset
+# # Colors
+# HDR="\033[90m"       # (headers)
+# LBL="\033[1;36m"     # (labels)
+# RST="\033[0m"        # reset
 
-# ## OS INFO
-echo -e "${HDR}## OS INFO${RST}"
-echo -e "${LBL}OS:${RST} Alpine Linux $(uname -m), Kernel: $(uname -r)"
+# # ## OS INFO
+# echo -e "${HDR}## OS INFO${RST}"
+# echo -e "${LBL}OS:${RST} Alpine Linux $(uname -m), Kernel: $(uname -r)"
 
-# ## SOFTWARE
-echo -e "${HDR}## SOFTWARE${RST}"
-if which php > /dev/null 2>&1; then
-  php_version=$(php -v | head -n1)
-  echo -e "${LBL}PHP:${RST} $php_version"
-else
-  echo -e "${LBL}PHP:${RST} not installed"
-fi
-if which node > /dev/null 2>&1; then
-  node_version=$(node -v)
-  echo -e "${LBL}Node.js:${RST} $node_version"
-else
-  echo -e "${LBL}Node.js:${RST} not installed"
-fi
-if which java > /dev/null 2>&1; then
-  java_version=$(java -version 2>&1 | head -n1)
-  echo -e "${LBL}Java:${RST} $java_version"
-else
-  echo -e "${LBL}Java:${RST} not installed"
-fi
+# # ## SOFTWARE
+# echo -e "${HDR}## SOFTWARE${RST}"
+# if which php > /dev/null 2>&1; then
+#   php_version=$(php -v | head -n1)
+#   echo -e "${LBL}PHP:${RST} $php_version"
+# else
+#   echo -e "${LBL}PHP:${RST} not installed"
+# fi
+# if which node > /dev/null 2>&1; then
+#   node_version=$(node -v)
+#   echo -e "${LBL}Node.js:${RST} $node_version"
+# else
+#   echo -e "${LBL}Node.js:${RST} not installed"
+# fi
+# if which java > /dev/null 2>&1; then
+#   java_version=$(java -version 2>&1 | head -n1)
+#   echo -e "${LBL}Java:${RST} $java_version"
+# else
+#   echo -e "${LBL}Java:${RST} not installed"
+# fi
 
-# ## RESOURCES
-echo -e "${HDR}## RESOURCES${RST}"
-# CPU usage + load average
-cpus=$(nproc)
-read avg1 avg5 avg15 _ < /proc/loadavg
-cpu_pct=$(awk "BEGIN { printf \"%.1f\", ($avg1 / $cpus) * 100 }")
-echo -e "${LBL}CPU:${RST} ${cpu_pct}% (LA: $avg1 $avg5 $avg15)"
+# # ## RESOURCES
+# echo -e "${HDR}## RESOURCES${RST}"
+# # CPU usage + load average
+# cpus=$(nproc)
+# read avg1 avg5 avg15 _ < /proc/loadavg
+# cpu_pct=$(awk "BEGIN { printf \"%.1f\", ($avg1 / $cpus) * 100 }")
+# echo -e "${LBL}CPU:${RST} ${cpu_pct}% (LA: $avg1 $avg5 $avg15)"
 
-# Memory
-meminfo=$(awk '/MemTotal|MemAvailable/ {print $2}' /proc/meminfo)
-mem_total=$(echo "$meminfo" | head -n1)
-mem_free=$(echo "$meminfo" | tail -n1)
-mem_total_mib=$((mem_total / 1024))
-mem_used_mib=$(( (mem_total - mem_free) / 1024 ))
+# # Memory
+# meminfo=$(awk '/MemTotal|MemAvailable/ {print $2}' /proc/meminfo)
+# mem_total=$(echo "$meminfo" | head -n1)
+# mem_free=$(echo "$meminfo" | tail -n1)
+# mem_total_mib=$((mem_total / 1024))
+# mem_used_mib=$(( (mem_total - mem_free) / 1024 ))
 
-if [ "$mem_total_mib" -ge 1024 ]; then
-  mem_total_fmt=$(awk "BEGIN { printf \"%.1f\", $mem_total_mib / 1024 }")
-  mem_used_fmt=$(awk "BEGIN { printf \"%.1f\", $mem_used_mib / 1024 }")
-  mem_unit="G"
-else
-  mem_total_fmt=$mem_total_mib
-  mem_used_fmt=$mem_used_mib
-  mem_unit="MiB"
-fi
+# if [ "$mem_total_mib" -ge 1024 ]; then
+#   mem_total_fmt=$(awk "BEGIN { printf \"%.1f\", $mem_total_mib / 1024 }")
+#   mem_used_fmt=$(awk "BEGIN { printf \"%.1f\", $mem_used_mib / 1024 }")
+#   mem_unit="G"
+# else
+#   mem_total_fmt=$mem_total_mib
+#   mem_used_fmt=$mem_used_mib
+#   mem_unit="MiB"
+# fi
 
-echo -e "${LBL}Memory:${RST} ${mem_used_fmt}${mem_unit} of ${mem_total_fmt}${mem_unit}"
+# echo -e "${LBL}Memory:${RST} ${mem_used_fmt}${mem_unit} of ${mem_total_fmt}${mem_unit}"
 
-# Disk usage
-disk_used=$(df -h . | awk 'NR==2 {print $3}')
-disk_total=$(df -h . | awk 'NR==2 {print $2}')
-echo -e "${LBL}Disk:${RST} ${disk_used} of ${disk_total}"
+# # Disk usage
+# disk_used=$(df -h . | awk 'NR==2 {print $3}')
+# disk_total=$(df -h . | awk 'NR==2 {print $2}')
+# echo -e "${LBL}Disk:${RST} ${disk_used} of ${disk_total}"
 
-# Uptime
-uptime_secs=$(cut -d. -f1 /proc/uptime)
-days=$((uptime_secs / 86400))
-hours=$(( (uptime_secs % 86400) / 3600 ))
-mins=$(( (uptime_secs % 3600) / 60 ))
-echo -e "${LBL}Uptime:${RST} ${days} days, ${hours} hours, ${mins} mins"
+# # Uptime
+# uptime_secs=$(cut -d. -f1 /proc/uptime)
+# days=$((uptime_secs / 86400))
+# hours=$(( (uptime_secs % 86400) / 3600 ))
+# mins=$(( (uptime_secs % 3600) / 60 ))
+# echo -e "${LBL}Uptime:${RST} ${days} days, ${hours} hours, ${mins} mins"
 
 autoload -Uz compinit
 compinit
@@ -75,4 +75,11 @@ compinit
 zstyle ':completion:*' menu select
 mkdir -p ~/.config
 starship preset plain-text-symbols -o ~/.config/starship.toml
+echo '
+[hostname]
+ssh_only = false
+trim_at = ""
+format = "[$hostname]($style) in "
+style = "yellow"
+' >> ~/.config/starship.toml
 eval "$(starship init zsh)"

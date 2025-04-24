@@ -386,6 +386,7 @@ services:
       ES_JAVA_OPTS: '${ES_JAVA_OPTS:--Xms256m -Xmx2048m}'
       ELASTIC_PASSWORD: elastic
       discovery.type: 'single-node'
+      xpack.security.enabled: false
     ports:
       - "${DC_ORO_SEARCH_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_SEARCH:-9200}:9200"
     networks:

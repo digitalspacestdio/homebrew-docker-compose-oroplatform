@@ -17,7 +17,7 @@ if [[ -n $ORO_SSH_PUBLIC_KEY ]]; then
 	echo "${ORO_SSH_PUBLIC_KEY}" > /root/.ssh/authorized_keys
 	chmod -R 0600 /root/.ssh
 	if which zsh; then
-		chsh zsh
+		chsh -s $(which zsh) $USER
 	fi
 
 	if [[ -n $PHP_UID ]]; then
@@ -52,7 +52,7 @@ if [[ -n $ORO_SSH_PUBLIC_KEY ]]; then
 		fi
 
 		if which zsh; then
-			chsh zsh $PHP_UID
+			chsh -s $(which zsh) $PHP_USER_NAME
 		fi
 	fi
 fi
