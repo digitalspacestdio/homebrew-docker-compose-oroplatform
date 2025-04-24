@@ -183,7 +183,7 @@ find_free_port()
   local SELECTED_PORT=$([[ -f "${DC_ORO_APPDIR}/compose.yml" ]] && yq '.services["'${SERVICE_NAME}'"].ports[] | select(.published) | .published' "${DC_ORO_APPDIR}/compose.yml" || echo "")
   
   # If a specific port is defined and there exists a running container that starts with the project name and service name, return that port
-  if [[ -n $SELECTED_PORT ]] && docker ps --filter "name=${DC_ORO_NAME}_${SERVICE_NAME}" --format '{{.Names}}' | grep -q "^${DC_ORO_NAME}_${SERVICE_NAME}"; then
+  if [[ -n $SELECTED_PORT ]] && docker ps -a --filter "name=${DC_ORO_NAME}_${SERVICE_NAME}" --format '{{.Names}}' | grep -q "^${DC_ORO_NAME}_${SERVICE_NAME}"; then
     echo $SELECTED_PORT
     return
   fi
@@ -412,10 +412,15 @@ if [[ $1 == "up" ]]; then
   printf "\033[0;37m[${DC_ORO_NAME}] Mailhog: http://localhost:${DC_ORO_PORT_MAIL_WEBGUI}\033[0m\n"
   printf "\033[0;37m[${DC_ORO_NAME}] Elasticsearch: http://localhost:${DC_ORO_PORT_SEARCH}\033[0m\n"
   printf "\033[0;37m[${DC_ORO_NAME}] Mq: http://localhost:${DC_ORO_PORT_MQ}\033[0m\n"
+  
   if [[ $DC_ORO_DATABASE_SCHEMA == "pdo_pgsql" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgres" ]];then
     printf "\033[0;37m[${DC_ORO_NAME}] Database: 127.0.0.1:${DC_ORO_PORT_PGSQL}\033[0m\n"
   elif [[ $DC_ORO_DATABASE_SCHEMA == "pdo_mysql" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "mysql" ]];then
     printf "\033[0;37m[${DC_ORO_NAME}] Database: 127.0.0.1:${DC_ORO_PORT_MYSQL}\033[0m\n"
+  fi
+
+  if [[ $DC_ORO_MODE == "ssh" ]];then
+    printf "\033[0;37m[${DC_ORO_NAME}] SSH: 127.0.0.1:${DC_ORO_PORT_SSH}\033[0m\n"
   fi
 fi
 
