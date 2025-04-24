@@ -30,6 +30,17 @@ services:
       - "${DC_ORO_SSH_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_SSH:-2222}:22"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    depends_on:
+      database:
+        condition: service_healthy
+      search:
+        condition: service_healthy
+      mq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mail:
+        condition: service_healthy
     environment:
       - 'APP_DIR=${DC_ORO_APPDIR:-/var/www}'
       - 'DC_ORO_APPDIR=${DC_ORO_APPDIR:-/var/www}'
