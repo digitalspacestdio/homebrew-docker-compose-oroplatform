@@ -186,8 +186,6 @@ fi
 
 find_free_port()
 {
-  find_free_port()
-{
   local SERVICE_NAME="$1"
   local PORT="$2"
   local DC_ORO_APPDIR="$3"
