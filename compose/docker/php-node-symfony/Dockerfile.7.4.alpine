@@ -268,7 +268,7 @@ COPY zshrc "/.zshrc"
 
 RUN mkdir -p /etc/bash_completion.d && \
   composer completion bash > /etc/bash_completion.d/composer; \
-  npm completion > /usr/local/etc/bash_completion.d/npm
+  npm completion > /etc/bash_completion.d/npm
 
 WORKDIR ${APP_DIR}
 USER ${PHP_USER_NAME}
