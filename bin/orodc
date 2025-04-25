@@ -11,10 +11,10 @@ export DC_ORO_NAME=${DC_ORO_NAME-$(basename $(pwd))}
 export DC_ORO_CONFIG_DIR="$HOME/.$(basename $0)/${DC_ORO_NAME}"
 RSYNC_BIN=$(brew --prefix rsync)/bin/rsync
 DOCKER_BIN="${DOCKER_BIN-$(which docker)}";
-DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN-$(which docker) compose}";
-DOCKER_COMPOSE_VERSION=$($DOCKER_COMPOSE_BIN version | grep '[0-9]\+\.[0-9]\+\.[0-9]\+' -o | awk -F. '{ print $1 }')
+DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN-$(which docker) compose}";
+DOCKER_COMPOSE_VERSION=$($DOCKER_COMPOSE_BIN_CMD version | grep '[0-9]\+\.[0-9]\+\.[0-9]\+' -o | awk -F. '{ print $1 }')
 if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose.yml" ]]; then
-  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose.yml"
+  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose.yml"
 fi
 
 load_env_safe() {
@@ -290,7 +290,7 @@ elif [[ -z $DC_ORO_MODE ]]; then
 fi
 
 if [[ $DC_ORO_MODE == "mutagen" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-mutagen.yml" ]]; then
-  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-mutagen.yml"
+  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-mutagen.yml"
   MUTAGEN_SESSION_NAME=$(echo ${DC_ORO_NAME}-appcode | awk '{print tolower($0)}' | sed 's/[^0-9a-z]/-/g')
   WAIT_SYNC="1"
   if ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep "^${DC_ORO_NAME}_appcode$" > /dev/null 2>&1; then
@@ -305,10 +305,10 @@ if [[ $DC_ORO_MODE == "mutagen" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose
     fi
     WAIT_SYNC=""
   elif echo $1 | grep -v -i '^build\|pull' > /dev/null; then
-    if [[ "0" -eq $(${DOCKER_COMPOSE_BIN} ps -q mutagen  2> /dev/null | wc -l > /dev/null) ]]; then
-      ${DOCKER_COMPOSE_BIN} up -d mutagen
+    if [[ "0" -eq $(${DOCKER_COMPOSE_BIN_CMD} ps -q mutagen  2> /dev/null | wc -l > /dev/null) ]]; then
+      ${DOCKER_COMPOSE_BIN_CMD} up -d mutagen
     fi
-    DOCKER_CONTAINER_NAME_MUTAGEN=$(${DOCKER_BIN} inspect -f '{{.Name}}' $(${DOCKER_COMPOSE_BIN} ps -q mutagen) | cut -c2-)
+    DOCKER_CONTAINER_NAME_MUTAGEN=$(${DOCKER_BIN} inspect -f '{{.Name}}' $(${DOCKER_COMPOSE_BIN_CMD} ps -q mutagen) | cut -c2-)
     if ! mutagen sync list | grep -i "Name: ${MUTAGEN_SESSION_NAME}" > /dev/null 2>&1; then
       mutagen sync create --sync-mode=two-way-resolved \
       --scan-mode=accelerated \
@@ -348,14 +348,14 @@ if [[ ${DC_ORO_MODE} == "ssh" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-s
     chmod 0600 "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519"
     export ORO_SSH_PUBLIC_KEY=$(cat "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519.pub")
   fi
-  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-ssh.yml"
+  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-ssh.yml"
   ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
     [[ $1 == "up" ]] && {
       >&2 echo -e "\033[36m==> Copying source code to the '${DC_ORO_NAME}_appcode' docker valume\033[0m"
       ${DOCKER_BIN} volume create "${DC_ORO_NAME}_appcode"  > /dev/null
-      ${DOCKER_COMPOSE_BIN} up -d ssh
+      ${DOCKER_COMPOSE_BIN_CMD} up -d ssh
       SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
-      SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
+      SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
       sleep 3
       until ${RSYNC_BIN} --exclude vendor --exclude node_modules --links -e "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i \"${DC_ORO_CONFIG_DIR}/ssh_id_ed25519\" -p $SSH_PORT" --timeout=3 --info=progress2 -r "${DC_ORO_APPDIR}/" ${DC_ORO_USER_NAME}@${SSH_HOST}:"${DC_ORO_APPDIR}/"; do
         sleep 5
@@ -365,27 +365,27 @@ if [[ ${DC_ORO_MODE} == "ssh" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-s
 fi
 
 if [[ $DC_ORO_MODE == "default" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-default.yml" ]]; then
-  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-default.yml"
+  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-default.yml"
 fi
 
 if [[ $DC_ORO_DATABASE_SCHEMA == "pgsql" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgres" ]];then
   export DC_ORO_DC_ORO_DATABASE_PORT=${DC_ORO_DC_ORO_DATABASE_PORT:-5432}
-  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-pgsql.yml"
+  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-pgsql.yml"
 elif [[ $DC_ORO_DATABASE_SCHEMA == "mariadb" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "mysql" ]];then
   export DC_ORO_DC_ORO_DATABASE_PORT=${DC_ORO_DC_ORO_DATABASE_PORT:-3306}
-  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-mysql.yml"
+  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-mysql.yml"
 fi
-if ${DOCKER_COMPOSE_BIN} ps --services | grep database > /dev/null; then
-  SERVICE_DATABASE_ID=$(${DOCKER_COMPOSE_BIN} ps -q database)
+if ${DOCKER_COMPOSE_BIN_CMD} ps --services | grep database > /dev/null; then
+  SERVICE_DATABASE_ID=$(${DOCKER_COMPOSE_BIN_CMD} ps -q database)
   if [[ "" != $SERVICE_DATABASE_ID ]] && ${DOCKER_BIN} inspect -f '{{ .Config.Image }}' "$SERVICE_DATABASE_ID" | grep 'busybox'; then
-    ${DOCKER_COMPOSE_BIN} stop database
-    ${DOCKER_COMPOSE_BIN} rm -f database
+    ${DOCKER_COMPOSE_BIN_CMD} stop database
+    ${DOCKER_COMPOSE_BIN_CMD} rm -f database
   fi
 fi
 
 if [[ -f "$DC_ORO_APPDIR/.docker-compose.user.yml" ]]; then
   >&2 echo -e "\033[36m==> Additional ${DOCKER_BIN} compose config will be used: $DC_ORO_APPDIR/.docker-compose.user.yml\033[0m"
-  DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f $DC_ORO_APPDIR/.docker-compose.user.yml"
+  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f $DC_ORO_APPDIR/.docker-compose.user.yml"
 fi
 
 if [[ -f "$DC_ORO_APPDIR/.php-version" ]] && [[ -z $DC_ORO_PHP_VERSION ]]; then
@@ -404,9 +404,9 @@ if [[ -f "$DC_ORO_APPDIR/.nvmrc" ]] && [[ -z $DC_ORO_NODE_VERSION ]]; then
 fi
 
 if [[ $DOCKER_COMPOSE_VERSION -gt 1 ]]; then
-  DOCKER_COMPOSE_RUN_CMD="${DOCKER_COMPOSE_BIN} run -i --rm"
+  DOCKER_COMPOSE_RUN_CMD="${DOCKER_COMPOSE_BIN_CMD} run -i --rm"
 else
-  DOCKER_COMPOSE_RUN_CMD="${DOCKER_COMPOSE_BIN} run --rm"
+  DOCKER_COMPOSE_RUN_CMD="${DOCKER_COMPOSE_BIN_CMD} run --rm"
 fi
 
 if ${DOCKER_BIN} system info --format '{{.SecurityOptions}}' | grep "name=rootless" > /dev/null; then
@@ -494,7 +494,7 @@ if echo $1 | grep -i '^ssh' > /dev/null; then
       C="$C \"${i//\"/\\\"}\""
   done
   SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
-  SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
+  SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
   set -x
   exec bash -c "ssh -o 'SendEnv COMPOSER_AUTH' -o StrictHostKeyChecking=no -p $SSH_PORT ${DC_ORO_USER_NAME}@${SSH_HOST} $C"
 fi
@@ -518,9 +518,9 @@ if echo $1 | grep -i '^install$' > /dev/null; then
 fi
 
 if [[ $1 == "down" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
-  rm -f "${DC_ORO_CONFIG_DIR}/compose.yml"
-else
-  ${DOCKER_COMPOSE_BIN} config > "${DC_ORO_CONFIG_DIR}/compose.yml"
+  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/compose.yml"
 fi
 
-exec ${DOCKER_COMPOSE_BIN} "$@"
+${DOCKER_COMPOSE_BIN_CMD} config > "${DC_ORO_CONFIG_DIR}/compose.yml"
+
+exec ${DOCKER_COMPOSE_BIN_CMD} "$@"
