@@ -263,6 +263,15 @@ RUN mkdir -p /etc/bash_completion.d && \
   composer completion bash > /etc/bash_completion.d/composer; \
   npm completion > /etc/bash_completion.d/npm
 
+RUN wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub && \
+  wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.35-r1/glibc-2.35-r1.apk && \
+  apk add glibc-2.35-r1.apk && rm -f glibc-2.35-r1.apk; \
+  \
+  wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.35-r1/glibc-bin-2.35-r1.apk && \
+  wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.35-r1/glibc-i18n-2.35-r1.apk && \
+  apk add glibc-bin-2.35-r1.apk glibc-i18n-2.35-r1.apk && \
+  /usr/glibc-compat/bin/localedef -i en_US -f UTF-8 en_US.UTF-8
+
 WORKDIR ${APP_DIR}
 USER ${PHP_USER_NAME}
 VOLUME "/home/${PHP_USER_NAME}" "/root" "${APP_DIR}"
