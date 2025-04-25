@@ -171,7 +171,6 @@ find-up () {
   echo "$path"
 }
 
-
 find_free_port()
 {
   local SERVICE_NAME="$1"
@@ -342,6 +341,12 @@ if [[ $DC_ORO_MODE == "mutagen" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose
 fi
 
 if [[ ${DC_ORO_MODE} == "ssh" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-ssh.yml" ]]; then
+  if [[ -z ${ORO_SSH_PUBLIC_KEY} ]]; then
+    if [[ ! -f ${DC_ORO_CONFIG_DIR}/ssh_id_ed25519 ]]; then
+      ssh-keygen -t ed25519 -f "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" -N "" -q
+    fi
+    export ORO_SSH_PUBLIC_KEY=$(cat "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519.pub")
+  fi
   DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-ssh.yml"
   ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
     [[ $1 == "up" ]] && {
