@@ -208,6 +208,9 @@ RUN echo http://dl-2.alpinelinux.org/alpine/edge/main >> /etc/apk/repositories; 
     btop \
   ;
 
+RUN apk add --no-cache --sudo; \
+  echo "${PHP_USER_NAME} ALL=(ALL) ALL" >> /etc/sudoers
+
 # Install Python 2
 RUN apk add --no-cache python2
 
