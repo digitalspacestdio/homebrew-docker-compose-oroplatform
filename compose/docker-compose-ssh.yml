@@ -30,6 +30,9 @@ services:
       - "${DC_ORO_SSH_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_SSH:-2222}:22"
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    cap_add:
+      - SYS_ADMIN
+      - DAC_READ_SEARCH
     depends_on:
       database:
         condition: service_healthy
