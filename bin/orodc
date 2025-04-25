@@ -297,8 +297,36 @@ if [[ -z ${ORO_SSH_PUBLIC_KEY} ]]; then
   chmod 0600 "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519"
   export ORO_SSH_PUBLIC_KEY=$(cat "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519.pub")
 fi
+
+if [[ $DC_ORO_MODE == "default" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-default.yml" ]]; then
+  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-default.yml"
+fi
+
+if [[ $DC_ORO_DATABASE_SCHEMA == "pgsql" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgres" ]];then
+  export DC_ORO_DC_ORO_DATABASE_PORT=${DC_ORO_DC_ORO_DATABASE_PORT:-5432}
+  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-pgsql.yml"
+elif [[ $DC_ORO_DATABASE_SCHEMA == "mariadb" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "mysql" ]];then
+  export DC_ORO_DC_ORO_DATABASE_PORT=${DC_ORO_DC_ORO_DATABASE_PORT:-3306}
+  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-mysql.yml"
+fi
+if ${DOCKER_COMPOSE_BIN_CMD} ps --services | grep database > /dev/null; then
+  SERVICE_DATABASE_ID=$(${DOCKER_COMPOSE_BIN_CMD} ps -q database)
+  if [[ "" != $SERVICE_DATABASE_ID ]] && ${DOCKER_BIN} inspect -f '{{ .Config.Image }}' "$SERVICE_DATABASE_ID" | grep 'busybox'; then
+    ${DOCKER_COMPOSE_BIN_CMD} stop database
+    ${DOCKER_COMPOSE_BIN_CMD} rm -f database
+  fi
+fi
+
+if [[ -f "$DC_ORO_APPDIR/.docker-compose.user.yml" ]]; then
+  >&2 echo -e "\033[36m==> Additional ${DOCKER_BIN} compose config will be used: $DC_ORO_APPDIR/.docker-compose.user.yml\033[0m"
+  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f $DC_ORO_APPDIR/.docker-compose.user.yml"
+fi
+
+# Enable ssh
 DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-ssh.yml"
-if [[ "$OSTYPE" == "darwin"* ]]; then
+
+# Sync source code if macos
+if [[ $DC_ORO_MODE == "mutagen" ]]; then
   ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
     [[ $1 == "up" ]] && {
       >&2 echo -e "\033[36m==> Copying source code to the '${DC_ORO_NAME}_appcode' docker valume\033[0m"
@@ -314,8 +342,7 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
   }
 fi
 
-#if [[ $DC_ORO_MODE == "mutagen" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-mutagen.yml" ]]; then
-if [[ $DC_ORO_MODE == "mutagen" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-mutagen.yml" ]]; then
+if [[ $DC_ORO_MODE == "mutagen" ]]; then
   #DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-mutagen.yml"
   MUTAGEN_SESSION_NAME=$(echo ${DC_ORO_NAME}-appcode | awk '{print tolower($0)}' | sed 's/[^0-9a-z]/-/g')
   WAIT_SYNC="1"
@@ -365,30 +392,6 @@ if [[ $DC_ORO_MODE == "mutagen" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose
   fi
 fi
 
-if [[ $DC_ORO_MODE == "default" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-default.yml" ]]; then
-  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-default.yml"
-fi
-
-if [[ $DC_ORO_DATABASE_SCHEMA == "pgsql" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgres" ]];then
-  export DC_ORO_DC_ORO_DATABASE_PORT=${DC_ORO_DC_ORO_DATABASE_PORT:-5432}
-  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-pgsql.yml"
-elif [[ $DC_ORO_DATABASE_SCHEMA == "mariadb" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "mysql" ]];then
-  export DC_ORO_DC_ORO_DATABASE_PORT=${DC_ORO_DC_ORO_DATABASE_PORT:-3306}
-  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-mysql.yml"
-fi
-if ${DOCKER_COMPOSE_BIN_CMD} ps --services | grep database > /dev/null; then
-  SERVICE_DATABASE_ID=$(${DOCKER_COMPOSE_BIN_CMD} ps -q database)
-  if [[ "" != $SERVICE_DATABASE_ID ]] && ${DOCKER_BIN} inspect -f '{{ .Config.Image }}' "$SERVICE_DATABASE_ID" | grep 'busybox'; then
-    ${DOCKER_COMPOSE_BIN_CMD} stop database
-    ${DOCKER_COMPOSE_BIN_CMD} rm -f database
-  fi
-fi
-
-if [[ -f "$DC_ORO_APPDIR/.docker-compose.user.yml" ]]; then
-  >&2 echo -e "\033[36m==> Additional ${DOCKER_BIN} compose config will be used: $DC_ORO_APPDIR/.docker-compose.user.yml\033[0m"
-  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f $DC_ORO_APPDIR/.docker-compose.user.yml"
-fi
-
 if [[ -f "$DC_ORO_APPDIR/.php-version" ]] && [[ -z $DC_ORO_PHP_VERSION ]]; then
   export DC_ORO_PHP_VERSION=$(cat $DC_ORO_APPDIR/.php-version | head -n1)
   >&2 echo -e "\033[36m==> Found .php-version with following version: $DC_ORO_PHP_VERSION\033[0m"
@@ -426,9 +429,9 @@ if [[ $1 == "up" ]]; then
     printf "\033[0;37m[${DC_ORO_NAME}] Database: 127.0.0.1:${DC_ORO_PORT_MYSQL}\033[0m\n"
   fi
 
-  if [[ $DC_ORO_MODE == "ssh" ]];then
+  #if [[ $DC_ORO_MODE == "ssh" ]];then
     printf "\033[0;37m[${DC_ORO_NAME}] SSH: 127.0.0.1:${DC_ORO_PORT_SSH}\033[0m\n"
-  fi
+  #fi
 fi
 
 if echo $1 | grep -i 'import' | grep -i 'db\|database' > /dev/null; then
