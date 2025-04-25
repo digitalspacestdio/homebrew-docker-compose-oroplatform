@@ -218,14 +218,6 @@ RUN echo http://dl-2.alpinelinux.org/alpine/edge/main >> /etc/apk/repositories; 
     mc \
   ;
 
-COPY msmtprc /.msmtprc
-
-ARG APP_DIR="/var/www"
-ENV APP_DIR=${APP_DIR}
-
-RUN chmod 0666 /usr/local/etc/php/conf.d/*
-RUN chown ${PHP_USER_NAME}:${PHP_USER_GROUP} /var/www
-
 # Zsh + starship
 RUN set -eux && \
   apk add --no-cache zsh && \
@@ -242,11 +234,19 @@ RUN set -eux && \
   echo 'eval "$(starship init zsh)"' >> /root/.zshrc && \
   rm -rf /tmp/starship
 
+COPY msmtprc /.msmtprc
 COPY zshrc "/.zshrc"
 
 RUN mkdir -p /etc/bash_completion.d && \
   composer completion bash > /etc/bash_completion.d/composer; \
   npm completion > /etc/bash_completion.d/npm
+
+ARG APP_DIR="/var/www"
+ENV APP_DIR=${APP_DIR}
+
+RUN chmod 0666 /usr/local/etc/php/conf.d/*; \
+    mkdir -p ${APP_DIR}; \
+    chown ${PHP_USER_NAME}:${PHP_USER_GROUP} ${APP_DIR}
 
 WORKDIR ${APP_DIR}
 USER ${PHP_USER_NAME}
