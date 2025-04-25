@@ -281,6 +281,12 @@ parse_dsn_uri "$ORO_SEARCH_URL" "search" "DC_ORO"
 parse_dsn_uri "$ORO_MQ_DSN" "mq" "DC_ORO"
 parse_dsn_uri "$ORO_REDIS_URL" "redis" "DC_ORO"
 
+if [[ echo $ORO_SEARCH_URL | grep 'orm:' > /dev/null ]]; then
+  export DC_ORO_SEARCH_DSN=
+else
+  export DC_ORO_SEARCH_DSN=$ORO_SEARCH_URL
+fi
+
 export DC_ORO_PORT_PREFIX=${DC_ORO_PORT_PREFIX-"301"}
 export DC_ORO_PORT_NGINX=$(find_free_port nginx ${DC_ORO_PORT_PREFIX}80 $DC_ORO_CONFIG_DIR)
 export DC_ORO_PORT_XHGUI=$(find_free_port xhgui "${DC_ORO_PORT_PREFIX}81" $DC_ORO_CONFIG_DIR)
