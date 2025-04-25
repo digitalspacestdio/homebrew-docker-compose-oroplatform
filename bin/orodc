@@ -323,7 +323,7 @@ if [[ $DC_ORO_MODE == "mutagen" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose
       --ignore-vcs \
       --symlink-mode=ignore \
       --name=${MUTAGEN_SESSION_NAME} \
-      "$DC_ORO_APPDIR" docker://${DC_ORO_USER_NAME}@${DOCKER_CONTAINER_NAME_MUTAGEN}/var/www
+      "$DC_ORO_APPDIR" docker://${DC_ORO_USER_NAME}@${DOCKER_CONTAINER_NAME_MUTAGEN}${DC_ORO_APPDIR}
     else
       WAIT_SYNC=""
     fi
