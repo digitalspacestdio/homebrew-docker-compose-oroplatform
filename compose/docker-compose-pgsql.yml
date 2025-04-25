@@ -15,8 +15,6 @@ services:
       - 'postgresql-data:/var/lib/postgresql/data:delegated'
     ports:
       - '${DC_ORO_DATABASE_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_PGSQL:-5432}:5432'
-    networks:
-      - 'app'
     restart: always
     healthcheck:
       test: "pg_isready -U $${POSTGRES_USER}"
@@ -47,8 +45,6 @@ services:
       DATABASE_USER: '${DC_ORO_DATABASE_USER:-app}'
       DATABASE_PASSWORD: '${DC_ORO_DATABASE_PASSWORD:-app}'
       DATABASE_NAME: '${DC_ORO_DATABASE_DBNAME:-app}'
-    networks:
-      - 'app'
     depends_on:
       database:
         condition: service_healthy

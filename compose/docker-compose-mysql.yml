@@ -19,8 +19,6 @@ services:
       - 'mysql-data:/var/lib/mysql:delegated'
     ports:
       - '${DC_ORO_DATABASE_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_MYSQL:-3306}:3306'
-    networks:
-      - 'app'
     restart: always
     healthcheck:
       test: "mysqladmin ping --silent -u$${MYSQL_USER} -p$${MYSQL_PASSWORD}"
@@ -51,8 +49,6 @@ services:
       DATABASE_USER: '${DC_ORO_DATABASE_USER:-app}'
       DATABASE_PASSWORD: '${DC_ORO_DATABASE_PASSWORD:-app}'
       DATABASE_NAME: '${DC_ORO_DATABASE_DBNAME:-app}'
-    networks:
-      - 'app'
     depends_on:
       database:
         condition: service_healthy

@@ -4,8 +4,6 @@ services:
     container_name: ${DC_ORO_NAME:-unnamed}_database
     hostname: database.${DC_ORO_NAME:-unnamed}.docker.local
     command: sleep infinity
-    networks:
-      - 'app'
     restart: always
     healthcheck:
       test: "sh -c 'exit 0'"
@@ -34,8 +32,6 @@ services:
       - "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/msmtprc:/home/${DC_ORO_PHP_USER_NAME:-developer}/.msmtprc:ro"
       - "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
-    networks:
-      - 'app'
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
@@ -109,8 +105,6 @@ services:
       - "home-root:/root"
       - "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
-    networks:
-      - 'app'
     extra_hosts:
       - "host.docker.internal:host-gateway"
     environment:
@@ -188,8 +182,6 @@ services:
       - "home-root:/root"
       - "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
-    networks:
-      - 'app'
     restart: always
     environment:
       - 'DC_ORO_DATABASE_HOST=${DC_ORO_DATABASE_HOST:-database}'
@@ -266,8 +258,6 @@ services:
       - "home-root:/root"
       - "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
-    networks:
-      - 'app'
     restart: always
     environment:
       - 'DC_ORO_DATABASE_HOST=${DC_ORO_DATABASE_HOST:-database}'
@@ -315,8 +305,6 @@ services:
     hostname: mail.${DC_ORO_NAME:-unnamed}.docker.local
     ports:
       - "${DC_ORO_MAIL_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_MAIL_WEBGUI:-8025}:8025"
-    networks:
-      - 'app'
     restart: always
     healthcheck:
       test: "nc -vz -w 1 localhost 8025"
@@ -339,8 +327,6 @@ services:
     depends_on:
       mongodb:
         condition: service_healthy
-    networks:
-      - 'app'
     restart: always
     healthcheck:
       test: nc -vz -w 1 localhost 80
@@ -363,8 +349,6 @@ services:
       - MONGO_INITDB_DATABASE=xhprof
     volumes:
       - '${DC_ORO_CONFIG_DIR:-.}/docker/mongo/initdb.d:/docker-entrypoint-initdb.d'
-    networks:
-      - 'app'
     restart: always
     healthcheck:
       test: mongo --quiet --eval 'db.runCommand("ping").ok' xhgui
@@ -389,8 +373,6 @@ services:
       xpack.security.enabled: false
     ports:
       - "${DC_ORO_SEARCH_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_SEARCH:-9200}:9200"
-    networks:
-      - 'app'
     restart: always
     healthcheck:
       test: /bin/bash -c "</dev/tcp/localhost/9200"
@@ -419,7 +401,6 @@ services:
       - "appcode:${DC_ORO_APPDIR:-/var/www}:ro"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     networks:
-      - 'app'
       - 'shared'
     restart: always
     environment:
@@ -484,8 +465,6 @@ services:
         max-size: "10m"
 
 networks:
-  app:
-    name: ${DC_ORO_NAME:-unnamed}_app_net
   shared:
     external: true
     name: dc_shared_net
