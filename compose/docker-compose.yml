@@ -402,7 +402,7 @@ services:
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     networks:
       - 'shared'
-      - '${DC_ORO_NAME:-unnamed}_default'
+      - 'default'
     restart: always
     environment:
       - 'APP_DIR=${DC_ORO_APPDIR:-/var/www}'
