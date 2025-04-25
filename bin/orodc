@@ -520,8 +520,8 @@ fi
 
 if [[ $1 == "down" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]] && [[ -s "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/compose.yml"
+  exec ${DOCKER_COMPOSE_BIN_CMD} "$@"
 fi
 
 ${DOCKER_COMPOSE_BIN_CMD} config > "${DC_ORO_CONFIG_DIR}/compose.yml"
-
 exec ${DOCKER_COMPOSE_BIN_CMD} "$@"
