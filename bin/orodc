@@ -554,6 +554,20 @@ if echo $1 | grep -i '^install$' > /dev/null; then
   exec ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "[[ ! -d ${DC_ORO_APPDIR}/vendor ]] && composer install || true && [[ ! -d ${DC_ORO_APPDIR}/node_modules ]] && npm ci || true && php bin/console --env=prod --timeout=1800 oro:install --language=en --formatting-code=en_US --organization-name='Acme Inc.' --user-name=admin --user-email=admin@example.com --user-firstname=John --user-lastname=Doe --user-password='\$ecretPassw0rd' --application-url='https://${DC_ORO_NAME:-unnamed}.docker.local/' --sample-data=y"
 fi
 
+if [[ $1 == "purge" ]]; then
+  [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
+    ${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/compose.yml down -v
+  else
+    ${DOCKER_COMPOSE_BIN_CMD} down -v
+  fi
+
+  ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' && {
+    ${DOCKER_BIN} volume rm ${DC_ORO_NAME}'_appcode'
+  }
+
+  exit 0
+fi
+
 if [[ $1 == "down" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]] && [[ -s "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/compose.yml"
   exec ${DOCKER_COMPOSE_BIN_CMD} "$@"
