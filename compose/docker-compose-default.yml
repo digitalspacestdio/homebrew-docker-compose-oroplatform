@@ -1,6 +1,7 @@
 volumes:
   appcode:
     driver: local
+    external: false
     driver_opts:
       type: none
       o: bind
