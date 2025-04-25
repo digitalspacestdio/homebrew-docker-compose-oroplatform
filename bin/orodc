@@ -172,7 +172,7 @@ find-up () {
   echo "$path"
 }
 
-# Global variable to store already selected ports
+# Глобальная переменная для хранения уже выбранных портов
 __FOUND_PORTS=""
 
 find_free_port()
@@ -181,40 +181,58 @@ find_free_port()
   local PORT="$2"
   local DC_ORO_CONFIG_DIR="$3"
 
-  # Try to get a published port from compose.yml
-  local SELECTED_PORT=$([[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]] && yq '.services["'${SERVICE_NAME}'"].ports[] | select(.published) | .published' "${DC_ORO_CONFIG_DIR}/compose.yml" || echo "")
+  local COMPOSE_FILE="${DC_ORO_CONFIG_DIR}/compose.yml"
+  local SELECTED_PORT=""
+  local USED_PORTS=""
 
-  # If port is defined and container with that service exists — return it
-  if [[ -n $SELECTED_PORT ]] && docker ps -a --filter "label=com.docker.compose.service=${SERVICE_NAME}" --format '{{.Names}}' | grep -q .; then
-    echo $SELECTED_PORT
-    return
+  # Получаем список всех опубликованных портов из compose.yml (для всех сервисов)
+  if [[ -f "$COMPOSE_FILE" ]]; then
+    USED_PORTS=$(yq '.services[].ports[]? | select(.published) | .published' "$COMPOSE_FILE" 2>/dev/null | xargs)
+    SELECTED_PORT=$(yq '.services["'"$SERVICE_NAME"'"].ports[]? | select(.published) | .published' "$COMPOSE_FILE" 2>/dev/null)
   fi
 
-  # Loop to find free port, avoiding reused and in-use ports
-  while [ $PORT -le 65535 ]; do
-    # Skip if already used in previous calls
-    if [[ " $__FOUND_PORTS " == *" $PORT "* ]]; then
-      PORT=$((PORT+1))
-      continue
-    fi
+  # Функция проверки — порт уже где-то используется
+  is_port_used() {
+    local p=$1
+    # уже найден ранее
+    [[ " $__FOUND_PORTS " == *" $p "* ]] && return 0
+    # уже прописан у другого сервиса в compose.yml
+    [[ " $USED_PORTS " == *" $p "* ]] && return 0
+    # уже используется Docker-контейнером
+    docker ps -a --filter "expose=$p" --format '{{.Ports}}' | grep -q ":$p" && return 0
+    # уже используется локальным процессом
+    lsof -t -i tcp:$p > /dev/null 2>&1 && return 0
+    return 1
+  }
 
-    # Check if docker exposes it
-    if docker ps -a --filter "expose=$PORT" --format '{{.Ports}}' | grep -q ":$PORT"; then
-      PORT=$((PORT+1))
-      continue
+  # Если порт из compose.yml определён
+  if [[ -n "$SELECTED_PORT" ]]; then
+    # Проверим, есть ли уже контейнер с этим сервисом
+    if docker ps -a --filter "label=com.docker.compose.service=${SERVICE_NAME}" --format '{{.Names}}' | grep -q .; then
+      echo "$SELECTED_PORT"
+      return
+    else
+      # Контейнера нет — если порт свободен, вернём его
+      if ! is_port_used "$SELECTED_PORT"; then
+        __FOUND_PORTS+=" $SELECTED_PORT"
+        echo "$SELECTED_PORT"
+        return
+      fi
     fi
+  fi
 
-    # Check if it's used by local process
-    if lsof -t -i tcp:$PORT > /dev/null 2>&1; then
-      PORT=$((PORT+1))
-      continue
+  # Ищем свободный порт начиная с указанного
+  while [ "$PORT" -le 65535 ]; do
+    if ! is_port_used "$PORT"; then
+      __FOUND_PORTS+=" $PORT"
+      echo "$PORT"
+      return
     fi
-
-    break
+    PORT=$((PORT+1))
   done
 
-  __FOUND_PORTS+=" $PORT"
-  echo $PORT
+  echo "Ошибка: не удалось найти свободный порт" >&2
+  return 1
 }
 
 if [[ -z $DC_ORO_APPDIR ]]; then
