@@ -54,12 +54,17 @@ if [[ -n $ORO_SSH_PUBLIC_KEY ]]; then
 		if which zsh; then
 			chsh -s $(which zsh) $PHP_USER_NAME
 		fi
+
+		chown ${PHP_UID}:${PHP_GID} ${APP_DIR:-/var/www}
 	fi
 fi
 
-chmod 0777 ${APP_DIR:-/var/www}
-if [[ -d "${APP_DIR:-/var/www}/.git" ]]; then
-	git config --global --add safe.directory "${APP_DIR:-/var/www}/.git"
+# if [[ -d "${APP_DIR:-/var/www}/.git" ]]; then
+# 	git config --global --add safe.directory "${APP_DIR:-/var/www}/.git"
+# fi
+
+if [[ -d "${APP_DIR:-/var/www}/var/cache" ]]; then
+	rm -rf "${APP_DIR:-/var/www}/var/cache/*"
 fi
 
 exec /usr/sbin/sshd -D -e
