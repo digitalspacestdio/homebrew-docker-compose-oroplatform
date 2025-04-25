@@ -322,9 +322,6 @@ if [[ -f "$DC_ORO_APPDIR/.docker-compose.user.yml" ]]; then
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f $DC_ORO_APPDIR/.docker-compose.user.yml"
 fi
 
-# Enable ssh
-DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-ssh.yml"
-
 # Sync source code if macos
 if [[ $DC_ORO_MODE == "mutagen" ]]; then
   ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
