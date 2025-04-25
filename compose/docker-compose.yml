@@ -409,6 +409,7 @@ services:
       - 'DC_ORO_APPDIR=${DC_ORO_APPDIR:-/var/www}'
     labels:
       - "traefik.enable=true"
+      - "traefik.docker.network=shared"
       - "traefik.http.middlewares.compress-${DC_ORO_NAME:-unnamed}.compress=true"
       - "traefik.http.middlewares.cors-${DC_ORO_NAME:-unnamed}.headers.accessControlAllowCredentials=true"
       - "traefik.http.middlewares.cors-${DC_ORO_NAME:-unnamed}.headers.accessControlAllowHeaders=*"
