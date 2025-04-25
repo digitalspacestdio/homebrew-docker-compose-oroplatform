@@ -401,10 +401,12 @@ if [[ $DC_ORO_MODE == "mutagen" ]]; then
       --watch-mode-alpha=portable \
       --watch-mode-beta=force-poll \
       --watch-polling-interval-beta=30 \
+      --ignore=".git" \
       --ignore=".idea" \
       --ignore=".history" \
       --ignore=".mysql.initdb.d" \
       --ignore=".psql.initdb.d" \
+      --ignore="var" \
       --ignore-vcs \
       --symlink-mode=ignore \
       --name=${MUTAGEN_SESSION_NAME} \
