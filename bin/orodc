@@ -11,7 +11,8 @@ export DC_ORO_NAME=${DC_ORO_NAME-$(basename $(pwd))}
 export DC_ORO_CONFIG_DIR="$HOME/.$(basename $0)/${DC_ORO_NAME}"
 RSYNC_BIN=$(brew --prefix rsync)/bin/rsync
 DOCKER_BIN="${DOCKER_BIN-$(which docker)}";
-DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN-$(which docker) compose}";
+DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN-$(which docker) compose}";
+DOCKER_COMPOSE_BIN_CMD=${DOCKER_COMPOSE_BIN};
 DOCKER_COMPOSE_VERSION=$($DOCKER_COMPOSE_BIN_CMD version | grep '[0-9]\+\.[0-9]\+\.[0-9]\+' -o | awk -F. '{ print $1 }')
 if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose.yml" ]]; then
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose.yml"
