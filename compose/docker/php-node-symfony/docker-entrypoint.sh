@@ -20,6 +20,7 @@ cat > ${PHP_USER_HOME}/.profile <<- EOM
 EOM
 
 if [[ -f /.zshrc ]]; then
+	rm -f ${PHP_USER_HOME}/.zshrc
 	cp /.zshrc ${PHP_USER_HOME}/.zshrc
 	cat >> ${PHP_USER_HOME}/.zshrc <<- EOM
 
