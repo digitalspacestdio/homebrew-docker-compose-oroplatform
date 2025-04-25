@@ -518,7 +518,7 @@ if echo $1 | grep -i '^install$' > /dev/null; then
   exec ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "exec php bin/console --env=prod --timeout=1800 oro:install --language=en --formatting-code=en_US --organization-name='Acme Inc.' --user-name=admin --user-email=admin@example.com --user-firstname=John --user-lastname=Doe --user-password='\$ecretPassw0rd' --application-url='https://${DC_ORO_NAME:-unnamed}.docker.local/' --sample-data=y"
 fi
 
-if [[ $1 == "down" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
+if [[ $1 == "down" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]] && [[ -s "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/compose.yml"
 fi
 
