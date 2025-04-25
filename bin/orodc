@@ -229,7 +229,7 @@ if [[ -z $DC_ORO_COMPOSER_AUTH ]] && [[ -z $COMPOSER_AUTH ]]; then
   cd "${DC_ORO_CONFIG_DIR}"
   if which php > /dev/null 2>&1 && which composer > /dev/null 2>&1; then
     COMPOSER_HOME=$(php -d display_startup_errors=0 $(which composer) config --working-dir=/tmp --no-interaction --global home 2> /dev/null) || {
-      >&2 echo "==> Can't resolve required php and(or) composer versions"
+      >&2 echo -e "\033[36m==> Can't find Composer home. Try setting COMPOSER_AUTH manually.\033[0m"
     }
   fi
 
@@ -277,10 +277,10 @@ fi
 NETWORK_NAME="dc_shared_net"
 # Check if the Docker network already exists
 if ! docker network ls --format '{{.Name}}' | grep -qw "$NETWORK_NAME"; then
-  >&2 echo "Creating Docker network: $NETWORK_NAME"
+  >&2 echo -e "\033[36m==> Creating Docker network: $NETWORK_NAME\033[0m"
   docker network create "$NETWORK_NAME"
 else
-  >&2 echo "Docker network '$NETWORK_NAME' already exists"
+  >&2 echo -e "\033[36m==> Docker network '$NETWORK_NAME' already exists\033[0m"
 fi
 
 if [[ -z $DC_ORO_MODE ]] && [[ "$OSTYPE" == "darwin"* ]]; then
@@ -351,7 +351,7 @@ if [[ ${DC_ORO_MODE} == "ssh" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-s
   DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose-ssh.yml"
   ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
     [[ $1 == "up" ]] && {
-      >&2 echo "==> Copying source code to the '${DC_ORO_NAME}_appcode' docker valume"
+      >&2 echo -e "\033[36m==> Copying source code to the '${DC_ORO_NAME}_appcode' docker valume\033[0m"
       ${DOCKER_BIN} volume create "${DC_ORO_NAME}_appcode"  > /dev/null
       ${DOCKER_COMPOSE_BIN} up -d ssh
       SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
@@ -384,23 +384,23 @@ if ${DOCKER_COMPOSE_BIN} ps --services | grep database > /dev/null; then
 fi
 
 if [[ -f "$DC_ORO_APPDIR/.docker-compose.user.yml" ]]; then
-  >&2 echo "==> Additional ${DOCKER_BIN} compose config will be used: $DC_ORO_APPDIR/.docker-compose.user.yml"
+  >&2 echo -e "\033[36m==> Additional ${DOCKER_BIN} compose config will be used: $DC_ORO_APPDIR/.docker-compose.user.yml\033[0m"
   DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN} -f $DC_ORO_APPDIR/.docker-compose.user.yml"
 fi
 
 if [[ -f "$DC_ORO_APPDIR/.php-version" ]] && [[ -z $DC_ORO_PHP_VERSION ]]; then
   export DC_ORO_PHP_VERSION=$(cat $DC_ORO_APPDIR/.php-version | head -n1)
-  >&2 echo "==> Found .php-version with following version: $DC_ORO_PHP_VERSION"
+  >&2 echo -e "\033[36m==> Found .php-version with following version: $DC_ORO_PHP_VERSION\033[0m"
 fi
 
 if [[ -f "$DC_ORO_APPDIR/.phprc" ]] && [[ -z $DC_ORO_PHP_VERSION ]]; then
   export DC_ORO_PHP_VERSION=$(cat $DC_ORO_APPDIR/.phprc | head -n1)
-  >&2 echo "==> Found .phprc with following version: $DC_ORO_PHP_VERSION"
+  >&2 echo -e "\033[36m==> Found .phprc with following version: $DC_ORO_PHP_VERSION\033[0m"
 fi
 
 if [[ -f "$DC_ORO_APPDIR/.nvmrc" ]] && [[ -z $DC_ORO_NODE_VERSION ]]; then
   export DC_ORO_NODE_VERSION=$(cat $DC_ORO_APPDIR/.nvmrc | head -n1)
-  >&2 echo "==> Found .nvmrc with following version: $DC_ORO_NODE_VERSION"
+  >&2 echo -e "\033[36m==> Found .nvmrc with following version: $DC_ORO_NODE_VERSION\033[0m"
 fi
 
 if [[ $DOCKER_COMPOSE_VERSION -gt 1 ]]; then
