@@ -290,15 +290,15 @@ elif [[ -z $DC_ORO_MODE ]]; then
   export DC_ORO_MODE="default"
 fi
 
-if [[ $DC_ORO_MODE == "mutagen" ]] || [[ ${DC_ORO_MODE} == "ssh" ]]; then
-  if [[ -z ${ORO_SSH_PUBLIC_KEY} ]]; then
-    if [[ ! -f ${DC_ORO_CONFIG_DIR}/ssh_id_ed25519 ]]; then
-      ssh-keygen -t ed25519 -f "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" -N "" -q
-    fi
-    chmod 0600 "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519"
-    export ORO_SSH_PUBLIC_KEY=$(cat "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519.pub")
+if [[ -z ${ORO_SSH_PUBLIC_KEY} ]]; then
+  if [[ ! -f ${DC_ORO_CONFIG_DIR}/ssh_id_ed25519 ]]; then
+    ssh-keygen -t ed25519 -f "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" -N "" -q
   fi
-  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-ssh.yml"
+  chmod 0600 "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519"
+  export ORO_SSH_PUBLIC_KEY=$(cat "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519.pub")
+fi
+DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-ssh.yml"
+if [[ "$OSTYPE" == "darwin"* ]]; then
   ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
     [[ $1 == "up" ]] && {
       >&2 echo -e "\033[36m==> Copying source code to the '${DC_ORO_NAME}_appcode' docker valume\033[0m"
@@ -314,8 +314,9 @@ if [[ $DC_ORO_MODE == "mutagen" ]] || [[ ${DC_ORO_MODE} == "ssh" ]]; then
   }
 fi
 
+#if [[ $DC_ORO_MODE == "mutagen" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-mutagen.yml" ]]; then
 if [[ $DC_ORO_MODE == "mutagen" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-mutagen.yml" ]]; then
-  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-mutagen.yml"
+  #DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-mutagen.yml"
   MUTAGEN_SESSION_NAME=$(echo ${DC_ORO_NAME}-appcode | awk '{print tolower($0)}' | sed 's/[^0-9a-z]/-/g')
   WAIT_SYNC="1"
   if ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep "^${DC_ORO_NAME}_appcode$" > /dev/null 2>&1; then
@@ -344,7 +345,6 @@ if [[ $DC_ORO_MODE == "mutagen" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose
       --ignore=".history" \
       --ignore=".mysql.initdb.d" \
       --ignore=".psql.initdb.d" \
-      --ignore=".git" \
       --ignore-vcs \
       --symlink-mode=ignore \
       --name=${MUTAGEN_SESSION_NAME} \
