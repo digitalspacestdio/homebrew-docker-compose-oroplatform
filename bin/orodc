@@ -566,6 +566,10 @@ if [[ $1 == "purge" ]]; then
     ${DOCKER_BIN} volume rm ${DC_ORO_NAME}'_appcode'
   }
 
+  if [[ -d "${DC_ORO_CONFIG_DIR}" ]]; then
+    rm -rf "${DC_ORO_CONFIG_DIR}"
+  fi
+
   exit 0
 fi
 
