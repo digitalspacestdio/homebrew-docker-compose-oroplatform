@@ -323,7 +323,7 @@ if [[ -f "$DC_ORO_APPDIR/.docker-compose.user.yml" ]]; then
 fi
 
 # Sync source code if macos
-if [[ $DC_ORO_MODE == "mutagen" ]]; then
+if [[ $DC_ORO_MODE == "mutagen" ]] || [[ $DC_ORO_MODE == "ssh" ]]; then
   ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
     [[ $1 == "up" ]] && {
       >&2 echo -e "\033[36m==> Copying source code to the '${DC_ORO_NAME}_appcode' docker valume\033[0m"
@@ -343,11 +343,11 @@ if [[ $DC_ORO_MODE == "mutagen" ]]; then
   #DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-mutagen.yml"
   MUTAGEN_SESSION_NAME=$(echo ${DC_ORO_NAME}-appcode | awk '{print tolower($0)}' | sed 's/[^0-9a-z]/-/g')
   WAIT_SYNC="1"
-  if ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep "^${DC_ORO_NAME}_appcode$" > /dev/null 2>&1; then
-    if [[ $(${DOCKER_BIN} volume inspect -f '{{ .Options.type }}' ${DC_ORO_NAME}_appcode) == "nfs" ]]; then
-      ${DOCKER_BIN} volume rm ${DC_ORO_NAME}_appcode
-    fi
-  fi
+  # if ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep "^${DC_ORO_NAME}_appcode$" > /dev/null 2>&1; then
+  #   if [[ $(${DOCKER_BIN} volume inspect -f '{{ .Options.type }}' ${DC_ORO_NAME}_appcode) == "nfs" ]]; then
+  #     ${DOCKER_BIN} volume rm ${DC_ORO_NAME}_appcode
+  #   fi
+  # fi
 
   if [[ $1 == "down" ]]; then
     if mutagen sync list | grep -i "Name: ${MUTAGEN_SESSION_NAME}" > /dev/null 2>&1; then
