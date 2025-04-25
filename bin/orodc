@@ -172,6 +172,9 @@ find-up () {
   echo "$path"
 }
 
+# Global variable to store already selected ports
+__FOUND_PORTS=""
+
 find_free_port()
 {
   local SERVICE_NAME="$1"
@@ -181,26 +184,36 @@ find_free_port()
   # Try to get a published port from compose.yml
   local SELECTED_PORT=$([[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]] && yq '.services["'${SERVICE_NAME}'"].ports[] | select(.published) | .published' "${DC_ORO_CONFIG_DIR}/compose.yml" || echo "")
 
-  # If a port is defined and container with the service label exists, return it
+  # If port is defined and container with that service exists — return it
   if [[ -n $SELECTED_PORT ]] && docker ps -a --filter "label=com.docker.compose.service=${SERVICE_NAME}" --format '{{.Names}}' | grep -q .; then
     echo $SELECTED_PORT
     return
   fi
 
-  # Search for a free port starting from specified one
+  # Loop to find free port, avoiding reused and in-use ports
   while [ $PORT -le 65535 ]; do
-    # Check that no container is exposing this port
-    if ! docker ps -a --filter "expose=$PORT" --format '{{.Ports}}' | grep -q ":$PORT"; then
-      break
+    # Skip if already used in previous calls
+    if [[ " $__FOUND_PORTS " == *" $PORT "* ]]; then
+      PORT=$((PORT+1))
+      continue
     fi
-    PORT=$((PORT+1))
+
+    # Check if docker exposes it
+    if docker ps -a --filter "expose=$PORT" --format '{{.Ports}}' | grep -q ":$PORT"; then
+      PORT=$((PORT+1))
+      continue
+    fi
+
+    # Check if it's used by local process
+    if lsof -t -i tcp:$PORT > /dev/null 2>&1; then
+      PORT=$((PORT+1))
+      continue
+    fi
+
+    break
   done
 
-  # Check that no process is using this port locally
-  while [ $PORT -le 65535 ] && lsof -t -i tcp:$PORT > /dev/null; do
-    PORT=$((PORT+1))
-  done
-
+  __FOUND_PORTS+=" $PORT"
   echo $PORT
 }
 
