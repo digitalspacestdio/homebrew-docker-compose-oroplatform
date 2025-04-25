@@ -218,10 +218,6 @@ RUN echo http://dl-2.alpinelinux.org/alpine/edge/main >> /etc/apk/repositories; 
     mc \
   ;
 
-# Install Symfony cli
-RUN curl -1sLf 'https://dl.cloudsmith.io/public/symfony/stable/setup.alpine.sh' | bash \
-      && apk add --no-cache symfony-cli
-
 COPY msmtprc /.msmtprc
 
 ARG APP_DIR="/var/www"

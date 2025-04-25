@@ -39,13 +39,10 @@ if [[ -n ${JBR_VERSION} ]] && [[ -n ${JBR_BUILD} ]] && [[ ! -d ${JAVA_HOME} ]]; 
 fi
 
 if [[ -f ${JAVA_HOME}/bin/java ]]; then
-	cat > /etc/profile.d/java.sh <<- EOM
+	cat >> ${PHP_USER_HOME}/.profile <<- EOM
 		export JAVA_HOME=${JAVA_HOME}
 		export PATH="\${JAVA_HOME}/bin:\${PATH}"
 	EOM
-	if [[ ! -e /usr/bin/java ]]; then
-		ln -f -s ${JAVA_HOME}/bin/java /usr/bin/java
-	fi
 fi
 
 if [[ -f /.zshrc ]]; then
@@ -56,6 +53,6 @@ if [[ -f /.zshrc ]]; then
 		cd \${APP_DIR:-/var/www}
 	EOM
 fi
-chmod +x ${PHP_USER_HOME}/.profile
 
+chmod +x ${PHP_USER_HOME}/.profile
 exec docker-php-entrypoint "$@"
