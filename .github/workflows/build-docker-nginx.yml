@@ -33,4 +33,4 @@ jobs:
           file: compose/docker/nginx/Dockerfile
           platforms: linux/amd64,linux/arm64
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/nginx
+          tags: ghcr.io/${{ github.repository_owner }}/orodc-nginx
