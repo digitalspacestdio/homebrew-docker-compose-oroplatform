@@ -1,4 +1,4 @@
-name: Build & Publish multi-arch images to GHCR
+name: Build & Publish php with nodejs multi-arch images to GHCR
 
 on:
   push:
