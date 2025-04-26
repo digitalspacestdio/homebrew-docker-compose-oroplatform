@@ -15,3 +15,4 @@ COPY nginx.conf /etc/nginx/nginx.conf
 COPY --chmod=+x entrypoint.sh /usr/local/bin/nginx-entrypoint
 
 ENTRYPOINT ["nginx-entrypoint"]
+CMD ["nginx", "-g", "daemon off;"]
