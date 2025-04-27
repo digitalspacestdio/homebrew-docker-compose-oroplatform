@@ -80,12 +80,16 @@ if [[ -n $ORO_SSH_PUBLIC_KEY ]]; then
 			if [[ -f ${JAVA_HOME}/bin/java ]]; then
 				cat >> ${PHP_USER_HOME}/.profile <<- EOM
 					export JAVA_HOME=${JAVA_HOME}
-					export PATH="\${JAVA_HOME}/bin:\${PATH}"
 				EOM
 
 				cat >> "${PHP_USER_HOME}/.ssh/environment" <<- EOM
 					JAVA_HOME=${JAVA_HOME}
-					PATH="${JAVA_HOME}/bin:\${PATH}"
+				EOM
+
+				cat >> ${PHP_USER_HOME}/.zshrc <<- EOM
+					if ! echo $PATH | egrep egrep '[^[:alnum:]_]${JAVA_HOME}/bin[^[:alnum:]_]' > /dev/null; then
+						export PATH="${JAVA_HOME}/bin:\${PATH}"
+					fi
 				EOM
 			fi
 
