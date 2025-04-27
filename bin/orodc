@@ -524,19 +524,29 @@ if echo $1 | grep -i '^psql' > /dev/null; then
   exec ${DOCKER_COMPOSE_RUN_CMD} database-cli bash -c "$PSQL_CMD"
 fi
 
-if echo $1 | grep -i '^ssh' > /dev/null; then
-  for i in "${@:2}"; do
-      i="${i//\\/\\\\}"
-      i="${i//$/\\$}"
-      C="$C \"${i//\"/\\\"}\""
-  done
+if [ $# -eq 0 ] || [ "$1" = "ssh" ]; then
+  # Build SSH arguments from the rest (if any)
+  SSH_ARGS=()
+  if [ "$1" = "ssh" ]; then
+    SSH_ARGS=("${@:2}")
+  fi
+
   SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
-  SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
+  SSH_PORT=$(${DOCKER_BIN} inspect "$(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }')" | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
+
   set -x
-  exec bash -c "ssh -o 'SendEnv COMPOSER_AUTH' -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i \"${DC_ORO_CONFIG_DIR}/ssh_id_ed25519\" -p ${SSH_PORT} ${ORO_DC_SSH_ARGS} ${DC_ORO_USER_NAME}@${SSH_HOST} $C"
+  exec ssh \
+    -o SendEnv=COMPOSER_AUTH \
+    -o UserKnownHostsFile=/dev/null \
+    -o StrictHostKeyChecking=no \
+    -i "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" \
+    -p "${SSH_PORT}" \
+    ${ORO_DC_SSH_ARGS} \
+    "${DC_ORO_USER_NAME}@${SSH_HOST}" \
+    "${SSH_ARGS[@]}"
 fi
 
-if echo $1 | grep -i '^composer\|bin/\|npm\|php\|node\|yarn\|bash\|symfony\|symfony' > /dev/null; then
+if echo $1 | grep -i '^composer\|bin/\|npm\|php\|node\|yarn\|bash' > /dev/null; then
   for i in "$@"; do
       i="${i//\\/\\\\}"
       i="${i//$/\\$}"
