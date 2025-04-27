@@ -62,7 +62,7 @@ if [[ -n $ORO_SSH_PUBLIC_KEY ]]; then
 			JBR_BUILD="b631.28"
 			JAVA_HOME=${PHP_USER_HOME}/.java
 
-			if [[ -n ${JBR_VERSION} ]] && [[ -n ${JBR_BUILD} ]] && [[ ! -d ${JAVA_HOME} ]]; then
+			if [[ -n ${JBR_VERSION} ]] && [[ -n ${JBR_BUILD} ]] && [[ ! -e ${JAVA_HOME}/bin/java ]]; then
 				ARCH=$(uname -m) && \
 				case "$ARCH" in \
 					x86_64) JBR_ARCH="x64";; \
@@ -81,6 +81,11 @@ if [[ -n $ORO_SSH_PUBLIC_KEY ]]; then
 				cat >> ${PHP_USER_HOME}/.profile <<- EOM
 					export JAVA_HOME=${JAVA_HOME}
 					export PATH="\${JAVA_HOME}/bin:\${PATH}"
+				EOM
+
+				cat >> "${PHP_USER_HOME}/.ssh/environment" <<- EOM
+					JAVA_HOME=${JAVA_HOME}
+					PATH="${JAVA_HOME}/bin:\${PATH}"
 				EOM
 			fi
 
