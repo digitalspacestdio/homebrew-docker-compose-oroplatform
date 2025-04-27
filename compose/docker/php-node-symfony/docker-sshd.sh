@@ -87,7 +87,7 @@ if [[ -n $ORO_SSH_PUBLIC_KEY ]]; then
 				EOM
 
 				cat >> ${PHP_USER_HOME}/.zshrc <<- EOM
-					if ! echo $PATH | egrep egrep '[^[:alnum:]_]${JAVA_HOME}/bin[^[:alnum:]_]' > /dev/null; then
+					if ! echo $PATH | egrep '[^[:alnum:]_]${JAVA_HOME}/bin[^[:alnum:]_]' > /dev/null; then
 						export PATH="${JAVA_HOME}/bin:\${PATH}"
 					fi
 				EOM
