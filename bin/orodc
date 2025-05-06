@@ -287,7 +287,7 @@ else
   export DC_ORO_SEARCH_DSN=$ORO_SEARCH_URL
 fi
 
-export DC_ORO_PORT_PREFIX=${DC_ORO_PORT_PREFIX-"301"}
+export DC_ORO_PORT_PREFIX=${DC_ORO_PORT_PREFIX:-"301"}
 export DC_ORO_PORT_NGINX=$(find_free_port nginx ${DC_ORO_PORT_PREFIX}80 $DC_ORO_CONFIG_DIR)
 export DC_ORO_PORT_XHGUI=$(find_free_port xhgui "${DC_ORO_PORT_PREFIX}81" $DC_ORO_CONFIG_DIR)
 export DC_ORO_PORT_MYSQL=$(find_free_port database "${DC_ORO_PORT_PREFIX}06" $DC_ORO_CONFIG_DIR)
