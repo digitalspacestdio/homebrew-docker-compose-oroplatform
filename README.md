@@ -148,13 +148,28 @@ orodc ssh
 orodc down
 ```
 
+XDEBUG
+```bash
+# CLI + FPM 
+XDEBUG_MODE_FPM=debug XDEBUG_MODE_CLI=debug orodc up -d
+
+# FPM only 
+XDEBUG_MODE_FPM=debug orodc up -d
+
+# CLI only
+XDEBUG_MODE_CLI=debug orodc up -d
+```
+
 ## Environment Variables
 
-Variables can be stored in `.dockenv`, `.dockerenv`, or `.env` in the project root.
+Variables can be stored in `.env.orodc`, `.env-app.local`, `.env-app`, or `.env` in the project root.
 
 Important options:
 - **DC_ORO_MODE** - (`default`|`ssh`|`mutagen`)
-- **DC_ORO_COMPOSER_VERSION** - Composer version (`1` or `2`)
+   * `default` - uses bind mount (this is default for linux and wsl hosts)
+   * `ssh` - uses isolated docker volume
+   * `mutagen` - uses isomutagen with isolated docker volume (this is default for macos hosts)
+- **DC_ORO_COMPOSER_VERSION** - Composer version (`1`|`2` default:`2`)
 - **DC_ORO_PHP_VERSION** - PHP version (`7.4`, `8.1`, `8.2`, `8.3`, `8.4`)
 - **DC_ORO_NODE_VERSION** - Node.js version (`18`, `20`, `22`)
 - **DC_ORO_MYSQL_IMAGE** - MySQL image (not recommended)
