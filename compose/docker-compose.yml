@@ -446,6 +446,7 @@ services:
       start_period: 5s
       interval: 5s
       retries: 18
+    restart: always
     logging:
       driver: "json-file"
       options:
