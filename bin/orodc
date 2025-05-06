@@ -360,12 +360,13 @@ fi
 # Sync source code if macos
 if [[ $DC_ORO_MODE == "mutagen" ]] || [[ $DC_ORO_MODE == "ssh" ]]; then
   if [[ $DC_ORO_VOLUME_MODE == "tmpfs" ]]; then
-    ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
-      >&2 echo -e "\033[36m==> Copying source code to the '${DC_ORO_NAME}_appcode' docker valume\033[0m"
-      ${DOCKER_BIN} volume create --driver local --opt type=none --opt "device=/dev/shm/${DC_ORO_NAME}_appcode" --opt o=bind "${DC_ORO_NAME}_appcode"  > /dev/null
-    }
     docker ps | grep ${DC_ORO_NAME}_appcode_shm_sidecar || {
-      ${DOCKER_BIN} run --name ${DC_ORO_NAME}_shm_sidecar --rm -d --privileged alpine sh -c "mkdir -p /dev/shm/${DC_ORO_NAME}_appcode && chmod 1777 /dev/shm/${DC_ORO_NAME}_appcode && sleep infinity"
+      ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 && {
+        ${DOCKER_BIN} volume rm "${DC_ORO_NAME}_appcode"
+      }
+      ${DOCKER_BIN} volume create --driver local --opt type=none --opt "device=/dev/shm/${DC_ORO_NAME}_appcode" --opt o=bind "${DC_ORO_NAME}_appcode"  > /dev/null
+      ${DOCKER_BIN} run --name ${DC_ORO_NAME}_shm_sidecar --rm -d --privileged alpine sleep infinity
+      ${DOCKER_BIN} exec -it ${DC_ORO_NAME}_shm_sidecar sh -c "mkdir -p /dev/shm/${DC_ORO_NAME}_appcode && chmod 1777 /dev/shm/${DC_ORO_NAME}_appcode"
     }
     if [[ $1 != "down" ]] && [[ $1 == "purge" ]]; then
       ${DOCKER_COMPOSE_BIN_CMD} up -d ssh
