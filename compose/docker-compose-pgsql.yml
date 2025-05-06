@@ -3,7 +3,7 @@ services:
     image: '${DC_ORO_PGSQL_IMAGE:-postgres}:${DC_ORO_PGSQL_VERSION:-15.1}'
     hostname: database.${DC_ORO_NAME:-unnamed}.docker.local
     container_name: ${DC_ORO_NAME:-unnamed}_database
-    command: postgres -c max_locks_per_transaction=10000 -c shared_buffers=512MB
+    command: postgres -c fsync=off -c synchronous_commit=off -c full_page_writes=off -c wal_level=minimal -c commit_delay=10000 -c max_locks_per_transaction=10000 -c shared_buffers=512MB
     shm_size: 512m
     environment:
       LANG: 'C.UTF-8'
