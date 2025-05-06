@@ -181,7 +181,7 @@ RUN rm -f $PHP_INI_DIR/conf.d/app.prod.ini; \
 
 COPY app.ini $PHP_INI_DIR/conf.d/
 COPY app.opcache.ini $PHP_INI_DIR/conf.d/
-COPY app.msmtp.mailhog.ini $PHP_INI_DIR/conf.d/
+COPY app.msmtp.ini $PHP_INI_DIR/conf.d/
 COPY app.xdebug.ini $PHP_INI_DIR/conf.d/
 COPY php-fpm.conf /usr/local/etc/php-fpm.conf
 
@@ -251,9 +251,9 @@ RUN mkdir -p /etc/bash_completion.d && \
 ARG APP_DIR="/var/www"
 ENV APP_DIR=${APP_DIR}
 
-RUN chmod 0666 /usr/local/etc/php/conf.d/*; \
-    mkdir -p ${APP_DIR}; \
-    chown ${PHP_USER_NAME}:${PHP_USER_GROUP} ${APP_DIR}
+RUN mkdir -p ${APP_DIR}; \
+    chown ${PHP_USER_NAME}:${PHP_USER_GROUP} ${APP_DIR}; \
+    chown -R ${PHP_USER_NAME}:${PHP_USER_GROUP} ${PHP_INI_DIR};
 
 WORKDIR ${APP_DIR}
 USER ${PHP_USER_NAME}

@@ -29,7 +29,7 @@ if [[ -f /.zshrc ]]; then
 fi
 
 if [[ $XDEBUG_MODE = "off" ]]; then
-	rm -f "${PHP_INI_DIR}/conf.d/docker-php-ext-xdebug.ini
+	rm -f "${PHP_INI_DIR}/conf.d/docker-php-ext-xdebug.ini"
 	rm -f "${PHP_INI_DIR}/conf.d/app.xdebug.ini"
 fi
 
