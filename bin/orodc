@@ -325,7 +325,7 @@ elif [[ -z $DC_ORO_MODE ]]; then
 fi
 
 if [[ -z ${ORO_SSH_PUBLIC_KEY} ]]; then
-  if [[ ! -f "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" ]]; then
+  if [[ ! -e "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" ]]; then
     ssh-keygen -t ed25519 -f "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" -N "" -q
     chmod 0600 "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519"
   fi
@@ -376,8 +376,8 @@ if [[ $DC_ORO_MODE == "mutagen" ]] || [[ $DC_ORO_MODE == "ssh" ]]; then
       ${DOCKER_COMPOSE_BIN_CMD} up -d ssh
       SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
       SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
-      if [[ 0 -eq $(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i \"${DC_ORO_CONFIG_DIR}/ssh_id_ed25519\" -p ${SSH_PORT} ${ORO_DC_SSH_ARGS} ${DC_ORO_USER_NAME}@${SSH_HOST} sh -c 'ls "'${DC_ORO_APPDIR}'/"' | wc -l) ]]; then
-        until ${RSYNC_BIN} --exclude var/cache --exclude vendor --exclude node_modules --links -e "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i \"${DC_ORO_CONFIG_DIR}/ssh_id_ed25519\" -p ${SSH_PORT} ${ORO_DC_SSH_ARGS}" --timeout=3 --info=progress2 -r "${DC_ORO_APPDIR}/" ${DC_ORO_USER_NAME}@${SSH_HOST}:"${DC_ORO_APPDIR}/"; do
+      if [[ 0 -eq $(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" -p ${SSH_PORT} ${ORO_DC_SSH_ARGS} ${DC_ORO_USER_NAME}@${SSH_HOST} sh -c 'ls "'${DC_ORO_APPDIR}'/"' | wc -l) ]]; then
+        until ${RSYNC_BIN} --exclude var/cache --exclude vendor --exclude node_modules --links -e "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i ${DC_ORO_CONFIG_DIR}/ssh_id_ed25519 -p ${SSH_PORT} ${ORO_DC_SSH_ARGS}" --timeout=3 --info=progress2 -r "${DC_ORO_APPDIR}/" ${DC_ORO_USER_NAME}@${SSH_HOST}:"${DC_ORO_APPDIR}/"; do
           sleep 5
         done
       fi
@@ -390,8 +390,8 @@ if [[ $DC_ORO_MODE == "mutagen" ]] || [[ $DC_ORO_MODE == "ssh" ]]; then
         ${DOCKER_COMPOSE_BIN_CMD} up -d ssh
         SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
         SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
-        if [[ 0 -eq $(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i \"${DC_ORO_CONFIG_DIR}/ssh_id_ed25519\" -p ${SSH_PORT} ${ORO_DC_SSH_ARGS} ${DC_ORO_USER_NAME}@${SSH_HOST} sh -c 'ls "'${DC_ORO_APPDIR}'/"' | wc -l) ]]; then
-          until ${RSYNC_BIN} --exclude var/cache --exclude vendor --exclude node_modules --links -e "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i \"${DC_ORO_CONFIG_DIR}/ssh_id_ed25519\" -p ${SSH_PORT} ${ORO_DC_SSH_ARGS}" --timeout=3 --info=progress2 -r "${DC_ORO_APPDIR}/" ${DC_ORO_USER_NAME}@${SSH_HOST}:"${DC_ORO_APPDIR}/"; do
+        if [[ 0 -eq $(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" -p ${SSH_PORT} ${ORO_DC_SSH_ARGS} ${DC_ORO_USER_NAME}@${SSH_HOST} sh -c 'ls "'${DC_ORO_APPDIR}'/"' | wc -l) ]]; then
+          until ${RSYNC_BIN} --exclude var/cache --exclude vendor --exclude node_modules --links -e "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i ${DC_ORO_CONFIG_DIR}/ssh_id_ed25519 -p ${SSH_PORT} ${ORO_DC_SSH_ARGS}" --timeout=3 --info=progress2 -r "${DC_ORO_APPDIR}/" ${DC_ORO_USER_NAME}@${SSH_HOST}:"${DC_ORO_APPDIR}/"; do
             sleep 5
           done
         fi
