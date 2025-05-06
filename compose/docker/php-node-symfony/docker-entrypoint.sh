@@ -1,10 +1,10 @@
 #!/bin/bash
 set -e
 
-# OWNER_UID=$(stat -c '%u' /var/www)
-# OWNER_GID=$(stat -c '%g' /var/www)
+#OWNER_UID=$(stat -c '%u' ${APP_DIR:-/var/www})
+#OWNER_GID=$(stat -c '%g' ${APP_DIR:-/var/www})
 
-# usermod -u $nginx_uid -o www-data && groupmod -g $nginx_gid -o www-data
+# usermod -u $OWNER_UID -o www-data && groupmod -g $OWNER_GID -o www-data
 
 # first arg is `-f` or `--some-option`
 if [ "${1#-}" != "$1" ]; then
@@ -26,6 +26,11 @@ if [[ -f /.zshrc ]]; then
 
 		cd \${APP_DIR:-/var/www}
 	EOM
+fi
+
+if [[ $XDEBUG_MODE = "off" ]]; then
+	rm -f "${PHP_INI_DIR}/conf.d/docker-php-ext-xdebug.ini
+	rm -f "${PHP_INI_DIR}/conf.d/app.xdebug.ini"
 fi
 
 chmod +x ${PHP_USER_HOME}/.profile

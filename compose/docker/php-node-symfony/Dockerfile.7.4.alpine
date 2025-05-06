@@ -179,7 +179,11 @@ RUN rm -f $PHP_INI_DIR/conf.d/app.prod.ini; \
   mv "$PHP_INI_DIR/php.ini" "$PHP_INI_DIR/php.ini-production"; \
   mv "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini"
 
-COPY app.dev.ini $PHP_INI_DIR/conf.d/
+COPY app.ini $PHP_INI_DIR/conf.d/
+COPY app.opcache.ini $PHP_INI_DIR/conf.d/
+COPY app.msmtp.mailhog.ini $PHP_INI_DIR/conf.d/
+COPY app.xdebug.ini $PHP_INI_DIR/conf.d/
+COPY php-fpm.conf /usr/local/etc/php-fpm.conf
 
 # Copy nodejs binaries
 COPY --from=app_node /usr/local /usr/local
