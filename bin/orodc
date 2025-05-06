@@ -320,24 +320,21 @@ fi
 
 if [[ -z $DC_ORO_MODE ]] && [[ "$OSTYPE" == "darwin"* ]]; then
   export DC_ORO_MODE="mutagen"
-  export DC_ORO_VOLUME_MODE=${DC_ORO_VOLUME_MODE:-""}
 elif [[ -z $DC_ORO_MODE ]]; then
   export DC_ORO_MODE="default"
-  export DC_ORO_VOLUME_MODE=${DC_ORO_VOLUME_MODE:-"default"}
-else
-  export DC_ORO_VOLUME_MODE=${DC_ORO_VOLUME_MODE:-""}
 fi
 
 if [[ -z ${ORO_SSH_PUBLIC_KEY} ]]; then
-  if [[ ! -f ${DC_ORO_CONFIG_DIR}/ssh_id_ed25519 ]]; then
+  if [[ ! -f "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" ]]; then
     ssh-keygen -t ed25519 -f "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" -N "" -q
+    chmod 0600 "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519"
   fi
-  chmod 0600 "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519"
+  
   export ORO_SSH_PUBLIC_KEY=$(cat "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519.pub")
 fi
 
-if [[ -n $DC_ORO_VOLUME_MODE ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-${DC_ORO_VOLUME_MODE}.yml" ]]; then
-  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-${DC_ORO_VOLUME_MODE}.yml"
+if [[ $DC_ORO_MODE == "default" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-default.yml" ]]; then
+  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-default.yml"
 fi
 
 if [[ $DC_ORO_DATABASE_SCHEMA == "pgsql" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgres" ]];then
@@ -362,19 +359,35 @@ fi
 
 # Sync source code if macos
 if [[ $DC_ORO_MODE == "mutagen" ]] || [[ $DC_ORO_MODE == "ssh" ]]; then
-  ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
-    if [[ $1 == "up" ]] || [[ $1 == "install" ]] || [[ $1 == "ssh" ]]; then
+  if [[ $DC_ORO_VOLUME_MODE == "tmpfs" ]]; then
+    ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
       >&2 echo -e "\033[36m==> Copying source code to the '${DC_ORO_NAME}_appcode' docker valume\033[0m"
-      ${DOCKER_BIN} volume create "${DC_ORO_NAME}_appcode"  > /dev/null
-      ${DOCKER_COMPOSE_BIN_CMD} up -d ssh
-      SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
-      SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
+      ${DOCKER_BIN} volume create --driver local --opt type=tmpfs --opt device=tmpfs --opt o=size=${DC_ORO_VOLUME_SIZE:-'2560m'} "${DC_ORO_NAME}_appcode"  > /dev/null
+    }
+    ${DOCKER_COMPOSE_BIN_CMD} up -d ssh
+    SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
+    SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
+    if [[ 0 -eq $(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i \"${DC_ORO_CONFIG_DIR}/ssh_id_ed25519\" -p ${SSH_PORT} ${ORO_DC_SSH_ARGS} ${DC_ORO_USER_NAME}@${SSH_HOST} sh -c 'ls "'${DC_ORO_APPDIR}'/"' | wc -l) ]]; then
       sleep 3
       until ${RSYNC_BIN} --exclude var/cache --exclude vendor --exclude node_modules --links -e "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i \"${DC_ORO_CONFIG_DIR}/ssh_id_ed25519\" -p ${SSH_PORT} ${ORO_DC_SSH_ARGS}" --timeout=3 --info=progress2 -r "${DC_ORO_APPDIR}/" ${DC_ORO_USER_NAME}@${SSH_HOST}:"${DC_ORO_APPDIR}/"; do
         sleep 5
       done
     fi
-  }
+  else
+    ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
+      if [[ $1 == "up" ]] || [[ $1 == "install" ]] || [[ $1 == "ssh" ]]; then
+        >&2 echo -e "\033[36m==> Copying source code to the '${DC_ORO_NAME}_appcode' docker valume\033[0m"
+        ${DOCKER_BIN} volume create "${DC_ORO_NAME}_appcode"  > /dev/null
+        ${DOCKER_COMPOSE_BIN_CMD} up -d ssh
+        SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
+        SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
+        sleep 3
+        until ${RSYNC_BIN} --exclude var/cache --exclude vendor --exclude node_modules --links -e "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i \"${DC_ORO_CONFIG_DIR}/ssh_id_ed25519\" -p ${SSH_PORT} ${ORO_DC_SSH_ARGS}" --timeout=3 --info=progress2 -r "${DC_ORO_APPDIR}/" ${DC_ORO_USER_NAME}@${SSH_HOST}:"${DC_ORO_APPDIR}/"; do
+          sleep 5
+        done
+      fi
+    }
+  fi
 fi
 
 if [[ $DC_ORO_MODE == "mutagen" ]]; then
