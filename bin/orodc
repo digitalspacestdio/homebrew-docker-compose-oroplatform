@@ -14,6 +14,9 @@ DOCKER_BIN="${DOCKER_BIN-$(which docker)}";
 DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN-$(which docker) compose}";
 DOCKER_COMPOSE_BIN_CMD=${DOCKER_COMPOSE_BIN};
 DOCKER_COMPOSE_VERSION=$($DOCKER_COMPOSE_BIN_CMD version | grep '[0-9]\+\.[0-9]\+\.[0-9]\+' -o | awk -F. '{ print $1 }')
+if [[ ! -d "${DC_ORO_CONFIG_DIR}" ]]; then
+    mkdir -p "${DC_ORO_CONFIG_DIR}"
+fi
 ${RSYNC_BIN} -r "${DIR}/compose/" "${DC_ORO_CONFIG_DIR}/"
 if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose.yml" ]]; then
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose.yml"
@@ -247,10 +250,6 @@ if [[ -z $DC_ORO_APPDIR ]]; then
     echo "Application root folder not found, and current directory is not empty, terminating..."
     exit 1
   fi
-fi
-
-if [[ ! -d "${DC_ORO_CONFIG_DIR}" ]]; then
-    mkdir -p "${DC_ORO_CONFIG_DIR}"
 fi
 
 if [[ ! -d "$DC_ORO_APPDIR" ]]; then
