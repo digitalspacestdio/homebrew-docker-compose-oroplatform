@@ -366,7 +366,7 @@ if [[ $DC_ORO_MODE == "mutagen" ]] || [[ $DC_ORO_MODE == "ssh" ]]; then
         ${DOCKER_BIN} volume create  \
           --driver local \
           --opt type=none \
-          --opt device=/dev/shm/my-shared-volume \
+          --opt device=/dev/shm/${DC_ORO_NAME}_appcode \
           --opt o=bind \
           "${DC_ORO_NAME}_appcode" \
          > /dev/null
