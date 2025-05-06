@@ -370,7 +370,7 @@ if [[ $DC_ORO_MODE == "mutagen" ]] || [[ $DC_ORO_MODE == "ssh" ]]; then
       SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
       SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
       sleep 3
-      until ${RSYNC_BIN} --exclude vendor --exclude node_modules --links -e "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i \"${DC_ORO_CONFIG_DIR}/ssh_id_ed25519\" -p ${SSH_PORT} ${ORO_DC_SSH_ARGS}" --timeout=3 --info=progress2 -r "${DC_ORO_APPDIR}/" ${DC_ORO_USER_NAME}@${SSH_HOST}:"${DC_ORO_APPDIR}/"; do
+      until ${RSYNC_BIN} --exclude var/cache --exclude vendor --exclude node_modules --links -e "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i \"${DC_ORO_CONFIG_DIR}/ssh_id_ed25519\" -p ${SSH_PORT} ${ORO_DC_SSH_ARGS}" --timeout=3 --info=progress2 -r "${DC_ORO_APPDIR}/" ${DC_ORO_USER_NAME}@${SSH_HOST}:"${DC_ORO_APPDIR}/"; do
         sleep 5
       done
     fi
