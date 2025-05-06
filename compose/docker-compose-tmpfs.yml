@@ -1,0 +1,8 @@
+volumes:
+  appcode:
+    driver: local
+    external: false
+    driver_opts:
+      type: tmpfs
+      device: tmpfs
+      o: size=2560m

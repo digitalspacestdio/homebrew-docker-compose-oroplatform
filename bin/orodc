@@ -317,10 +317,15 @@ else
   >&2 echo -e "\033[36m==> Docker network '$NETWORK_NAME' already exists\033[0m"
 fi
 
+
 if [[ -z $DC_ORO_MODE ]] && [[ "$OSTYPE" == "darwin"* ]]; then
   export DC_ORO_MODE="mutagen"
+  export DC_ORO_VOLUME_MODE=${DC_ORO_VOLUME_MODE:-""}
 elif [[ -z $DC_ORO_MODE ]]; then
   export DC_ORO_MODE="default"
+  export DC_ORO_VOLUME_MODE=${DC_ORO_VOLUME_MODE:-"default"}
+else
+  export DC_ORO_VOLUME_MODE=${DC_ORO_VOLUME_MODE:-""}
 fi
 
 if [[ -z ${ORO_SSH_PUBLIC_KEY} ]]; then
@@ -331,8 +336,8 @@ if [[ -z ${ORO_SSH_PUBLIC_KEY} ]]; then
   export ORO_SSH_PUBLIC_KEY=$(cat "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519.pub")
 fi
 
-if [[ $DC_ORO_MODE == "default" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-default.yml" ]]; then
-  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-default.yml"
+if [[ -n $DC_ORO_VOLUME_MODE ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-${DC_ORO_VOLUME_MODE}.yml" ]]; then
+  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-${DC_ORO_VOLUME_MODE}.yml"
 fi
 
 if [[ $DC_ORO_DATABASE_SCHEMA == "pgsql" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgres" ]];then

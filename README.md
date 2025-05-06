@@ -91,44 +91,42 @@ Updates are delivered via **Rsync** or **Mutagen** (optional).
    - Linux: [Install Docker Engine](https://docs.docker.com/engine/install/ubuntu/)
    - Windows (WSL2): [Install Docker Desktop](https://docs.docker.com/desktop/windows/wsl/)
 
-2. **Install Homebrew** (recommended):
+1. **Install Homebrew** (recommended):
    - [Follow this guide](https://brew.sh/)
-
-3. **Install OroDC**:
+1. **Install OroDC**:
    ```bash
    brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform
    ```
-
-4. **Clone your Oro project**:
+1. **Clone your Oro project**:
    ```bash
    git clone --single-branch --branch 6.1.0 https://github.com/oroinc/orocommerce-application.git ~/orocommerce
+   ```
+1. **Navigate to the product directory**:
+   ```bash
    cd ~/orocommerce
    ```
-
-5. **Pull Docker images and install Composer dependencies**:
+1. **Pull Docker images**:
    ```bash
    orodc pull
+   ```
+1. **Install Dependencies**:
+   ```bash
    orodc composer install -o --no-interaction
    ```
-
-6. (Optional) Adjust your database connection settings (PostgreSQL by default).
-
-7. **Launch the environment**:
+1. (Optional) Adjust your database connection settings (PostgreSQL by default).
+1. **Launch the environment**:
    ```bash
    orodc up -d
    ```
-
-8. **Install Oro application with sample data**:
+1. **Install Oro application with sample data**:
    ```bash
    orodc install
    ```
-
-9. **Open your application**:
+1. **Open your application**:
    ```
    http://localhost:30280/
    ```
-
-10. **Develop using your favorite IDE (PHPStorm or VSCode Remote Development)**
+1. **Develop using your favorite IDE (PHPStorm or VSCode Remote Development)**
 
 ## Usage
 
