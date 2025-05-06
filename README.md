@@ -1,6 +1,6 @@
 
 # ORO Platform Docker Compose (OroDC)
-![Docker architecture](docs/docker-architecture.svg)
+![Docker architecture](docs/docker-architecture-small.png)
 CLI tool to run ORO applications locally or on a server. Designed specifically for local development environments.
 
 ## Supported Systems
