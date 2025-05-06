@@ -364,6 +364,7 @@ if [[ $DC_ORO_MODE == "mutagen" ]] || [[ $DC_ORO_MODE == "ssh" ]]; then
       >&2 echo -e "\033[36m==> Copying source code to the '${DC_ORO_NAME}_appcode' docker valume\033[0m"
       ${DOCKER_BIN} volume create --driver local --opt type=none --opt "device=/dev/shm/${DC_ORO_NAME}_appcode" --opt o=bind "${DC_ORO_NAME}_appcode"  > /dev/null
     }
+    ${DOCKER_BIN} run --rm -it --privileged alpine sh -c "mkdir -p /dev/shm/${DC_ORO_NAME}_appcode && chmod 1777 /dev/shm/${DC_ORO_NAME}_appcode"
     if [[ $1 != "down" ]] && [[ $1 == "purge" ]]; then
       ${DOCKER_COMPOSE_BIN_CMD} up -d ssh
       SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
