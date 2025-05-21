@@ -175,7 +175,7 @@ services:
         PHP_GID: "${DC_ORO_PHP_GID:-1000}"
         COMPOSER_VERSION: "${DC_ORO_COMPOSER_VERSION:-2}"
     user: "${DC_ORO_USER_NAME:-developer}"
-    command: until [ -f bin/console ]; do sleep 1; done; php bin/console oro:message-queue:consume -vv
+    command: php bin/console oro:message-queue:consume -vv
     volumes:
       - "appcode:${DC_ORO_APPDIR:-/var/www}:consisten"
       - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
@@ -251,7 +251,7 @@ services:
         PHP_GID: "${DC_ORO_PHP_GID:-1000}"
         COMPOSER_VERSION: "${DC_ORO_COMPOSER_VERSION:-2}"
     user: "${DC_ORO_USER_NAME:-developer}"
-    command: until [ -f bin/console ]; do sleep 1; done; php bin/console gos:websocket:server
+    command: php bin/console gos:websocket:server
     volumes:
       - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
       - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
