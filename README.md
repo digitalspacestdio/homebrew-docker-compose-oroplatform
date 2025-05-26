@@ -105,22 +105,13 @@ Updates are delivered via **Rsync** or **Mutagen** (optional).
    ```bash
    cd ~/orocommerce
    ```
-1. **Pull Docker images**:
-   ```bash
-   orodc pull
-   ```
-1. **Install Dependencies**:
-   ```bash
-   orodc composer install -o --no-interaction
-   ```
-1. (Optional) Adjust your database connection settings (PostgreSQL by default).
-1. **Launch the environment**:
-   ```bash
-   orodc up -d
-   ```
 1. **Install Oro application with sample data**:
    ```bash
    orodc install
+   ```
+1. **Launch the environment**:
+   ```bash
+   orodc up -d
    ```
 1. **Open your application**:
    ```
