@@ -384,9 +384,9 @@ if [[ $DC_ORO_MODE == "mutagen" ]] || [[ $DC_ORO_MODE == "ssh" ]]; then
     fi
   else
     ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
-      if [[ $1 == "up" ]] || [[ $1 == "install" ]] || [[ $1 == "ssh" ]]; then
+      ${DOCKER_BIN} volume create "${DC_ORO_NAME}_appcode"  > /dev/null
+      #if [[ $1 == "up" ]] || [[ $1 == "install" ]] || [[ $1 == "ssh" ]]; then
         >&2 echo -e "\033[36m==> Copying source code to the '${DC_ORO_NAME}_appcode' docker valume\033[0m"
-        ${DOCKER_BIN} volume create "${DC_ORO_NAME}_appcode"  > /dev/null
         ${DOCKER_COMPOSE_BIN_CMD} up -d ssh
         SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
         SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
@@ -395,7 +395,7 @@ if [[ $DC_ORO_MODE == "mutagen" ]] || [[ $DC_ORO_MODE == "ssh" ]]; then
             sleep 5
           done
         fi
-      fi
+      #fi
     }
   fi
 fi
