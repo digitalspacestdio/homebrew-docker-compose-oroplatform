@@ -456,7 +456,7 @@ if [[ $DC_ORO_MODE == "mutagen" ]]; then
       mutagen sync terminate "${MUTAGEN_SESSION_NAME}"
     fi
     WAIT_SYNC=""
-  elif echo ${args[0]} | grep -v -i '^(build\|pull)' > /dev/null; then
+  elif echo ${args[0]} | grep -v -i '^(build\|pull\|config)' > /dev/null; then
     if [[ "0" -eq $(${DOCKER_COMPOSE_BIN_CMD} ps -q ssh  2> /dev/null | wc -l > /dev/null) ]]; then
       ${DOCKER_COMPOSE_BIN_CMD} up -d ssh
     fi
