@@ -626,6 +626,7 @@ if [ $# -eq 0 ] || [ ${args[0]} = "ssh" ]; then
     -p "${SSH_PORT}" \
     ${ORO_DC_SSH_ARGS} \
     "${DC_ORO_USER_NAME}@${SSH_HOST}" \
+    "${args[@]:1}" \
     "${right_flags[@]}" \
     "${right_options[@]}"
 fi
