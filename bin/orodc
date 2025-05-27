@@ -677,8 +677,8 @@ fi
 
 if [[ ${args[0]} == "down" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]] && [[ -s "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/compose.yml"
-  exec ${DOCKER_COMPOSE_BIN_CMD} "${left_flags[*]} ${left_options[*]} ${args[*]} ${right_flags[*]} ${right_options[*]}"
+  exec ${DOCKER_COMPOSE_BIN_CMD} "${left_flags[@]} ${left_options[@]} ${args[@]} ${right_flags[@]} ${right_options[@]}"
 fi
 
 ${DOCKER_COMPOSE_BIN_CMD} config > "${DC_ORO_CONFIG_DIR}/compose.yml"
-exec ${DOCKER_COMPOSE_BIN_CMD} "${left_flags[*]} ${left_options[*]} ${args[*]} ${right_flags[*]} ${right_options[*]}"
+exec ${DOCKER_COMPOSE_BIN_CMD} "${left_flags[@]} ${left_options[@]} ${args[@]} ${right_flags[@]} ${right_options[@]}"
