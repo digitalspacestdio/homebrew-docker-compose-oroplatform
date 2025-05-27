@@ -35,6 +35,6 @@ fi
 
 chmod +x ${PHP_USER_HOME}/.profile
 
-export PHP_IDE_CONFIG="serverName=${$(hostname)#*.}"
+export PHP_IDE_CONFIG="serverName=$(hostname | cut -d. -f2-)"
 
 exec docker-php-entrypoint "$@"
