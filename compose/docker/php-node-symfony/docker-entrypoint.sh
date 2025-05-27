@@ -34,4 +34,7 @@ if [[ $XDEBUG_MODE = "off" ]]; then
 fi
 
 chmod +x ${PHP_USER_HOME}/.profile
+
+export PHP_IDE_CONFIG="serverName=${$(hostname)#*.}"
+
 exec docker-php-entrypoint "$@"
