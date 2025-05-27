@@ -1,6 +1,45 @@
 #!/bin/bash
 set -e
 
+#!/bin/bash
+
+flags=()
+options=()
+args=()
+
+args_input=("$@")
+i=0
+
+while [[ $i -lt ${#args_input[@]} ]]; do
+  arg="${args_input[$i]}"
+  next="${args_input[$((i + 1))]:-}"
+
+  if [[ "$arg" == --*=* ]]; then
+    # Option with inline value: --key=value
+    options+=("$arg")
+    ((i++))
+  elif [[ "$arg" == --* && "$next" != -* && -n "$next" ]]; then
+    # Option with separate value: --key value
+    options+=("$arg" "$next")
+    ((i+=2))
+  elif [[ "$arg" == -* ]]; then
+    # Flag without a value
+    flags+=("$arg")
+    ((i++))
+  else
+    # Positional argument
+    args+=("$arg")
+    ((i++))
+  fi
+done
+
+# Debug output
+if [[ -n $DEBUG ]]; then 
+  echo "Flags: ${flags[*]}"
+  echo "Options: ${options[*]}"
+  echo "Args: ${args[*]}"
+fi
+
 if [[ -n $DEBUG ]]; then 
   set -x
 fi
@@ -372,7 +411,7 @@ if [[ $DC_ORO_MODE == "mutagen" ]] || [[ $DC_ORO_MODE == "ssh" ]]; then
          > /dev/null
       }
     }
-    if [[ $1 != "down" ]] && [[ $1 != "purge" ]]; then
+    if [[ ${args[0]} != "down" ]] && [[ ${args[0]} != "purge" ]]; then
       ${DOCKER_COMPOSE_BIN_CMD} up -d ssh
       SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
       SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
@@ -385,17 +424,15 @@ if [[ $DC_ORO_MODE == "mutagen" ]] || [[ $DC_ORO_MODE == "ssh" ]]; then
   else
     ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
       ${DOCKER_BIN} volume create "${DC_ORO_NAME}_appcode"  > /dev/null
-      #if [[ $1 == "up" ]] || [[ $1 == "install" ]] || [[ $1 == "ssh" ]]; then
-        >&2 echo -e "\033[36m==> Copying source code to the '${DC_ORO_NAME}_appcode' docker valume\033[0m"
-        ${DOCKER_COMPOSE_BIN_CMD} up -d ssh
-        SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
-        SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
-        if [[ 0 -eq $(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" -p ${SSH_PORT} ${ORO_DC_SSH_ARGS} ${DC_ORO_USER_NAME}@${SSH_HOST} sh -c 'ls "'${DC_ORO_APPDIR}'/"' | wc -l) ]]; then
-          until ${RSYNC_BIN} --exclude var/cache --exclude vendor --exclude node_modules --links -e "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i ${DC_ORO_CONFIG_DIR}/ssh_id_ed25519 -p ${SSH_PORT} ${ORO_DC_SSH_ARGS}" --timeout=3 --info=progress2 -r "${DC_ORO_APPDIR}/" ${DC_ORO_USER_NAME}@${SSH_HOST}:"${DC_ORO_APPDIR}/"; do
-            sleep 5
-          done
-        fi
-      #fi
+      >&2 echo -e "\033[36m==> Copying source code to the '${DC_ORO_NAME}_appcode' docker valume\033[0m"
+      ${DOCKER_COMPOSE_BIN_CMD} up -d ssh
+      SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
+      SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
+      if [[ 0 -eq $(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" -p ${SSH_PORT} ${ORO_DC_SSH_ARGS} ${DC_ORO_USER_NAME}@${SSH_HOST} sh -c 'ls "'${DC_ORO_APPDIR}'/"' | wc -l) ]]; then
+        until ${RSYNC_BIN} --exclude var/cache --exclude vendor --exclude node_modules --links -e "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i ${DC_ORO_CONFIG_DIR}/ssh_id_ed25519 -p ${SSH_PORT} ${ORO_DC_SSH_ARGS}" --timeout=3 --info=progress2 -r "${DC_ORO_APPDIR}/" ${DC_ORO_USER_NAME}@${SSH_HOST}:"${DC_ORO_APPDIR}/"; do
+          sleep 5
+        done
+      fi
     }
   fi
 fi
@@ -410,12 +447,12 @@ if [[ $DC_ORO_MODE == "mutagen" ]]; then
   #   fi
   # fi
 
-  if [[ $1 == "down" ]]; then
+  if [[ ${args[0]} == "down" ]]; then
     if mutagen sync list | grep -i "Name: ${MUTAGEN_SESSION_NAME}" > /dev/null 2>&1; then
       mutagen sync terminate "${MUTAGEN_SESSION_NAME}"
     fi
     WAIT_SYNC=""
-  elif echo $1 | grep -v -i '^(build\|pull)' > /dev/null; then
+  elif echo ${args[0]} | grep -v -i '^(build\|pull)' > /dev/null; then
     if [[ "0" -eq $(${DOCKER_COMPOSE_BIN_CMD} ps -q ssh  2> /dev/null | wc -l > /dev/null) ]]; then
       ${DOCKER_COMPOSE_BIN_CMD} up -d ssh
     fi
@@ -477,7 +514,7 @@ if ${DOCKER_BIN} system info --format '{{.SecurityOptions}}' | grep "name=rootle
   DOCKER_COMPOSE_RUN_CMD="${DOCKER_COMPOSE_RUN_CMD} --user root"
 fi
 
-if [[ $1 == "up" ]]; then
+if [[ ${args[0]} == "up" ]]; then
   printf "\033[0;37m[${DC_ORO_NAME}] Application: http://localhost:${DC_ORO_PORT_NGINX}\033[0m\n"
   printf "\033[0;37m[${DC_ORO_NAME}] Mailhog: http://localhost:${DC_ORO_PORT_MAIL_WEBGUI}\033[0m\n"
   printf "\033[0;37m[${DC_ORO_NAME}] Elasticsearch: http://localhost:${DC_ORO_PORT_SEARCH}\033[0m\n"
@@ -494,7 +531,7 @@ if [[ $1 == "up" ]]; then
   #fi
 fi
 
-if echo $1 | grep -i 'import' | grep -i 'db\|database' > /dev/null; then
+if echo ${args[0]} | grep -i 'import' | grep -i 'db\|database' > /dev/null; then
   if [[ -z $2 ]]; then
     >&2 echo "Data file was not provided"
     exit 1
@@ -526,7 +563,7 @@ if echo $1 | grep -i 'import' | grep -i 'db\|database' > /dev/null; then
   exec ${DOCKER_COMPOSE_RUN_CMD} -v "${DB_DUMP}:/${DB_DUMP_BASENAME}" database-cli bash -c "$DB_IMPORT_CMD"
 fi
 
-if echo $1 | grep -i 'export\|dump' | grep -i 'db\|database' > /dev/null; then
+if echo ${args[0]} | grep -i 'export\|dump' | grep -i 'db\|database' > /dev/null; then
   DB_DUMP=$DC_ORO_APPDIR/database-$(date +'%Y%m%d%H%M%S').sql.gz
   DB_DUMP_BASENAME=$(echo "${DB_DUMP##*/}")
   touch "${DB_DUMP}"
@@ -541,20 +578,20 @@ if echo $1 | grep -i 'export\|dump' | grep -i 'db\|database' > /dev/null; then
   exec ${DOCKER_COMPOSE_RUN_CMD} -v "${DB_DUMP}:/${DB_DUMP_BASENAME}" database-cli bash -c "$DB_EXPORT_CMD | gzip > /${DB_DUMP_BASENAME}"
 fi
 
-if echo $1 | grep -i '^mysql' > /dev/null; then
+if echo ${args[0]} | grep -i '^mysql' > /dev/null; then
   MYSQL_CMD="MYSQL_PWD=\$DC_ORO_DATABASE_PASSWORD mysql -h\$DC_ORO_DATABASE_HOST -P\$DC_ORO_DATABASE_PORT -u\$DC_ORO_DATABASE_USER \$DC_ORO_DATABASE_DBNAME"
   exec ${DOCKER_COMPOSE_RUN_CMD} database-cli bash -c "$MYSQL_CMD"
 fi
 
-if echo $1 | grep -i '^psql' > /dev/null; then
+if echo ${args[0]} | grep -i '^psql' > /dev/null; then
   PSQL_CMD="PGPASSWORD=\$DC_ORO_DATABASE_PASSWORD psql -h \$DC_ORO_DATABASE_HOST -p \$DC_ORO_DATABASE_PORT -U \$DC_ORO_DATABASE_USER -d \$DC_ORO_DATABASE_DBNAME"
   exec ${DOCKER_COMPOSE_RUN_CMD} database-cli bash -c "$PSQL_CMD"
 fi
 
-if [ $# -eq 0 ] || [ "$1" = "ssh" ]; then
+if [ $# -eq 0 ] || [ ${args[0]} = "ssh" ]; then
   # Build SSH arguments from the rest (if any)
   SSH_ARGS=()
-  if [ "$1" = "ssh" ]; then
+  if [ ${args[0]} = "ssh" ]; then
     SSH_ARGS=("${@:2}")
   fi
 
@@ -573,7 +610,7 @@ if [ $# -eq 0 ] || [ "$1" = "ssh" ]; then
     "${SSH_ARGS[@]}"
 fi
 
-if echo $1 | grep -i '^composer\|bin/\|npm\|php\|node\|yarn\|bash' > /dev/null; then
+if echo ${args[0]} | grep -i '^composer\|bin/\|npm\|php\|node\|yarn\|bash' > /dev/null; then
   for i in "$@"; do
       i="${i//\\/\\\\}"
       i="${i//$/\\$}"
@@ -582,11 +619,11 @@ if echo $1 | grep -i '^composer\|bin/\|npm\|php\|node\|yarn\|bash' > /dev/null; 
   exec ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "exec $C"
 fi
 
-if echo $1 | grep -i '^cli$' > /dev/null; then
+if echo ${args[0]} | grep -i '^cli$' > /dev/null; then
   exec ${DOCKER_COMPOSE_RUN_CMD} cli
 fi
 
-if echo $1 | grep -i '^install$' > /dev/null; then
+if echo ${args[0]} | grep -i '^install$' > /dev/null; then
   export XDEBUG_MODE=off
   ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "[[ -d ${DC_ORO_APPDIR}/var/cache ]] && rm -rf ${DC_ORO_APPDIR}/var/cache/* || true"
   ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "composer install && npm ci"
@@ -594,7 +631,7 @@ if echo $1 | grep -i '^install$' > /dev/null; then
   exit 0
 fi
 
-if [[ $1 == "purge" ]]; then
+if [[ ${args[0]} == "purge" ]]; then
   if [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
     ${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/compose.yml down -v
   else
@@ -613,7 +650,7 @@ if [[ $1 == "purge" ]]; then
   exit 0
 fi
 
-if [[ $1 == "down" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]] && [[ -s "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
+if [[ ${args[0]} == "down" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]] && [[ -s "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/compose.yml"
   exec ${DOCKER_COMPOSE_BIN_CMD} "$@"
 fi
