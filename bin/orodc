@@ -614,12 +614,6 @@ if echo ${args[0]} | grep -i '^psql' > /dev/null; then
 fi
 
 if [ $# -eq 0 ] || [ ${args[0]} = "ssh" ]; then
-  # Build SSH arguments from the rest (if any)
-  SSH_ARGS=()
-  if [ ${args[0]} = "ssh" ]; then
-    SSH_ARGS=("${@:2}")
-  fi
-
   SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
   SSH_PORT=$(${DOCKER_BIN} inspect "$(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }')" | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
 
@@ -632,7 +626,8 @@ if [ $# -eq 0 ] || [ ${args[0]} = "ssh" ]; then
     -p "${SSH_PORT}" \
     ${ORO_DC_SSH_ARGS} \
     "${DC_ORO_USER_NAME}@${SSH_HOST}" \
-    "${SSH_ARGS[@]}"
+    "${right_flags[@]}" \
+    "${right_options[@]}"
 fi
 
 if echo ${args[0]} | grep -i '^composer\|bin/\|npm\|php\|node\|yarn\|bash' > /dev/null; then
