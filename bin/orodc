@@ -397,44 +397,48 @@ if [[ -f "$DC_ORO_APPDIR/.docker-compose.user.yml" ]]; then
 fi
 
 if [[ $DC_ORO_MODE == "mutagen" ]] || [[ $DC_ORO_MODE == "ssh" ]]; then
-  if [[ "$OSTYPE" != "darwin"* ]] && [[ $DC_ORO_VOLUME_MODE == "tmpfs" ]]; then
-    sudo mkdir -p /dev/shm/${DC_ORO_NAME}_appcode
-    sudo chmod 1777 /dev/shm/${DC_ORO_NAME}_appcode
-    docker ps | grep ${DC_ORO_NAME}_appcode_shm_sidecar || {
-      ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
-        ${DOCKER_BIN} volume create  \
-          --driver local \
-          --opt type=none \
-          --opt device=/dev/shm/${DC_ORO_NAME}_appcode \
-          --opt o=bind \
-          "${DC_ORO_NAME}_appcode" \
-         > /dev/null
-      }
-    }
+  # if [[ "$OSTYPE" != "darwin"* ]]; then
+  #   sudo mkdir -p /dev/shm/${DC_ORO_NAME}_appcode
+  #   sudo chmod 1777 /dev/shm/${DC_ORO_NAME}_appcode
+  #   docker ps | grep ${DC_ORO_NAME}_appcode_shm_sidecar || {
+  #     ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
+  #       ${DOCKER_BIN} volume create  \
+  #         --driver local \
+  #         --opt type=none \
+  #         --opt device=/dev/shm/${DC_ORO_NAME}_appcode \
+  #         --opt o=bind \
+  #         "${DC_ORO_NAME}_appcode" \
+  #        > /dev/null
+  #     }
+  #   }
+  #   if [[ ${args[0]} != "down" ]] && [[ ${args[0]} != "purge" ]]; then
+  #     ${DOCKER_COMPOSE_BIN_CMD} up -d ssh
+  #     SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
+  #     SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
+  #     if [[ 0 -eq $(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" -p ${SSH_PORT} ${ORO_DC_SSH_ARGS} ${DC_ORO_USER_NAME}@${SSH_HOST} sh -c 'ls "'${DC_ORO_APPDIR}'/"' | wc -l) ]]; then
+  #       until ${RSYNC_BIN} --exclude var/cache --exclude vendor --exclude node_modules --links -e "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i ${DC_ORO_CONFIG_DIR}/ssh_id_ed25519 -p ${SSH_PORT} ${ORO_DC_SSH_ARGS}" --timeout=3 --info=progress2 -r "${DC_ORO_APPDIR}/" ${DC_ORO_USER_NAME}@${SSH_HOST}:"${DC_ORO_APPDIR}/"; do
+  #         sleep 5
+  #       done
+  #     fi
+  #   fi
+  # else
     if [[ ${args[0]} != "down" ]] && [[ ${args[0]} != "purge" ]]; then
-      ${DOCKER_COMPOSE_BIN_CMD} up -d ssh
-      SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
-      SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
-      if [[ 0 -eq $(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" -p ${SSH_PORT} ${ORO_DC_SSH_ARGS} ${DC_ORO_USER_NAME}@${SSH_HOST} sh -c 'ls "'${DC_ORO_APPDIR}'/"' | wc -l) ]]; then
-        until ${RSYNC_BIN} --exclude var/cache --exclude vendor --exclude node_modules --links -e "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i ${DC_ORO_CONFIG_DIR}/ssh_id_ed25519 -p ${SSH_PORT} ${ORO_DC_SSH_ARGS}" --timeout=3 --info=progress2 -r "${DC_ORO_APPDIR}/" ${DC_ORO_USER_NAME}@${SSH_HOST}:"${DC_ORO_APPDIR}/"; do
-          sleep 5
-        done
-      fi
+      ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
+        ${DOCKER_BIN} volume create "${DC_ORO_NAME}_appcode"  > /dev/null
+        >&2 echo -e "\033[36m==> Copying source code to the '${DC_ORO_NAME}_appcode' docker valume\033[0m"
+        ${DOCKER_COMPOSE_BIN_CMD} up -d ssh
+        SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
+        SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
+        if [[ 0 -eq $(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" -p ${SSH_PORT} ${ORO_DC_SSH_ARGS} ${DC_ORO_USER_NAME}@${SSH_HOST} sh -c 'ls "'${DC_ORO_APPDIR}'/"' | wc -l) ]]; then
+          until ${RSYNC_BIN} --exclude var/cache --exclude vendor --exclude node_modules --links -e "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i ${DC_ORO_CONFIG_DIR}/ssh_id_ed25519 -p ${SSH_PORT} ${ORO_DC_SSH_ARGS}" --timeout=3 --info=progress2 -r "${DC_ORO_APPDIR}/" ${DC_ORO_USER_NAME}@${SSH_HOST}:"${DC_ORO_APPDIR}/" 2> /dev/null; do
+            echo -n ".";
+            sleep 3
+          done
+          echo "";
+        fi
+      }
     fi
-  else
-    ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
-      ${DOCKER_BIN} volume create "${DC_ORO_NAME}_appcode"  > /dev/null
-      >&2 echo -e "\033[36m==> Copying source code to the '${DC_ORO_NAME}_appcode' docker valume\033[0m"
-      ${DOCKER_COMPOSE_BIN_CMD} up -d ssh
-      SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
-      SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
-      if [[ 0 -eq $(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" -p ${SSH_PORT} ${ORO_DC_SSH_ARGS} ${DC_ORO_USER_NAME}@${SSH_HOST} sh -c 'ls "'${DC_ORO_APPDIR}'/"' | wc -l) ]]; then
-        until ${RSYNC_BIN} --exclude var/cache --exclude vendor --exclude node_modules --links -e "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i ${DC_ORO_CONFIG_DIR}/ssh_id_ed25519 -p ${SSH_PORT} ${ORO_DC_SSH_ARGS}" --timeout=3 --info=progress2 -r "${DC_ORO_APPDIR}/" ${DC_ORO_USER_NAME}@${SSH_HOST}:"${DC_ORO_APPDIR}/"; do
-          sleep 5
-        done
-      fi
-    }
-  fi
+  #fi
 fi
 
 if [[ $DC_ORO_MODE == "mutagen" ]]; then
@@ -447,7 +451,7 @@ if [[ $DC_ORO_MODE == "mutagen" ]]; then
   #   fi
   # fi
 
-  if [[ ${args[0]} == "down" ]]; then
+  if [[ ${args[0]} == "down" ]] || [[ ${args[0]} == "purge" ]]; then
     if mutagen sync list | grep -i "Name: ${MUTAGEN_SESSION_NAME}" > /dev/null 2>&1; then
       mutagen sync terminate "${MUTAGEN_SESSION_NAME}"
     fi
