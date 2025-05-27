@@ -3,12 +3,15 @@ set -e
 
 #!/bin/bash
 
-flags=()
-options=()
+left_flags=()
+right_flags=()
+left_options=()
+right_options=()
 args=()
 
 args_input=("$@")
 i=0
+saw_first_arg=false
 
 while [[ $i -lt ${#args_input[@]} ]]; do
   arg="${args_input[$i]}"
@@ -16,28 +19,46 @@ while [[ $i -lt ${#args_input[@]} ]]; do
 
   if [[ "$arg" == --*=* ]]; then
     # Option with inline value: --key=value
-    options+=("$arg")
+    if ! $saw_first_arg; then
+      left_options+=("$arg")
+    else
+      right_options+=("$arg")
+    fi
     ((i++))
+
   elif [[ "$arg" == --* && "$next" != -* && -n "$next" ]]; then
     # Option with separate value: --key value
-    options+=("$arg" "$next")
+    if ! $saw_first_arg; then
+      left_options+=("$arg" "$next")
+    else
+      right_options+=("$arg" "$next")
+    fi
     ((i+=2))
+
   elif [[ "$arg" == -* ]]; then
-    # Flag without a value
-    flags+=("$arg")
+    # Flag without value
+    if ! $saw_first_arg; then
+      left_flags+=("$arg")
+    else
+      right_flags+=("$arg")
+    fi
     ((i++))
+
   else
     # Positional argument
     args+=("$arg")
+    saw_first_arg=true
     ((i++))
   fi
 done
 
 # Debug output
 if [[ -n $DEBUG ]]; then 
-  echo "Flags: ${flags[*]}"
-  echo "Options: ${options[*]}"
+  echo "Left Flags: ${left_flags[*]}"
+  echo "Left Options: ${left_options[*]}"
   echo "Args: ${args[*]}"
+  echo "Right Flags: ${right_flags[*]}"
+  echo "Right Options: ${right_options[*]}"
 fi
 
 if [[ -n $DEBUG ]]; then 
@@ -656,8 +677,8 @@ fi
 
 if [[ ${args[0]} == "down" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]] && [[ -s "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/compose.yml"
-  exec ${DOCKER_COMPOSE_BIN_CMD} "$@"
+  exec ${DOCKER_COMPOSE_BIN_CMD} "${left_flags[*]} ${left_options[*]} ${args[*]} ${right_flags[*]} ${right_options[*]}"
 fi
 
 ${DOCKER_COMPOSE_BIN_CMD} config > "${DC_ORO_CONFIG_DIR}/compose.yml"
-exec ${DOCKER_COMPOSE_BIN_CMD} "$@"
+exec ${DOCKER_COMPOSE_BIN_CMD} "${left_flags[*]} ${left_options[*]} ${args[*]} ${right_flags[*]} ${right_options[*]}"
