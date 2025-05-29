@@ -558,7 +558,7 @@ if echo ${args[0]} | grep -i 'import' | grep -i 'db\|database' > /dev/null; then
 fi
 
 if echo ${args[0]} | grep -i 'set\|update' | grep -i 'url\|uri' > /dev/null; then
-  local URL=${args[1]:-"https://${DC_ORO_NAME}.docker.local"}
+  URL=${args[1]:-"https://${DC_ORO_NAME}.docker.local"}
   set -x
   ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "php bin/console --env=prod oro:config:update --env=dev oro_website.secure_url ${URL}"
   ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "php bin/console --env=prod oro:config:update --env=dev oro_ui.application_url ${URL}"
