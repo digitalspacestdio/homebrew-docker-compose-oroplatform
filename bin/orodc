@@ -570,7 +570,7 @@ fi
 if echo ${args[0]} | grep -i 'update' | grep -i 'platform' > /dev/null; then
   URL=${args[1]:-"https://${DC_ORO_NAME}.docker.local"}
   set -x
-  ${DOCKER_COMPOSE_RUN_CMD} -q cli bash -c "php bin/console oro:platform:update" || true
+  ${DOCKER_COMPOSE_RUN_CMD} -q cli bash -c "php bin/console  --force" || true
   set +x
   exit 0
 fi
