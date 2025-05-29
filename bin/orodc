@@ -560,9 +560,9 @@ fi
 if echo ${args[0]} | grep -i 'set\|update' | grep -i 'url\|uri' > /dev/null; then
   URL=${args[1]:-"https://${DC_ORO_NAME}.docker.local"}
   set -x
-  ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "php bin/console --env=prod oro:config:update --env=dev oro_website.secure_url ${URL}"
-  ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "php bin/console --env=prod oro:config:update --env=dev oro_ui.application_url ${URL}"
-  ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "php bin/console --env=prod oro:config:update --env=dev oro_website.url ${URL}"
+  ${DOCKER_COMPOSE_RUN_CMD} -q cli bash -c "php bin/console --env=prod oro:config:update --env=dev oro_website.secure_url ${URL}"
+  ${DOCKER_COMPOSE_RUN_CMD} -q cli bash -c "php bin/console --env=prod oro:config:update --env=dev oro_ui.application_url ${URL}"
+  ${DOCKER_COMPOSE_RUN_CMD} -q cli bash -c "php bin/console --env=prod oro:config:update --env=dev oro_website.url ${URL}"
   set +x
   exit 0
 fi
