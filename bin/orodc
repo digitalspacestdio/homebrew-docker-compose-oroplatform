@@ -446,7 +446,7 @@ if [[ $DC_ORO_MODE == "mutagen" ]]; then
     fi
     WAIT_SYNC=""
   elif ! echo ${args[0]} | grep -i '^\(build\|pull\|config\)' > /dev/null; then
-    if [[ "0" -eq $(${DOCKER_COMPOSE_BIN_CMD} ps -q ssh  2> /dev/null | wc -l > /dev/null) ]]; then
+    if [[ "0" -eq $(${DOCKER_COMPOSE_BIN_CMD} ps -q ssh  2> /dev/null | wc -l 2> /dev/null) ]]; then
       ${DOCKER_COMPOSE_BIN_CMD} up -d ssh
     fi
     DOCKER_CONTAINER_NAME_MUTAGEN=$(${DOCKER_BIN} inspect -f '{{.Name}}' $(${DOCKER_COMPOSE_BIN_CMD} ps -q ssh) | cut -c2-)
