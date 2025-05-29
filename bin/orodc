@@ -575,6 +575,14 @@ if echo ${args[0]} | grep -i 'update' | grep -i 'platform' > /dev/null; then
   exit 0
 fi
 
+if echo ${args[0]} | grep -i 'composer' | grep -i 'install' > /dev/null; then
+  URL=${args[1]:-"https://${DC_ORO_NAME}.docker.local"}
+  set -x
+  ${DOCKER_COMPOSE_RUN_CMD} -q cli bash -c "composer install" || true
+  set +x
+  exit 0
+fi
+
 if echo ${args[0]} | grep -i 'export\|dump' | grep -i 'db\|database' > /dev/null; then
   DB_DUMP=$DC_ORO_APPDIR/database-$(date +'%Y%m%d%H%M%S').sql.gz
   DB_DUMP_BASENAME=$(echo "${DB_DUMP##*/}")
