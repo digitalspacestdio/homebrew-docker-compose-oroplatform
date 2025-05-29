@@ -553,7 +553,16 @@ if echo ${args[0]} | grep -i 'import' | grep -i 'db\|database' > /dev/null; then
 
   >&2 echo "/* Starting import of the database dump... */"
   >&2 echo "/* From: $DB_DUMP */"
-  exec ${DOCKER_COMPOSE_RUN_CMD} "${left_flags[@]}" "${left_options[@]}" -v "${DB_DUMP}:/${DB_DUMP_BASENAME}" database-cli bash -c "$DB_IMPORT_CMD"
+  ${DOCKER_COMPOSE_RUN_CMD} "${left_flags[@]}" "${left_options[@]}" -v "${DB_DUMP}:/${DB_DUMP_BASENAME}" database-cli bash -c "$DB_IMPORT_CMD"
+  exit 0
+fi
+
+if echo ${args[0]} | grep -i 'update' | grep -i 'url\|uri' > /dev/null; then
+  local URL=${args[1]:-"https://${DC_ORO_NAME}.docker.local"}
+  ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "php bin/console --env=prod oro:config:update --env=dev oro_website.secure_url ${URL}"
+  ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "php bin/console --env=prod oro:config:update --env=dev oro_ui.application_url ${URL}"
+  ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "php bin/console --env=prod oro:config:update --env=dev oro_website.url ${URL}"
+  exit 0
 fi
 
 if echo ${args[0]} | grep -i 'export\|dump' | grep -i 'db\|database' > /dev/null; then
