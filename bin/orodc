@@ -1,8 +1,6 @@
 #!/bin/bash
 set -e
 
-#!/bin/bash
-
 left_flags=()
 right_flags=()
 left_options=()
@@ -18,37 +16,33 @@ while [[ $i -lt ${#args_input[@]} ]]; do
   next="${args_input[$((i + 1))]:-}"
 
   if [[ "$arg" == --*=* ]]; then
-    # Option with inline value: --key=value
-    if ! $saw_first_arg; then
+    if [[ "$saw_first_arg" == false ]]; then
       left_options+=("$arg")
     else
       right_options+=("$arg")
     fi
-    ((i++))
+    i=$((i + 1))
 
   elif [[ "$arg" == --* && "$next" != -* && -n "$next" ]]; then
-    # Option with separate value: --key value
-    if ! $saw_first_arg; then
+    if [[ "$saw_first_arg" == false ]]; then
       left_options+=("$arg" "$next")
     else
       right_options+=("$arg" "$next")
     fi
-    ((i+=2))
+    i=$((i + 2))
 
   elif [[ "$arg" == -* ]]; then
-    # Flag without value
-    if ! $saw_first_arg; then
+    if [[ "$saw_first_arg" == false ]]; then
       left_flags+=("$arg")
     else
       right_flags+=("$arg")
     fi
-    ((i++))
+    i=$((i + 1))
 
   else
-    # Positional argument
     args+=("$arg")
     saw_first_arg=true
-    ((i++))
+    i=$((i + 1))
   fi
 done
 
