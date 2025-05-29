@@ -567,6 +567,14 @@ if echo ${args[0]} | grep -i 'set\|update' | grep -i 'url\|uri' > /dev/null; the
   exit 0
 fi
 
+if echo ${args[0]} | grep -i 'cache' | grep -i 'cl' > /dev/null; then
+  URL=${args[1]:-"https://${DC_ORO_NAME}.docker.local"}
+  set -x
+  ${DOCKER_COMPOSE_RUN_CMD} -q cli bash -c "php bin/console cache:cl" || true
+  set +x
+  exit 0
+fi
+
 if echo ${args[0]} | grep -i 'update' | grep -i 'platform' > /dev/null; then
   URL=${args[1]:-"https://${DC_ORO_NAME}.docker.local"}
   set -x
