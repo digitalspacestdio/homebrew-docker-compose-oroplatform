@@ -546,9 +546,9 @@ if echo ${args[0]} | grep -i 'import' | grep -i 'db\|database' > /dev/null; then
   fi
 
   if echo ${DB_DUMP_BASENAME} | grep -i 'sql\.gz$' > /dev/null; then
-    DB_IMPORT_CMD="zcat ${DB_DUMP_BASENAME} | ${DB_IMPORT_CMD}"
+    DB_IMPORT_CMD="zcat ${DB_DUMP_BASENAME} | sed -E 's/^\s*CREATE\s+FUNCTION/CREATE OR REPLACE FUNCTION/I' | ${DB_IMPORT_CMD}"
   else
-    DB_IMPORT_CMD="cat /${DB_DUMP_BASENAME} | ${DB_IMPORT_CMD}"
+    DB_IMPORT_CMD="cat /${DB_DUMP_BASENAME} | sed -E 's/^\s*CREATE\s+FUNCTION/CREATE OR REPLACE FUNCTION/I' | ${DB_IMPORT_CMD}"
   fi
 
   >&2 echo "/* Starting import of the database dump... */"
