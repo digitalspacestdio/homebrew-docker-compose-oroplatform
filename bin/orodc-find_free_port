@@ -1,0 +1,105 @@
+#!/usr/bin/env bash
+
+# Global variable to store already selected ports
+__FOUND_PORTS=""
+
+find_free_port() {
+  local PROJECT_NAME="$1"
+  local SERVICE_NAME="$2"
+  local PORT="$3"
+  local COMPOSE_CONFIG_DIR="$4"
+
+  local COMPOSE_FILE="${COMPOSE_CONFIG_DIR}/compose.yml"
+  local SELECTED_PORT=""
+  local USED_PORTS=""
+
+  # Get a list of all published ports from compose.yml (for all services)
+  if [[ -f "$COMPOSE_FILE" ]]; then
+    USED_PORTS=$(yq '.services[].ports[]? | select(.published) | .published' "$COMPOSE_FILE" 2>/dev/null | xargs)
+    SELECTED_PORT=$(yq '.services["'"$SERVICE_NAME"'"].ports[]? | select(.published) | .published' "$COMPOSE_FILE" 2>/dev/null)
+  fi
+
+  # Check if the port is used by a local process
+  is_port_used_by_local() {
+    local p=$1
+    lsof -t -i tcp:$p > /dev/null 2>&1
+  }
+
+  # Check if the port is used by another Docker container
+  is_port_used_by_other_container() {
+    local p=$1
+    docker ps -a \
+      --filter "expose=$p" \
+      --format '{{.Names}} {{.Ports}}' | \
+      while read -r name ports; do
+        # Check project name and service name for the container
+        local container_project
+        local container_service
+        container_project=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.project" }}' "$name" 2>/dev/null)
+        container_service=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.service" }}' "$name" 2>/dev/null)
+
+        # If it's the same project and same service, skip it
+        if [[ "$container_project" == "$PROJECT_NAME" && "$container_service" == "$SERVICE_NAME" ]]; then
+          continue
+        fi
+
+        # Otherwise, check if it really uses the port
+        if echo "$ports" | grep -q ":$p"; then
+          return 0  # port is used by another container (different service or project)
+        fi
+      done
+    return 1
+  }
+
+  # Main check: whether the port is in use (excluding the current service in the current project)
+  is_port_used() {
+    local p=$1
+    [[ " $__FOUND_PORTS " == *" $p "* ]] && return 0
+    [[ " $USED_PORTS " == *" $p "* ]] && return 0
+
+    if is_port_used_by_local "$p"; then
+      return 0
+    fi
+
+    if is_port_used_by_other_container "$p"; then
+      return 0
+    fi
+
+    return 1
+  }
+
+  # If a port is specified in compose.yml, use it if available
+  if [[ -n "$SELECTED_PORT" ]]; then
+    if docker ps -a \
+      --filter "label=com.docker.compose.service=${SERVICE_NAME}" \
+      --filter "label=com.docker.compose.project=${PROJECT_NAME}" \
+      --format '{{.Names}}' | grep -q .; then
+      echo "$SELECTED_PORT"
+      return
+    else
+      if ! is_port_used "$SELECTED_PORT"; then
+        __FOUND_PORTS+=" $SELECTED_PORT"
+        echo "$SELECTED_PORT"
+        return
+      fi
+    fi
+  fi
+
+  # Search for a free port starting from the given port
+  while [ "$PORT" -le 65535 ]; do
+    if ! is_port_used "$PORT"; then
+      __FOUND_PORTS+=" $PORT"
+      echo "$PORT"
+      return
+    fi
+    PORT=$((PORT+1))
+  done
+
+  echo "Error: could not find a free port" >&2
+  return 1
+}
+
+# If the script is run directly, execute the function with the provided arguments
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  find_free_port "$@"
+fi

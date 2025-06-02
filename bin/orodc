@@ -230,69 +230,6 @@ find-up () {
   echo "$path"
 }
 
-# Глобальная переменная для хранения уже выбранных портов
-__FOUND_PORTS=""
-
-find_free_port()
-{
-  local SERVICE_NAME="$1"
-  local PORT="$2"
-  local DC_ORO_CONFIG_DIR="$3"
-
-  local COMPOSE_FILE="${DC_ORO_CONFIG_DIR}/compose.yml"
-  local SELECTED_PORT=""
-  local USED_PORTS=""
-
-  # Получаем список всех опубликованных портов из compose.yml (для всех сервисов)
-  if [[ -f "$COMPOSE_FILE" ]]; then
-    USED_PORTS=$(yq '.services[].ports[]? | select(.published) | .published' "$COMPOSE_FILE" 2>/dev/null | xargs)
-    SELECTED_PORT=$(yq '.services["'"$SERVICE_NAME"'"].ports[]? | select(.published) | .published' "$COMPOSE_FILE" 2>/dev/null)
-  fi
-
-  # Функция проверки — порт уже где-то используется
-  is_port_used() {
-    local p=$1
-    # уже найден ранее
-    [[ " $__FOUND_PORTS " == *" $p "* ]] && return 0
-    # уже прописан у другого сервиса в compose.yml
-    [[ " $USED_PORTS " == *" $p "* ]] && return 0
-    # уже используется Docker-контейнером
-    docker ps -a --filter "expose=$p" --format '{{.Ports}}' | grep -q ":$p" && return 0
-    # уже используется локальным процессом
-    lsof -t -i tcp:$p > /dev/null 2>&1 && return 0
-    return 1
-  }
-
-  # Если порт из compose.yml определён
-  if [[ -n "$SELECTED_PORT" ]]; then
-    # Проверим, есть ли уже контейнер с этим сервисом
-    if docker ps -a --filter "label=com.docker.compose.service=${SERVICE_NAME}" --format '{{.Names}}' | grep -q .; then
-      echo "$SELECTED_PORT"
-      return
-    else
-      # Контейнера нет — если порт свободен, вернём его
-      if ! is_port_used "$SELECTED_PORT"; then
-        __FOUND_PORTS+=" $SELECTED_PORT"
-        echo "$SELECTED_PORT"
-        return
-      fi
-    fi
-  fi
-
-  # Ищем свободный порт начиная с указанного
-  while [ "$PORT" -le 65535 ]; do
-    if ! is_port_used "$PORT"; then
-      __FOUND_PORTS+=" $PORT"
-      echo "$PORT"
-      return
-    fi
-    PORT=$((PORT+1))
-  done
-
-  echo "Ошибка: не удалось найти свободный порт" >&2
-  return 1
-}
-
 if [[ -z $DC_ORO_APPDIR ]]; then
   export DC_ORO_APPDIR=$(find-up composer.json "$PWD/www")
 fi
@@ -342,15 +279,15 @@ else
 fi
 
 export DC_ORO_PORT_PREFIX=${DC_ORO_PORT_PREFIX:-"301"}
-export DC_ORO_PORT_NGINX=$(find_free_port nginx ${DC_ORO_PORT_PREFIX}80 $DC_ORO_CONFIG_DIR)
-export DC_ORO_PORT_XHGUI=$(find_free_port xhgui "${DC_ORO_PORT_PREFIX}81" $DC_ORO_CONFIG_DIR)
-export DC_ORO_PORT_MYSQL=$(find_free_port database "${DC_ORO_PORT_PREFIX}06" $DC_ORO_CONFIG_DIR)
-export DC_ORO_PORT_PGSQL=$(find_free_port database "${DC_ORO_PORT_PREFIX}32" $DC_ORO_CONFIG_DIR)
-export DC_ORO_PORT_SEARCH=$(find_free_port search "${DC_ORO_PORT_PREFIX}92" $DC_ORO_CONFIG_DIR)
-export DC_ORO_PORT_MQ=$(find_free_port mq "${DC_ORO_PORT_PREFIX}72" $DC_ORO_CONFIG_DIR)
-export DC_ORO_PORT_REDIS=$(find_free_port redis "${DC_ORO_PORT_PREFIX}72" $DC_ORO_CONFIG_DIR)
-export DC_ORO_PORT_MAIL_WEBGUI=$(find_free_port mail "${DC_ORO_PORT_PREFIX}25" $DC_ORO_CONFIG_DIR)
-export DC_ORO_PORT_SSH=$(find_free_port ssh "${DC_ORO_PORT_PREFIX}22" $DC_ORO_CONFIG_DIR)
+export DC_ORO_PORT_NGINX=$(orodc-find_free_port ${DC_ORO_NAME} nginx ${DC_ORO_PORT_PREFIX}80 $DC_ORO_CONFIG_DIR)
+export DC_ORO_PORT_XHGUI=$(orodc-find_free_port ${DC_ORO_NAME} xhgui "${DC_ORO_PORT_PREFIX}81" $DC_ORO_CONFIG_DIR)
+export DC_ORO_PORT_MYSQL=$(orodc-find_free_port ${DC_ORO_NAME} database "${DC_ORO_PORT_PREFIX}06" $DC_ORO_CONFIG_DIR)
+export DC_ORO_PORT_PGSQL=$(orodc-find_free_port ${DC_ORO_NAME} database "${DC_ORO_PORT_PREFIX}32" $DC_ORO_CONFIG_DIR)
+export DC_ORO_PORT_SEARCH=$(orodc-find_free_port ${DC_ORO_NAME} search "${DC_ORO_PORT_PREFIX}92" $DC_ORO_CONFIG_DIR)
+export DC_ORO_PORT_MQ=$(orodc-find_free_port ${DC_ORO_NAME} mq "${DC_ORO_PORT_PREFIX}72" $DC_ORO_CONFIG_DIR)
+export DC_ORO_PORT_REDIS=$(orodc-find_free_port ${DC_ORO_NAME} redis "${DC_ORO_PORT_PREFIX}72" $DC_ORO_CONFIG_DIR)
+export DC_ORO_PORT_MAIL_WEBGUI=$(orodc-find_free_port ${DC_ORO_NAME} mail "${DC_ORO_PORT_PREFIX}25" $DC_ORO_CONFIG_DIR)
+export DC_ORO_PORT_SSH=$(orodc-find_free_port ${DC_ORO_NAME} ssh "${DC_ORO_PORT_PREFIX}22" $DC_ORO_CONFIG_DIR)
 
 export COMPOSER_AUTH=$(echo ${DC_ORO_COMPOSER_AUTH:-${COMPOSER_AUTH}} | jq -c .)
 export DC_ORO_COMPOSER_AUTH=${COMPOSER_AUTH}

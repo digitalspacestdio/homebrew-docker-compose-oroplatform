@@ -2,7 +2,7 @@ require 'formula'
 
 class DockerComposeOroplatform < Formula
   url "https://github.com/digitalspacestdio/homebrew-docker-compose-oroplatform.git", :using => :git
-  version "0.7.19"
+  version "0.7.20"
   revision 1
 
   depends_on 'yq'
@@ -14,7 +14,10 @@ class DockerComposeOroplatform < Formula
   def install
     libexec.install "bin/orodc"
     libexec.install "bin/orodc-sync"
+    libexec.install "bin/orodc-find_free_port"
+
     bin.write_exec_script libexec/"orodc"
+    bin.write_exec_script libexec/"orodc-find_free_port"
 
     pkgshare.install "compose"
   end
