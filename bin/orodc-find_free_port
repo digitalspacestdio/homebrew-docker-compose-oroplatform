@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-
+if [[ -n $DEBUG ]]; then
+  set -x
+fi
 # Global variable to store already selected ports
 __FOUND_PORTS=""
 
@@ -28,27 +30,65 @@ find_free_port() {
   # Check if the port is used by another Docker container
   is_port_used_by_other_container() {
     local p=$1
-    docker ps -a \
-      --filter "expose=$p" \
-      --format '{{.Names}} {{.Ports}}' | \
-      while read -r name ports; do
-        # Check project name and service name for the container
-        local container_project
-        local container_service
-        container_project=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.project" }}' "$name" 2>/dev/null)
-        container_service=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.service" }}' "$name" 2>/dev/null)
+    local found=1
+    while read -r name ports; do
+      if [[ "$name" == k8s_* ]]; then
+        continue
+      fi
 
-        # If it's the same project and same service, skip it
-        if [[ "$container_project" == "$PROJECT_NAME" && "$container_service" == "$SERVICE_NAME" ]]; then
-          continue
-        fi
+      local container_project
+      local container_service
+      container_project=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.project" }}' "$name" 2>/dev/null)
+      container_service=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.service" }}' "$name" 2>/dev/null)
 
-        # Otherwise, check if it really uses the port
-        if echo "$ports" | grep -q ":$p"; then
-          return 0  # port is used by another container (different service or project)
+      if [[ "$container_project" == "$PROJECT_NAME" && "$container_service" == "$SERVICE_NAME" ]]; then
+        continue
+      fi
+
+      for part in ${ports//,/ }; do
+        part="${part%/tcp}"
+        part="${part%/udp}"
+
+        if [[ "$part" == *"->"* ]]; then
+          host_port_part="${part%%->*}"
+          if [[ "$host_port_part" == *":"* ]]; then
+            host_port="${host_port_part##*:}"
+          else
+            host_port="$host_port_part"
+          fi
+
+          if [[ "$host_port" == *"-"* ]]; then
+            range_start=${host_port%-*}
+            range_end=${host_port#*-}
+            if [[ "$p" -ge "$range_start" && "$p" -le "$range_end" ]]; then
+              found=0
+              break
+            fi
+          elif [[ "$host_port" == "$p" ]]; then
+            found=0
+            break
+          fi
+        else
+          if [[ "$part" == *"-"* ]]; then
+            range_start=${part%-*}
+            range_end=${part#*-}
+            if [[ "$p" -ge "$range_start" && "$p" -le "$range_end" ]]; then
+              found=0
+              break
+            fi
+          elif [[ "$part" == "$p" ]]; then
+            found=0
+            break
+          fi
         fi
       done
-    return 1
+
+      if [[ $found -eq 0 ]]; then
+        break
+      fi
+    done < <(docker ps -a --format '{{.Names}} {{.Ports}}')
+
+    return $found
   }
 
   # Main check: whether the port is in use (excluding the current service in the current project)
@@ -70,18 +110,10 @@ find_free_port() {
 
   # If a port is specified in compose.yml, use it if available
   if [[ -n "$SELECTED_PORT" ]]; then
-    if docker ps -a \
-      --filter "label=com.docker.compose.service=${SERVICE_NAME}" \
-      --filter "label=com.docker.compose.project=${PROJECT_NAME}" \
-      --format '{{.Names}}' | grep -q .; then
+    if ! is_port_used "$SELECTED_PORT"; then
+      __FOUND_PORTS+=" $SELECTED_PORT"
       echo "$SELECTED_PORT"
       return
-    else
-      if ! is_port_used "$SELECTED_PORT"; then
-        __FOUND_PORTS+=" $SELECTED_PORT"
-        echo "$SELECTED_PORT"
-        return
-      fi
     fi
   fi
 
