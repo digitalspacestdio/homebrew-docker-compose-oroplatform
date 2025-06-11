@@ -268,6 +268,9 @@ load_env_safe "$DC_ORO_APPDIR/.env-app.local"
 load_env_safe "$DC_ORO_APPDIR/.env.orodc"
 
 parse_dsn_uri "$ORO_DB_URL" "database" "DC_ORO"
+export DC_ORO_DATABASE_USER=${DC_ORO_DATABASE_USER:-app}
+export DC_ORO_DATABASE_PASSWORD=${DC_ORO_DATABASE_PASSWORD:-app}
+
 parse_dsn_uri "$ORO_SEARCH_URL" "search" "DC_ORO"
 parse_dsn_uri "$ORO_MQ_DSN" "mq" "DC_ORO"
 parse_dsn_uri "$ORO_REDIS_URL" "redis" "DC_ORO"
