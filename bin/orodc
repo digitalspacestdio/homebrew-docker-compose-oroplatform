@@ -328,7 +328,7 @@ if [[ $DC_ORO_MODE == "default" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-default.yml"
 fi
 
-if [[ $DC_ORO_DATABASE_SCHEMA == "pgsql" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgres" ]];then
+if [[ $DC_ORO_DATABASE_SCHEMA == "pgsql" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgres" || [[ $DC_ORO_DATABASE_SCHEMA == "postgresql" ]];then
   export DC_ORO_DC_ORO_DATABASE_PORT=${DC_ORO_DC_ORO_DATABASE_PORT:-5432}
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-pgsql.yml"
 elif [[ $DC_ORO_DATABASE_SCHEMA == "mariadb" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "mysql" ]];then
@@ -444,7 +444,7 @@ if [[ ${args[0]} == "up" ]]; then
   printf "\033[0;37m[${DC_ORO_NAME}] Elasticsearch: http://localhost:${DC_ORO_PORT_SEARCH}\033[0m\n"
   printf "\033[0;37m[${DC_ORO_NAME}] Mq: http://localhost:${DC_ORO_PORT_MQ}\033[0m\n"
   
-  if [[ $DC_ORO_DATABASE_SCHEMA == "pdo_pgsql" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgres" ]];then
+  if [[ $DC_ORO_DATABASE_SCHEMA == "pdo_pgsql" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgres" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgresql" ]];then
     printf "\033[0;37m[${DC_ORO_NAME}] Database: 127.0.0.1:${DC_ORO_PORT_PGSQL}\033[0m\n"
   elif [[ $DC_ORO_DATABASE_SCHEMA == "pdo_mysql" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "mysql" ]];then
     printf "\033[0;37m[${DC_ORO_NAME}] Database: 127.0.0.1:${DC_ORO_PORT_MYSQL}\033[0m\n"
@@ -526,7 +526,7 @@ if echo ${args[0]} | grep -i 'export\|dump' | grep -i 'db\|database' > /dev/null
   DB_DUMP=$DC_ORO_APPDIR/database-$(date +'%Y%m%d%H%M%S').sql.gz
   DB_DUMP_BASENAME=$(echo "${DB_DUMP##*/}")
   touch "${DB_DUMP}"
-  if [[ $DC_ORO_DATABASE_SCHEMA == "pgsql" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgres" ]];then
+  if [[ $DC_ORO_DATABASE_SCHEMA == "pgsql" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgres" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgresql" ]];then
     DB_EXPORT_CMD="PGPASSWORD=\$DC_ORO_DATABASE_PASSWORD pg_dump -Fp --clean --if-exists -h \$DC_ORO_DATABASE_HOST -p \$DC_ORO_DATABASE_PORT -U \$DC_ORO_DATABASE_USER -d \$DC_ORO_DATABASE_DBNAME"
   elif [[ $DC_ORO_DATABASE_SCHEMA == "mariadb" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "mysql" ]];then
     DB_EXPORT_CMD="MYSQL_PWD=\$DC_ORO_DATABASE_PASSWORD mysqldump --no-tablespaces --column-statistics=0 --set-gtid-purged=OFF --quick --max-allowed-packet=16M --disable-keys --hex-blob --no-autocommit --insert-ignore --skip-lock-tables --single-transaction -h\$DC_ORO_DATABASE_HOST -P\$DC_ORO_DATABASE_PORT -u\$DC_ORO_DATABASE_USER \$DC_ORO_DATABASE_DBNAME | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/DEFINER=CURRENT_USER \*/'"
