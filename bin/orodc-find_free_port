@@ -82,7 +82,7 @@ find_free_port() {
       if [[ $found -eq 0 ]]; then
         break
       fi
-    done < <(docker ps -a --format '{{.Names}} {{.Ports}}' | grep -v k8s_)
+    done < <(docker ps -a --format '{{.Names}} {{.Ports}}' | grep -v '^k8s_')
 
     return $found
   }
