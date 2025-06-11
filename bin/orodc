@@ -148,7 +148,7 @@ parse_dsn_uri() {
     rest="${rest%%\?*}"
   fi
 
-  local user="" password="" host="" port="" dbname=""
+  local user="app" password="app" host="" port="" dbname=""
 
   # Special case: SQLite
   if [[ "$schema" == "sqlite" ]]; then
