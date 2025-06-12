@@ -365,17 +365,17 @@ services:
         max-size: "10m"
 
   search:
-    image: '${DC_ORO_ELASTICSEARCH_IMAGE:-docker.elastic.co/elasticsearch/elasticsearch}:${DC_ORO_ELASTICSEARCH_VERSION:-8.9.1}'
+    image: '${DC_ORO_ELASTICSEARCH_IMAGE:-elasticsearch}:${DC_ORO_ELASTICSEARCH_VERSION:-8.16.6}'
     hostname: search.${DC_ORO_NAME:-unnamed}.docker.local
     container_name: ${DC_ORO_NAME:-unnamed}_search
     volumes:
       - "search-data:/usr/share/elasticsearch/data:delegated"
     environment:
-      ES_JAVA_OPTS: '${ES_JAVA_OPTS:--Xms256m -Xmx2048m}'
-      ELASTIC_PASSWORD: elastic
+      ES_JAVA_OPTS: '${ES_JAVA_OPTS:-Xms64m -Xmx2048m}'
+      cluster.name: 'search.${DC_ORO_NAME:-unnamed}.docker.local'
       discovery.type: 'single-node'
-      xpack.security.enabled: false
-      bootstrap_memory_lock: true
+      bootstrap_memory_lock: 'false'
+      xpack.security.enabled: 'false'
     ports:
       - "${DC_ORO_SEARCH_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_SEARCH:-9200}:9200"
     restart: always
