@@ -23,6 +23,8 @@ services:
         PHP_UID: "${DC_ORO_PHP_UID:-1000}"
         PHP_GID: "${DC_ORO_PHP_GID:-1000}"
         COMPOSER_VERSION: "${DC_ORO_COMPOSER_VERSION:-2}"
+    tmpfs:
+      - /tmp:rw,size=256m
     user: "${DC_ORO_USER_NAME:-developer}"
     command: php-fpm -R
     volumes:
@@ -100,6 +102,8 @@ services:
         PHP_GID: "${DC_ORO_PHP_GID:-1000}"
         COMPOSER_VERSION: "${DC_ORO_COMPOSER_VERSION:-2}"
     user: "${DC_ORO_USER_NAME:-developer}"
+    tmpfs:
+      - /tmp:rw,size=256m
     volumes:
       - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
       - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
@@ -488,6 +492,8 @@ services:
         PHP_UID: "${DC_ORO_PHP_UID:-1000}"
         PHP_GID: "${DC_ORO_PHP_GID:-1000}"
         COMPOSER_VERSION: "${DC_ORO_COMPOSER_VERSION:-2}"
+    tmpfs:
+      - /tmp:rw,size=256m
     user: "root"
     command: docker-sshd
     volumes:
