@@ -371,7 +371,7 @@ services:
     volumes:
       - "search-data:/usr/share/elasticsearch/data:delegated"
     environment:
-      ES_JAVA_OPTS: '${ES_JAVA_OPTS:"-Xms64m -Xmx2048m"}'
+      ES_JAVA_OPTS: "${ES_JAVA_OPTS:-'-Xmx2048m'}"
       cluster.name: 'search.${DC_ORO_NAME:-unnamed}.docker.local'
       discovery.type: 'single-node'
       bootstrap_memory_lock: 'false'
