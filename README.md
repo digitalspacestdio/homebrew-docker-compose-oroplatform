@@ -163,6 +163,6 @@ Important options:
 - **DC_ORO_NODE_VERSION** - Node.js docker tag (`18`, `20`, `22`)
 - **DC_ORO_MYSQL_IMAGE** - MySQL docker tag (not recommended)
 - **DC_ORO_PGSQL_VERSION** - PostgreSQL docker tag (default: `15.1`)
-- **DC_ORO_ELASTICSEARCH_VERSION** - Elasticsearch docker tag (default: `8.16.6`)
+- **DC_ORO_ELASTICSEARCH_VERSION** - Elasticsearch docker tag (default: `8.10.3`)
 - **DC_ORO_NAME** - Project name (defaults to directory name)
 - **DC_ORO_PORT_PREFIX** - Port prefix (default `302`)
