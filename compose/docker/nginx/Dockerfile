@@ -12,7 +12,7 @@ ARG nginx_gid=1000
 # The -o switch allows reusing an existing user id
 RUN usermod -u $nginx_uid -o www-data && groupmod -g $nginx_gid -o www-data
 COPY nginx.conf /etc/nginx/nginx.conf
-COPY --chmod=+x entrypoint.sh /usr/local/bin/nginx-entrypoint
+COPY --chmod=0755 entrypoint.sh /usr/local/bin/nginx-entrypoint
 
 ENTRYPOINT ["nginx-entrypoint"]
 CMD ["nginx", "-g", "daemon off;"]

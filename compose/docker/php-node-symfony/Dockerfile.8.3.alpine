@@ -163,12 +163,12 @@ RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
 
 RUN mkdir -p /var/run/php
 
-COPY --chmod=+x docker-healthcheck.sh /usr/local/bin/docker-healthcheck
-COPY --chmod=+x docker-entrypoint.sh /usr/local/bin/docker-entrypoint
-COPY --chmod=+x docker-sshd.sh /usr/local/bin/docker-sshd
+COPY --chmod=0755 docker-healthcheck.sh /usr/local/bin/docker-healthcheck
+COPY --chmod=0755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint
+COPY --chmod=0755 docker-sshd.sh /usr/local/bin/docker-sshd
 
-COPY --chmod=+x docker-psql.sh /usr/local/bin/psql
-COPY --chmod=+x docker-mysql.sh /usr/local/bin/mysql
+COPY --chmod=0755 docker-psql.sh /usr/local/bin/psql
+COPY --chmod=0755 docker-mysql.sh /usr/local/bin/mysql
 
 ENTRYPOINT ["docker-entrypoint"]
 
