@@ -298,9 +298,20 @@ export DC_ORO_COMPOSER_AUTH=${COMPOSER_AUTH}
 if ${DOCKER_BIN} system info --format '{{.SecurityOptions}}' | grep "name=rootless" > /dev/null 2>&1; then
   # Use root user in the rootless mode
   export DC_ORO_USER_NAME="root"
+  export DC_ORO_USER_GROUP="root"
+  export DC_ORO_USER_UID=0
+  export DC_ORO_USER_GID=0
 else
   export DC_ORO_USER_NAME="developer"
+  export DC_ORO_USER_GROUP="developer"
+  export DC_ORO_USER_UID=$UID
+  export DC_ORO_USER_GID=$GID
 fi
+
+export DC_ORO_PHP_USER_NAME=${DC_ORO_USER_NAME}
+export DC_ORO_PHP_USER_GROUP=${DC_ORO_USER_GROUP}
+export DC_ORO_PHP_USER_UID=${DC_ORO_USER_UID}
+export DC_ORO_PHP_USER_GID=${DC_ORO_USER_GID}
 
 NETWORK_NAME="dc_shared_net"
 # Check if the Docker network already exists
@@ -310,7 +321,6 @@ if ! docker network ls --format '{{.Name}}' | grep -qw "$NETWORK_NAME"; then
 else
   >&2 echo -e "\033[36m==> Docker network '$NETWORK_NAME' already exists\033[0m"
 fi
-
 
 if [[ -z $DC_ORO_MODE ]] && [[ "$OSTYPE" == "darwin"* ]]; then
   export DC_ORO_MODE="mutagen"
