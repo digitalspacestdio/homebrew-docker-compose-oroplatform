@@ -64,6 +64,7 @@ RUN apk add --no-cache \
     postgresql-client \
     mysql-client \
     util-linux \
+    patch \
   ;
 
 ARG REDIS_VERSION="6.2.9"
