@@ -1,11 +1,9 @@
 class OrodcGo < Formula
   desc "Oro Docker Compose CLI utility (Golang version)"
   homepage "https://github.com/zelpex/homebrew-docker-compose-oroplatform"
-  url "https://github.com/zelpex/homebrew-docker-compose-oroplatform.git",
-      branch: "golang-based"
+  url "file://#{Dir.pwd}", using: :git, branch: "golang-based"
   version "0.7.24"
   license "MIT"
-  head "https://github.com/zelpex/homebrew-docker-compose-oroplatform.git", branch: "golang-based"
 
   depends_on "go" => :build
 
