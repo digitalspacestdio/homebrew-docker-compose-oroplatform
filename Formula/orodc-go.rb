@@ -9,6 +9,7 @@ class OrodcGo < Formula
 
   def install
     system "go", "build", *std_go_args(output: bin/"orodc-go")
+    pkgshare.install "compose" if File.directory?("compose")
   end
 
   def caveats
