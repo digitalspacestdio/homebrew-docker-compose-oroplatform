@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 
+	"github.com/boykore/orodc-go/internal/config"
 	"github.com/spf13/cobra"
 )
 
@@ -14,40 +14,14 @@ var upCmd = &cobra.Command{
 	Short: "Start the Oro environment (docker-compose up)",
 	Args:  cobra.ArbitraryArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		projectDir, err := os.Getwd()
+		// Setup environment and get compose file paths
+		composeArgs, err := config.SetupEnvironment()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "❌ Failed to get current directory: %v\n", err)
+			fmt.Fprintf(os.Stderr, "❌ Environment setup failed: %v\n", err)
 			os.Exit(1)
 		}
 
-		projectName := filepath.Base(projectDir)
-		configDir := filepath.Join(os.Getenv("HOME"), ".orodc", projectName)
-
-		// Copy compose/ from Homebrew pkgshare to configDir (only if not exists)
-		composeSource := "/opt/homebrew/share/orodc-go/compose" // change if on Intel
-		if _, err := os.Stat(configDir); os.IsNotExist(err) {
-			fmt.Printf("📦 Copying compose/ files to: %s\n", configDir)
-			if err := os.MkdirAll(configDir, 0755); err != nil {
-				fmt.Fprintf(os.Stderr, "❌ Failed to create config dir: %v\n", err)
-				os.Exit(1)
-			}
-			copyCmd := exec.Command("rsync", "-a", composeSource+"/", configDir+"/")
-			copyCmd.Stdout = os.Stdout
-			copyCmd.Stderr = os.Stderr
-			if err := copyCmd.Run(); err != nil {
-				fmt.Fprintf(os.Stderr, "❌ Failed to copy compose files: %v\n", err)
-				os.Exit(1)
-			}
-		}
-
-		// Build docker compose args
-		composeFiles := []string{
-			"-f", filepath.Join(configDir, "docker-compose.yml"),
-			"-f", filepath.Join(configDir, "docker-compose-default.yml"),
-			"-f", filepath.Join(configDir, "docker-compose-pgsql.yml"),
-		}
-		dockerArgs := append([]string{"compose"}, composeFiles...)
-		dockerArgs = append(dockerArgs, "up")
+		dockerArgs := append(composeArgs, "up")
 		dockerArgs = append(dockerArgs, args...)
 
 		fmt.Println("🐳 Running:", "docker", dockerArgs)

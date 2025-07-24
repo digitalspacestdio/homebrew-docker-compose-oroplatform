@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 
+	"github.com/boykore/orodc-go/internal/config"
 	"github.com/spf13/cobra"
 )
 
@@ -25,9 +26,10 @@ func init() {
 }
 
 func runInstall() {
-	appDir, err := os.Getwd()
+	// Setup environment and get compose file paths
+	composeArgs, err := config.SetupEnvironment()
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "❌ Failed to detect working directory: %v\n", err)
+		fmt.Fprintf(os.Stderr, "❌ Environment setup failed: %v\n", err)
 		os.Exit(1)
 	}
 
@@ -36,11 +38,13 @@ func runInstall() {
 
 	// Clear cache
 	fmt.Println("🧹 Clearing var/cache...")
+	appDir, _ := os.Getwd()
 	_ = exec.Command("rm", "-rf", appDir+"/var/cache").Run()
 
 	// Run composer install
 	fmt.Println("📦 Running composer install...")
-	runCommand("docker", "compose", "run", "--rm", "cli", "composer", "install")
+	composerArgs := append(composeArgs, "run", "--rm", "cli", "composer", "install")
+	runCommand("docker", composerArgs...)
 
 	// Run oro:install
 	fmt.Println("⚙️  Running oro:install...")
@@ -48,8 +52,8 @@ func runInstall() {
 	if withoutDemo {
 		sampleData = "n"
 	}
-	installArgs := []string{
-		"compose", "run", "--rm", "cli", "php", "bin/console",
+
+	installArgs := append(composeArgs, "run", "--rm", "cli", "php", "bin/console",
 		"--env=prod", "--timeout=1800", "oro:install",
 		"--language=en",
 		"--formatting-code=en_US",
@@ -60,8 +64,8 @@ func runInstall() {
 		"--user-lastname=Doe",
 		"--user-password=$ecretPassw0rd",
 		fmt.Sprintf("--application-url=https://%s.docker.local/", os.Getenv("DC_ORO_NAME")),
-		"--sample-data=" + sampleData,
-	}
+		"--sample-data="+sampleData,
+	)
 	runCommand("docker", installArgs...)
 	fmt.Println("✅ Installation finished!")
 }
