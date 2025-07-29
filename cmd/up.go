@@ -88,6 +88,12 @@ func parseArguments(input []string) ArgumentSet {
 }
 
 func runUp(args []string) {
+	// Show the OroDC header for important commands
+	fmt.Print(GetOroDCHeader())
+	fmt.Println("")
+	fmt.Println("🚀 Starting OroPlatform development environment...")
+	fmt.Println("")
+
 	// Setup environment and get compose file paths
 	composeArgs, err := config.SetupEnvironment()
 	if err != nil {
