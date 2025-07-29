@@ -56,6 +56,12 @@ Features:
 
 Perfect for OroPlatform developers who want a streamlined Docker-based workflow!`,
 	Run: func(cmd *cobra.Command, args []string) {
+		// Check if version flag was used
+		if versionFlag, _ := cmd.Flags().GetBool("version"); versionFlag {
+			showVersionInfo()
+			return
+		}
+
 		fmt.Print(GetOroDCLogo())
 		fmt.Println("\n")
 		fmt.Println("🚀 Welcome to OroDC - OroPlatform Development Environment Manager!")
@@ -68,26 +74,31 @@ Perfect for OroPlatform developers who want a streamlined Docker-based workflow!
 	},
 }
 
+// showVersionInfo displays version information (shared between version command and -v flag)
+func showVersionInfo() {
+	fmt.Print(GetOroDCLogo())
+	fmt.Println("\n")
+
+	// Get version info from centralized system
+	versionInfo := config.GetVersionInfo()
+
+	fmt.Println("📦 OroDC (Oro Docker Compose) - Golang Edition")
+	fmt.Printf("🏷️  Version: %s\n", versionInfo["version"])
+	fmt.Printf("🔧 Git Commit: %s\n", versionInfo["gitCommit"])
+	fmt.Printf("📅 Build Date: %s\n", versionInfo["buildDate"])
+	fmt.Println("🐳 Docker Compose support: ✅")
+	fmt.Println("🔧 OroPlatform support: ✅")
+	fmt.Println("⚡ PHP 8.x support: ✅")
+	fmt.Println("")
+	fmt.Println("💻 Built with Go and Cobra CLI framework")
+	fmt.Println("🚀 Equivalent functionality to bash version")
+}
+
 var versionCmd = &cobra.Command{
 	Use:   "version",
 	Short: "Show OroDC version information",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Print(GetOroDCLogo())
-		fmt.Println("\n")
-
-		// Get version info from centralized system
-		versionInfo := config.GetVersionInfo()
-
-		fmt.Println("📦 OroDC (Oro Docker Compose) - Golang Edition")
-		fmt.Printf("🏷️  Version: %s\n", versionInfo["version"])
-		fmt.Printf("🔧 Git Commit: %s\n", versionInfo["gitCommit"])
-		fmt.Printf("📅 Build Date: %s\n", versionInfo["buildDate"])
-		fmt.Println("🐳 Docker Compose support: ✅")
-		fmt.Println("🔧 OroPlatform support: ✅")
-		fmt.Println("⚡ PHP 8.x support: ✅")
-		fmt.Println("")
-		fmt.Println("💻 Built with Go and Cobra CLI framework")
-		fmt.Println("🚀 Equivalent functionality to bash version")
+		showVersionInfo()
 	},
 }
 
@@ -99,5 +110,8 @@ func Execute() {
 }
 
 func init() {
+	// Add -v/--version flag to root command
+	rootCmd.Flags().BoolP("version", "v", false, "Show version information")
+
 	rootCmd.AddCommand(versionCmd)
 }
