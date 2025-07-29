@@ -29,6 +29,7 @@ services:
     command: php-fpm -R
     volumes:
       - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
+      - "/dev/null:${DC_ORO_APPDIR:-/var/www}/.env-app.local:ro"
       - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
       - "home-root:/root"
       - "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/msmtprc:/home/${DC_ORO_PHP_USER_NAME:-developer}/.msmtprc:ro"
@@ -106,6 +107,7 @@ services:
       - /tmp:rw,size=256m
     volumes:
       - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
+      - "/dev/null:${DC_ORO_APPDIR:-/var/www}/.env-app.local:ro"
       - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
       - "home-root:/root"
       - "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro"
@@ -183,7 +185,8 @@ services:
     user: "${DC_ORO_USER_NAME:-developer}"
     command: php bin/console oro:message-queue:consume -vv
     volumes:
-      - "appcode:${DC_ORO_APPDIR:-/var/www}:consisten"
+      - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
+      - "/dev/null:${DC_ORO_APPDIR:-/var/www}/.env-app.local:ro"
       - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
       - "home-root:/root"
       - "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro"
@@ -261,6 +264,7 @@ services:
     command: php bin/console gos:websocket:server
     volumes:
       - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
+      - "/dev/null:${DC_ORO_APPDIR:-/var/www}/.env-app.local:ro"
       - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
       - "home-root:/root"
       - "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro"
@@ -408,6 +412,7 @@ services:
       - '${DC_ORO_NGINX_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_NGINX:-80}:80'
     volumes:
       - "appcode:${DC_ORO_APPDIR:-/var/www}:ro"
+      - "/dev/null:${DC_ORO_APPDIR:-/var/www}/.env-app.local:ro"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     networks:
       - 'shared'
@@ -498,6 +503,7 @@ services:
     command: docker-sshd
     volumes:
       - "appcode:${DC_ORO_APPDIR:-/var/www}"
+      - "/dev/null:${DC_ORO_APPDIR:-/var/www}/.env-app.local:ro"
       - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
       - "home-root:/root"
       - "ssh-hostkeys:/etc/ssh/hostkeys"

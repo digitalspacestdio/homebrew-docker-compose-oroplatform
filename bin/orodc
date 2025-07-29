@@ -366,7 +366,7 @@ if [[ $DC_ORO_MODE == "mutagen" ]] || [[ $DC_ORO_MODE == "ssh" ]]; then
     ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
       ${DOCKER_BIN} volume create "${DC_ORO_NAME}_appcode"  > /dev/null
       >&2 echo -e "\033[36m==> Copying source code to the '${DC_ORO_NAME}_appcode' docker valume\033[0m"
-      ${DOCKER_COMPOSE_BIN_CMD} up -d ssh
+      bash -c "${DOCKER_COMPOSE_BIN_CMD} up -d ssh"
       SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
       SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
       if [[ 0 -eq $(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -i "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" -p ${SSH_PORT} ${ORO_DC_SSH_ARGS} ${DC_ORO_USER_NAME}@${SSH_HOST} sh -c 'ls "'${DC_ORO_APPDIR}'/"' | wc -l) ]]; then
@@ -391,9 +391,9 @@ if [[ $DC_ORO_MODE == "mutagen" ]]; then
     WAIT_SYNC=""
   elif ! echo ${args[0]} | grep -i '^\(build\|pull\|config\)' > /dev/null; then
     if [[ "0" -eq $(${DOCKER_COMPOSE_BIN_CMD} ps -q ssh  2> /dev/null | wc -l 2> /dev/null) ]]; then
-      ${DOCKER_COMPOSE_BIN_CMD} up -d ssh
+      bash -c "${DOCKER_COMPOSE_BIN_CMD} up -d ssh"
     fi
-    DOCKER_CONTAINER_NAME_MUTAGEN=$(${DOCKER_BIN} inspect -f '{{.Name}}' $(${DOCKER_COMPOSE_BIN_CMD} ps -q ssh) | cut -c2-)
+    DOCKER_CONTAINER_NAME_MUTAGEN=$(${DOCKER_BIN} inspect -f '{{.Name}}' $(bash -c "${DOCKER_COMPOSE_BIN_CMD} ps -q ssh") | cut -c2-)
     if ! mutagen sync list | grep -i "Name: ${MUTAGEN_SESSION_NAME}" > /dev/null 2>&1; then
       mutagen sync create --sync-mode=two-way-resolved \
       --scan-mode=accelerated \
@@ -497,6 +497,7 @@ if echo ${args[0]} | grep -i 'import' | grep -i 'db\|database' > /dev/null; then
 
   >&2 echo "/* Starting import of the database dump... */"
   >&2 echo "/* From: $DB_DUMP */"
+  set -x
   ${DOCKER_COMPOSE_RUN_CMD} "${left_flags[@]}" "${left_options[@]}" -v "${DB_DUMP}:/${DB_DUMP_BASENAME}" database-cli bash -c "$DB_IMPORT_CMD"
   exit 0
 fi
@@ -507,7 +508,6 @@ if echo ${args[0]} | grep -i 'set\|update' | grep -i 'url\|uri' > /dev/null; the
   ${DOCKER_COMPOSE_RUN_CMD} -q cli bash -c "php bin/console oro:config:update oro_website.secure_url ${URL}" || true
   ${DOCKER_COMPOSE_RUN_CMD} -q cli bash -c "php bin/console oro:config:update oro_ui.application_url ${URL}" || true
   ${DOCKER_COMPOSE_RUN_CMD} -q cli bash -c "php bin/console oro:config:update oro_website.url ${URL}" || true
-  set +x
   exit 0
 fi
 
@@ -515,15 +515,13 @@ if echo ${args[0]} | grep -i 'cache' | grep -i 'cl' > /dev/null; then
   URL=${args[1]:-"https://${DC_ORO_NAME}.docker.local"}
   set -x
   ${DOCKER_COMPOSE_RUN_CMD} -q cli bash -c "php bin/console cache:cl" || true
-  set +x
   exit 0
 fi
 
 if echo ${args[0]} | grep -i 'update' | grep -i 'platform' > /dev/null; then
   URL=${args[1]:-"https://${DC_ORO_NAME}.docker.local"}
   set -x
-  ${DOCKER_COMPOSE_RUN_CMD} -q cli bash -c "php bin/console oro:platform:update --force" || true
-  set +x
+  ${DOCKER_COMPOSE_RUN_CMD} -q cli bash -c "rm -rf var/cache/* || true; php bin/console oro:platform:update --force" || true
   exit 0
 fi
 
@@ -531,7 +529,6 @@ if echo ${args[0]} | grep -i 'composer' | grep -i 'install' > /dev/null; then
   URL=${args[1]:-"https://${DC_ORO_NAME}.docker.local"}
   set -x
   ${DOCKER_COMPOSE_RUN_CMD} -q cli bash -c "composer install" || true
-  set +x
   exit 0
 fi
 
@@ -607,9 +604,9 @@ fi
 
 if [[ ${args[0]} == "purge" ]]; then
   if [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
-    ${DOCKER_COMPOSE_BIN} "${left_flags[@]}" "${left_options[@]}" -f ${DC_ORO_CONFIG_DIR}/compose.yml down -v
+    bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} -f ${DC_ORO_CONFIG_DIR}/compose.yml down -v"
   else
-    ${DOCKER_COMPOSE_BIN_CMD} "${left_flags[@]}" "${left_options[@]}" down -v
+    bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} down -v"
   fi
 
   ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null && {
@@ -626,8 +623,8 @@ fi
 
 if [[ ${args[0]} == "down" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]] && [[ -s "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/compose.yml"
-  exec ${DOCKER_COMPOSE_BIN_CMD} "${left_flags[@]}" "${left_options[@]}" "${args[@]}" "${right_flags[@]}" "${right_options[@]}"
+  exec "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} ${args[@]} ${right_flags[@]} ${right_options[@]}"
 fi
 
-${DOCKER_COMPOSE_BIN_CMD} "${left_flags[@]}" "${left_options[@]}" config > "${DC_ORO_CONFIG_DIR}/compose.yml"
-exec ${DOCKER_COMPOSE_BIN_CMD} "${left_flags[@]}" "${left_options[@]}" "${args[@]}" "${right_flags[@]}" "${right_options[@]}"
+bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} config" > "${DC_ORO_CONFIG_DIR}/compose.yml"
+exec "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} ${args[@]} ${right_flags[@]} ${right_options[@]}"
