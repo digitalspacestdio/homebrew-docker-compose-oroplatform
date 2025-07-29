@@ -570,7 +570,10 @@ func detectNodeVersionFromProject(projectDir string) {
 func copyComposeFiles(configDir string) ([]string, error) {
 	// Copy compose/ from Homebrew pkgshare to configDir (only if not exists)
 	composeSource := "/opt/homebrew/share/orodc-go/compose" // change if on Intel
-	if _, err := os.Stat(configDir); os.IsNotExist(err) {
+	dockerComposeFile := filepath.Join(configDir, "docker-compose.yml")
+
+	// Check if docker-compose.yml exists instead of checking the entire directory
+	if _, err := os.Stat(dockerComposeFile); os.IsNotExist(err) {
 		fmt.Printf("📦 Copying compose/ files to: %s\n", configDir)
 		if err := os.MkdirAll(configDir, 0755); err != nil {
 			return nil, fmt.Errorf("failed to create config dir: %w", err)
