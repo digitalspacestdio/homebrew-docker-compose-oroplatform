@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/boykore/orodc-go/internal/config"
 	"github.com/spf13/cobra"
 )
 
@@ -73,8 +74,14 @@ var versionCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		fmt.Print(GetOroDCLogo())
 		fmt.Println("\n")
+
+		// Get version info from centralized system
+		versionInfo := config.GetVersionInfo()
+
 		fmt.Println("📦 OroDC (Oro Docker Compose) - Golang Edition")
-		fmt.Println("🏷️  Version: 1.0.0")
+		fmt.Printf("🏷️  Version: %s\n", versionInfo["version"])
+		fmt.Printf("🔧 Git Commit: %s\n", versionInfo["gitCommit"])
+		fmt.Printf("📅 Build Date: %s\n", versionInfo["buildDate"])
 		fmt.Println("🐳 Docker Compose support: ✅")
 		fmt.Println("🔧 OroPlatform support: ✅")
 		fmt.Println("⚡ PHP 8.x support: ✅")

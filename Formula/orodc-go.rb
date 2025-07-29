@@ -2,7 +2,7 @@ class OrodcGo < Formula
   desc "Oro Docker Compose CLI utility (Golang version)"
   homepage "https://github.com/zelpex/homebrew-docker-compose-oroplatform"
   url "file://#{Dir.pwd}", using: :git, branch: "golang-based"
-  version "0.7.24"
+  version File.read("VERSION").strip
   license "MIT"
 
   depends_on "go" => :build
@@ -10,6 +10,7 @@ class OrodcGo < Formula
   def install
     system "go", "build", *std_go_args(output: bin/"orodc-go")
     pkgshare.install "compose" if File.directory?("compose")
+    pkgshare.install "VERSION" if File.exist?("VERSION")
   end
 
   def caveats
