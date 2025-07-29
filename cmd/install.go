@@ -14,8 +14,22 @@ var withoutDemo bool
 var installCmd = &cobra.Command{
 	Use:   "install",
 	Short: "Run OroPlatform installation (with or without demo data)",
+	Long: `Install OroPlatform with all required dependencies and configuration.
+
+This command will:
+• Set up Docker containers (PHP, database, search, etc.)
+• Install Composer dependencies  
+• Run oro:install with sample data
+• Configure database and application settings
+• Generate OAuth 2.0 keys for API access
+
+Use --without-demo flag to install without sample data.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("🔧 Starting Oro installation...")
+		// Show the OroDC header
+		fmt.Print(GetOroDCHeader())
+		fmt.Println("")
+		fmt.Println("🔧 Starting OroPlatform installation...")
+		fmt.Println("")
 		runInstall()
 	},
 }
