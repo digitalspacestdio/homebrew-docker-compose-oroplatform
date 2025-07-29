@@ -497,6 +497,7 @@ if echo ${args[0]} | grep -i 'import' | grep -i 'db\|database' > /dev/null; then
 
   >&2 echo "/* Starting import of the database dump... */"
   >&2 echo "/* From: $DB_DUMP */"
+  set -x
   ${DOCKER_COMPOSE_RUN_CMD} "${left_flags[@]}" "${left_options[@]}" -v "${DB_DUMP}:/${DB_DUMP_BASENAME}" database-cli bash -c "$DB_IMPORT_CMD"
   exit 0
 fi
@@ -507,7 +508,6 @@ if echo ${args[0]} | grep -i 'set\|update' | grep -i 'url\|uri' > /dev/null; the
   ${DOCKER_COMPOSE_RUN_CMD} -q cli bash -c "php bin/console oro:config:update oro_website.secure_url ${URL}" || true
   ${DOCKER_COMPOSE_RUN_CMD} -q cli bash -c "php bin/console oro:config:update oro_ui.application_url ${URL}" || true
   ${DOCKER_COMPOSE_RUN_CMD} -q cli bash -c "php bin/console oro:config:update oro_website.url ${URL}" || true
-  set +x
   exit 0
 fi
 
@@ -515,15 +515,13 @@ if echo ${args[0]} | grep -i 'cache' | grep -i 'cl' > /dev/null; then
   URL=${args[1]:-"https://${DC_ORO_NAME}.docker.local"}
   set -x
   ${DOCKER_COMPOSE_RUN_CMD} -q cli bash -c "php bin/console cache:cl" || true
-  set +x
   exit 0
 fi
 
 if echo ${args[0]} | grep -i 'update' | grep -i 'platform' > /dev/null; then
   URL=${args[1]:-"https://${DC_ORO_NAME}.docker.local"}
   set -x
-  ${DOCKER_COMPOSE_RUN_CMD} -q cli bash -c "php bin/console oro:platform:update --force" || true
-  set +x
+  ${DOCKER_COMPOSE_RUN_CMD} -q cli bash -c "rm -rf var/cache/* || true; php bin/console oro:platform:update --force" || true
   exit 0
 fi
 
@@ -531,7 +529,6 @@ if echo ${args[0]} | grep -i 'composer' | grep -i 'install' > /dev/null; then
   URL=${args[1]:-"https://${DC_ORO_NAME}.docker.local"}
   set -x
   ${DOCKER_COMPOSE_RUN_CMD} -q cli bash -c "composer install" || true
-  set +x
   exit 0
 fi
 
