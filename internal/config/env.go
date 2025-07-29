@@ -592,6 +592,99 @@ func copyComposeFiles(configDir string) ([]string, error) {
 	return composeFiles, nil
 }
 
+// assignProjectPorts assigns unique ports for each service using find-free-port (like bash script)
+func assignProjectPorts(projectName, configDir string) error {
+	fmt.Println("🔌 Assigning unique ports for services...")
+
+	// Port assignments like bash script (lines 284-292)
+	portAssignments := map[string]struct {
+		service   string
+		startPort string
+		envVar    string
+	}{
+		"nginx":    {"nginx", "8080", "DC_ORO_PORT_NGINX"},
+		"xhgui":    {"xhgui", "8081", "DC_ORO_PORT_XHGUI"},
+		"database": {"database", "5432", "DC_ORO_PORT_PGSQL"}, // Will be updated based on schema
+		"search":   {"search", "9200", "DC_ORO_PORT_SEARCH"},
+		"mq":       {"mq", "5672", "DC_ORO_PORT_MQ"},
+		"redis":    {"redis", "6379", "DC_ORO_PORT_REDIS"},
+		"mail":     {"mail", "8025", "DC_ORO_PORT_MAIL_WEBGUI"},
+		"ssh":      {"ssh", "2222", "DC_ORO_PORT_SSH"},
+	}
+
+	// Update database port based on schema
+	databaseSchema := os.Getenv("DC_ORO_DATABASE_SCHEMA")
+	if databaseSchema == "mysql" || databaseSchema == "mariadb" {
+		portAssignments["database"] = struct {
+			service   string
+			startPort string
+			envVar    string
+		}{"database", "3306", "DC_ORO_PORT_MYSQL"}
+	}
+
+	// Get the path to find-free-port command
+	findFreePortPath, err := findOroDCGoPath()
+	if err != nil {
+		fmt.Printf("⚠️ Warning: Could not find orodc-go binary for port assignment: %v\n", err)
+		return nil // Non-fatal, continue without port assignment
+	}
+
+	// Assign ports for each service
+	for name, assignment := range portAssignments {
+		port, err := getFreePort(findFreePortPath, projectName, assignment.service, assignment.startPort, configDir)
+		if err != nil {
+			fmt.Printf("⚠️ Warning: Failed to assign port for %s: %v\n", name, err)
+			continue
+		}
+
+		os.Setenv(assignment.envVar, port)
+		fmt.Printf("🔌 %s: %s (port %s)\n", name, assignment.service, port)
+	}
+
+	return nil
+}
+
+// findOroDCGoPath finds the path to the orodc-go binary
+func findOroDCGoPath() (string, error) {
+	// Try common locations
+	paths := []string{
+		"./orodc-go",                 // Local build
+		"/opt/homebrew/bin/orodc-go", // Homebrew ARM
+		"/usr/local/bin/orodc-go",    // Homebrew Intel
+		filepath.Join(os.Getenv("HOME"), "bin", "orodc-go"),                  // User bin
+		"/Users/andrew/www/dev/homebrew-docker-compose-oroplatform/orodc-go", // Development
+	}
+
+	for _, path := range paths {
+		if _, err := os.Stat(path); err == nil {
+			return path, nil
+		}
+	}
+
+	// Try PATH
+	if path, err := exec.LookPath("orodc-go"); err == nil {
+		return path, nil
+	}
+
+	return "", fmt.Errorf("orodc-go binary not found")
+}
+
+// getFreePort uses the find-free-port command to get an available port
+func getFreePort(oroDCPath, projectName, serviceName, startPort, configDir string) (string, error) {
+	cmd := exec.Command(oroDCPath, "find-free-port", projectName, serviceName, startPort, configDir)
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("find-free-port failed: %w", err)
+	}
+
+	port := strings.TrimSpace(string(output))
+	if port == "" {
+		return "", fmt.Errorf("no port returned")
+	}
+
+	return port, nil
+}
+
 func SetupEnvironment() ([]string, error) {
 	// Get current directory as project directory
 	appDir, err := os.Getwd()
@@ -631,6 +724,11 @@ func SetupEnvironment() ([]string, error) {
 
 	// Set additional environment variables (like bash script)
 	setAdditionalEnvVars()
+
+	// Assign unique ports for all services (like bash script)
+	if err := assignProjectPorts(projectName, configDir); err != nil {
+		fmt.Printf("⚠️ Warning: Port assignment failed: %v\n", err)
+	}
 
 	// Create required Docker network
 	if err := createSharedNetwork(); err != nil {
