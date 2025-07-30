@@ -505,30 +505,30 @@ fi
 if echo ${args[0]} | grep -i 'set\|update' | grep -i 'url\|uri' > /dev/null; then
   URL=${args[1]:-"https://${DC_ORO_NAME}.docker.local"}
   set -x
-  ${DOCKER_COMPOSE_RUN_CMD} -q cli bash -c "php bin/console oro:config:update oro_website.secure_url ${URL}" || true
-  ${DOCKER_COMPOSE_RUN_CMD} -q cli bash -c "php bin/console oro:config:update oro_ui.application_url ${URL}" || true
-  ${DOCKER_COMPOSE_RUN_CMD} -q cli bash -c "php bin/console oro:config:update oro_website.url ${URL}" || true
+  ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "php bin/console oro:config:update oro_website.secure_url ${URL}" || true
+  ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "php bin/console oro:config:update oro_ui.application_url ${URL}" || true
+  ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "php bin/console oro:config:update oro_website.url ${URL}" || true
   exit 0
 fi
 
 if echo ${args[0]} | grep -i 'cache' | grep -i 'cl' > /dev/null; then
   URL=${args[1]:-"https://${DC_ORO_NAME}.docker.local"}
   set -x
-  ${DOCKER_COMPOSE_RUN_CMD} -q cli bash -c "php bin/console cache:cl" || true
+  ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "php bin/console cache:cl" || true
   exit 0
 fi
 
 if echo ${args[0]} | grep -i 'update' | grep -i 'platform' > /dev/null; then
   URL=${args[1]:-"https://${DC_ORO_NAME}.docker.local"}
   set -x
-  ${DOCKER_COMPOSE_RUN_CMD} -q cli bash -c "rm -rf var/cache/* || true; php bin/console oro:platform:update --force" || true
+  ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "rm -rf var/cache/* || true; php bin/console oro:platform:update --force" || true
   exit 0
 fi
 
 if echo ${args[0]} | grep -i 'composer' | grep -i 'install' > /dev/null; then
   URL=${args[1]:-"https://${DC_ORO_NAME}.docker.local"}
   set -x
-  ${DOCKER_COMPOSE_RUN_CMD} -q cli bash -c "composer install" || true
+  ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "composer install" || true
   exit 0
 fi
 
