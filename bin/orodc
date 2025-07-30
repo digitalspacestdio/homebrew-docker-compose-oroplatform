@@ -190,7 +190,9 @@ parse_dsn_uri() {
     host="$rest"
   fi
 
-  [[ "$host" == "localhost" || "$host" == "127.0.0.1" ]] && host="$host_alias"
+  #[[ "$host" == "localhost" || "$host" == "127.0.0.1" ]] && host="$host_alias"
+  # always use container host for services
+  host="$host_alias"
 
   # Reconstruct URI only if it's not a simple scheme:
   local clean_uri=""
