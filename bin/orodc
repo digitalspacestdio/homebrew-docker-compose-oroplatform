@@ -67,7 +67,7 @@ RSYNC_BIN=$(brew --prefix rsync)/bin/rsync
 DOCKER_BIN="${DOCKER_BIN-$(which docker)}";
 DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN-$(which docker) compose}";
 DOCKER_COMPOSE_BIN_CMD=${DOCKER_COMPOSE_BIN};
-DOCKER_COMPOSE_VERSION=$($DOCKER_COMPOSE_BIN_CMD version | grep '[0-9]\+\.[0-9]\+\.[0-9]\+' -o | awk -F. '{ print $1 }')
+DOCKER_COMPOSE_VERSION=$($DOCKER_COMPOSE_BIN_CMD version | grep '[0-9]\+\.[0-9]\+\.[0-9]\+' -o | head -1 |awk -F. '{ print $1 }')
 if [[ ! -d "${DC_ORO_CONFIG_DIR}" ]]; then
     mkdir -p "${DC_ORO_CONFIG_DIR}"
 fi
@@ -441,7 +441,7 @@ if [[ -f "$DC_ORO_APPDIR/.nvmrc" ]] && [[ -z $DC_ORO_NODE_VERSION ]]; then
   >&2 echo -e "\033[36m==> Found .nvmrc with following version: $DC_ORO_NODE_VERSION\033[0m"
 fi
 
-if [[ $DOCKER_COMPOSE_VERSION -gt 1 ]]; then
+if [[ ${DOCKER_COMPOSE_VERSION} -gt 1 ]]; then
   DOCKER_COMPOSE_RUN_CMD="${DOCKER_COMPOSE_BIN_CMD} run -i --rm"
 else
   DOCKER_COMPOSE_RUN_CMD="${DOCKER_COMPOSE_BIN_CMD} run --rm"
@@ -620,7 +620,7 @@ if [[ ${args[0]} == "purge" ]]; then
 
   exit 0
 fi
-
+set -x
 if [[ ${args[0]} == "down" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]] && [[ -s "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/compose.yml"
   exec bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} ${args[@]} ${right_flags[@]} ${right_options[@]}"
