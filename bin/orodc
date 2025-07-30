@@ -557,6 +557,11 @@ if echo ${args[0]} | grep -i '^psql' > /dev/null; then
   exec bash -c "${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} database-cli bash -c \"$PSQL_CMD\""
 fi
 
+if echo ${args[0]} | grep -i '^database-cli' > /dev/null; then
+  PSQL_CMD="PGPASSWORD=\$DC_ORO_DATABASE_PASSWORD bash"
+  exec bash -c "${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} database-cli bash -c \"$PSQL_CMD\""
+fi
+
 if [ $# -eq 0 ] || [ ${args[0]} = "ssh" ]; then
   SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
   SSH_PORT=$(${DOCKER_BIN} inspect "$(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }')" | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
