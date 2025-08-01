@@ -89,6 +89,24 @@ func runInstall() {
 	composerArgs := append(composeArgs, "run", "--rm", "cli", "composer", "install")
 	runCommand("docker", composerArgs...)
 
+	// Generate application URL like bash version: https://{projectname}.docker.local
+	projectName := os.Getenv("DC_ORO_NAME")
+	applicationURL := fmt.Sprintf("https://%s.docker.local/", projectName)
+
+	// Add domain to hosts file
+	fmt.Printf("🌐 Application URL will be: %s\n", applicationURL)
+	fmt.Printf("📝 Adding %s.docker.local to /etc/hosts (you may need to enter your password)\n", projectName)
+
+	// Add domain to hosts file automatically
+	hostEntry := fmt.Sprintf("127.0.0.1 %s.docker.local", projectName)
+	addHostsCmd := exec.Command("bash", "-c", fmt.Sprintf("grep -q '%s.docker.local' /etc/hosts || echo '%s' | sudo tee -a /etc/hosts", projectName, hostEntry))
+	addHostsCmd.Stdout = os.Stdout
+	addHostsCmd.Stderr = os.Stderr
+	if err := addHostsCmd.Run(); err != nil {
+		fmt.Printf("⚠️ Warning: Failed to add hosts entry automatically: %v\n", err)
+		fmt.Printf("💡 Please manually add this line to /etc/hosts: %s\n", hostEntry)
+	}
+
 	// Run oro:install
 	fmt.Println("⚙️  Running oro:install...")
 	sampleData := "y"
@@ -154,7 +172,33 @@ func runInstall() {
 		fmt.Printf("✅ OAuth keys generated successfully\n")
 	}
 
+	// Show completion message with URLs and ports (like bash version)
+	fmt.Println("")
+	fmt.Printf("🌐 Your OroPlatform application is available at:\n")
+	fmt.Printf("   Primary: %s\n", applicationURL)
+	fmt.Printf("   HTTP: http://%s.docker.local:%s (redirects to HTTPS)\n", projectName, os.Getenv("DC_ORO_PORT_NGINX"))
+	fmt.Printf("   Direct: http://localhost:%s (may redirect to domain)\n", os.Getenv("DC_ORO_PORT_NGINX"))
+	fmt.Println("")
+	fmt.Printf("🔧 Additional services:\n")
+	fmt.Printf("   📧 MailHog: http://localhost:%s\n", os.Getenv("DC_ORO_PORT_MAIL_WEBGUI"))
+	fmt.Printf("   🔍 XHProf: http://localhost:%s\n", os.Getenv("DC_ORO_PORT_XHGUI"))
+	fmt.Printf("   🔌 SSH: ssh -p %s developer@localhost\n", os.Getenv("DC_ORO_PORT_SSH"))
+	fmt.Printf("   📊 Database: localhost:%s\n", getDatabasePort())
+	fmt.Printf("   🔎 Search: http://localhost:%s\n", os.Getenv("DC_ORO_PORT_SEARCH"))
+	fmt.Println("")
+	fmt.Printf("👤 Login credentials:\n")
+	fmt.Printf("   Username: admin\n")
+	fmt.Printf("   Password: $ecretPassw0rd\n")
+	fmt.Println("")
 	fmt.Println("✅ Installation finished!")
+}
+
+func getDatabasePort() string {
+	databaseSchema := os.Getenv("DC_ORO_DATABASE_SCHEMA")
+	if databaseSchema == "mysql" || databaseSchema == "mariadb" {
+		return os.Getenv("DC_ORO_PORT_MYSQL")
+	}
+	return os.Getenv("DC_ORO_PORT_PGSQL")
 }
 
 func runCommand(name string, args ...string) {

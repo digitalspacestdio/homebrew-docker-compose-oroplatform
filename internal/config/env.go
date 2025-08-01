@@ -570,7 +570,10 @@ func detectNodeVersionFromProject(projectDir string) {
 func copyComposeFiles(configDir string) ([]string, error) {
 	// Copy compose/ from Homebrew pkgshare to configDir (only if not exists)
 	composeSource := "/opt/homebrew/share/orodc-go/compose" // change if on Intel
-	if _, err := os.Stat(configDir); os.IsNotExist(err) {
+	dockerComposeFile := filepath.Join(configDir, "docker-compose.yml")
+
+	// Check if docker-compose.yml exists instead of checking the entire directory
+	if _, err := os.Stat(dockerComposeFile); os.IsNotExist(err) {
 		fmt.Printf("📦 Copying compose/ files to: %s\n", configDir)
 		if err := os.MkdirAll(configDir, 0755); err != nil {
 			return nil, fmt.Errorf("failed to create config dir: %w", err)
@@ -596,20 +599,27 @@ func copyComposeFiles(configDir string) ([]string, error) {
 func assignProjectPorts(projectName, configDir string) error {
 	fmt.Println("🔌 Assigning unique ports for services...")
 
-	// Port assignments like bash script (lines 284-292)
+	// Set port prefix like bash script (default "301")
+	portPrefix := os.Getenv("DC_ORO_PORT_PREFIX")
+	if portPrefix == "" {
+		portPrefix = "301"
+		os.Setenv("DC_ORO_PORT_PREFIX", portPrefix)
+	}
+
+	// Port assignments like bash script with proper prefix system
 	portAssignments := map[string]struct {
 		service   string
 		startPort string
 		envVar    string
 	}{
-		"nginx":    {"nginx", "8080", "DC_ORO_PORT_NGINX"},
-		"xhgui":    {"xhgui", "8081", "DC_ORO_PORT_XHGUI"},
-		"database": {"database", "5432", "DC_ORO_PORT_PGSQL"}, // Will be updated based on schema
-		"search":   {"search", "9200", "DC_ORO_PORT_SEARCH"},
-		"mq":       {"mq", "5672", "DC_ORO_PORT_MQ"},
-		"redis":    {"redis", "6379", "DC_ORO_PORT_REDIS"},
-		"mail":     {"mail", "8025", "DC_ORO_PORT_MAIL_WEBGUI"},
-		"ssh":      {"ssh", "2222", "DC_ORO_PORT_SSH"},
+		"nginx":    {"nginx", portPrefix + "80", "DC_ORO_PORT_NGINX"},
+		"xhgui":    {"xhgui", portPrefix + "81", "DC_ORO_PORT_XHGUI"},
+		"database": {"database", portPrefix + "32", "DC_ORO_PORT_PGSQL"}, // Will be updated based on schema
+		"search":   {"search", portPrefix + "92", "DC_ORO_PORT_SEARCH"},
+		"mq":       {"mq", portPrefix + "72", "DC_ORO_PORT_MQ"},
+		"redis":    {"redis", portPrefix + "73", "DC_ORO_PORT_REDIS"},
+		"mail":     {"mail", portPrefix + "25", "DC_ORO_PORT_MAIL_WEBGUI"},
+		"ssh":      {"ssh", portPrefix + "22", "DC_ORO_PORT_SSH"},
 	}
 
 	// Update database port based on schema
@@ -619,7 +629,7 @@ func assignProjectPorts(projectName, configDir string) error {
 			service   string
 			startPort string
 			envVar    string
-		}{"database", "3306", "DC_ORO_PORT_MYSQL"}
+		}{"database", portPrefix + "06", "DC_ORO_PORT_MYSQL"}
 	}
 
 	// Get the path to find-free-port command
