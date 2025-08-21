@@ -410,7 +410,7 @@ services:
       - "appcode:${DC_ORO_APPDIR:-/var/www}:ro"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     networks:
-      - 'shared'
+      - 'dc_shared_net'
       - 'default'
     restart: always
     environment:
@@ -418,7 +418,7 @@ services:
       - 'DC_ORO_APPDIR=${DC_ORO_APPDIR:-/var/www}'
     labels:
       - "traefik.enable=true"
-      - "traefik.docker.network=shared"
+      - "traefik.docker.network=dc_shared_net"
       - "traefik.http.middlewares.compress-${DC_ORO_NAME:-unnamed}.compress=true"
       - "traefik.http.middlewares.cors-${DC_ORO_NAME:-unnamed}.headers.accessControlAllowCredentials=true"
       - "traefik.http.middlewares.cors-${DC_ORO_NAME:-unnamed}.headers.accessControlAllowHeaders=*"
@@ -569,9 +569,8 @@ services:
     restart: always
 
 networks:
-  shared:
+  dc_shared_net:
     external: true
-    name: dc_shared_net
 
 volumes:
   appcode:
