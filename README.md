@@ -99,7 +99,7 @@ Updates are delivered via **Rsync** or **Mutagen** (optional).
    ```
 1. **Clone your Oro project**:
    ```bash
-   git clone --single-branch --branch 6.1.0 https://github.com/oroinc/orocommerce-application.git ~/orocommerce
+   git clone --single-branch --branch 6.1.4 https://github.com/oroinc/orocommerce-application.git ~/orocommerce
    ```
 1. **Navigate to the product directory**:
    ```bash
