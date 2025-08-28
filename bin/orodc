@@ -344,10 +344,10 @@ if [[ $DC_ORO_MODE == "default" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose
 fi
 
 if [[ $DC_ORO_DATABASE_SCHEMA == "pgsql" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgres" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgresql" ]];then
-  export DC_ORO_DC_ORO_DATABASE_PORT=${DC_ORO_DC_ORO_DATABASE_PORT:-5432}
+  export DC_ORO_DATABASE_PORT=${DC_ORO_DATABASE_PORT:-5432}
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-pgsql.yml"
 elif [[ $DC_ORO_DATABASE_SCHEMA == "mariadb" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "mysql" ]];then
-  export DC_ORO_DC_ORO_DATABASE_PORT=${DC_ORO_DC_ORO_DATABASE_PORT:-3306}
+  export DC_ORO_DATABASE_PORT=${DC_ORO_DATABASE_PORT:-3306}
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-mysql.yml"
 fi
 if ${DOCKER_COMPOSE_BIN_CMD} ps --services | grep database > /dev/null; then
