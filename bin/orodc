@@ -363,6 +363,21 @@ if [[ -f "$DC_ORO_APPDIR/.docker-compose.user.yml" ]]; then
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f $DC_ORO_APPDIR/.docker-compose.user.yml"
 fi
 
+if [[ -f "$DC_ORO_APPDIR/.php-version" ]] && [[ -z $DC_ORO_PHP_VERSION ]]; then
+  export DC_ORO_PHP_VERSION=$(cat $DC_ORO_APPDIR/.php-version | head -n1)
+  >&2 echo -e "\033[36m==> Found .php-version with following version: $DC_ORO_PHP_VERSION\033[0m"
+fi
+
+if [[ -f "$DC_ORO_APPDIR/.phprc" ]] && [[ -z $DC_ORO_PHP_VERSION ]]; then
+  export DC_ORO_PHP_VERSION=$(cat $DC_ORO_APPDIR/.phprc | head -n1)
+  >&2 echo -e "\033[36m==> Found .phprc with following version: $DC_ORO_PHP_VERSION\033[0m"
+fi
+
+if [[ -f "$DC_ORO_APPDIR/.nvmrc" ]] && [[ -z $DC_ORO_NODE_VERSION ]]; then
+  export DC_ORO_NODE_VERSION=$(cat $DC_ORO_APPDIR/.nvmrc | head -n1)
+  >&2 echo -e "\033[36m==> Found .nvmrc with following version: $DC_ORO_NODE_VERSION\033[0m"
+fi
+
 if [[ $DC_ORO_MODE == "mutagen" ]] || [[ $DC_ORO_MODE == "ssh" ]]; then
   if [[ ${args[0]} != "down" ]] && [[ ${args[0]} != "purge" ]]; then
     ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
@@ -426,21 +441,6 @@ if [[ $DC_ORO_MODE == "mutagen" ]]; then
       done
     fi
   fi
-fi
-
-if [[ -f "$DC_ORO_APPDIR/.php-version" ]] && [[ -z $DC_ORO_PHP_VERSION ]]; then
-  export DC_ORO_PHP_VERSION=$(cat $DC_ORO_APPDIR/.php-version | head -n1)
-  >&2 echo -e "\033[36m==> Found .php-version with following version: $DC_ORO_PHP_VERSION\033[0m"
-fi
-
-if [[ -f "$DC_ORO_APPDIR/.phprc" ]] && [[ -z $DC_ORO_PHP_VERSION ]]; then
-  export DC_ORO_PHP_VERSION=$(cat $DC_ORO_APPDIR/.phprc | head -n1)
-  >&2 echo -e "\033[36m==> Found .phprc with following version: $DC_ORO_PHP_VERSION\033[0m"
-fi
-
-if [[ -f "$DC_ORO_APPDIR/.nvmrc" ]] && [[ -z $DC_ORO_NODE_VERSION ]]; then
-  export DC_ORO_NODE_VERSION=$(cat $DC_ORO_APPDIR/.nvmrc | head -n1)
-  >&2 echo -e "\033[36m==> Found .nvmrc with following version: $DC_ORO_NODE_VERSION\033[0m"
 fi
 
 if [[ ${DOCKER_COMPOSE_VERSION} -gt 1 ]]; then
