@@ -5,11 +5,240 @@ fi
 # Global variable to store already selected ports
 __FOUND_PORTS=""
 
+# Cache for Docker container information to avoid repeated calls
+__DOCKER_CONTAINERS_CACHE=""
+__DOCKER_INSPECT_CACHE=""
+__DOCKER_CACHE_LOADED=false
+
+# Function to get all Docker containers info once
+load_docker_containers_cache() {
+  if [[ "$__DOCKER_CACHE_LOADED" == "false" ]]; then
+    __DOCKER_CONTAINERS_CACHE=$(docker ps -a --format '{{.Names}} {{.Ports}}' | grep -v '^k8s_')
+    
+    # Get all container names and create inspect cache
+    local container_names
+    container_names=$(echo "$__DOCKER_CONTAINERS_CACHE" | awk '{print $1}' | tr '\n' ' ')
+    
+    if [[ -n "$container_names" ]]; then
+      # Single docker inspect call for all containers
+      __DOCKER_INSPECT_CACHE=$(docker inspect --format '{{.Name}}|{{ index .Config.Labels "com.docker.compose.project" }}|{{ index .Config.Labels "com.docker.compose.service" }}' $container_names 2>/dev/null)
+    fi
+    
+    __DOCKER_CACHE_LOADED=true
+  fi
+}
+
+# Function to get container labels from cache
+get_container_labels() {
+  local container_name="$1"
+  local project_var="$2"
+  local service_var="$3"
+  
+  # Look for container in inspect cache
+  while IFS='|' read -r name project service; do
+    # Remove leading slash from docker inspect name
+    name="${name#/}"
+    if [[ "$name" == "$container_name" ]]; then
+      eval "$project_var=\"$project\""
+      eval "$service_var=\"$service\""
+      return 0
+    fi
+  done <<< "$__DOCKER_INSPECT_CACHE"
+  
+  # Not found, set empty values
+  eval "$project_var=\"\""
+  eval "$service_var=\"\""
+  return 1
+}
+
+# Batch function to find free ports for multiple services
+find_free_ports_batch() {
+  local PROJECT_NAME="$1"
+  local COMPOSE_CONFIG_DIR="$2"
+  shift 2
+  
+  # Load Docker containers info once
+  load_docker_containers_cache
+  
+  local COMPOSE_FILE="${COMPOSE_CONFIG_DIR}/compose.yml"
+  local USED_PORTS=""
+  
+  # Get all used ports from compose.yml once
+  if [[ -f "$COMPOSE_FILE" ]]; then
+    USED_PORTS=$(yq '.services[].ports[]? | select(.published) | .published' "$COMPOSE_FILE" 2>/dev/null | xargs)
+  fi
+  
+  # Process each service
+  while [[ $# -gt 0 ]]; do
+    local SERVICE_NAME="$1"
+    local DEFAULT_PORT="$2"
+    shift 2
+    
+    local SELECTED_PORT=""
+    if [[ -f "$COMPOSE_FILE" ]]; then
+      SELECTED_PORT=$(yq '.services["'"$SERVICE_NAME"'"].ports[]? | select(.published) | .published' "$COMPOSE_FILE" 2>/dev/null)
+    fi
+    
+    # Find free port for this service
+    local port_found=""
+    if [[ -n "$SELECTED_PORT" ]]; then
+      # Check if the port from compose.yml is available or occupied by our project
+      if ! is_port_used_batch "$SELECTED_PORT" "$PROJECT_NAME" "$SERVICE_NAME" "$USED_PORTS"; then
+        # Port is free or used by our project - use it
+        port_found="$SELECTED_PORT"
+      else
+        # Port is occupied by another project - find a new one
+        echo -e "\033[33m==> Warning: Port $SELECTED_PORT from compose.yml is occupied by another project, searching for alternative\033[0m" >&2
+      fi
+    fi
+    
+    if [[ -z "$port_found" ]]; then
+      # Find a free port starting from default (or from compose port if it was occupied)
+      local PORT="${SELECTED_PORT:-$DEFAULT_PORT}"
+      while [[ "$PORT" -le 65535 ]]; do
+        if ! is_port_used_batch "$PORT" "$PROJECT_NAME" "$SERVICE_NAME" "$USED_PORTS"; then
+          port_found="$PORT"
+          break
+        fi
+        PORT=$((PORT+1))
+      done
+    fi
+    
+    if [[ -n "$port_found" ]]; then
+      # For database services, don't add to __FOUND_PORTS to allow port reuse between mysql/pgsql
+      if [[ "$SERVICE_NAME" != "database" ]]; then
+        __FOUND_PORTS+=" $port_found"
+      fi
+      echo "${SERVICE_NAME}:${port_found}"
+    else
+      echo -e "\033[38;5;208m==> Error: could not find a free port for $SERVICE_NAME\033[0m" >&2
+      return 1
+    fi
+  done
+}
+
+# Optimized port check using cached Docker info
+is_port_used_batch() {
+  local p=$1
+  local PROJECT_NAME=$2
+  local SERVICE_NAME=$3
+  local USED_PORTS=$4
+  
+  # Check if already found in this session, but allow same port for different database types
+  if [[ " $__FOUND_PORTS " == *" $p "* ]]; then
+    # Allow reuse of the same port for different database services (mysql/pgsql)
+    if [[ "$SERVICE_NAME" == "database" ]]; then
+      # For database services, allow port reuse since only one DB type will be active
+      return 1
+    else
+      # For other services, port reuse is not allowed
+      return 0
+    fi
+  fi
+  
+  # Don't check USED_PORTS here - those are from our own compose.yml and should be reusable
+  
+  # First check Docker containers using cached data to see if it's used by our project
+  local found=1
+  local used_by_our_project=false
+  while read -r name ports; do
+    [[ -z "$name" ]] && continue
+    
+    local container_project
+    local container_service
+    get_container_labels "$name" container_project container_service
+    
+    # Check if this container belongs to our project
+    if [[ "$container_project" == "$PROJECT_NAME" ]]; then
+      # Check if this container uses the port we're checking
+      for part in ${ports//,/ }; do
+        part="${part// /}"
+        if [[ "$part" == *"->"* ]]; then
+          local host_port_part="${part%->*}"
+          if [[ "$host_port_part" == *":"* ]]; then
+            local host_port="${host_port_part##*:}"
+          else
+            local host_port="$host_port_part"
+          fi
+          if [[ "$host_port" != *"-"* ]] && [[ "$host_port" == "$p" ]]; then
+            used_by_our_project=true
+            break 2
+          fi
+        else
+          if [[ "$part" != *"-"* ]] && [[ "$part" == "$p" ]]; then
+            used_by_our_project=true
+            break 2
+          fi
+        fi
+      done
+    fi
+  done <<< "$__DOCKER_CONTAINERS_CACHE"
+  
+  # If port is used by our project, consider it available for reuse
+  if [[ "$used_by_our_project" == "true" ]]; then
+    [[ "$DEBUG" == "1" ]] && echo "DEBUG: Port $p is used by our project ($PROJECT_NAME), allowing reuse" >&2
+    return 1
+  fi
+  
+  # Check local processes only if not used by our project
+  if lsof -t -i tcp:$p > /dev/null 2>&1; then
+    [[ "$DEBUG" == "1" ]] && echo "DEBUG: Port $p is used by local process (lsof)" >&2
+    return 0
+  fi
+  
+  # Check Docker containers from other projects
+  local found=1
+  while read -r name ports; do
+    [[ -z "$name" ]] && continue
+    
+    local container_project
+    local container_service
+    get_container_labels "$name" container_project container_service
+    
+    # Ignore all containers from the same project (not just same service)
+    if [[ "$container_project" == "$PROJECT_NAME" ]]; then
+      continue
+    fi
+    
+    # Debug: show which project is using the port
+    local port_conflict=false
+    
+    for part in ${ports//,/ }; do
+      part="${part%/tcp}"
+      part="${part%/udp}"
+      
+      if [[ "$part" == *"->"* ]]; then
+        host_port_part="${part%%->*}"
+        if [[ "$host_port_part" == *":"* ]]; then
+          host_port="${host_port_part##*:}"
+        else
+          host_port="$host_port_part"
+        fi
+        
+        if [[ "$host_port" == *"-"* ]]; then
+          range_start=${host_port%-*}
+          range_end=${host_port#*-}
+          if [[ "$p" -ge "$range_start" && "$p" -le "$range_end" ]]; then
+            [[ "$DEBUG" == "1" ]] && echo "DEBUG: Port $p is used by container $name from project '$container_project' (range $range_start-$range_end)" >&2
+            return 0
+          fi
+        elif [[ "$host_port" == "$p" ]]; then
+          [[ "$DEBUG" == "1" ]] && echo "DEBUG: Port $p is used by container $name from project '$container_project'" >&2
+          return 0
+        fi
+      fi
+    done
+  done <<< "$__DOCKER_CONTAINERS_CACHE"
+  
+  # Port is free
+  return 1
+}
+
 find_free_port() {
   local PROJECT_NAME="$1"
-  local SERVICE_NAME="$2"
-  local PORT="$3"
-  local COMPOSE_CONFIG_DIR="$4"
+  local COMPOSE_CONFIG_DIR="$2"
+  local SERVICE_NAME="$3"
+  local PORT="$4"
 
   local COMPOSE_FILE="${COMPOSE_CONFIG_DIR}/compose.yml"
   local SELECTED_PORT=""
@@ -30,14 +259,57 @@ find_free_port() {
   # Check if the port is used by another Docker container
   is_port_used_by_other_container() {
     local p=$1
-    local found=1
+    # Load cache if not loaded yet
+    load_docker_containers_cache
+    
+    # First check if port is used by our project - if so, allow reuse
+    local used_by_our_project=false
+    while read -r name ports; do
+      [[ -z "$name" ]] && continue
+      
+      local container_project
+      local container_service
+      get_container_labels "$name" container_project container_service
+      
+      # Check if this container belongs to our project
+      if [[ "$container_project" == "$PROJECT_NAME" ]]; then
+        # Check if this container uses the port we're checking
+        for part in ${ports//,/ }; do
+          part="${part// /}"
+          if [[ "$part" == *"->"* ]]; then
+            local host_port_part="${part%->*}"
+            if [[ "$host_port_part" == *":"* ]]; then
+              local host_port="${host_port_part##*:}"
+            else
+              local host_port="$host_port_part"
+            fi
+            if [[ "$host_port" != *"-"* ]] && [[ "$host_port" == "$p" ]]; then
+              used_by_our_project=true
+              break 2
+            fi
+          else
+            if [[ "$part" != *"-"* ]] && [[ "$part" == "$p" ]]; then
+              used_by_our_project=true
+              break 2
+            fi
+          fi
+        done
+      fi
+    done <<< "$__DOCKER_CONTAINERS_CACHE"
+    
+    # If port is used by our project, consider it available for reuse
+    if [[ "$used_by_our_project" == "true" ]]; then
+      return 1
+    fi
+    
+    # Check other projects
     while read -r name ports; do
       local container_project
       local container_service
-      container_project=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.project" }}' "$name" 2>/dev/null)
-      container_service=$(docker inspect --format '{{ index .Config.Labels "com.docker.compose.service" }}' "$name" 2>/dev/null)
+      get_container_labels "$name" container_project container_service
 
-      if [[ "$container_project" == "$PROJECT_NAME" && "$container_service" == "$SERVICE_NAME" ]]; then
+      # Ignore all containers from the same project (not just same service)
+      if [[ "$container_project" == "$PROJECT_NAME" ]]; then
         continue
       fi
 
@@ -82,7 +354,7 @@ find_free_port() {
       if [[ $found -eq 0 ]]; then
         break
       fi
-    done < <(docker ps -a --format '{{.Names}} {{.Ports}}' | grep -v '^k8s_')
+    done <<< "$__DOCKER_CONTAINERS_CACHE"
 
     return $found
   }
@@ -90,8 +362,18 @@ find_free_port() {
   # Main check: whether the port is in use (excluding the current service in the current project)
   is_port_used() {
     local p=$1
-    [[ " $__FOUND_PORTS " == *" $p "* ]] && return 0
-    [[ " $USED_PORTS " == *" $p "* ]] && return 0
+    # Check if already found in this session, but allow same port for different database types
+    if [[ " $__FOUND_PORTS " == *" $p "* ]]; then
+      # Allow reuse of the same port for different database services (mysql/pgsql)
+      if [[ "$SERVICE_NAME" == "database" ]]; then
+        # For database services, allow port reuse since only one DB type will be active
+        return 1
+      else
+        # For other services, port reuse is not allowed
+        return 0
+      fi
+    fi
+    # Don't check USED_PORTS here - those are from our own compose.yml and should be reusable
 
     if is_port_used_by_local "$p"; then
       return 0
@@ -104,30 +386,48 @@ find_free_port() {
     return 1
   }
 
-  # If a port is specified in compose.yml, use it if available
+  # If a port is specified in compose.yml, check if it's available or used by our project
   if [[ -n "$SELECTED_PORT" ]]; then
     if ! is_port_used "$SELECTED_PORT"; then
-      __FOUND_PORTS+=" $SELECTED_PORT"
+      # Port is free or used by our project - use it
+      # For database services, don't add to __FOUND_PORTS to allow port reuse between mysql/pgsql
+      if [[ "$SERVICE_NAME" != "database" ]]; then
+        __FOUND_PORTS+=" $SELECTED_PORT"
+      fi
       echo "$SELECTED_PORT"
       return
+    else
+      # Port is occupied by another project - continue to find alternative
+      echo -e "\033[33m==> Warning: Port $SELECTED_PORT from compose.yml is occupied by another project, searching for alternative\033[0m" >&2
     fi
   fi
 
-  # Search for a free port starting from the given port
+  # Search for a free port starting from the given port (or compose port if it was occupied)
+  [[ -n "$SELECTED_PORT" ]] && PORT="$SELECTED_PORT"
   while [ "$PORT" -le 65535 ]; do
     if ! is_port_used "$PORT"; then
-      __FOUND_PORTS+=" $PORT"
+      # For database services, don't add to __FOUND_PORTS to allow port reuse between mysql/pgsql
+      if [[ "$SERVICE_NAME" != "database" ]]; then
+        __FOUND_PORTS+=" $PORT"
+      fi
       echo "$PORT"
       return
     fi
     PORT=$((PORT+1))
   done
 
-  echo "Error: could not find a free port" >&2
+  echo -e "\033[38;5;208m==> Error: could not find a free port\033[0m" >&2
   return 1
 }
 
 # If the script is run directly, execute the function with the provided arguments
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-  find_free_port "$@"
+  if [[ "$1" == "--batch" ]]; then
+    # Batch mode: orodc-find_free_port --batch PROJECT_NAME CONFIG_DIR service1 port1 service2 port2 ...
+    shift
+    find_free_ports_batch "$@"
+  else
+    # Single mode: orodc-find_free_port PROJECT_NAME SERVICE_NAME PORT CONFIG_DIR
+    find_free_port "$@"
+  fi
 fi
