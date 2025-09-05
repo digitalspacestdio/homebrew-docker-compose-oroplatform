@@ -1,5 +1,9 @@
 #!/bin/bash
 set -e
+[[ -n "${DEBUG:-}" ]] && set -x
+
+# Save original arguments before any processing
+original_args=("$@")
 
 left_flags=()
 right_flags=()
@@ -8,46 +12,77 @@ right_options=()
 args=()
 
 args_input=("$@")
-i=0
-saw_first_arg=false
 
-while [[ $i -lt ${#args_input[@]} ]]; do
-  arg="${args_input[$i]}"
-  next="${args_input[$((i + 1))]:-}"
+# Handle version command
+if [[ "$1" == "version" ]]; then
+  echo "orodc version 0.8.0_47"
+  exit 0
+fi
 
-  if [[ "$arg" == --*=* ]]; then
-    if [[ "$saw_first_arg" == false ]]; then
-      left_options+=("$arg")
+# Check if first argument is a docker compose command
+# Only docker compose commands need left/right argument parsing
+is_compose_command() {
+  local cmd="$1"
+  local compose_commands="build|config|cp|create|down|events|exec|export|images|kill|logs|ls|pause|port|ps|pull|push|restart|rm|run|scale|start|stats|stop|top|unpause|up|version|volumes|wait|watch"
+  echo "$cmd" | grep -qE "^($compose_commands)$"
+}
+
+if [[ $# -gt 0 ]] && is_compose_command "$1"; then
+  NEEDS_ARG_PARSING=true
+else
+  NEEDS_ARG_PARSING=false
+  # Save original arguments for non-compose commands
+  non_compose_args=("$@")
+fi
+
+
+
+# Only parse arguments for docker compose commands
+if [[ "$NEEDS_ARG_PARSING" == "true" ]]; then
+  i=0
+  saw_first_arg=false
+
+  while [[ $i -lt ${#args_input[@]} ]]; do
+    arg="${args_input[$i]}"
+    next="${args_input[$((i + 1))]:-}"
+
+    if [[ "$arg" == --*=* ]]; then
+      if [[ "$saw_first_arg" == false ]]; then
+        left_options+=("$arg")
+      else
+        right_options+=("$arg")
+      fi
+      i=$((i + 1))
+
+    elif [[ "$arg" == --* && "$next" != -* && -n "$next" ]]; then
+      if [[ "$saw_first_arg" == false ]]; then
+        left_options+=("$arg" "$next")
+      else
+        right_options+=("$arg" "$next")
+      fi
+      i=$((i + 2))
+
+    elif [[ "$arg" == -* ]]; then
+      if [[ "$saw_first_arg" == false ]]; then
+        left_flags+=("$arg")
+      else
+        right_flags+=("$arg")
+      fi
+      i=$((i + 1))
+
     else
-      right_options+=("$arg")
+      args+=("$arg")
+      saw_first_arg=true
+      i=$((i + 1))
     fi
-    i=$((i + 1))
-
-  elif [[ "$arg" == --* && "$next" != -* && -n "$next" ]]; then
-    if [[ "$saw_first_arg" == false ]]; then
-      left_options+=("$arg" "$next")
-    else
-      right_options+=("$arg" "$next")
-    fi
-    i=$((i + 2))
-
-  elif [[ "$arg" == -* ]]; then
-    if [[ "$saw_first_arg" == false ]]; then
-      left_flags+=("$arg")
-    else
-      right_flags+=("$arg")
-    fi
-    i=$((i + 1))
-
-  else
-    args+=("$arg")
-    saw_first_arg=true
-    i=$((i + 1))
-  fi
-done
+  done
+else
+  # For non-compose commands, set args to original arguments without parsing
+  args=("${non_compose_args[@]}")
+fi
 
 # Debug output
-if [[ -n $DEBUG ]]; then 
+if [[ -n "${DEBUG:-}" ]]; then 
   echo "Left Flags: ${left_flags[*]}"
   echo "Left Options: ${left_options[*]}"
   echo "Args: ${args[*]}"
@@ -55,26 +90,138 @@ if [[ -n $DEBUG ]]; then
   echo "Right Options: ${right_options[*]}"
 fi
 
-if [[ -n $DEBUG ]]; then 
-  set -x
-fi
 
 DIR=$(brew --prefix docker-compose-oroplatform)/share/docker-compose-oroplatform
 export PWD=$(pwd)
 export DC_ORO_NAME=${DC_ORO_NAME-$(basename $(pwd))}
 export DC_ORO_CONFIG_DIR="$HOME/.$(basename $0)/${DC_ORO_NAME}"
+[[ -n "${DEBUG:-}" ]] && echo "DEBUG: Basic variables set" >&2
 RSYNC_BIN=$(brew --prefix rsync)/bin/rsync
 DOCKER_BIN="${DOCKER_BIN-$(which docker)}";
 DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN-$(which docker) compose}";
+# DOCKER_COMPOSE_BIN_CMD is the main command that gets built up with compose files
+# This variable is reused throughout the script and in the test merging logic
 DOCKER_COMPOSE_BIN_CMD=${DOCKER_COMPOSE_BIN};
 DOCKER_COMPOSE_VERSION=$($DOCKER_COMPOSE_BIN_CMD version | grep '[0-9]\+\.[0-9]\+\.[0-9]\+' -o | head -1 |awk -F. '{ print $1 }')
 if [[ ! -d "${DC_ORO_CONFIG_DIR}" ]]; then
     mkdir -p "${DC_ORO_CONFIG_DIR}"
 fi
 ${RSYNC_BIN} -r "${DIR}/compose/" "${DC_ORO_CONFIG_DIR}/"
+# Build the compose command by adding compose files in the correct order
+# This logic is reused in test merging - DO NOT duplicate this logic elsewhere
 if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose.yml" ]]; then
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose.yml"
 fi
+
+# Profile caching functions
+save_profiles() {
+  local profiles=()
+  local cli_profiles=()
+  local i=0
+  
+  # Extract --profile arguments from left_flags and left_options
+  while [[ $i -lt ${#left_flags[@]} ]]; do
+    if [[ "${left_flags[$i]}" == --profile=* ]]; then
+      local profile_value="${left_flags[$i]#--profile=}"
+      if [[ "$profile_value" == "database-cli" ]] || [[ "$profile_value" == "php-cli" ]]; then
+        cli_profiles+=("${left_flags[$i]}")
+      else
+        profiles+=("${left_flags[$i]}")
+      fi
+    fi
+    i=$((i + 1))
+  done
+  
+  i=0
+  while [[ $i -lt ${#left_options[@]} ]]; do
+    if [[ "${left_options[$i]}" == "--profile" ]]; then
+      local profile_value="${left_options[$((i + 1))]}"
+      if [[ "$profile_value" == "database-cli" ]] || [[ "$profile_value" == "php-cli" ]]; then
+        cli_profiles+=("--profile" "$profile_value")
+      else
+        profiles+=("--profile" "$profile_value")
+      fi
+      i=$((i + 2))
+    else
+      i=$((i + 1))
+    fi
+  done
+  
+  # Save regular profiles to cache file
+  if [[ ${#profiles[@]} -gt 0 ]]; then
+    printf '%s\n' "${profiles[@]}" > "${DC_ORO_CONFIG_DIR}/.cached_profiles"
+    [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Saved profiles: ${profiles[*]}" >&2
+  else
+    # Remove cache file if no profiles
+    [[ -f "${DC_ORO_CONFIG_DIR}/.cached_profiles" ]] && rm -f "${DC_ORO_CONFIG_DIR}/.cached_profiles" || true
+    [[ -n "${DEBUG:-}" ]] && echo "DEBUG: No profiles to save, removed cache" >&2
+  fi
+  
+  # Save CLI profiles to separate cache file
+  if [[ ${#cli_profiles[@]} -gt 0 ]]; then
+    printf '%s\n' "${cli_profiles[@]}" > "${DC_ORO_CONFIG_DIR}/.cached_cli_profiles"
+    [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Saved CLI profiles: ${cli_profiles[*]}" >&2
+  else
+    # Remove CLI cache file if no CLI profiles
+    [[ -f "${DC_ORO_CONFIG_DIR}/.cached_cli_profiles" ]] && rm -f "${DC_ORO_CONFIG_DIR}/.cached_cli_profiles" || true
+    [[ -n "${DEBUG:-}" ]] && echo "DEBUG: No CLI profiles to save, removed CLI cache" >&2
+  fi
+  return 0
+}
+
+load_cached_profiles() {
+  local cached_profiles=()
+  local include_cli_profiles=false
+  
+  # Check if we need CLI profiles based on the command
+  if [[ ${#args[@]} -gt 0 ]]; then
+    local first_arg="${args[0]}"
+    
+    # Commands that always need CLI profiles (for proper cleanup)
+    if [[ "$first_arg" =~ ^(down|purge)$ ]]; then
+      include_cli_profiles=true
+      [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Cleanup command detected, will load all CLI profiles" >&2
+    # Commands that need database-cli profile
+    elif [[ "$first_arg" =~ ^(mysql|psql|database-cli)$ ]] || \
+       echo "$first_arg" | grep -i 'import.*db\|export.*db\|dump.*db' > /dev/null; then
+      include_cli_profiles=true
+      [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Database command detected, will load CLI profiles" >&2
+    # Commands that need php-cli profile (already handled by auto-redirect, but for completeness)
+    elif [[ "$first_arg" =~ ^(cli|php|composer|bin/)$ ]] || \
+       [[ "$first_arg" == *.php ]] || \
+       [[ "$first_arg" == -* ]]; then
+      include_cli_profiles=true
+      [[ -n "${DEBUG:-}" ]] && echo "DEBUG: PHP/CLI command detected, will load CLI profiles" >&2
+    fi
+  fi
+  
+  # Load regular profiles
+  if [[ -f "${DC_ORO_CONFIG_DIR}/.cached_profiles" ]]; then
+    while IFS= read -r line; do
+      cached_profiles+=("$line")
+    done < "${DC_ORO_CONFIG_DIR}/.cached_profiles"
+    
+    if [[ ${#cached_profiles[@]} -gt 0 ]]; then
+      [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Loaded cached profiles: ${cached_profiles[*]}" >&2
+      # Add cached profiles to left_options (they will be applied to DOCKER_COMPOSE_BIN_CMD)
+      left_options=("${cached_profiles[@]}" "${left_options[@]}")
+    fi
+  fi
+  
+  # Load CLI profiles only when needed
+  if [[ "$include_cli_profiles" == "true" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/.cached_cli_profiles" ]]; then
+    local cached_cli_profiles=()
+    while IFS= read -r line; do
+      cached_cli_profiles+=("$line")
+    done < "${DC_ORO_CONFIG_DIR}/.cached_cli_profiles"
+    
+    if [[ ${#cached_cli_profiles[@]} -gt 0 ]]; then
+      [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Loaded cached CLI profiles: ${cached_cli_profiles[*]}" >&2
+      # Add CLI profiles to left_options
+      left_options=("${cached_cli_profiles[@]}" "${left_options[@]}")
+    fi
+  fi
+}
 
 load_env_safe() {
   local env_file="$1"
@@ -237,7 +384,7 @@ if [[ -z $DC_ORO_APPDIR ]]; then
 fi
 
 if [[ -z $DC_ORO_APPDIR ]]; then
-  if [ -z "$(ls -A $PWD)" ]; then
+  if [ -z "$(ls -A "$PWD")" ]; then
     export DC_ORO_APPDIR="$PWD"
   else
     echo -e "\033[38;5;208m==> Application root folder not found, and current directory is not empty, terminating...\033[0m"
@@ -277,7 +424,7 @@ parse_dsn_uri "$ORO_SEARCH_URL" "search" "DC_ORO"
 parse_dsn_uri "$ORO_MQ_DSN" "mq" "DC_ORO"
 parse_dsn_uri "$ORO_REDIS_URL" "redis" "DC_ORO"
 
-if echo $ORO_SEARCH_URL | grep 'orm:' > /dev/null; then
+if [[ -n "$ORO_SEARCH_URL" ]] && echo "$ORO_SEARCH_URL" | grep 'orm:' > /dev/null; then
   export DC_ORO_SEARCH_DSN=
 else
   export DC_ORO_SEARCH_DSN=$ORO_SEARCH_URL
@@ -333,18 +480,21 @@ done <<< "$BATCH_PORTS"
 
 export COMPOSER_AUTH=$(echo ${DC_ORO_COMPOSER_AUTH:-${COMPOSER_AUTH}} | jq -c .)
 export DC_ORO_COMPOSER_AUTH=${COMPOSER_AUTH}
+[[ -n "${DEBUG:-}" ]] && echo "DEBUG: COMPOSER_AUTH set" >&2
 
-if ${DOCKER_BIN} system info --format '{{.SecurityOptions}}' | grep "name=rootless" > /dev/null 2>&1; then
+if ${DOCKER_BIN} system info --format '{{.SecurityOptions}}' 2>/dev/null | grep "name=rootless" > /dev/null 2>&1; then
   # Use root user in the rootless mode
   export DC_ORO_USER_NAME="root"
   export DC_ORO_USER_GROUP="root"
   export DC_ORO_USER_UID=0
   export DC_ORO_USER_GID=0
+  [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Using rootless mode" >&2
 else
   export DC_ORO_USER_NAME="developer"
   export DC_ORO_USER_GROUP="developer"
   export DC_ORO_USER_UID=$UID
   export DC_ORO_USER_GID=$GID
+  [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Using normal mode" >&2
 fi
 
 export DC_ORO_PHP_USER_NAME=${DC_ORO_USER_NAME}
@@ -376,18 +526,19 @@ if [[ -z ${ORO_SSH_PUBLIC_KEY} ]]; then
   export ORO_SSH_PUBLIC_KEY=$(cat "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519.pub")
 fi
 
-if [[ $DC_ORO_MODE == "default" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-default.yml" ]]; then
+if [[ "${DC_ORO_MODE}" == "default" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-default.yml" ]]; then
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-default.yml"
 fi
 
-if [[ $DC_ORO_DATABASE_SCHEMA == "pgsql" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgres" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgresql" ]];then
+if [[ "${DC_ORO_DATABASE_SCHEMA}" == "pgsql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgresql" ]];then
   export DC_ORO_DATABASE_PORT=${DC_ORO_DATABASE_PORT:-5432}
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-pgsql.yml"
-elif [[ $DC_ORO_DATABASE_SCHEMA == "mariadb" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "mysql" ]];then
+elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "mariadb" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]];then
   export DC_ORO_DATABASE_PORT=${DC_ORO_DATABASE_PORT:-3306}
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-mysql.yml"
 fi
-if ${DOCKER_COMPOSE_BIN_CMD} ps --services | grep database > /dev/null; then
+if ${DOCKER_COMPOSE_BIN_CMD} ps --services 2>/dev/null | grep database > /dev/null; then
+  [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Found database service" >&2
   SERVICE_DATABASE_ID=$(${DOCKER_COMPOSE_BIN_CMD} ps -q database)
   if [[ "" != $SERVICE_DATABASE_ID ]] && ${DOCKER_BIN} inspect -f '{{ .Config.Image }}' "$SERVICE_DATABASE_ID" | grep 'busybox'; then
     ${DOCKER_COMPOSE_BIN_CMD} stop database
@@ -415,7 +566,7 @@ if [[ -f "$DC_ORO_APPDIR/.nvmrc" ]] && [[ -z $DC_ORO_NODE_VERSION ]]; then
   >&2 echo -e "\033[36m==> Found .nvmrc with following version: $DC_ORO_NODE_VERSION\033[0m"
 fi
 
-if [[ $DC_ORO_MODE == "mutagen" ]] || [[ $DC_ORO_MODE == "ssh" ]]; then
+if [[ "${DC_ORO_MODE}" == "mutagen" ]] || [[ "${DC_ORO_MODE}" == "ssh" ]]; then
   if [[ ${args[0]} != "down" ]] && [[ ${args[0]} != "purge" ]]; then
     ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
       ${DOCKER_BIN} volume create "${DC_ORO_NAME}_appcode"  > /dev/null
@@ -434,7 +585,7 @@ if [[ $DC_ORO_MODE == "mutagen" ]] || [[ $DC_ORO_MODE == "ssh" ]]; then
   fi
 fi
 
-if [[ $DC_ORO_MODE == "mutagen" ]]; then
+if [[ "${DC_ORO_MODE}" == "mutagen" ]]; then
   MUTAGEN_SESSION_NAME=$(echo ${DC_ORO_NAME}-appcode | awk '{print tolower($0)}' | sed 's/[^0-9a-z]/-/g')
   WAIT_SYNC="1"
 
@@ -443,7 +594,7 @@ if [[ $DC_ORO_MODE == "mutagen" ]]; then
       mutagen sync terminate "${MUTAGEN_SESSION_NAME}"
     fi
     WAIT_SYNC=""
-  elif ! echo ${args[0]} | grep -i '^\(build\|pull\|config\)' > /dev/null; then
+  elif ! echo ${args[0]} | grep -i '^\(build\|pull\|config\)' > /dev/null 2>&1; then
     if [[ "0" -eq $(${DOCKER_COMPOSE_BIN_CMD} ps -q ssh  2> /dev/null | wc -l 2> /dev/null) ]]; then
       bash -c "${DOCKER_COMPOSE_BIN_CMD} up -d ssh"
     fi
@@ -468,7 +619,7 @@ if [[ $DC_ORO_MODE == "mutagen" ]]; then
       WAIT_SYNC=""
     fi
 
-    if [[ $WAIT_SYNC == "1" ]]; then
+    if [[ "${WAIT_SYNC}" == "1" ]]; then
       until mutagen sync list "${MUTAGEN_SESSION_NAME}" | grep 'Status:' | grep 'Watching for changes' > /dev/null 2>&1; do
         if which tput > /dev/null 2>&1; then
           tput cuu 1 && tput el
@@ -486,26 +637,36 @@ else
   DOCKER_COMPOSE_RUN_CMD="${DOCKER_COMPOSE_BIN_CMD} run --rm"
 fi
 
-if ${DOCKER_BIN} system info --format '{{.SecurityOptions}}' | grep "name=rootless" > /dev/null; then
+if ${DOCKER_BIN} system info --format '{{.SecurityOptions}}' 2>/dev/null | grep "name=rootless" > /dev/null; then
   DOCKER_COMPOSE_RUN_CMD="${DOCKER_COMPOSE_RUN_CMD} --user root"
 fi
 
+# Load cached profiles for all commands except 'up' (which saves new profiles)
+if [[ ${args[0]} != "up" ]]; then
+  load_cached_profiles
+fi
+
 if [[ ${args[0]} == "up" ]]; then
+  # Save profiles for future commands
+  save_profiles
+  
+  
   printf "\033[0;37m[${DC_ORO_NAME}] Application: http://localhost:${DC_ORO_PORT_NGINX}\033[0m\n"
   printf "\033[0;37m[${DC_ORO_NAME}] Mailhog: http://localhost:${DC_ORO_PORT_MAIL_WEBGUI}\033[0m\n"
   printf "\033[0;37m[${DC_ORO_NAME}] Elasticsearch: http://localhost:${DC_ORO_PORT_SEARCH}\033[0m\n"
   printf "\033[0;37m[${DC_ORO_NAME}] Mq: http://localhost:${DC_ORO_PORT_MQ}\033[0m\n"
   
-  if [[ $DC_ORO_DATABASE_SCHEMA == "pdo_pgsql" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgres" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgresql" ]];then
+  if [[ "${DC_ORO_DATABASE_SCHEMA}" == "pdo_pgsql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgresql" ]];then
     printf "\033[0;37m[${DC_ORO_NAME}] Database: 127.0.0.1:${DC_ORO_PORT_PGSQL}\033[0m\n"
-  elif [[ $DC_ORO_DATABASE_SCHEMA == "pdo_mysql" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "mysql" ]];then
+  elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "pdo_mysql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]];then
     printf "\033[0;37m[${DC_ORO_NAME}] Database: 127.0.0.1:${DC_ORO_PORT_MYSQL}\033[0m\n"
   fi
 
   printf "\033[0;37m[${DC_ORO_NAME}] SSH: 127.0.0.1:${DC_ORO_PORT_SSH}\033[0m\n"
 fi
 
-if echo ${args[0]} | grep -i 'import' | grep -i 'db\|database' > /dev/null; then
+
+if echo ${args[0]} | grep -i 'import' | grep -i 'db\|database' > /dev/null 2>&1 || false; then
   if [[ -z $2 ]]; then
     >&2 echo "Data file was not provided"
     exit 1
@@ -516,7 +677,7 @@ if echo ${args[0]} | grep -i 'import' | grep -i 'db\|database' > /dev/null; then
     DB_DUMP=$(realpath "$DC_ORO_APPDIR/$2")
   fi
 
-  if [[ -z $DB_DUMP ]] || [[ ! -r $DB_DUMP ]]; then
+  if [[ -z "$DB_DUMP" ]] || [[ ! -r "$DB_DUMP" ]]; then
     >&2 echo "Data file '$2' does not readable"
     exit 1
   fi
@@ -524,7 +685,7 @@ if echo ${args[0]} | grep -i 'import' | grep -i 'db\|database' > /dev/null; then
   DB_DUMP_BASENAME=$(echo "${DB_DUMP##*/}")
   if [[ $DC_ORO_DATABASE_SCHEMA == "pdo_pgsql" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgres" ]];then
     DB_IMPORT_CMD="sed -e 's/OWNER TO [a-zA-Z0-9_]\+/OWNER TO '\$DC_ORO_DATABASE_USER'/g' | sed -e '/SET transaction_timeout = 0;/d' | PGPASSWORD=\$DC_ORO_DATABASE_PASSWORD psql --set ON_ERROR_STOP=on -h \$DC_ORO_DATABASE_HOST -p \$DC_ORO_DATABASE_PORT -U \$DC_ORO_DATABASE_USER -d \$DC_ORO_DATABASE_DBNAME -1 >/dev/null"
-  elif [[ $DC_ORO_DATABASE_SCHEMA == "pdo_mysql" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "mysql" ]];then
+  elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "pdo_mysql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]];then
     DB_IMPORT_CMD="sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/DEFINER=CURRENT_USER \*/' | MYSQL_PWD=\$DC_ORO_DATABASE_PASSWORD mysql -h\$DC_ORO_DATABASE_HOST -P\$DC_ORO_DATABASE_PORT -u\$DC_ORO_DATABASE_USER \$DC_ORO_DATABASE_DBNAME"
   fi
 
@@ -536,7 +697,7 @@ if echo ${args[0]} | grep -i 'import' | grep -i 'db\|database' > /dev/null; then
 
   >&2 echo "/* Starting import of the database dump... */"
   >&2 echo "/* From: $DB_DUMP */"
-  set -x
+
   ${DOCKER_COMPOSE_RUN_CMD} "${left_flags[@]}" "${left_options[@]}" -v "${DB_DUMP}:/${DB_DUMP_BASENAME}" database-cli bash -c "$DB_IMPORT_CMD"
   exit 0
 fi
@@ -550,18 +711,38 @@ if echo ${args[0]} | grep -i 'set\|update' | grep -i 'url\|uri' > /dev/null; the
   exit 0
 fi
 
-if echo ${args[0]} | grep -i 'cache' | grep -i 'cl' > /dev/null; then
-  URL=${args[1]:-"https://${DC_ORO_NAME}.docker.local"}
+if [[ "${args[0]}" == "cache" ]]; then
+  # Use second argument as cache subcommand, default to 'clear'
+  cache_cmd="${args[1]:-clear}"
+  
   set -x
-  ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "php bin/console cache:cl" || true
-  exit 0
+  if [[ "$NEEDS_ARG_PARSING" == "true" ]]; then
+    exec ${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} cli php ./bin/console cache:${cache_cmd} "${args[@]:2}" "${right_flags[@]}" "${right_options[@]}"
+  else
+    exec ${DOCKER_COMPOSE_RUN_CMD} cli php ./bin/console cache:${cache_cmd} "${args[@]:2}"
+  fi
 fi
 
-if echo ${args[0]} | grep -i 'update' | grep -i 'platform' > /dev/null; then
-  URL=${args[1]:-"https://${DC_ORO_NAME}.docker.local"}
+# Handle cache:subcommand syntax (e.g., cache:clear, cache:warmup)
+if echo ${args[0]} | grep -i '^cache:' > /dev/null; then
+  # Extract cache subcommand (everything after 'cache:')
+  cache_cmd="${args[0]#cache:}"
+  
   set -x
-  ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "rm -rf var/cache/* || true; php bin/console oro:platform:update --force" || true
-  exit 0
+  if [[ "$NEEDS_ARG_PARSING" == "true" ]]; then
+    exec ${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} cli php ./bin/console cache:${cache_cmd} "${args[@]:1}" "${right_flags[@]}" "${right_options[@]}"
+  else
+    exec ${DOCKER_COMPOSE_RUN_CMD} cli php ./bin/console cache:${cache_cmd} "${args[@]:1}"
+  fi
+fi
+
+if [[ "${args[0]}" == "platform" && "${args[1]}" == "update" ]]; then
+  set -x
+  if [[ "$NEEDS_ARG_PARSING" == "true" ]]; then
+    exec ${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} cli php ./bin/console oro:platform:update --force "${args[@]:2}" "${right_flags[@]}" "${right_options[@]}"
+  else
+    exec ${DOCKER_COMPOSE_RUN_CMD} cli php ./bin/console oro:platform:update --force "${args[@]:2}"
+  fi
 fi
 
 if echo ${args[0]} | grep -i 'composer' | grep -i 'install' > /dev/null; then
@@ -577,13 +758,37 @@ if echo ${args[0]} | grep -i 'export\|dump' | grep -i 'db\|database' > /dev/null
   touch "${DB_DUMP}"
   if [[ $DC_ORO_DATABASE_SCHEMA == "pgsql" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgres" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgresql" ]]; then
     DB_EXPORT_CMD="PGPASSWORD=\$DC_ORO_DATABASE_PASSWORD pg_dump -Fp --clean --if-exists -h \$DC_ORO_DATABASE_HOST -p \$DC_ORO_DATABASE_PORT -U \$DC_ORO_DATABASE_USER -d \$DC_ORO_DATABASE_DBNAME"
-  elif [[ $DC_ORO_DATABASE_SCHEMA == "mariadb" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "mysql" ]];then
+  elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "mariadb" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]];then
     DB_EXPORT_CMD="MYSQL_PWD=\$DC_ORO_DATABASE_PASSWORD mysqldump --no-tablespaces --column-statistics=0 --set-gtid-purged=OFF --quick --max-allowed-packet=16M --disable-keys --hex-blob --no-autocommit --insert-ignore --skip-lock-tables --single-transaction -h\$DC_ORO_DATABASE_HOST -P\$DC_ORO_DATABASE_PORT -u\$DC_ORO_DATABASE_USER \$DC_ORO_DATABASE_DBNAME | sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/DEFINER=CURRENT_USER \*/'"
   fi
 
   >&2 echo "/* Starting export of the database... */"
   >&2 echo "/* Dumping database to: $DB_DUMP */"
   exec bash -c "${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} -v \"${DB_DUMP}:/${DB_DUMP_BASENAME}\" database-cli bash -c \"$DB_EXPORT_CMD | gzip > /${DB_DUMP_BASENAME}\""
+fi
+
+
+
+# Handle PHP flags (redirect to PHP CLI when appropriate)
+if [[ ${#left_flags[@]} -gt 0 ]]; then
+  # Check if we should redirect to PHP
+  should_redirect_to_php=true
+  
+  # If there are args (non-flag arguments), check if they are PHP files or PHP-compatible
+  if [[ ${#args[@]} -gt 0 ]]; then
+    for arg in "${args[@]}"; do
+      # If argument doesn't end with .php and contains path separators or doesn't look like PHP code
+      if [[ "$arg" != *.php && ("$arg" == *"/"* || "$arg" == *"."* && "$arg" != *";"* && "$arg" != *"("*) ]]; then
+        should_redirect_to_php=false
+        break
+      fi
+    done
+  fi
+  
+  if [[ "$should_redirect_to_php" == true ]]; then
+    # Redirect to PHP
+    exec bash -c "${DOCKER_COMPOSE_RUN_CMD} cli php \"\${@}\"" -- "${left_flags[@]}" "${left_options[@]}" "${args[@]}" "${right_flags[@]}" "${right_options[@]}"
+  fi
 fi
 
 if echo ${args[0]} | grep -i '^mysql' > /dev/null; then
@@ -601,7 +806,7 @@ if echo ${args[0]} | grep -i '^database-cli' > /dev/null; then
   exec bash -c "${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} database-cli bash -c \"$PSQL_CMD\""
 fi
 
-if [ $# -eq 0 ] || [ ${args[0]} = "ssh" ]; then
+if [ $# -eq 0 ] || [ "${args[0]}" = "ssh" ]; then
   SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
   SSH_PORT=$(${DOCKER_BIN} inspect "$(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }')" | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
 
@@ -619,13 +824,99 @@ if [ $# -eq 0 ] || [ ${args[0]} = "ssh" ]; then
     "${right_options[@]}"
 fi
 
-if echo ${args[0]} | grep -i '^composer\|bin/\|npm\|php\|node\|yarn\|bash' > /dev/null; then
-  for i in "$@"; do
-      i="${i//\\/\\\\}"
-      i="${i//$/\\$}"
-      C="$C \"${i//\"/\\\"}\""
+# Function to check if command is a built-in docker compose command
+is_docker_compose_command() {
+  local cmd="$1"
+  # Get list of docker compose commands dynamically
+  local compose_commands
+  compose_commands=$(${DOCKER_COMPOSE_BIN} --help 2>/dev/null | grep -A 100 "Commands:" | grep "^  [a-z]" | awk '{print $1}' | tr '\n' '|')
+  compose_commands="${compose_commands%|}" # remove trailing |
+  
+  # Check if command matches any docker compose command
+  echo "$cmd" | grep -qE "^(${compose_commands})$"
+}
+
+# Function to check if command is a special orodc command
+is_special_orodc_command() {
+  local cmd="$1"
+  case "$cmd" in
+    ssh|cli|pgsql|psql|mysql|database-cli|install|purge|test|tests)
+      return 0
+      ;;
+    *)
+      # Check complex patterns that are handled specially
+      if echo "$cmd" | grep -qi 'import.*\(db\|database\)'; then return 0; fi
+      if echo "$cmd" | grep -qi '\(set\|update\).*\(url\|uri\)'; then return 0; fi
+      if echo "$cmd" | grep -qi '^cache'; then return 0; fi
+      if [[ "$cmd" == "platform" ]]; then return 0; fi
+      if echo "$cmd" | grep -qi 'composer.*install'; then return 0; fi
+      if echo "$cmd" | grep -qi '\(export\|dump\).*\(db\|database\)'; then return 0; fi
+      return 1
+      ;;
+  esac
+}
+
+# Check if first argument is a docker compose command (will be handled at the end)
+[[ -n "${DEBUG:-}" ]] && echo "DEBUG: Checking if ${args[0]} is docker compose command" >&2
+is_docker_compose_cmd=false
+if [[ ${#args[@]} -gt 0 ]] && is_docker_compose_command "${args[0]}"; then
+  is_docker_compose_cmd=true
+  [[ -n "${DEBUG:-}" ]] && echo "DEBUG: ${args[0]} is docker compose command" >&2
+fi
+
+if [[ "$is_docker_compose_cmd" != "true" ]]; then
+  # Check if any argument contains a .php file
+  has_php_file=false
+  for arg in "${args[@]}" "${right_flags[@]}" "${right_options[@]}"; do
+    if [[ "$arg" == *.php ]]; then
+      has_php_file=true
+      break
+    fi
   done
-  exec bash -c "${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} cli bash -c \"exec $C\""
+
+# If arguments contain .php file, redirect to PHP
+if [[ "$has_php_file" == true ]]; then
+  # Special handling for bash -c commands with PHP files
+  if [[ "${args[0]}" == "bash" && "${right_flags[0]}" == "-c" ]]; then
+    # For bash -c 'php script.php', reconstruct proper argument order
+    exec ${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} cli bash -c "${args[@]:1}" "${right_options[@]}"
+  else
+    # Prepend 'php' to the command if not already present
+    if [[ "${args[0]}" != "php" ]]; then
+      # For PHP files, treat left_flags as PHP flags (not docker compose flags)
+      # Only use actual docker compose flags from left_flags
+      docker_flags=()
+      php_flags=()
+      for flag in "${left_flags[@]}"; do
+        case "$flag" in
+          -d|-e|--env|--env-file|--label|--name|--user|--workdir|--entrypoint|--platform)
+            docker_flags+=("$flag")
+            ;;
+          *)
+            php_flags+=("$flag")
+            ;;
+        esac
+      done
+      exec ${DOCKER_COMPOSE_RUN_CMD} "${docker_flags[@]}" ${left_options[@]} cli php "${php_flags[@]}" "${right_flags[@]}" "${right_options[@]}" "${args[@]}"
+    else
+      exec ${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} cli "${args[@]}" "${right_flags[@]}" "${right_options[@]}"
+    fi
+  fi
+fi
+fi
+
+# If command is not a docker compose built-in command and not a special orodc command, redirect to CLI container
+if [[ ${#args[@]} -gt 0 ]] && ! is_docker_compose_command "${args[0]}" && ! is_special_orodc_command "${args[0]}"; then
+  echo "Running command in 'cli' service..."
+  # Special handling for bash -c commands
+  if [[ "${args[0]}" == "bash" && "${right_flags[0]}" == "-c" ]]; then
+    # For bash -c 'command', reconstruct proper argument order
+    exec ${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} cli bash -c "${args[@]:1}" "${right_options[@]}"
+  else
+    # Pass arguments directly to docker compose exec without additional escaping
+    # Combine args with right_flags and right_options in proper order
+    exec ${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} cli "${args[@]}" "${right_flags[@]}" "${right_options[@]}"
+  fi
 fi
 
 if echo ${args[0]} | grep -i '^cli$' > /dev/null; then
@@ -643,6 +934,227 @@ elif echo ${args[0]} | grep -i '^install$' > /dev/null; then
   ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "[[ -d ${DC_ORO_APPDIR}/var/cache ]] && rm -rf ${DC_ORO_APPDIR}/var/cache/* || true"
   ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "composer install"
   ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "php bin/console --env=prod --timeout=1800 oro:install --language=en --formatting-code=en_US --organization-name='Acme Inc.' --user-name=admin --user-email=admin@example.com --user-firstname=John --user-lastname=Doe --user-password='\$ecretPassw0rd' --application-url='https://${DC_ORO_NAME:-unnamed}.docker.local/' --sample-data=y"
+  exit 0
+fi
+
+# Handle tests commands - unified entry point
+if [[ "${args[0]}" == "tests" ]]; then
+  # CRITICAL COMPOSE MERGING LOGIC - READ CAREFULLY BEFORE MODIFYING
+  # =================================================================
+  # 
+  # PROBLEM: Test services in docker-compose-test.yml reference volumes (like 'appcode') 
+  # that are defined in the main docker-compose.yml. Simply using docker-compose-test.yml 
+  # alone causes "undefined volume" errors.
+  #
+  # SOLUTION: We must merge ALL compose files into a single compose.yml that contains:
+  # 1. Base services and volumes from docker-compose.yml
+  # 2. Database-specific services from docker-compose-{pgsql|mysql}.yml
+  # 3. User customizations from .docker-compose.user.yml (if exists)
+  # 4. Test services from docker-compose-test.yml
+  #
+  # WHY USE DOCKER_COMPOSE_BIN_CMD: This variable already contains the properly constructed
+  # command with all base compose files in the correct order. We reuse this logic instead
+  # of duplicating the file selection logic.
+  #
+  # WHY GENERATE compose.yml: The 'down' and 'purge' commands need to know about test 
+  # services to stop them properly. By creating a merged compose.yml, these commands
+  # can find and stop test containers even after the test session ends.
+  
+  # Reuse existing compose command logic and add test file
+  # DOCKER_COMPOSE_BIN_CMD already contains: base + database + user compose files
+  TEST_AWARE_COMPOSE_CMD="${DOCKER_COMPOSE_BIN_CMD}"
+  if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-test.yml" ]]; then
+    TEST_AWARE_COMPOSE_CMD="${TEST_AWARE_COMPOSE_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-test.yml"
+  fi
+  
+  # Generate properly merged compose.yml using 'docker compose config'
+  # This command merges all compose files and resolves all references (volumes, networks, etc.)
+  if DC_ORO_NAME="$DC_ORO_NAME" bash -c "${TEST_AWARE_COMPOSE_CMD} config" > "${DC_ORO_CONFIG_DIR}/compose.yml" 2>/dev/null; then
+    >&2 echo -e "\033[36m==> All services merged into compose.yml for persistent management\033[0m"
+  else
+    >&2 echo -e "\033[31m==> Warning: Failed to merge compose files, falling back to test-only mode\033[0m"
+    # Fallback: create basic merged file (this will likely cause volume errors)
+    # This fallback exists for edge cases but is not the intended path
+    cat > "${DC_ORO_CONFIG_DIR}/compose.yml" << 'EOF'
+# Auto-generated merged compose file including test services
+# This ensures test services are included in down/purge operations
+# WARNING: This fallback may cause "undefined volume" errors
+EOF
+    if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-test.yml" ]]; then
+      cat "${DC_ORO_CONFIG_DIR}/docker-compose-test.yml" >> "${DC_ORO_CONFIG_DIR}/compose.yml"
+    fi
+  fi
+  
+  # Build test-aware compose command using the merged compose.yml
+  # IMPORTANT: We use the merged compose.yml file instead of multiple -f flags
+  # because it already contains all services and resolved volume references
+  TEST_COMPOSE_CMD="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/compose.yml"
+  
+  # Use test-cli container for test commands
+  CLI_SERVICE="test-cli"
+  
+  # Define test-specific variables with fallbacks to main variables
+  DC_ORO_TEST_DATABASE_HOST="${DC_ORO_TEST_DATABASE_HOST:-${DC_ORO_DATABASE_HOST:-database}}"
+  DC_ORO_TEST_DATABASE_PORT="${DC_ORO_TEST_DATABASE_PORT:-${DC_ORO_DATABASE_PORT:-5432}}"
+  DC_ORO_TEST_DATABASE_USER="${DC_ORO_TEST_DATABASE_USER:-${DC_ORO_DATABASE_USER:-oro_db_user}}"
+  DC_ORO_TEST_DATABASE_PASSWORD="${DC_ORO_TEST_DATABASE_PASSWORD:-${DC_ORO_DATABASE_PASSWORD:-oro_db_pass}}"
+  DC_ORO_TEST_DATABASE_DBNAME="${DC_ORO_TEST_DATABASE_DBNAME:-${DC_ORO_DATABASE_DBNAME:-oro_db}_test}"
+  
+  # Create test database URI using parse_dsn_uri function
+  TEST_DB_URI="postgres://${DC_ORO_TEST_DATABASE_USER}:${DC_ORO_TEST_DATABASE_PASSWORD}@${DC_ORO_TEST_DATABASE_HOST}:${DC_ORO_TEST_DATABASE_PORT}/${DC_ORO_TEST_DATABASE_DBNAME}"
+  parse_dsn_uri "$TEST_DB_URI" "database" "DC_ORO_TEST"
+  # Function creates DC_ORO_TEST_DATABASE_URI automatically
+  
+  # Handle different test subcommands
+  case "${args[1]}" in
+    "install"|"setup")
+      >&2 echo -e "\033[36m==> Installing test environment and database...\033[0m"
+      # Start all required services
+      ${TEST_COMPOSE_CMD} up -d >/dev/null 2>&1
+      
+      
+      # Check if test database already exists
+      DB_EXISTS=false
+      if [[ "${DC_ORO_DATABASE_SCHEMA}" == "pgsql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgresql" ]]; then
+        # Check PostgreSQL database existence
+        if ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "PGPASSWORD=\$DC_ORO_DATABASE_PASSWORD psql -h \$DC_ORO_DATABASE_HOST -p \$DC_ORO_DATABASE_PORT -U \$DC_ORO_DATABASE_USER -d \$DC_ORO_DATABASE_DBNAME -c 'SELECT 1 FROM pg_database WHERE datname = '\''${DC_ORO_TEST_DATABASE_DBNAME}'\'';'" 2>/dev/null | grep -q "1 row"; then
+          DB_EXISTS=true
+        fi
+      elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "mariadb" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]]; then
+        # Check MySQL/MariaDB database existence
+        if ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "MYSQL_PWD=\$DC_ORO_DATABASE_PASSWORD mysql -h\$DC_ORO_DATABASE_HOST -P\$DC_ORO_DATABASE_PORT -u\$DC_ORO_DATABASE_USER \$DC_ORO_DATABASE_DBNAME -e 'SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '\''${DC_ORO_TEST_DATABASE_DBNAME}'\'';'" 2>/dev/null | grep -q "${DC_ORO_TEST_DATABASE_DBNAME}"; then
+          DB_EXISTS=true
+        fi
+      fi
+      
+      if [[ "$DB_EXISTS" == "true" ]]; then
+        echo "Test database ${DC_ORO_TEST_DATABASE_DBNAME} already exists, skipping database setup..."
+      else
+        echo "Creating test database ${DC_ORO_TEST_DATABASE_DBNAME}..."
+        if [[ "${DC_ORO_DATABASE_SCHEMA}" == "pgsql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgresql" ]]; then
+          # PostgreSQL commands using test-specific environment variables
+          ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "PGPASSWORD=${DC_ORO_TEST_DATABASE_PASSWORD} psql -h ${DC_ORO_TEST_DATABASE_HOST} -p ${DC_ORO_TEST_DATABASE_PORT} -U ${DC_ORO_TEST_DATABASE_USER} -d \$DC_ORO_DATABASE_DBNAME -c 'SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '\''${DC_ORO_TEST_DATABASE_DBNAME}'\'';'" 2>/dev/null || true
+          ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "PGPASSWORD=${DC_ORO_TEST_DATABASE_PASSWORD} psql -h ${DC_ORO_TEST_DATABASE_HOST} -p ${DC_ORO_TEST_DATABASE_PORT} -U ${DC_ORO_TEST_DATABASE_USER} -d \$DC_ORO_DATABASE_DBNAME -c 'DROP DATABASE IF EXISTS ${DC_ORO_TEST_DATABASE_DBNAME};'" 2>/dev/null || true
+          ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "PGPASSWORD=${DC_ORO_TEST_DATABASE_PASSWORD} psql -h ${DC_ORO_TEST_DATABASE_HOST} -p ${DC_ORO_TEST_DATABASE_PORT} -U ${DC_ORO_TEST_DATABASE_USER} -d \$DC_ORO_DATABASE_DBNAME -c 'CREATE DATABASE ${DC_ORO_TEST_DATABASE_DBNAME};'" || {
+            echo "Failed to create test database"
+            exit 1
+          }
+        elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "mariadb" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]]; then
+          # MySQL/MariaDB commands using environment variables like existing mysql command
+          ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "MYSQL_PWD=\$DC_ORO_DATABASE_PASSWORD mysql -h\$DC_ORO_DATABASE_HOST -P\$DC_ORO_DATABASE_PORT -u\$DC_ORO_DATABASE_USER \$DC_ORO_DATABASE_DBNAME -e 'DROP DATABASE IF EXISTS ${DC_ORO_TEST_DATABASE_DBNAME};'" 2>/dev/null || true
+          ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "MYSQL_PWD=\$DC_ORO_DATABASE_PASSWORD mysql -h\$DC_ORO_DATABASE_HOST -P\$DC_ORO_DATABASE_PORT -u\$DC_ORO_DATABASE_USER \$DC_ORO_DATABASE_DBNAME -e 'CREATE DATABASE ${DC_ORO_TEST_DATABASE_DBNAME};'" || {
+            echo "Failed to create test database"
+            exit 1
+          }
+        fi
+      fi
+      
+      # Clear test cache and install (only if database was created)
+      if [[ "$DB_EXISTS" == "false" ]]; then
+        >&2 echo -e "\033[36m==> Setting up Oro test environment...\033[0m"
+        echo "Running cache clear in 'test-cli' service..."
+        ${TEST_COMPOSE_CMD} run --rm test-cli bash -c "rm -rf var/cache/test" 2>/dev/null || true
+        echo "Running oro:install in 'test-cli' service..."
+        ${TEST_COMPOSE_CMD} run --rm test-cli bin/console --env=test oro:install
+      else
+        echo "Oro test environment already installed, skipping oro:install..."
+      fi
+      
+      # Generate behat.yml with correct URLs for test environment
+      >&2 echo -e "\033[36m==> Generating behat.yml with test environment URLs...\033[0m"
+      BEHAT_DIST_FILE="${DC_ORO_APPDIR}/vendor/oro/platform/src/Oro/Bundle/TestFrameworkBundle/Resources/config/behat.yml.dist"
+      BEHAT_CONFIG_FILE="${DC_ORO_APPDIR}/behat.yml"
+      
+      if [[ -f "$BEHAT_DIST_FILE" ]]; then
+        # Copy behat.yml.dist and replace URLs with sed for test environment
+        cp "$BEHAT_DIST_FILE" "$BEHAT_CONFIG_FILE"
+        
+        # Replace base_url for test environment
+        sed -i "s|base_url: 'http://localhost.com/'|base_url: 'http://test-nginx/'|g" "$BEHAT_CONFIG_FILE"
+        
+        # Replace all Selenium WebDriver hosts for test environment
+        sed -i "s|wd_host: 'http://localhost:4444/wd/hub'|wd_host: 'http://test-selenium:4444/wd/hub'|g" "$BEHAT_CONFIG_FILE"
+        echo "Generated behat.yml with test environment URLs"
+      else
+        echo "Warning: behat.yml.dist not found, skipping behat.yml generation"
+      fi
+      
+      # Start test services
+      ${TEST_COMPOSE_CMD} up -d test-fpm test-nginx test-selenium
+      echo "Test environment setup completed!"
+      exit 0
+      ;;
+      
+    "purge"|"destroy")
+      echo "Purging test environment..."
+      
+      # Build compose command without test file to get list of test services
+      MAIN_COMPOSE_CMD="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose.yml"
+      
+      # Add database-specific compose file
+      if [[ "${DC_ORO_DATABASE_SCHEMA}" == "pgsql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgresql" ]];then
+        MAIN_COMPOSE_CMD="${MAIN_COMPOSE_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-pgsql.yml"
+      elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "mariadb" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]];then
+        MAIN_COMPOSE_CMD="${MAIN_COMPOSE_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-mysql.yml"
+      fi
+      
+      # Add user compose file if exists
+      if [[ -f "$DC_ORO_APPDIR/.docker-compose.user.yml" ]]; then
+        MAIN_COMPOSE_CMD="${MAIN_COMPOSE_CMD} -f $DC_ORO_APPDIR/.docker-compose.user.yml"
+      fi
+      
+      # Get test services from docker-compose-test.yml using yq
+      if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-test.yml" ]]; then
+        TEST_SERVICES=$(yq e '.services | keys | .[]' "${DC_ORO_CONFIG_DIR}/docker-compose-test.yml" 2>/dev/null | tr '\n' ' ')
+        if [[ -n "$TEST_SERVICES" ]]; then
+          echo "Stopping test services: $TEST_SERVICES"
+          ${TEST_COMPOSE_CMD} stop $TEST_SERVICES 2>/dev/null || true
+          ${TEST_COMPOSE_CMD} rm -f $TEST_SERVICES 2>/dev/null || true
+        fi
+      fi
+      
+      # Drop test database using the same approach as existing database commands
+      # Test database name = main database name + _test suffix
+      echo "Dropping test database ${DC_ORO_TEST_DATABASE_DBNAME}..."
+      
+      if [[ "${DC_ORO_DATABASE_SCHEMA}" == "pgsql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgresql" ]]; then
+        # PostgreSQL commands using test-specific environment variables
+        ${MAIN_COMPOSE_CMD} run --rm database-cli bash -c "PGPASSWORD=${DC_ORO_TEST_DATABASE_PASSWORD} psql -h ${DC_ORO_TEST_DATABASE_HOST} -p ${DC_ORO_TEST_DATABASE_PORT} -U ${DC_ORO_TEST_DATABASE_USER} -d \$DC_ORO_DATABASE_DBNAME -c 'SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '\''${DC_ORO_TEST_DATABASE_DBNAME}'\'';'" 2>/dev/null || true
+        ${MAIN_COMPOSE_CMD} run --rm database-cli bash -c "PGPASSWORD=${DC_ORO_TEST_DATABASE_PASSWORD} psql -h ${DC_ORO_TEST_DATABASE_HOST} -p ${DC_ORO_TEST_DATABASE_PORT} -U ${DC_ORO_TEST_DATABASE_USER} -d \$DC_ORO_DATABASE_DBNAME -c 'DROP DATABASE ${DC_ORO_TEST_DATABASE_DBNAME};'" 2>/dev/null || true
+      elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "mariadb" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]]; then
+        # MySQL/MariaDB commands using environment variables like existing mysql command
+        ${MAIN_COMPOSE_CMD} run --rm database-cli bash -c "MYSQL_PWD=\$DC_ORO_DATABASE_PASSWORD mysql -h\$DC_ORO_DATABASE_HOST -P\$DC_ORO_DATABASE_PORT -u\$DC_ORO_DATABASE_USER \$DC_ORO_DATABASE_DBNAME -e 'DROP DATABASE IF EXISTS ${DC_ORO_TEST_DATABASE_DBNAME};'" 2>/dev/null || true
+      fi
+      
+      # Remove merged compose.yml to restore original configuration
+      # IMPORTANT: This cleanup prevents the merged compose.yml from interfering 
+      # with normal operations. The merged file should only exist during test sessions.
+      rm -f "${DC_ORO_CONFIG_DIR}/compose.yml" 2>/dev/null || true
+      echo "Test environment destroyed!"
+      exit 0
+      ;;
+      
+    "status")
+      echo "Test environment status:"
+      ${TEST_COMPOSE_CMD} ps test-fpm test-nginx test-selenium
+      echo ""
+      echo "Test application: Available in Docker network (test-nginx)"
+      echo "Selenium WebDriver: Available in Docker network (test-selenium:4444)"
+      exit 0
+      ;;
+      
+    *)
+      # Handle any other command by executing it in test-cli container
+      # This makes 'orodc tests' a full replacement for 'orodc' but in test environment
+      >&2 echo -e "\033[36m==> Running command in 'test-cli' service...\033[0m"
+      ${TEST_COMPOSE_CMD} up -d >/dev/null 2>&1
+      
+      # For tests command, use arguments after 'tests' without parsing
+      # Skip 'tests' (first argument) and use everything else as-is
+      test_command_args=("${args[@]:1}")
+      exec ${TEST_COMPOSE_CMD} run --rm test-cli "${test_command_args[@]}"
+      ;;
+  esac
   exit 0
 fi
 
@@ -664,11 +1176,30 @@ if [[ ${args[0]} == "purge" ]]; then
 
   exit 0
 fi
-set -x
+
 if [[ ${args[0]} == "down" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]] && [[ -s "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/compose.yml"
-  exec bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} ${args[@]} ${right_flags[@]} ${right_options[@]}"
+  # Combine all arguments into a single string for proper execution
+  full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${args[*]} ${right_flags[*]} ${right_options[*]}"
+  exec bash -c "$full_cmd"
 fi
 
-bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} config" > "${DC_ORO_CONFIG_DIR}/compose.yml"
-exec bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} ${args[@]} ${right_flags[@]} ${right_options[@]}"
+# Handle docker compose commands with all variables set
+if [[ "$is_docker_compose_cmd" == "true" ]]; then
+  [[ -n "${DEBUG:-}" ]] && echo "DEBUG: About to execute docker compose command" >&2
+  # Generate config file, ignore warnings/errors
+  DC_ORO_NAME="$DC_ORO_NAME" bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} config" > "${DC_ORO_CONFIG_DIR}/compose.yml" 2>/dev/null || true
+  [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Config generated" >&2
+  # For docker compose commands, proper order is: command flags services
+  # Extract command (first element) and services (rest of elements)
+  docker_cmd="${args[0]}"
+  docker_services="${args[*]:1}"
+  full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${docker_cmd} ${right_flags[*]} ${right_options[*]} ${docker_services}"
+  [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Executing: $full_cmd" >&2
+  DC_ORO_NAME="$DC_ORO_NAME" exec bash -c "$full_cmd"
+fi
+
+DC_ORO_NAME="$DC_ORO_NAME" bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} config" > "${DC_ORO_CONFIG_DIR}/compose.yml" 2>/dev/null || true
+# Combine all arguments into a single string for proper execution  
+full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${args[*]} ${right_flags[*]} ${right_options[*]}"
+DC_ORO_NAME="$DC_ORO_NAME" exec bash -c "$full_cmd"

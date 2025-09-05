@@ -1,0 +1,180 @@
+services:
+  test-fpm:
+    container_name: "${DC_ORO_NAME:-unnamed}_test_fpm_${DC_ORO_PHP_VERSION:-8.3}-${DC_ORO_NODE_VERSION:-20}-${DC_ORO_COMPOSER_VERSION:-2}"
+    hostname: test-fpm.${DC_ORO_NAME:-unnamed}.docker.local
+    image: ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.3}-${DC_ORO_NODE_VERSION:-20}-${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}
+    build:
+      dockerfile: Dockerfile.${DC_ORO_PHP_VERSION:-8.3}.${DC_ORO_PHP_DIST:-alpine}
+      context: "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony"
+      args:
+        APP_DIR: "${DC_ORO_APPDIR:-/var/www}"
+        PHP_VERSION: "${DC_ORO_PHP_VERSION:-8.3}"
+        NODE_VERSION: "${DC_ORO_NODE_VERSION:-20}"
+        PHP_USER_NAME: "${DC_ORO_PHP_USER_NAME:-developer}"
+        PHP_USER_GROUP: "${DC_ORO_PHP_USER_GROUP:-developer}"
+        PHP_UID: "${DC_ORO_PHP_UID:-1000}"
+        PHP_GID: "${DC_ORO_PHP_GID:-1000}"
+        COMPOSER_VERSION: "${DC_ORO_COMPOSER_VERSION:-2}"
+    tmpfs:
+      - /tmp:rw,size=256m
+    user: "${DC_ORO_USER_NAME:-developer}"
+    command: php-fpm -R
+    volumes:
+      - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
+      - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
+      - "home-root:/root"
+      - "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/msmtprc:/home/${DC_ORO_PHP_USER_NAME:-developer}/.msmtprc:ro"
+      - "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro"
+    working_dir: "${DC_ORO_APPDIR:-/var/www}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - 'APP_DIR=${DC_ORO_APPDIR:-/var/www}'
+      - 'ORO_ENV=test'
+      - 'SYMFONY_ENV=test'
+      - 'DC_ORO_APPDIR=${DC_ORO_APPDIR:-/var/www}'
+      - 'DC_ORO_DATABASE_HOST=${DC_ORO_DATABASE_HOST:-database}'
+      - 'DC_ORO_DATABASE_PORT=${DC_ORO_DATABASE_PORT:-5432}'
+      - 'DC_ORO_DATABASE_USER=${DC_ORO_DATABASE_USER:-app}'
+      - 'DC_ORO_DATABASE_PASSWORD=${DC_ORO_DATABASE_PASSWORD:-app}'
+      - 'DC_ORO_DATABASE_DBNAME=${DC_ORO_TEST_DATABASE_DBNAME:-oro_db_test}'
+      - 'ORO_DB_URL=${DC_ORO_TEST_DATABASE_URI:-postgres://oro_db_user:oro_db_pass@database:5432/oro_db_test}'
+      - 'ORO_DB_DSN=${DC_ORO_TEST_DATABASE_URI:-postgres://oro_db_user:oro_db_pass@database:5432/oro_db_test}'
+      - 'ORO_DB_HOST=${DC_ORO_DATABASE_HOST:-database}'
+      - 'ORO_DB_PORT=${DC_ORO_DATABASE_PORT:-5432}'
+      - 'ORO_DB_NAME=${DC_ORO_TEST_DATABASE_DBNAME:-oro_db_test}'
+      - 'ORO_DB_USER=${DC_ORO_DATABASE_USER:-app}'
+      - 'ORO_DB_PASSWORD=${DC_ORO_DATABASE_PASSWORD:-app}'
+      - 'ORO_SEARCH_URL=${DC_ORO_SEARCH_URI:-elastic-search://search:9200}'
+      - 'ORO_SEARCH_DSN=${DC_ORO_SEARCH_DSN:-elastic-search://search:9200}'
+      - 'ORO_SEARCH_ENGINE_DSN=${DC_ORO_SEARCH_DSN:-elastic-search://search:9200}?prefix=oro_search_test'
+      - 'ORO_WEBSITE_SEARCH_ENGINE_DSN=${DC_ORO_SEARCH_DSN:-elastic-search://search:9200}?prefix=oro_website_search_test'
+      - 'ORO_MQ_DSN=${DC_ORO_MQ_URI:-""}'
+      - 'ORO_REDIS_URL=${DC_ORO_REDIS_URI:-""}'
+      - 'ORO_SESSION_DSN=${DC_ORO_REDIS_URI:-""}/10'
+      - 'ORO_REDIS_CACHE_DSN=${DC_ORO_REDIS_URI:-""}/11'
+      - 'ORO_REDIS_DOCTRINE_DSN=${DC_ORO_REDIS_URI:-""}/12'
+      - 'ORO_REDIS_LAYOUT_DSN=${DC_ORO_REDIS_URI:-""}/13'
+      - 'ORO_MAILER_DRIVER=${ORO_MAILER_DRIVER:-smtp}'
+      - 'ORO_MAILER_HOST=${ORO_MAILER_HOST:-mail}'
+      - 'ORO_MAILER_PORT=${ORO_MAILER_PORT:-1025}'
+      - 'ORO_SECRET=${ORO_SECRET-ThisTokenIsNotSoSecretChangeIt}'
+      - 'COMPOSER_AUTH=${DC_ORO_COMPOSER_AUTH:-""}'
+      - 'NODE_OPTIONS="--max-old-space-size=1024"'
+      - 'XDEBUG_MODE=${XDEBUG_MODE_FPM:-off}'
+    restart: "no"
+    healthcheck:
+      test: /bin/bash -c "</dev/tcp/localhost/9000"
+      start_period: 5s
+      interval: 5s
+      retries: 18
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+
+  test-nginx:
+    image: ghcr.io/digitalspacestdio/orodc-nginx
+    hostname: test-nginx.${DC_ORO_NAME:-unnamed}.docker.local
+    container_name: ${DC_ORO_NAME:-unnamed}_test_nginx
+    build:
+      context: "${DC_ORO_CONFIG_DIR:-.}/docker/nginx"
+      args:
+        APP_DIR: "${DC_ORO_APPDIR:-/var/www}"
+    depends_on:
+      test-fpm:
+        condition: service_healthy
+    links:
+      - "test-fpm:fpm"
+    volumes:
+      - "appcode:${DC_ORO_APPDIR:-/var/www}:ro"
+    working_dir: "${DC_ORO_APPDIR:-/var/www}"
+    restart: "no"
+    environment:
+      - 'APP_DIR=${DC_ORO_APPDIR:-/var/www}'
+      - 'DC_ORO_APPDIR=${DC_ORO_APPDIR:-/var/www}'
+    healthcheck:
+      test: /bin/bash -c "</dev/tcp/localhost/80"
+      start_period: 5s
+      interval: 5s
+      retries: 18
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+
+  test-selenium:
+    image: selenium/standalone-chrome:3.141.59-20210607
+    hostname: test-selenium.${DC_ORO_NAME:-unnamed}.docker.local
+    container_name: ${DC_ORO_NAME:-unnamed}_test_selenium
+    ports:
+      - "4444:4444"
+    shm_size: "2g"
+    restart: "no"
+    # environment:
+      # - SE_OPTS=--log-level FINE  # Not supported in Selenium 3.x
+    healthcheck:
+      test: "curl -f http://localhost:4444/wd/hub/status || exit 1"
+      start_period: 10s
+      interval: 10s
+      retries: 10
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+
+  test-cli:
+    container_name: "${DC_ORO_NAME:-unnamed}_test_cli_${DC_ORO_PHP_VERSION:-8.3}-${DC_ORO_NODE_VERSION:-20}-${DC_ORO_COMPOSER_VERSION:-2}"
+    hostname: test-cli.${DC_ORO_NAME:-unnamed}.docker.local
+    image: ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.3}-${DC_ORO_NODE_VERSION:-20}-${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}
+    user: "${DC_ORO_USER_NAME:-developer}"
+    tmpfs:
+      - /tmp:rw,size=256m
+    volumes:
+      - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
+      - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
+      - "home-root:/root"
+      - "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro"
+    working_dir: "${DC_ORO_APPDIR:-/var/www}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    environment:
+      - 'APP_DIR=${DC_ORO_APPDIR:-/var/www}'
+      - 'DC_ORO_APPDIR=${DC_ORO_APPDIR:-/var/www}'
+      - 'DC_ORO_DATABASE_HOST=${DC_ORO_TEST_DATABASE_HOST:-${DC_ORO_DATABASE_HOST:-database}}'
+      - 'DC_ORO_DATABASE_PORT=${DC_ORO_TEST_DATABASE_PORT:-${DC_ORO_DATABASE_PORT:-5432}}'
+      - 'DC_ORO_DATABASE_USER=${DC_ORO_TEST_DATABASE_USER:-${DC_ORO_DATABASE_USER:-oro_db_user}}'
+      - 'DC_ORO_DATABASE_PASSWORD=${DC_ORO_TEST_DATABASE_PASSWORD:-${DC_ORO_DATABASE_PASSWORD:-oro_db_pass}}'
+      - 'DC_ORO_DATABASE_DBNAME=${DC_ORO_TEST_DATABASE_DBNAME:-oro_db_test}'
+      - 'ORO_DB_URL=${DC_ORO_TEST_DATABASE_URI:-postgres://${DC_ORO_TEST_DATABASE_USER:-${DC_ORO_DATABASE_USER:-oro_db_user}}:${DC_ORO_TEST_DATABASE_PASSWORD:-${DC_ORO_DATABASE_PASSWORD:-oro_db_pass}}@${DC_ORO_TEST_DATABASE_HOST:-${DC_ORO_DATABASE_HOST:-database}}:${DC_ORO_TEST_DATABASE_PORT:-${DC_ORO_DATABASE_PORT:-5432}}/${DC_ORO_TEST_DATABASE_DBNAME:-oro_db_test}}'
+      - 'ORO_DB_DSN=${DC_ORO_TEST_DATABASE_URI:-postgres://${DC_ORO_TEST_DATABASE_USER:-${DC_ORO_DATABASE_USER:-oro_db_user}}:${DC_ORO_TEST_DATABASE_PASSWORD:-${DC_ORO_DATABASE_PASSWORD:-oro_db_pass}}@${DC_ORO_TEST_DATABASE_HOST:-${DC_ORO_DATABASE_HOST:-database}}:${DC_ORO_TEST_DATABASE_PORT:-${DC_ORO_DATABASE_PORT:-5432}}/${DC_ORO_TEST_DATABASE_DBNAME:-oro_db_test}}'
+      - 'ORO_DB_HOST=${DC_ORO_TEST_DATABASE_HOST:-${DC_ORO_DATABASE_HOST:-database}}'
+      - 'ORO_DB_PORT=${DC_ORO_TEST_DATABASE_PORT:-${DC_ORO_DATABASE_PORT:-5432}}'
+      - 'ORO_DB_NAME=${DC_ORO_TEST_DATABASE_DBNAME:-oro_db_test}'
+      - 'ORO_DB_USER=${DC_ORO_TEST_DATABASE_USER:-${DC_ORO_DATABASE_USER:-oro_db_user}}'
+      - 'ORO_DB_PASSWORD=${DC_ORO_TEST_DATABASE_PASSWORD:-${DC_ORO_DATABASE_PASSWORD:-oro_db_pass}}'
+      - 'ORO_SEARCH_URL=${DC_ORO_TEST_SEARCH_URI:-${DC_ORO_SEARCH_URI:-elastic-search://search:9200}}'
+      - 'ORO_SEARCH_DSN=${DC_ORO_TEST_SEARCH_DSN:-${DC_ORO_SEARCH_DSN:-elastic-search://search:9200}}'
+      - 'ORO_SEARCH_ENGINE_DSN=${DC_ORO_TEST_SEARCH_DSN:-${DC_ORO_SEARCH_DSN:-elastic-search://search:9200}}?prefix=${DC_ORO_TEST_SEARCH_PREFIX:-oro_search_test}'
+      - 'ORO_WEBSITE_SEARCH_ENGINE_DSN=${DC_ORO_TEST_SEARCH_DSN:-${DC_ORO_SEARCH_DSN:-elastic-search://search:9200}}?prefix=${DC_ORO_TEST_WEBSITE_SEARCH_PREFIX:-oro_website_search_test}'
+      - 'ORO_MQ_DSN=${DC_ORO_TEST_MQ_URI:-${DC_ORO_MQ_URI:-""}}'
+      - 'ORO_REDIS_URL=${DC_ORO_TEST_REDIS_URI:-${DC_ORO_REDIS_URI:-""}}'
+      - 'ORO_SESSION_DSN=${DC_ORO_TEST_REDIS_URI:-${DC_ORO_REDIS_URI:-""}}/${DC_ORO_TEST_REDIS_SESSION_DB:-10}'
+      - 'ORO_REDIS_CACHE_DSN=${DC_ORO_TEST_REDIS_URI:-${DC_ORO_REDIS_URI:-""}}/${DC_ORO_TEST_REDIS_CACHE_DB:-11}'
+      - 'ORO_REDIS_DOCTRINE_DSN=${DC_ORO_TEST_REDIS_URI:-${DC_ORO_REDIS_URI:-""}}/${DC_ORO_TEST_REDIS_DOCTRINE_DB:-12}'
+      - 'ORO_REDIS_LAYOUT_DSN=${DC_ORO_TEST_REDIS_URI:-${DC_ORO_REDIS_URI:-""}}/${DC_ORO_TEST_REDIS_LAYOUT_DB:-13}'
+      - 'ORO_MAILER_DRIVER=${DC_ORO_TEST_MAILER_DRIVER:-${ORO_MAILER_DRIVER:-smtp}}'
+      - 'ORO_MAILER_HOST=${DC_ORO_TEST_MAILER_HOST:-${ORO_MAILER_HOST:-mail}}'
+      - 'ORO_MAILER_PORT=${DC_ORO_TEST_MAILER_PORT:-${ORO_MAILER_PORT:-1025}}'
+      - 'ORO_SECRET=${DC_ORO_TEST_SECRET:-${ORO_SECRET-ThisTokenIsNotSoSecretChangeIt}}'
+      - 'COMPOSER_AUTH=${DC_ORO_COMPOSER_AUTH:-""}'
+      - 'NODE_OPTIONS="--max-old-space-size=1024"'
+      - 'SYMFONY_ENV=test'
+      - 'ORO_ENV=test'
+      - 'XDEBUG_MODE=${XDEBUG_MODE_CLI:-off}'
+    restart: "no"
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+
