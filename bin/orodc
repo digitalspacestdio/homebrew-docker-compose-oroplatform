@@ -1,6 +1,14 @@
 #!/bin/bash
-set -e
-[[ -n "${DEBUG:-}" ]] && set -x
+set -ex
+
+# Setup logging
+exec 3>&1 4>&2
+mkdir -p /tmp/.orodc
+touch /tmp/.orodc/$(basename $0).$(echo "$@" | md5sum - | awk '{ print $1 }').err
+touch /tmp/.orodc/$(basename $0).$(echo "$@" | md5sum - | awk '{ print $1 }').log
+exec 2> >(tee /tmp/.orodc/$(basename $0).$(echo "$@" | md5sum - | awk '{ print $1 }').err)
+exec 1> >(tee /tmp/.orodc/$(basename $0).$(echo "$@" | md5sum - | awk '{ print $1 }').log)
+
 
 # Save original arguments before any processing
 original_args=("$@")
@@ -34,7 +42,6 @@ if [[ "$1" == "version" ]]; then
   # Extract version from Formula file
   if [[ -n "$FORMULA_FILE" && -f "$FORMULA_FILE" ]]; then
     FORMULA_VERSION=$(grep -o 'version "[^"]*"' "$FORMULA_FILE" 2>/dev/null | sed 's/version "\(.*\)"/\1/')
-    [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Found version $FORMULA_VERSION in $FORMULA_FILE" >&2
   fi
   
   # Output version or fallback
@@ -42,7 +49,6 @@ if [[ "$1" == "version" ]]; then
     echo "orodc version $FORMULA_VERSION"
   else
     echo "orodc version 0.8.2 (fallback)"
-    [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Could not find Formula file, using fallback version" >&2
   fi
   exit 0
 fi
@@ -109,14 +115,6 @@ else
   args=("${non_compose_args[@]}")
 fi
 
-# Debug output
-if [[ -n "${DEBUG:-}" ]]; then 
-  echo "Left Flags: ${left_flags[*]}"
-  echo "Left Options: ${left_options[*]}"
-  echo "Args: ${args[*]}"
-  echo "Right Flags: ${right_flags[*]}"
-  echo "Right Options: ${right_options[*]}"
-fi
 
 BREW_BIN=$(which brew 2>/dev/null)
 if [ -z "${BREW_BIN}" ]; then
@@ -130,7 +128,6 @@ DIR=$(brew --prefix docker-compose-oroplatform)/share/docker-compose-oroplatform
 export PWD=$(pwd)
 export DC_ORO_NAME=${DC_ORO_NAME-$(basename $(pwd))}
 export DC_ORO_CONFIG_DIR="$HOME/.$(basename $0)/${DC_ORO_NAME}"
-[[ -n "${DEBUG:-}" ]] && echo "DEBUG: Basic variables set" >&2
 RSYNC_BIN=$(brew --prefix rsync)/bin/rsync
 DOCKER_BIN="${DOCKER_BIN-$(which docker)}";
 DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN-$(which docker) compose}";
@@ -185,21 +182,17 @@ save_profiles() {
   # Save regular profiles to cache file
   if [[ ${#profiles[@]} -gt 0 ]]; then
     printf '%s\n' "${profiles[@]}" > "${DC_ORO_CONFIG_DIR}/.cached_profiles"
-    [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Saved profiles: ${profiles[*]}" >&2
   else
     # Remove cache file if no profiles
     [[ -f "${DC_ORO_CONFIG_DIR}/.cached_profiles" ]] && rm -f "${DC_ORO_CONFIG_DIR}/.cached_profiles" || true
-    [[ -n "${DEBUG:-}" ]] && echo "DEBUG: No profiles to save, removed cache" >&2
   fi
   
   # Save CLI profiles to separate cache file
   if [[ ${#cli_profiles[@]} -gt 0 ]]; then
     printf '%s\n' "${cli_profiles[@]}" > "${DC_ORO_CONFIG_DIR}/.cached_cli_profiles"
-    [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Saved CLI profiles: ${cli_profiles[*]}" >&2
   else
     # Remove CLI cache file if no CLI profiles
     [[ -f "${DC_ORO_CONFIG_DIR}/.cached_cli_profiles" ]] && rm -f "${DC_ORO_CONFIG_DIR}/.cached_cli_profiles" || true
-    [[ -n "${DEBUG:-}" ]] && echo "DEBUG: No CLI profiles to save, removed CLI cache" >&2
   fi
   return 0
 }
@@ -215,18 +208,15 @@ load_cached_profiles() {
     # Commands that always need CLI profiles (for proper cleanup)
     if [[ "$first_arg" =~ ^(down|purge)$ ]]; then
       include_cli_profiles=true
-      [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Cleanup command detected, will load all CLI profiles" >&2
     # Commands that need database-cli profile
     elif [[ "$first_arg" =~ ^(mysql|psql|database-cli)$ ]] || \
        echo "$first_arg" | grep -i 'import.*db\|export.*db\|dump.*db' > /dev/null; then
       include_cli_profiles=true
-      [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Database command detected, will load CLI profiles" >&2
     # Commands that need php-cli profile (already handled by auto-redirect, but for completeness)
     elif [[ "$first_arg" =~ ^(cli|php|composer|bin/)$ ]] || \
        [[ "$first_arg" == *.php ]] || \
        [[ "$first_arg" == -* ]]; then
       include_cli_profiles=true
-      [[ -n "${DEBUG:-}" ]] && echo "DEBUG: PHP/CLI command detected, will load CLI profiles" >&2
     fi
   fi
   
@@ -237,7 +227,6 @@ load_cached_profiles() {
     done < "${DC_ORO_CONFIG_DIR}/.cached_profiles"
     
     if [[ ${#cached_profiles[@]} -gt 0 ]]; then
-      [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Loaded cached profiles: ${cached_profiles[*]}" >&2
       # Add cached profiles to left_options (they will be applied to DOCKER_COMPOSE_BIN_CMD)
       left_options=("${cached_profiles[@]}" "${left_options[@]}")
     fi
@@ -251,7 +240,6 @@ load_cached_profiles() {
     done < "${DC_ORO_CONFIG_DIR}/.cached_cli_profiles"
     
     if [[ ${#cached_cli_profiles[@]} -gt 0 ]]; then
-      [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Loaded cached CLI profiles: ${cached_cli_profiles[*]}" >&2
       # Add CLI profiles to left_options
       left_options=("${cached_cli_profiles[@]}" "${left_options[@]}")
     fi
@@ -515,7 +503,6 @@ done <<< "$BATCH_PORTS"
 
 export COMPOSER_AUTH=$(echo ${DC_ORO_COMPOSER_AUTH:-${COMPOSER_AUTH}} | jq -c .)
 export DC_ORO_COMPOSER_AUTH=${COMPOSER_AUTH}
-[[ -n "${DEBUG:-}" ]] && echo "DEBUG: COMPOSER_AUTH set" >&2
 
 if ${DOCKER_BIN} system info --format '{{.SecurityOptions}}' 2>/dev/null | grep "name=rootless" > /dev/null 2>&1; then
   # Use root user in the rootless mode
@@ -523,13 +510,11 @@ if ${DOCKER_BIN} system info --format '{{.SecurityOptions}}' 2>/dev/null | grep 
   export DC_ORO_USER_GROUP="root"
   export DC_ORO_USER_UID=0
   export DC_ORO_USER_GID=0
-  [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Using rootless mode" >&2
 else
   export DC_ORO_USER_NAME="developer"
   export DC_ORO_USER_GROUP="developer"
   export DC_ORO_USER_UID=$UID
   export DC_ORO_USER_GID=$GID
-  [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Using normal mode" >&2
 fi
 
 export DC_ORO_PHP_USER_NAME=${DC_ORO_USER_NAME}
@@ -573,7 +558,6 @@ elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "mariadb" ]] || [[ "${DC_ORO_DATABASE_SCH
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-mysql.yml"
 fi
 if ${DOCKER_COMPOSE_BIN_CMD} ps --services 2>/dev/null | grep database > /dev/null; then
-  [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Found database service" >&2
   SERVICE_DATABASE_ID=$(${DOCKER_COMPOSE_BIN_CMD} ps -q database)
   if [[ "" != $SERVICE_DATABASE_ID ]] && ${DOCKER_BIN} inspect -f '{{ .Config.Image }}' "$SERVICE_DATABASE_ID" | grep 'busybox'; then
     ${DOCKER_COMPOSE_BIN_CMD} stop database
@@ -892,11 +876,9 @@ is_special_orodc_command() {
 }
 
 # Check if first argument is a docker compose command (will be handled at the end)
-[[ -n "${DEBUG:-}" ]] && echo "DEBUG: Checking if ${args[0]} is docker compose command" >&2
 is_docker_compose_cmd=false
 if [[ ${#args[@]} -gt 0 ]] && is_docker_compose_command "${args[0]}"; then
   is_docker_compose_cmd=true
-  [[ -n "${DEBUG:-}" ]] && echo "DEBUG: ${args[0]} is docker compose command" >&2
 fi
 
 # Function to copy external PHP files to container
@@ -914,10 +896,7 @@ copy_external_php_files() {
       if [[ -z $DC_ORO_APPDIR ]] || [[ $PHPFILE_DIR != '.' && $PHPFILE_DIR != $DC_ORO_APPDIR && $PHPFILE_DIR != $DC_ORO_APPDIR/* ]]; then
         # Check if file exists locally
         if [[ -f "${PHPFILE_PATH}" ]]; then
-          [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Found external PHP file ${PHPFILE_PATH} for copying" >&2
           external_files+=("${PHPFILE_PATH}")
-        else
-          [[ -n "${DEBUG:-}" ]] && echo "DEBUG: External PHP file ${PHPFILE_PATH} not found locally" >&2
         fi
       fi
     fi
@@ -925,33 +904,25 @@ copy_external_php_files() {
   
   # Copy files if any external files found
   if [[ ${#external_files[@]} -gt 0 ]]; then
-    [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Starting temporary container to copy ${#external_files[@]} external PHP files" >&2
     
     # Start temporary container with sleep infinity
     TEMP_CONTAINER_NAME="${DC_ORO_NAME}_temp_copy_$$"
-    ${DOCKER_COMPOSE_RUN_CMD} --name "${TEMP_CONTAINER_NAME}" -d cli sleep infinity 2>/dev/null || {
-      [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Failed to start temporary container" >&2
+    ${DOCKER_COMPOSE_RUN_CMD} --name "${TEMP_CONTAINER_NAME}" -d cli sleep infinity >/dev/null 2>&1 || {
       return 1
     }
     
     # Copy each external file
     for file in "${external_files[@]}"; do
       file_dir=$(dirname "${file}")
-      [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Copying ${file} to temporary container" >&2
       
       # Create directory and copy file
-      docker exec "${TEMP_CONTAINER_NAME}" mkdir -p "${file_dir}" 2>/dev/null || true
-      if docker cp "${file}" "${TEMP_CONTAINER_NAME}:${file}" 2>/dev/null; then
-        [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Successfully copied ${file}" >&2
-      else
-        [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Failed to copy ${file}" >&2
-      fi
+      docker exec "${TEMP_CONTAINER_NAME}" mkdir -p "${file_dir}" >/dev/null 2>&1 || true
+      docker cp "${file}" "${TEMP_CONTAINER_NAME}:${file}" >/dev/null 2>&1 || true
     done
     
     # Stop and remove temporary container
     docker stop "${TEMP_CONTAINER_NAME}" >/dev/null 2>&1 || true
     docker rm "${TEMP_CONTAINER_NAME}" >/dev/null 2>&1 || true
-    [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Temporary container stopped and removed" >&2
   fi
 }
 
@@ -991,9 +962,17 @@ if [[ "$has_php_file" == true ]]; then
             ;;
         esac
       done
-      exec ${DOCKER_COMPOSE_RUN_CMD} "${docker_flags[@]}" ${left_options[@]} cli php "${php_flags[@]}" "${right_flags[@]}" "${right_options[@]}" "${args[@]}"
+      # Restore standard streams
+      exec 1>&3 2>&4
+      # Close temporary descriptors
+      exec 3>&- 4>&-
+      exec ${DOCKER_COMPOSE_RUN_CMD} "${docker_flags[@]}" "${left_options[@]}" cli php "${php_flags[@]}" "${right_flags[@]}" "${right_options[@]}" "${args[@]}"
     else
-      exec ${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} cli "${args[@]}" "${right_flags[@]}" "${right_options[@]}"
+      # Restore standard streams
+      exec 1>&3 2>&4
+      # Close temporary descriptors
+      exec 3>&- 4>&-
+      exec ${DOCKER_COMPOSE_RUN_CMD} "${left_flags[@]}" "${left_options[@]}" cli "${args[@]}" "${right_flags[@]}" "${right_options[@]}"
     fi
   fi
 fi
@@ -1005,10 +984,18 @@ if [[ ${#args[@]} -gt 0 ]] && ! is_docker_compose_command "${args[0]}" && ! is_s
   # Special handling for bash -c commands
   if [[ "${args[0]}" == "bash" && "${right_flags[0]}" == "-c" ]]; then
     # For bash -c 'command', reconstruct proper argument order
+    # Restore standard streams
+    exec 1>&3 2>&4
+    # Close temporary descriptors
+    exec 3>&- 4>&-
     exec ${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} cli bash -c "${args[@]:1}" "${right_options[@]}"
   else
     # Pass arguments directly to docker compose exec without additional escaping
     # Combine args with right_flags and right_options in proper order
+    # Restore standard streams
+    exec 1>&3 2>&4
+    # Close temporary descriptors
+    exec 3>&- 4>&-
     exec ${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} cli "${args[@]}" "${right_flags[@]}" "${right_options[@]}"
   fi
 fi
@@ -1280,20 +1267,28 @@ fi
 
 # Handle docker compose commands with all variables set
 if [[ "$is_docker_compose_cmd" == "true" ]]; then
-  [[ -n "${DEBUG:-}" ]] && echo "DEBUG: About to execute docker compose command" >&2
   # Generate config file, ignore warnings/errors
   DC_ORO_NAME="$DC_ORO_NAME" bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} config" > "${DC_ORO_CONFIG_DIR}/compose.yml" 2>/dev/null || true
-  [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Config generated" >&2
   # For docker compose commands, proper order is: command flags services
   # Extract command (first element) and services (rest of elements)
   docker_cmd="${args[0]}"
   docker_services="${args[*]:1}"
   full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${docker_cmd} ${right_flags[*]} ${right_options[*]} ${docker_services}"
-  [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Executing: $full_cmd" >&2
+  # Restore standard streams
+  exec 1>&3 2>&4
+  # Close temporary descriptors
+  exec 3>&- 4>&-
   DC_ORO_NAME="$DC_ORO_NAME" exec bash -c "$full_cmd"
 fi
 
 DC_ORO_NAME="$DC_ORO_NAME" bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} config" > "${DC_ORO_CONFIG_DIR}/compose.yml" 2>/dev/null || true
 # Combine all arguments into a single string for proper execution  
 full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${args[*]} ${right_flags[*]} ${right_options[*]}"
+
+# Restore standard streams
+exec 1>&3 2>&4
+
+# Close temporary descriptors
+exec 3>&- 4>&-
+
 DC_ORO_NAME="$DC_ORO_NAME" exec bash -c "$full_cmd"
