@@ -900,9 +900,11 @@ if [[ ${#args[@]} -gt 0 ]] && is_docker_compose_command "${args[0]}"; then
 fi
 
 # Function to copy external PHP files to container
-# Now that /tmp and /private/ are Docker volumes (not host mounts),
-# we need to copy files from host to container for all external files
+# Use temporary container with sleep infinity approach
 copy_external_php_files() {
+  local external_files=()
+  
+  # Collect external PHP files
   for arg in "$@"; do
     if [[ $arg == *.php ]]; then
       PHPFILE_PATH=$(echo $arg | grep -o '.\+\.php' | sed s~.\*=~~)
@@ -912,23 +914,45 @@ copy_external_php_files() {
       if [[ -z $DC_ORO_APPDIR ]] || [[ $PHPFILE_DIR != '.' && $PHPFILE_DIR != $DC_ORO_APPDIR && $PHPFILE_DIR != $DC_ORO_APPDIR/* ]]; then
         # Check if file exists locally
         if [[ -f "${PHPFILE_PATH}" ]]; then
-          [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Copying external PHP file ${PHPFILE_PATH} to shared volume" >&2
-          
-          # Create directory and copy file using docker compose run
-          ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "mkdir -p '${PHPFILE_DIR}'" 2>/dev/null || true
-          
-          # Copy file content using docker compose run with stdin
-          if cat "${PHPFILE_PATH}" | ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "cat > '${PHPFILE_PATH}'" 2>/dev/null; then
-            [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Successfully copied ${PHPFILE_PATH} to shared volume" >&2
-          else
-            [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Failed to copy ${PHPFILE_PATH} to shared volume" >&2
-          fi
+          [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Found external PHP file ${PHPFILE_PATH} for copying" >&2
+          external_files+=("${PHPFILE_PATH}")
         else
           [[ -n "${DEBUG:-}" ]] && echo "DEBUG: External PHP file ${PHPFILE_PATH} not found locally" >&2
         fi
       fi
     fi
   done
+  
+  # Copy files if any external files found
+  if [[ ${#external_files[@]} -gt 0 ]]; then
+    [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Starting temporary container to copy ${#external_files[@]} external PHP files" >&2
+    
+    # Start temporary container with sleep infinity
+    TEMP_CONTAINER_NAME="${DC_ORO_NAME}_temp_copy_$$"
+    ${DOCKER_COMPOSE_RUN_CMD} --name "${TEMP_CONTAINER_NAME}" -d cli sleep infinity 2>/dev/null || {
+      [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Failed to start temporary container" >&2
+      return 1
+    }
+    
+    # Copy each external file
+    for file in "${external_files[@]}"; do
+      file_dir=$(dirname "${file}")
+      [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Copying ${file} to temporary container" >&2
+      
+      # Create directory and copy file
+      docker exec "${TEMP_CONTAINER_NAME}" mkdir -p "${file_dir}" 2>/dev/null || true
+      if docker cp "${file}" "${TEMP_CONTAINER_NAME}:${file}" 2>/dev/null; then
+        [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Successfully copied ${file}" >&2
+      else
+        [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Failed to copy ${file}" >&2
+      fi
+    done
+    
+    # Stop and remove temporary container
+    docker stop "${TEMP_CONTAINER_NAME}" >/dev/null 2>&1 || true
+    docker rm "${TEMP_CONTAINER_NAME}" >/dev/null 2>&1 || true
+    [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Temporary container stopped and removed" >&2
+  fi
 }
 
 # Copy external PHP files before executing any command
@@ -949,7 +973,7 @@ if [[ "$has_php_file" == true ]]; then
   # Special handling for bash -c commands with PHP files
   if [[ "${args[0]}" == "bash" && "${right_flags[0]}" == "-c" ]]; then
     # For bash -c 'php script.php', reconstruct proper argument order
-    exec ${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} cli bash -c "${args[@]:1}" "${right_options[@]}"
+    exec ${DOCKER_COMPOSE_RUN_CLI_CMD} ${left_flags[@]} ${left_options[@]} cli bash -c "${args[@]:1}" "${right_options[@]}"
   else
     # Prepend 'php' to the command if not already present
     if [[ "${args[0]}" != "php" ]]; then
