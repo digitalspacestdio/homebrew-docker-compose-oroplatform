@@ -15,7 +15,35 @@ args_input=("$@")
 
 # Handle version command
 if [[ "$1" == "version" ]]; then
-  echo "orodc version 0.8.0_47"
+  # Try to find and read version from Formula file
+  FORMULA_VERSION=""
+  FORMULA_FILE=""
+  
+  # Use find to locate Formula file, starting from script directory and going up
+  SCRIPT_DIR="$(dirname "$0")"
+  FORMULA_FILE=$(find "$SCRIPT_DIR" -name "docker-compose-oroplatform.rb" -type f 2>/dev/null | head -1)
+  
+  # If not found relative to script, try brew repository
+  if [[ -z "$FORMULA_FILE" ]] && command -v brew >/dev/null 2>&1; then
+    BREW_REPO=$(brew --repository 2>/dev/null)
+    if [[ -n "$BREW_REPO" ]]; then
+      FORMULA_FILE=$(find "$BREW_REPO" -name "docker-compose-oroplatform.rb" -type f 2>/dev/null | head -1)
+    fi
+  fi
+  
+  # Extract version from Formula file
+  if [[ -n "$FORMULA_FILE" && -f "$FORMULA_FILE" ]]; then
+    FORMULA_VERSION=$(grep -o 'version "[^"]*"' "$FORMULA_FILE" 2>/dev/null | sed 's/version "\(.*\)"/\1/')
+    [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Found version $FORMULA_VERSION in $FORMULA_FILE" >&2
+  fi
+  
+  # Output version or fallback
+  if [[ -n "$FORMULA_VERSION" ]]; then
+    echo "orodc version $FORMULA_VERSION"
+  else
+    echo "orodc version 0.8.2 (fallback)"
+    [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Could not find Formula file, using fallback version" >&2
+  fi
   exit 0
 fi
 
@@ -870,6 +898,49 @@ if [[ ${#args[@]} -gt 0 ]] && is_docker_compose_command "${args[0]}"; then
   is_docker_compose_cmd=true
   [[ -n "${DEBUG:-}" ]] && echo "DEBUG: ${args[0]} is docker compose command" >&2
 fi
+
+# Function to copy external PHP files to container
+# Now that /tmp and /private/ are Docker volumes (not host mounts),
+# we need to copy files from host to container for all external files
+copy_external_php_files() {
+  local container_name="${DC_ORO_NAME}_cli"
+  
+  # Check if CLI container is running
+  if ! docker ps --format "table {{.Names}}" | grep -q "^${container_name}$"; then
+    [[ -n "${DEBUG:-}" ]] && echo "DEBUG: CLI container ${container_name} not running, skipping PHP file copy" >&2
+    return 0
+  fi
+  
+  for arg in "$@"; do
+    if [[ $arg == *.php ]]; then
+      PHPFILE_PATH=$(echo $arg | grep -o '.\+\.php' | sed s~.\*=~~)
+      PHPFILE_DIR=$(dirname "${PHPFILE_PATH}")
+
+      # Check if file is outside project directory
+      if [[ -z $DC_ORO_APPDIR ]] || [[ $PHPFILE_DIR != '.' && $PHPFILE_DIR != $DC_ORO_APPDIR && $PHPFILE_DIR != $DC_ORO_APPDIR/* ]]; then
+        # Check if file exists locally
+        if [[ -f "${PHPFILE_PATH}" ]]; then
+          [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Copying external PHP file ${PHPFILE_PATH} to container ${container_name}" >&2
+          
+          # Create directory in container
+          docker exec -i "${container_name}" mkdir -p "${PHPFILE_DIR}" 2>/dev/null || true
+          
+          # Copy file to container
+          if docker cp "${PHPFILE_PATH}" "${container_name}:${PHPFILE_PATH}" 2>/dev/null; then
+            [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Successfully copied ${PHPFILE_PATH} to container" >&2
+          else
+            [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Failed to copy ${PHPFILE_PATH} to container" >&2
+          fi
+        else
+          [[ -n "${DEBUG:-}" ]] && echo "DEBUG: External PHP file ${PHPFILE_PATH} not found locally" >&2
+        fi
+      fi
+    fi
+  done
+}
+
+# Copy external PHP files before executing any command
+copy_external_php_files "${original_args[@]}"
 
 if [[ "$is_docker_compose_cmd" != "true" ]]; then
   # Check if any argument contains a .php file

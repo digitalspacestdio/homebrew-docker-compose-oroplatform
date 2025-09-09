@@ -23,8 +23,6 @@ services:
         PHP_UID: "${DC_ORO_PHP_UID:-1000}"
         PHP_GID: "${DC_ORO_PHP_GID:-1000}"
         COMPOSER_VERSION: "${DC_ORO_COMPOSER_VERSION:-2}"
-    tmpfs:
-      - /tmp:rw,size=256m
     user: "${DC_ORO_USER_NAME:-developer}"
     command: php-fpm -R
     volumes:
@@ -33,6 +31,8 @@ services:
       - "home-root:/root"
       - "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/msmtprc:/home/${DC_ORO_PHP_USER_NAME:-developer}/.msmtprc:ro"
       - "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro"
+      - "shared-tmp:/tmp:rw"
+      - "shared-private:/private:rw"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -102,13 +102,13 @@ services:
         PHP_GID: "${DC_ORO_PHP_GID:-1000}"
         COMPOSER_VERSION: "${DC_ORO_COMPOSER_VERSION:-2}"
     user: "${DC_ORO_USER_NAME:-developer}"
-    tmpfs:
-      - /tmp:rw,size=256m
     volumes:
       - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
       - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
       - "home-root:/root"
       - "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony/docker-entrypoint.sh:/usr/local/bin/docker-entrypoint:ro"
+      - "shared-tmp:/tmp:rw"
+      - "shared-private:/private:rw"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -584,3 +584,9 @@ volumes:
     driver: local
   search-data:
     driver: local
+  shared-tmp:
+    driver: local
+    name: ${DC_ORO_NAME:-unnamed}_shared_tmp
+  shared-private:
+    driver: local
+    name: ${DC_ORO_NAME:-unnamed}_shared_private
