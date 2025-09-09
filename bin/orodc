@@ -90,9 +90,13 @@ if [[ -n "${DEBUG:-}" ]]; then
   echo "Right Options: ${right_options[*]}"
 fi
 
-BREW_BIN=$(find /opt/homebrew/bin /usr/local/bin /home/linuxbrew/.linuxbrew/bin -name "brew" 2>/dev/null | head -1); [ -f "${BREW_BIN}" ] \
-&& (echo; echo 'eval "$('${BREW_BIN}' shellenv)"') | tee -a $HOME/.zprofile | tee -a $HOME/.bashrc \
-&& eval "$(${BREW_BIN} shellenv)"
+BREW_BIN=$(which brew 2>/dev/null)
+if [ -z "${BREW_BIN}" ]; then
+  BREW_BIN=$(find /opt/homebrew/bin /usr/local/bin /home/linuxbrew/.linuxbrew/bin -name "brew" 2>/dev/null | head -1)
+  [ -f "${BREW_BIN}" ] \
+  && (echo; echo 'eval "$('${BREW_BIN}' shellenv)"') | tee -a $HOME/.zprofile | tee -a $HOME/.bashrc \
+  && eval "$(${BREW_BIN} shellenv)"
+fi
 
 DIR=$(brew --prefix docker-compose-oroplatform)/share/docker-compose-oroplatform
 export PWD=$(pwd)
