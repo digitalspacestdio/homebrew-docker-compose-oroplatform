@@ -903,14 +903,6 @@ fi
 # Now that /tmp and /private/ are Docker volumes (not host mounts),
 # we need to copy files from host to container for all external files
 copy_external_php_files() {
-  local container_name="${DC_ORO_NAME}_cli"
-  
-  # Check if CLI container is running
-  if ! docker ps --format "table {{.Names}}" | grep -q "^${container_name}$"; then
-    [[ -n "${DEBUG:-}" ]] && echo "DEBUG: CLI container ${container_name} not running, skipping PHP file copy" >&2
-    return 0
-  fi
-  
   for arg in "$@"; do
     if [[ $arg == *.php ]]; then
       PHPFILE_PATH=$(echo $arg | grep -o '.\+\.php' | sed s~.\*=~~)
@@ -920,16 +912,16 @@ copy_external_php_files() {
       if [[ -z $DC_ORO_APPDIR ]] || [[ $PHPFILE_DIR != '.' && $PHPFILE_DIR != $DC_ORO_APPDIR && $PHPFILE_DIR != $DC_ORO_APPDIR/* ]]; then
         # Check if file exists locally
         if [[ -f "${PHPFILE_PATH}" ]]; then
-          [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Copying external PHP file ${PHPFILE_PATH} to container ${container_name}" >&2
+          [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Copying external PHP file ${PHPFILE_PATH} to shared volume" >&2
           
-          # Create directory in container
-          docker exec -i "${container_name}" mkdir -p "${PHPFILE_DIR}" 2>/dev/null || true
+          # Create directory and copy file using docker compose run
+          ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "mkdir -p '${PHPFILE_DIR}'" 2>/dev/null || true
           
-          # Copy file to container
-          if docker cp "${PHPFILE_PATH}" "${container_name}:${PHPFILE_PATH}" 2>/dev/null; then
-            [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Successfully copied ${PHPFILE_PATH} to container" >&2
+          # Copy file content using docker compose run with stdin
+          if cat "${PHPFILE_PATH}" | ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "cat > '${PHPFILE_PATH}'" 2>/dev/null; then
+            [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Successfully copied ${PHPFILE_PATH} to shared volume" >&2
           else
-            [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Failed to copy ${PHPFILE_PATH} to container" >&2
+            [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Failed to copy ${PHPFILE_PATH} to shared volume" >&2
           fi
         else
           [[ -n "${DEBUG:-}" ]] && echo "DEBUG: External PHP file ${PHPFILE_PATH} not found locally" >&2
