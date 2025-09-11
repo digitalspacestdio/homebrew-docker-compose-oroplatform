@@ -1,0 +1,66 @@
+# Git Workflow Guidelines
+
+## 🌿 **ВСЕГДА работать в ветках!**
+
+### ✅ Правильный workflow:
+
+1. **Начинать от master/main:**
+   ```bash
+   git checkout master
+   git pull origin master
+   ```
+
+2. **Создать новую ветку для задачи:**
+   ```bash
+   git checkout -b feature/descriptive-branch-name
+   # или
+   git checkout -b fix/issue-description
+   # или  
+   git checkout -b update/component-name
+   ```
+
+3. **Делать коммиты в ветке:**
+   ```bash
+   git add .
+   git commit -m "descriptive commit message"
+   ```
+
+4. **Push ветки для review:**
+   ```bash
+   git push -u origin feature/descriptive-branch-name
+   ```
+
+### ❌ **НИКОГДА не работать прямо в master/main!**
+
+### 📛 Если случайно работал в master:
+
+1. **Создать ветку от текущего состояния:**
+   ```bash
+   git checkout -b fix/accidental-master-work
+   ```
+
+2. **Сбросить master к origin:**
+   ```bash
+   git checkout master
+   git reset --hard origin/master
+   ```
+
+3. **Продолжить работу в ветке**
+
+### 🎯 Правила именования веток:
+
+- `feature/short-description` - новые возможности
+- `fix/issue-description` - исправления багов  
+- `update/component-name` - обновления версий/конфигураций
+- `docs/topic` - документация
+- `refactor/component` - рефакторинг
+
+### 💡 Примеры хороших имен веток:
+
+- `update/oro-workflow-versions`
+- `fix/yaml-syntax-errors`  
+- `feature/php-auto-detection`
+- `docs/installation-guide`
+
+---
+**Запомни: Branch first, commit later! 🌳**
