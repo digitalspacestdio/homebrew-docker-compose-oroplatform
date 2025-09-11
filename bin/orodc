@@ -1440,7 +1440,7 @@ EOF
           echo "$line"
           if [[ "$line" == *"Processing consumer messages"* ]]; then
             echo "==> Detected consumer message processing, stopping test-consumer..."
-            ${TEST_COMPOSE_CMD} exec test-cli bash -c "pgrep -f 'oro:message-queue:consume' | xargs -r kill -STOP" 2>/dev/null || true
+            ${TEST_COMPOSE_CMD} exec test-cli bash -c "pgrep -f 'oro:message-queue:consume' | xargs -r kill -9" 2>/dev/null || true
           fi
         done
       else
@@ -1543,8 +1543,8 @@ EOF
       ;;
       
     "consumer-kill")
-      echo "Killing test consumer (SIGTERM)..."
-      ${TEST_COMPOSE_CMD} exec test-cli bash -c "pgrep -f 'oro:message-queue:consume' | xargs -r kill -TERM" 2>/dev/null || echo "Consumer process not found"
+      echo "Killing test consumer (SIGKILL)..."
+      ${TEST_COMPOSE_CMD} exec test-cli bash -c "pgrep -f 'oro:message-queue:consume' | xargs -r kill -9" 2>/dev/null || echo "Consumer process not found"
       exit 0
       ;;
       
