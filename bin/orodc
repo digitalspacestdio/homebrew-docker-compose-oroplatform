@@ -1440,13 +1440,27 @@ EOF
           echo "$line"
           if [[ "$line" == *"Processing consumer messages"* ]]; then
             echo "==> Detected consumer message processing, stopping test-consumer..."
-            ${TEST_COMPOSE_CMD} exec test-cli bash -c "pgrep -f 'oro:message-queue:consume' | xargs -r kill -9" 2>/dev/null || true
+            # Wait for consumer processes to start
+            for i in {1..10}; do
+              if ${TEST_COMPOSE_CMD} exec -T test-cli bash -c "ps aux | grep 'oro:message-queue:consume' | grep -v grep >/dev/null 2>&1"; then
+                echo "Consumer processes found, stopping them..."
+                ${TEST_COMPOSE_CMD} exec -T test-cli bash -c "ps aux | grep 'oro:message-queue:consume' | grep -v grep | awk '{print \$2}' | xargs -r kill -9" 2>/dev/null || true
+                break
+              fi
+              echo "Waiting for consumer processes to start... ($i/10)"
+              sleep 0.5
+            done
           fi
         done
       else
         echo "Oro test environment already installed, skipping oro:install..."
       fi
       
+      # Warm up test environment caches
+      >&2 echo -e "\033[36m==> Warming up test environment caches...\033[0m"
+      echo "Warming up test cache..."
+      ${TEST_COMPOSE_CMD} run --rm test-cli bin/console cache:warmup --env=test 2>/dev/null || true
+
       # Generate behat.yml with correct URLs for test environment
       >&2 echo -e "\033[36m==> Generating behat.yml with test environment URLs...\033[0m"
       BEHAT_DIST_FILE="${DC_ORO_APPDIR}/vendor/oro/platform/src/Oro/Bundle/TestFrameworkBundle/Resources/config/behat.yml.dist"
@@ -1456,12 +1470,25 @@ EOF
         # Copy behat.yml.dist and replace URLs with sed for test environment
         cp "$BEHAT_DIST_FILE" "$BEHAT_CONFIG_FILE"
         
-        # Replace base_url for test environment
-        sed -i "s|base_url: 'http://localhost.com/'|base_url: 'http://test-nginx/'|g" "$BEHAT_CONFIG_FILE"
+        # Replace localhost:4444 with test-selenium:4444 for WebDriver host
+        sed -i "s|localhost:4444|test-selenium:4444|g" "$BEHAT_CONFIG_FILE"
+        # Replace localhost:9515 with test-selenium:9515 for ChromeDriver host  
+        sed -i "s|localhost:9515|test-selenium:9515|g" "$BEHAT_CONFIG_FILE"
         
-        # Replace all Selenium WebDriver hosts for test environment
-        sed -i "s|wd_host: 'http://localhost:4444/wd/hub'|wd_host: 'http://test-selenium:4444/wd/hub'|g" "$BEHAT_CONFIG_FILE"
-        echo "Generated behat.yml with test environment URLs"
+        # Note: OroCommerce admin panel is accessible at root path, not /admin/
+        echo "Keeping base_url as root path for admin panel access"
+        
+        # Add necessary Chrome arguments for Docker environment to the main sessions (port 4444)
+        # This fixes the "DevToolsActivePort file doesn't exist" error
+        sed -i '/--load-extension.*chrome-extension/a\                                        - "--no-sandbox"\
+                                        - "--disable-gpu"\
+                                        - "--headless"\
+                                        - "--disable-dev-shm-usage"\
+                                        - "--no-first-run"\
+                                        - "--disable-extensions"\
+                                        - "--disable-renderer-backgrounding"' "$BEHAT_CONFIG_FILE"
+        
+        echo "Generated behat.yml with test environment URLs and Docker-compatible Chrome options"
       else
         echo "Warning: behat.yml.dist not found, skipping behat.yml generation"
       fi
