@@ -51,6 +51,83 @@ get_container_labels() {
   return 1
 }
 
+# Function to get information about which container/project is using a port
+get_port_usage_info() {
+  local port="$1"
+  local current_project="$2"
+  
+  # Load cache if not loaded yet
+  load_docker_containers_cache
+  
+  # Check Docker containers
+  while read -r name ports; do
+    [[ -z "$name" ]] && continue
+    
+    local container_project
+    local container_service
+    get_container_labels "$name" container_project container_service
+    
+    # Skip containers from the same project
+    if [[ "$container_project" == "$current_project" ]]; then
+      continue
+    fi
+    
+    # Check if this container uses the port
+    for part in ${ports//,/ }; do
+      part="${part%/tcp}"
+      part="${part%/udp}"
+      
+      local host_port=""
+      if [[ "$part" == *"->"* ]]; then
+        local host_port_part="${part%%->*}"
+        if [[ "$host_port_part" == *":"* ]]; then
+          host_port="${host_port_part##*:}"
+        else
+          host_port="$host_port_part"
+        fi
+      else
+        host_port="$part"
+      fi
+      
+      # Check for exact port match or port range
+      if [[ "$host_port" == *"-"* ]]; then
+        local range_start=${host_port%-*}
+        local range_end=${host_port#*-}
+        if [[ "$port" -ge "$range_start" && "$port" -le "$range_end" ]]; then
+          if [[ -n "$container_project" ]]; then
+            echo "project '$container_project' (container: $name)"
+          else
+            echo "container '$name'"
+          fi
+          return 0
+        fi
+      elif [[ "$host_port" == "$port" ]]; then
+        if [[ -n "$container_project" ]]; then
+          echo "project '$container_project' (container: $name)"
+        else
+          echo "container '$name'"
+        fi
+        return 0
+      fi
+    done
+  done <<< "$__DOCKER_CONTAINERS_CACHE"
+  
+  # Check local processes
+  if lsof -t -i tcp:$port > /dev/null 2>&1; then
+    local process_info
+    process_info=$(lsof -i tcp:$port -P -n | tail -n +2 | head -1 | awk '{print $1 " (PID: " $2 ")"}')
+    if [[ -n "$process_info" ]]; then
+      echo "local process: $process_info"
+    else
+      echo "local process"
+    fi
+    return 0
+  fi
+  
+  echo "unknown process"
+  return 1
+}
+
 # Batch function to find free ports for multiple services
 find_free_ports_batch() {
   local PROJECT_NAME="$1"
@@ -88,7 +165,9 @@ find_free_ports_batch() {
         port_found="$SELECTED_PORT"
       else
         # Port is occupied by another project - find a new one
-        echo -e "\033[33m==> Warning: Port $SELECTED_PORT from compose.yml is occupied by another project, searching for alternative\033[0m" >&2
+        local usage_info
+        usage_info=$(get_port_usage_info "$SELECTED_PORT" "$PROJECT_NAME")
+        echo -e "\033[33m==> Warning: Port $SELECTED_PORT from compose.yml is occupied by $usage_info, searching for alternative\033[0m" >&2
       fi
     fi
     
@@ -398,7 +477,9 @@ find_free_port() {
       return
     else
       # Port is occupied by another project - continue to find alternative
-      echo -e "\033[33m==> Warning: Port $SELECTED_PORT from compose.yml is occupied by another project, searching for alternative\033[0m" >&2
+      local usage_info
+      usage_info=$(get_port_usage_info "$SELECTED_PORT" "$PROJECT_NAME")
+      echo -e "\033[33m==> Warning: Port $SELECTED_PORT from compose.yml is occupied by $usage_info, searching for alternative\033[0m" >&2
     fi
   fi
 
