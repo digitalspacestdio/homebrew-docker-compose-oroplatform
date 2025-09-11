@@ -1460,9 +1460,7 @@ EOF
       >&2 echo -e "\033[36m==> Warming up test environment caches...\033[0m"
       echo "Warming up test cache..."
       ${TEST_COMPOSE_CMD} run --rm test-cli bin/console cache:warmup --env=test 2>/dev/null || true
-      echo "Generating Doctrine proxies..."
-      ${TEST_COMPOSE_CMD} run --rm test-cli bin/console doctrine:generate:proxies --env=test 2>/dev/null || true
-      
+
       # Generate behat.yml with correct URLs for test environment
       >&2 echo -e "\033[36m==> Generating behat.yml with test environment URLs...\033[0m"
       BEHAT_DIST_FILE="${DC_ORO_APPDIR}/vendor/oro/platform/src/Oro/Bundle/TestFrameworkBundle/Resources/config/behat.yml.dist"
