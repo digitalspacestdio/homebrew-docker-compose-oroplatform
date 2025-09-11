@@ -1,4 +1,4 @@
-# 🚀 ORO Platform Docker Compose (OroDC)
+# 🚀 OroCommerce / OroPlatform Docker Environment (OroDC)
 
 ![Docker architecture](docs/docker-architecture-small.png)
 
