@@ -1470,8 +1470,8 @@ EOF
         # Copy behat.yml.dist and replace URLs with sed for test environment
         cp "$BEHAT_DIST_FILE" "$BEHAT_CONFIG_FILE"
         
-        # Replace base_url for test environment
-        sed -i "s|base_url: 'http://localhost.com/'|base_url: 'http://test-nginx/'|g" "$BEHAT_CONFIG_FILE"
+        # Replace base_url for test environment - use localhost since socat proxies it to test-nginx
+        sed -i "s|base_url: 'http://localhost.com/'|base_url: 'http://localhost/'|g" "$BEHAT_CONFIG_FILE"
         
         # Replace all Selenium WebDriver hosts for test environment
         sed -i "s|wd_host: 'http://localhost:4444/wd/hub'|wd_host: 'http://test-selenium:4444/wd/hub'|g" "$BEHAT_CONFIG_FILE"
