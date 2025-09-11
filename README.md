@@ -17,7 +17,7 @@
 
 ## ✨ Key Features
 
-- 🔥 **Lightning Fast**: Optimized port resolution (~1 second vs 5-10 seconds)
+- 🔥 **Minimal Dependencies**: No application changes required, works out of the box
 - 🎯 **Smart PHP Detection**: Auto-redirect PHP commands to CLI container
 - 🗄️ **Smart Database Access**: Direct psql/mysql commands with auto-configuration
 - 🐳 **Full Docker Integration**: Complete containerized development environment
