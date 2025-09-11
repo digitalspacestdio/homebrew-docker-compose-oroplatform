@@ -6,15 +6,11 @@ on:
     paths:
       - 'compose/**'
       - 'bin/**'
-      - 'Formula/**'
-      - '.github/workflows/test-oro-installations.yml'
   pull_request:
     branches: [ main, master, develop ]
     paths:
       - 'compose/**'
       - 'bin/**'
-      - 'Formula/**'
-      - '.github/workflows/test-oro-installations.yml'
   schedule:
     # Run tests daily at 2 AM UTC
     - cron: '0 2 * * *'
