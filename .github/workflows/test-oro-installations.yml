@@ -55,44 +55,30 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Cache Homebrew
-        uses: actions/cache@v4
-        with:
-          path: |
-            /home/linuxbrew/.linuxbrew
-          key: homebrew-${{ runner.os }}-${{ hashFiles('Formula/docker-compose-oroplatform.rb') }}
-          restore-keys: |
-            homebrew-${{ runner.os }}-
-
       - name: Install Homebrew
         run: |
           # Configure git to use HTTPS instead of SSH BEFORE Homebrew installation
           git config --global url."https://github.com/".insteadOf git@github.com:
           
-          # Check if Homebrew is already installed
-          if [ ! -f "/home/linuxbrew/.linuxbrew/bin/brew" ]; then
-            echo "Installing Homebrew..."
-            NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
-          else
-            echo "Homebrew already installed from cache"
-          fi
+          # Install Homebrew (always fresh installation)
+          echo "Installing Homebrew..."
+          NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
           echo "/home/linuxbrew/.linuxbrew/bin" >> $GITHUB_PATH
 
       - name: Install OroDC
         run: |
-          # Check if we're already in the tap directory (Act scenario)
-          if [[ "$PWD" == *"homebrew-docker-compose-oroplatform"* ]]; then
-            echo "Already in tap directory, no need to copy files"
-          else
-            # Copy current source code to tap directory for installation
-            TAP_DIR="/home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform"
-            
-            # Copy current source files to tap directory (overwrite with current version)
-            cp -r bin/ "$TAP_DIR/"
-            cp -r compose/ "$TAP_DIR/"
-          fi
+          # Install tap and switch to current commit
+          brew tap digitalspacestdio/docker-compose-oroplatform
           
-          # Install OroDC from tap (this will use our current source code)
+          # Navigate to tap directory and switch to current commit
+          TAP_DIR="/home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform"
+          cd "$TAP_DIR"
+          
+          # Fetch and checkout current commit
+          git fetch origin
+          git checkout "${{ github.sha }}"
+          
+          # Install OroDC from current commit
           brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform
           
           # Verify installation
