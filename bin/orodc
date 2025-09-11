@@ -1470,11 +1470,8 @@ EOF
         # Copy behat.yml.dist and replace URLs with sed for test environment
         cp "$BEHAT_DIST_FILE" "$BEHAT_CONFIG_FILE"
         
-        # Keep base_url as localhost.com since it's mapped to test-nginx via extra_hosts
-        # No URL replacement needed - localhost.com resolves to test-nginx in test-cli container
-        
-        # Replace all Selenium WebDriver hosts for test environment
-        sed -i "s|wd_host: 'http://localhost:4444/wd/hub'|wd_host: 'http://test-selenium:4444/wd/hub'|g" "$BEHAT_CONFIG_FILE"
+        # Keep URLs as-is since localhost.com maps to test-nginx and localhost maps to test-selenium via extra_hosts
+        # No URL replacement needed - all localhost addresses resolve correctly in test-cli container
         echo "Generated behat.yml with test environment URLs"
       else
         echo "Warning: behat.yml.dist not found, skipping behat.yml generation"

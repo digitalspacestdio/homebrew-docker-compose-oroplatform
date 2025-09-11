@@ -136,6 +136,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
       - "localhost.com:test-nginx"
+      - "localhost:test-selenium"
     environment:
       - 'APP_DIR=${DC_ORO_APPDIR:-/var/www}'
       - 'DC_ORO_APPDIR=${DC_ORO_APPDIR:-/var/www}'
