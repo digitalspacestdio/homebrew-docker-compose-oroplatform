@@ -1475,13 +1475,8 @@ EOF
         # Replace localhost:9515 with test-selenium:9515 for ChromeDriver host  
         sed -i "s|localhost:9515|test-selenium:9515|g" "$BEHAT_CONFIG_FILE"
         
-        # Fix base_url to point to admin panel for backend tests (only for OroCommerce)
-        if [[ -f "composer.json" ]] && grep -qi "orocommerce" composer.json; then
-          sed -i "s|base_url: 'http://localhost.com/'|base_url: 'http://localhost.com/admin/'|g" "$BEHAT_CONFIG_FILE"
-          echo "Detected OroCommerce - updated base_url to point to /admin/"
-        else
-          echo "Non-Commerce Oro application detected - keeping base_url as root"
-        fi
+        # Note: OroCommerce admin panel is accessible at root path, not /admin/
+        echo "Keeping base_url as root path for admin panel access"
         
         # Add necessary Chrome arguments for Docker environment to the main sessions (port 4444)
         # This fixes the "DevToolsActivePort file doesn't exist" error
