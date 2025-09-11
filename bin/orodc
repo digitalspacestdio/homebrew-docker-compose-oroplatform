@@ -1435,7 +1435,7 @@ EOF
         echo "Running cache clear in 'test-cli' service..."
         ${TEST_COMPOSE_CMD} run --rm test-cli bash -c "rm -rf var/cache/test" 2>/dev/null || true
         echo "Running oro:install in 'test-cli' service..."
-        ${TEST_COMPOSE_CMD} run --rm test-cli bin/console oro:install
+        ${TEST_COMPOSE_CMD} run --rm test-cli bin/console oro:install --skip-optional-listeners
       else
         echo "Oro test environment already installed, skipping oro:install..."
       fi
