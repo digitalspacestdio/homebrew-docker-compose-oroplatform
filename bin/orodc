@@ -732,19 +732,82 @@ if [[ -f "$DC_ORO_APPDIR/.docker-compose.user.yml" ]]; then
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f $DC_ORO_APPDIR/.docker-compose.user.yml"
 fi
 
-if [[ -f "$DC_ORO_APPDIR/.php-version" ]] && [[ -z $DC_ORO_PHP_VERSION ]]; then
-  export DC_ORO_PHP_VERSION=$(cat $DC_ORO_APPDIR/.php-version | head -n1)
-  >&2 echo -e "\033[36m==> Found .php-version with following version: $DC_ORO_PHP_VERSION\033[0m"
+# Auto-detect PHP version from composer.json
+detect_php_version_from_composer() {
+  if [[ -f "$DC_ORO_APPDIR/composer.json" ]]; then
+    # Try direct PHP requirement first
+    local php_constraint=$(jq -r '.require.php // empty' "$DC_ORO_APPDIR/composer.json" 2>/dev/null)
+    if [[ -n "$php_constraint" ]]; then
+      # Extract version from constraint (e.g., "^8.1" -> "8.1", ">=8.2" -> "8.2")
+      local php_version=$(echo "$php_constraint" | sed -E 's/[^0-9.]*([0-9]+\.[0-9]+).*/\1/')
+      if [[ "$php_version" =~ ^[0-9]+\.[0-9]+$ ]]; then
+        echo "$php_version"
+        return 0
+      fi
+    fi
+    
+    # Fallback: detect from Oro Platform version
+    local oro_platform=$(jq -r '.require["oro/platform"] // empty' "$DC_ORO_APPDIR/composer.json" 2>/dev/null)
+    if [[ -n "$oro_platform" ]]; then
+      # Extract Oro version (e.g., "6.0.*" -> "6.0", "^6.1" -> "6.1")
+      local oro_version=$(echo "$oro_platform" | sed -E 's/[^0-9.]*([0-9]+\.[0-9]+).*/\1/')
+      case "$oro_version" in
+        "6.1"|"6.2") echo "8.3" && return 0 ;;
+        "6.0") echo "8.2" && return 0 ;;
+        "5.1") echo "8.1" && return 0 ;;
+        "5.0") echo "8.0" && return 0 ;;
+        "4.2") echo "8.1" && return 0 ;;
+        "4.1") echo "8.0" && return 0 ;;
+        "4.0") echo "7.4" && return 0 ;;
+      esac
+    fi
+  fi
+  return 1
+}
+
+
+# Get compatible Node.js version for PHP version
+get_compatible_node_version() {
+  local php_version="$1"
+  case "$php_version" in
+    "8.4") echo "22" ;;
+    "8.3") echo "20" ;;
+    "8.2") echo "20" ;;
+    "8.1") echo "18" ;;
+    "8.0") echo "18" ;;
+    "7.4") echo "16" ;;
+    *) echo "20" ;;  # Default to Node 20 for unknown PHP versions
+  esac
+}
+
+# Auto-detect PHP version with fallback chain
+if [[ -z $DC_ORO_PHP_VERSION ]]; then
+  # Priority 1: .php-version file
+  if [[ -f "$DC_ORO_APPDIR/.php-version" ]]; then
+    export DC_ORO_PHP_VERSION=$(cat $DC_ORO_APPDIR/.php-version | head -n1)
+    >&2 echo -e "\033[36m==> Found .php-version with following version: $DC_ORO_PHP_VERSION\033[0m"
+  # Priority 2: .phprc file
+  elif [[ -f "$DC_ORO_APPDIR/.phprc" ]]; then
+    export DC_ORO_PHP_VERSION=$(cat $DC_ORO_APPDIR/.phprc | head -n1)
+    >&2 echo -e "\033[36m==> Found .phprc with following version: $DC_ORO_PHP_VERSION\033[0m"
+  # Priority 3: composer.json
+  elif DC_ORO_PHP_VERSION=$(detect_php_version_from_composer); then
+    export DC_ORO_PHP_VERSION
+    >&2 echo -e "\033[36m==> Detected PHP version from composer.json: $DC_ORO_PHP_VERSION\033[0m"
+  fi
 fi
 
-if [[ -f "$DC_ORO_APPDIR/.phprc" ]] && [[ -z $DC_ORO_PHP_VERSION ]]; then
-  export DC_ORO_PHP_VERSION=$(cat $DC_ORO_APPDIR/.phprc | head -n1)
-  >&2 echo -e "\033[36m==> Found .phprc with following version: $DC_ORO_PHP_VERSION\033[0m"
-fi
-
-if [[ -f "$DC_ORO_APPDIR/.nvmrc" ]] && [[ -z $DC_ORO_NODE_VERSION ]]; then
-  export DC_ORO_NODE_VERSION=$(cat $DC_ORO_APPDIR/.nvmrc | head -n1)
-  >&2 echo -e "\033[36m==> Found .nvmrc with following version: $DC_ORO_NODE_VERSION\033[0m"
+# Auto-detect Node.js version with fallback chain
+if [[ -z $DC_ORO_NODE_VERSION ]]; then
+  # Priority 1: .nvmrc file
+  if [[ -f "$DC_ORO_APPDIR/.nvmrc" ]]; then
+    export DC_ORO_NODE_VERSION=$(cat $DC_ORO_APPDIR/.nvmrc | head -n1)
+    >&2 echo -e "\033[36m==> Found .nvmrc with following version: $DC_ORO_NODE_VERSION\033[0m"
+  # Priority 2: Compatibility matrix based on detected PHP version
+  elif [[ -n "$DC_ORO_PHP_VERSION" ]]; then
+    export DC_ORO_NODE_VERSION=$(get_compatible_node_version "$DC_ORO_PHP_VERSION")
+    >&2 echo -e "\033[36m==> Using compatible Node.js version for PHP $DC_ORO_PHP_VERSION: $DC_ORO_NODE_VERSION\033[0m"
+  fi
 fi
 
 if [[ "${DC_ORO_MODE}" == "mutagen" ]] || [[ "${DC_ORO_MODE}" == "ssh" ]]; then
