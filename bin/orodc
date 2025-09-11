@@ -1435,9 +1435,7 @@ EOF
         echo "Running cache clear in 'test-cli' service..."
         ${TEST_COMPOSE_CMD} run --rm test-cli bash -c "rm -rf var/cache/test" 2>/dev/null || true
         echo "Running oro:install in 'test-cli' service..."
-        timeout 300 ${TEST_COMPOSE_CMD} run --rm test-cli bin/console --env=test --timeout=300 oro:install --language=en --formatting-code=en_US --organization-name='Test Org' --user-name=admin --user-email=admin@example.com --user-firstname=Test --user-lastname=User --user-password='12345678' --application-url='http://localhost/' --sample-data=n --skip-translations || {
-          echo "oro:install completed or timed out, continuing..."
-        }
+        ${TEST_COMPOSE_CMD} run --rm test-cli bin/console oro:install
       else
         echo "Oro test environment already installed, skipping oro:install..."
       fi
@@ -1461,8 +1459,8 @@ EOF
         echo "Warning: behat.yml.dist not found, skipping behat.yml generation"
       fi
       
-      # Start test services
-      ${TEST_COMPOSE_CMD} up -d test-fpm test-nginx test-selenium
+      # Start test services including test-consumer
+      ${TEST_COMPOSE_CMD} up -d test-fpm test-nginx test-selenium test-consumer
       echo "Test environment setup completed!"
       exit 0
       ;;
