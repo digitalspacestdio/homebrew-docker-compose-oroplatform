@@ -1523,6 +1523,30 @@ EOF
       exit 0
       ;;
       
+    "consumer-stop")
+      echo "Stopping test consumer (SIGSTOP)..."
+      ${TEST_COMPOSE_CMD} exec test-consumer bash -c "pkill -STOP -f 'oro:message-queue:consume'" 2>/dev/null || echo "Consumer process not found or already stopped"
+      exit 0
+      ;;
+      
+    "consumer-start")
+      echo "Starting test consumer (SIGCONT)..."
+      ${TEST_COMPOSE_CMD} exec test-consumer bash -c "pkill -CONT -f 'oro:message-queue:consume'" 2>/dev/null || echo "Consumer process not found"
+      exit 0
+      ;;
+      
+    "consumer-kill")
+      echo "Killing test consumer (SIGTERM)..."
+      ${TEST_COMPOSE_CMD} exec test-consumer bash -c "pkill -TERM -f 'oro:message-queue:consume'" 2>/dev/null || echo "Consumer process not found"
+      exit 0
+      ;;
+      
+    "consumer-status")
+      echo "Test consumer status:"
+      ${TEST_COMPOSE_CMD} exec test-consumer bash -c "ps aux | grep -v grep | grep 'oro:message-queue:consume' || echo 'Consumer process not running'"
+      exit 0
+      ;;
+      
     *)
       # Handle any other command by executing it in test-cli container
       # This makes 'orodc tests' a full replacement for 'orodc' but in test environment
