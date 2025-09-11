@@ -586,7 +586,5 @@ volumes:
     driver: local
   shared-tmp:
     driver: local
-    name: ${DC_ORO_NAME:-unnamed}_shared_tmp
   shared-private:
     driver: local
-    name: ${DC_ORO_NAME:-unnamed}_shared_private

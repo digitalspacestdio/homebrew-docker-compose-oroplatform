@@ -15,6 +15,7 @@
 
 - 🔥 **Lightning Fast**: Optimized port resolution (~1 second vs 5-10 seconds)
 - 🎯 **Smart PHP Detection**: Auto-redirect PHP commands to CLI container
+- 🗄️ **Smart Database Access**: Direct psql/mysql commands with auto-configuration
 - 🐳 **Full Docker Integration**: Complete containerized development environment
 - 🔧 **Zero Configuration**: Works out of the box with sensible defaults
 - 🎨 **Beautiful CLI**: Colored output and informative messages
@@ -37,9 +38,11 @@ orodc install && orodc up -d
 # Open your application
 open http://localhost:30280/
 
-# 🎯 New! Smart PHP Commands & Testing
+# 🎯 New! Smart PHP Commands & Database Access
 orodc --version                    # Check PHP version
 orodc -r 'echo "Hello OroDC!";'    # Run PHP code directly
+orodc psql -l                      # List databases directly
+orodc psql -c "SELECT version();"  # Execute SQL commands
 orodc bin/phpunit --testsuite=unit # Run PHPUnit tests
 orodc bin/behat --available-suites # Run Behat behavior tests
 ```
@@ -58,6 +61,27 @@ orodc bin/console cache:clear  # → cli bin/console cache:clear
 
 # Traditional way still works
 orodc cli php -v           # Still supported
+```
+
+## 🗄️ Smart Database Integration
+
+OroDC provides direct database access with automatic connection configuration:
+
+```bash
+# PostgreSQL commands (auto-configured with connection details)
+orodc psql                          # Interactive PostgreSQL shell
+orodc psql -l                       # List all databases
+orodc psql -c "SELECT version();"   # Execute single SQL command
+orodc psql -c "DROP DATABASE IF EXISTS test_db;"  # DDL operations
+orodc psql -f backup.sql            # Execute SQL file
+
+# MySQL commands (auto-configured with connection details)  
+orodc mysql                         # Interactive MySQL shell
+orodc mysql -e "SHOW DATABASES;"    # Execute single MySQL command
+orodc mysql -e "USE oro_db; SHOW TABLES;"  # Multiple commands
+
+# All database credentials are automatically configured!
+# No need to specify host, port, username, or password
 ```
 
 ## 🎨 Frontend Development
@@ -826,6 +850,10 @@ orodc composer require package/name
 # Database operations
 orodc mysql                # Connect to MySQL
 orodc psql                 # Connect to PostgreSQL
+orodc psql -l              # List all databases
+orodc psql -c "SELECT version();"  # Execute SQL command directly
+orodc psql -c "DROP DATABASE IF EXISTS test_db;"  # Execute DDL commands
+orodc mysql -e "SHOW DATABASES;"   # Execute MySQL commands with arguments
 orodc databaseimport dump.sql    # Import database
 orodc databaseexport             # Export database
 

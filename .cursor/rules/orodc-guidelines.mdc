@@ -161,6 +161,7 @@ orodc ssh                         # Container access
 - `default` mode on macOS
 - Commands without setup context
 - Incomplete workflows
+- `[[ -n "${DEBUG:-}" ]]` syntax (causes script termination due to `set -e`)
 
 ### Ask User For:
 - Operating system

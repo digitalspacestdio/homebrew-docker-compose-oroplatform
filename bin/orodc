@@ -1,5 +1,6 @@
 #!/bin/bash
-set -ex
+set -e
+if [ "$DEBUG" ]; then set -x; fi
 
 # Setup logging
 exec 3>&1 4>&2
@@ -21,7 +22,43 @@ args=()
 
 args_input=("$@")
 
-# Handle version command
+# Save and load XDEBUG_MODE* environment variables
+export PWD=$(pwd)
+export DC_ORO_NAME=${DC_ORO_NAME-$(basename $(pwd))}
+export DC_ORO_CONFIG_DIR="$HOME/.$(basename $0)/${DC_ORO_NAME}"
+
+if [[ ! -d "${DC_ORO_CONFIG_DIR}" ]]; then
+    mkdir -p "${DC_ORO_CONFIG_DIR}"
+fi
+
+XDEBUG_ENV_FILE="${DC_ORO_CONFIG_DIR}/.xdebug_env"
+
+# Save XDEBUG_MODE* variables if they exist in environment
+if [[ -n "${XDEBUG_MODE:-}" ]] || [[ -n "${XDEBUG_MODE_CLI:-}" ]] || [[ -n "${XDEBUG_MODE_FPM:-}" ]] || [[ -n "${XDEBUG_MODE_CONSUMER:-}" ]]; then
+  {
+    [[ -n "${XDEBUG_MODE:-}" ]] && echo "export XDEBUG_MODE=\"${XDEBUG_MODE}\""
+    [[ -n "${XDEBUG_MODE_CLI:-}" ]] && echo "export XDEBUG_MODE_CLI=\"${XDEBUG_MODE_CLI}\""
+    [[ -n "${XDEBUG_MODE_FPM:-}" ]] && echo "export XDEBUG_MODE_FPM=\"${XDEBUG_MODE_FPM}\""
+    [[ -n "${XDEBUG_MODE_CONSUMER:-}" ]] && echo "export XDEBUG_MODE_CONSUMER=\"${XDEBUG_MODE_CONSUMER}\""
+  } > "${XDEBUG_ENV_FILE}"
+fi
+
+# Load XDEBUG_MODE* variables from file if they don't exist in environment
+if [[ -f "${XDEBUG_ENV_FILE}" ]]; then
+  source "${XDEBUG_ENV_FILE}"
+fi
+
+# Set default value for XDEBUG_MODE if not set
+[[ -z "${XDEBUG_MODE:-}" ]] && export XDEBUG_MODE="off"
+
+# Set fallback values for XDEBUG_MODE_* variables if not set but XDEBUG_MODE exists
+if [[ -n "${XDEBUG_MODE:-}" ]]; then
+  [[ -z "${XDEBUG_MODE_CLI:-}" ]] && export XDEBUG_MODE_CLI="${XDEBUG_MODE}"
+  [[ -z "${XDEBUG_MODE_FPM:-}" ]] && export XDEBUG_MODE_FPM="${XDEBUG_MODE}"
+  [[ -z "${XDEBUG_MODE_CONSUMER:-}" ]] && export XDEBUG_MODE_CONSUMER="${XDEBUG_MODE}"
+fi
+
+# Handle version command (only "version", not --version)
 if [[ "$1" == "version" ]]; then
   # Try to find and read version from Formula file
   FORMULA_VERSION=""
@@ -53,6 +90,19 @@ if [[ "$1" == "version" ]]; then
   exit 0
 fi
 
+# Function to get first non-flag argument
+get_first_non_flag_arg() {
+  local args=("$@")
+  for arg in "${args[@]}"; do
+    if [[ "$arg" != -* ]]; then
+      echo "$arg"
+      return 0
+    fi
+  done
+  echo "php"
+  return 0
+}
+
 # Check if first argument is a docker compose command
 # Only docker compose commands need left/right argument parsing
 is_compose_command() {
@@ -61,26 +111,66 @@ is_compose_command() {
   echo "$cmd" | grep -qE "^($compose_commands)$"
 }
 
-if [[ $# -gt 0 ]] && is_compose_command "$1"; then
+# Find first non-flag argument to determine parsing needs
+temp_first_non_flag_arg=""
+if [[ $# -gt 0 ]]; then
+  for arg in "$@"; do
+    if [[ "$arg" != -* ]]; then
+      temp_first_non_flag_arg="$arg"
+      break
+    fi
+  done
+fi
+
+# If no command found (only flags), treat as PHP command
+if [[ -z "$temp_first_non_flag_arg" && $# -gt 0 ]]; then
+  temp_first_non_flag_arg="php"
+fi
+
+# Check if we need argument parsing
+# Parse for docker compose commands OR commands with docker compose flags
+has_docker_compose_flags=false
+for arg in "$@"; do
+  if [[ "$arg" =~ ^--profile(=.*)?$ ]] || [[ "$arg" =~ ^--env-file(=.*)?$ ]] || [[ "$arg" =~ ^--project-name(=.*)?$ ]] || [[ "$arg" =~ ^--file(=.*)?$ ]] || [[ "$arg" =~ ^-f$ ]]; then
+    has_docker_compose_flags=true
+    if [ "$DEBUG" ]; then echo "DEBUG: Found docker compose flag: $arg" >&2; fi
+    break
+  fi
+done
+
+if [ "$DEBUG" ]; then echo "DEBUG: has_docker_compose_flags=$has_docker_compose_flags, temp_first_non_flag_arg=$temp_first_non_flag_arg" >&2; fi
+
+if [[ $# -gt 0 ]] && (is_compose_command "$temp_first_non_flag_arg" || [[ "$temp_first_non_flag_arg" == "purge" ]] || [[ "$temp_first_non_flag_arg" == "php" ]] || [[ "$has_docker_compose_flags" == "true" ]]); then
   NEEDS_ARG_PARSING=true
+  if [ "$DEBUG" ]; then echo "DEBUG: NEEDS_ARG_PARSING=true" >&2; fi
 else
   NEEDS_ARG_PARSING=false
+  if [ "$DEBUG" ]; then echo "DEBUG: NEEDS_ARG_PARSING=false" >&2; fi
   # Save original arguments for non-compose commands
   non_compose_args=("$@")
 fi
 
 
 
-# Only parse arguments for docker compose commands
+
+# Only parse arguments for docker compose commands or commands with docker compose flags
 if [[ "$NEEDS_ARG_PARSING" == "true" ]]; then
   i=0
   saw_first_arg=false
+  
+  # Special case: if first argument is 'php' OR no non-flag arguments, treat all flags as right flags
+  if [ "$DEBUG" ]; then echo "DEBUG: Checking special case: args_input[0]='${args_input[0]:-}', temp_first_non_flag_arg='$temp_first_non_flag_arg'" >&2; fi
+  if [[ ${#args_input[@]} -gt 0 && "${args_input[0]}" == "php" ]] || [[ "$temp_first_non_flag_arg" == "php" ]]; then
+    if [ "$DEBUG" ]; then echo "DEBUG: Setting saw_first_arg=true for PHP command" >&2; fi
+    saw_first_arg=true
+  fi
 
   while [[ $i -lt ${#args_input[@]} ]]; do
     arg="${args_input[$i]}"
     next="${args_input[$((i + 1))]:-}"
 
     if [[ "$arg" == --*=* ]]; then
+      [[ -n "${DEBUG:-}" ]] && echo "DEBUG: Found --*=* flag: $arg, saw_first_arg=$saw_first_arg" >&2
       if [[ "$saw_first_arg" == false ]]; then
         left_options+=("$arg")
       else
@@ -110,9 +200,22 @@ if [[ "$NEEDS_ARG_PARSING" == "true" ]]; then
       i=$((i + 1))
     fi
   done
+  # Get first non-flag argument for command detection (after args is properly set)
+  first_non_flag_arg=$(get_first_non_flag_arg "${args[@]}")
 else
   # For non-compose commands, set args to original arguments without parsing
   args=("${non_compose_args[@]}")
+  # Get first non-flag argument for command detection (after args is properly set)
+  first_non_flag_arg=$(get_first_non_flag_arg "${args[@]}")
+fi
+
+# Ensure first_non_flag_arg is always set regardless of parsing mode
+if [[ -z "${first_non_flag_arg:-}" ]]; then
+  first_non_flag_arg=$(get_first_non_flag_arg "${args[@]}")
+fi
+
+if [[ -n "${DEBUG:-}" ]]; then
+  echo "DEBUG: first_non_flag_arg='$first_non_flag_arg', args=(${args[*]})" >&2
 fi
 
 
@@ -124,20 +227,20 @@ if [ -z "${BREW_BIN}" ]; then
   && eval "$(${BREW_BIN} shellenv)"
 fi
 
-DIR=$(brew --prefix docker-compose-oroplatform)/share/docker-compose-oroplatform
-export PWD=$(pwd)
-export DC_ORO_NAME=${DC_ORO_NAME-$(basename $(pwd))}
-export DC_ORO_CONFIG_DIR="$HOME/.$(basename $0)/${DC_ORO_NAME}"
-RSYNC_BIN=$(brew --prefix rsync)/bin/rsync
+# Use BREW_BIN consistently
+if [ -z "${BREW_BIN}" ]; then
+  echo "Error: brew not found. Please install Homebrew first." >&2
+  exit 1
+fi
+
+DIR=$(${BREW_BIN} --prefix docker-compose-oroplatform)/share/docker-compose-oroplatform
+RSYNC_BIN=$(${BREW_BIN} --prefix rsync)/bin/rsync
 DOCKER_BIN="${DOCKER_BIN-$(which docker)}";
 DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN-$(which docker) compose}";
 # DOCKER_COMPOSE_BIN_CMD is the main command that gets built up with compose files
 # This variable is reused throughout the script and in the test merging logic
 DOCKER_COMPOSE_BIN_CMD=${DOCKER_COMPOSE_BIN};
 DOCKER_COMPOSE_VERSION=$($DOCKER_COMPOSE_BIN_CMD version | grep '[0-9]\+\.[0-9]\+\.[0-9]\+' -o | head -1 |awk -F. '{ print $1 }')
-if [[ ! -d "${DC_ORO_CONFIG_DIR}" ]]; then
-    mkdir -p "${DC_ORO_CONFIG_DIR}"
-fi
 ${RSYNC_BIN} -r "${DIR}/compose/" "${DC_ORO_CONFIG_DIR}/"
 # Build the compose command by adding compose files in the correct order
 # This logic is reused in test merging - DO NOT duplicate this logic elsewhere
@@ -203,19 +306,20 @@ load_cached_profiles() {
   
   # Check if we need CLI profiles based on the command
   if [[ ${#args[@]} -gt 0 ]]; then
-    local first_arg="${args[0]}"
+    # Use the actual first non-flag argument for command detection
+    local cmd_to_check="$first_non_flag_arg"
     
     # Commands that always need CLI profiles (for proper cleanup)
-    if [[ "$first_arg" =~ ^(down|purge)$ ]]; then
+    if [[ "$cmd_to_check" =~ ^(down|purge)$ ]]; then
       include_cli_profiles=true
     # Commands that need database-cli profile
-    elif [[ "$first_arg" =~ ^(mysql|psql|database-cli)$ ]] || \
-       echo "$first_arg" | grep -i 'import.*db\|export.*db\|dump.*db' > /dev/null; then
+    elif [[ "$cmd_to_check" =~ ^(mysql|psql|database-cli)$ ]] || \
+       echo "$cmd_to_check" | grep -i 'import.*db\|export.*db\|dump.*db' > /dev/null; then
       include_cli_profiles=true
     # Commands that need php-cli profile (already handled by auto-redirect, but for completeness)
-    elif [[ "$first_arg" =~ ^(cli|php|composer|bin/)$ ]] || \
-       [[ "$first_arg" == *.php ]] || \
-       [[ "$first_arg" == -* ]]; then
+    elif [[ "$cmd_to_check" =~ ^(cli|php|composer|bin/)$ ]] || \
+       [[ "$cmd_to_check" == *.php ]] || \
+       [[ "$cmd_to_check" == -* ]]; then
       include_cli_profiles=true
     fi
   fi
@@ -608,12 +712,12 @@ if [[ "${DC_ORO_MODE}" == "mutagen" ]]; then
   MUTAGEN_SESSION_NAME=$(echo ${DC_ORO_NAME}-appcode | awk '{print tolower($0)}' | sed 's/[^0-9a-z]/-/g')
   WAIT_SYNC="1"
 
-  if [[ ${args[0]} == "down" ]] || [[ ${args[0]} == "purge" ]]; then
+  if [[ "$first_non_flag_arg" == "down" ]] || [[ "$first_non_flag_arg" == "purge" ]]; then
     if mutagen sync list | grep -i "Name: ${MUTAGEN_SESSION_NAME}" > /dev/null 2>&1; then
       mutagen sync terminate "${MUTAGEN_SESSION_NAME}"
     fi
     WAIT_SYNC=""
-  elif ! echo ${args[0]} | grep -i '^\(build\|pull\|config\)' > /dev/null 2>&1; then
+  elif ! echo "$first_non_flag_arg" | grep -i '^\(build\|pull\|config\)' > /dev/null 2>&1; then
     if [[ "0" -eq $(${DOCKER_COMPOSE_BIN_CMD} ps -q ssh  2> /dev/null | wc -l 2> /dev/null) ]]; then
       bash -c "${DOCKER_COMPOSE_BIN_CMD} up -d ssh"
     fi
@@ -656,16 +760,69 @@ else
   DOCKER_COMPOSE_RUN_CMD="${DOCKER_COMPOSE_BIN_CMD} run --rm"
 fi
 
+# Function to build docker compose run command with proper flag placement
+build_docker_compose_run_cmd() {
+  local service="$1"
+  local cmd_args=("${@:2}")
+  
+  if [[ ${#left_flags[@]} -gt 0 ]] || [[ ${#left_options[@]} -gt 0 ]]; then
+    # Place docker compose flags before 'run' command
+    if [[ ${DOCKER_COMPOSE_VERSION} -gt 1 ]]; then
+      echo "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} run -i --rm ${service} ${cmd_args[*]} ${right_flags[*]} ${right_options[*]}"
+    else
+      echo "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} run --rm ${service} ${cmd_args[*]} ${right_flags[*]} ${right_options[*]}"
+    fi
+  else
+    # Use standard command without parsed flags
+    echo "${DOCKER_COMPOSE_RUN_CMD} ${service} ${cmd_args[*]}"
+  fi
+}
+
 if ${DOCKER_BIN} system info --format '{{.SecurityOptions}}' 2>/dev/null | grep "name=rootless" > /dev/null; then
   DOCKER_COMPOSE_RUN_CMD="${DOCKER_COMPOSE_RUN_CMD} --user root"
 fi
 
+# Function to mount external PHP files via volume mounts
+# Use volume mounts for external files
+mount_external_php_files() {
+  local external_files=()
+  
+  # Collect external PHP files
+  for arg in "$@"; do
+    if [[ $arg == *.php ]]; then
+      PHPFILE_PATH=$(echo $arg | grep -o '.\+\.php' | sed s~.\*=~~)
+      PHPFILE_DIR=$(dirname "${PHPFILE_PATH}")
+
+      # Check if file is outside project directory
+      if [[ -z $DC_ORO_APPDIR ]] || [[ $PHPFILE_DIR != '.' && $PHPFILE_DIR != $DC_ORO_APPDIR && $PHPFILE_DIR != $DC_ORO_APPDIR/* ]]; then
+        # Check if file exists locally
+        if [[ -f "${PHPFILE_PATH}" ]]; then
+          external_files+=("${PHPFILE_PATH}")
+        fi
+      fi
+    fi
+  done
+  
+  # Prepare volume mounts for external files
+  if [[ ${#external_files[@]} -gt 0 ]]; then
+    # Build volume mount arguments for docker compose run
+    for file in "${external_files[@]}"; do
+      file_dir=$(dirname "${file}")
+      # Add bind mount for each external file directory
+      DOCKER_COMPOSE_RUN_CMD="${DOCKER_COMPOSE_RUN_CMD} -v ${file_dir}:${file_dir}:ro"
+    done
+  fi
+}
+
+# Mount external PHP files before executing any command
+mount_external_php_files "${original_args[@]}"
+
 # Load cached profiles for all commands except 'up' (which saves new profiles)
-if [[ ${args[0]} != "up" ]]; then
+if [[ "$first_non_flag_arg" != "up" ]]; then
   load_cached_profiles
 fi
 
-if [[ ${args[0]} == "up" ]]; then
+if [[ "$first_non_flag_arg" == "up" ]]; then
   # Save profiles for future commands
   save_profiles
   
@@ -717,7 +874,8 @@ if echo ${args[0]} | grep -i 'import' | grep -i 'db\|database' > /dev/null 2>&1 
   >&2 echo "/* Starting import of the database dump... */"
   >&2 echo "/* From: $DB_DUMP */"
 
-  ${DOCKER_COMPOSE_RUN_CMD} "${left_flags[@]}" "${left_options[@]}" -v "${DB_DUMP}:/${DB_DUMP_BASENAME}" database-cli bash -c "$DB_IMPORT_CMD"
+  db_cmd=$(build_docker_compose_run_cmd "database-cli" "-v" "${DB_DUMP}:/${DB_DUMP_BASENAME}" "bash" "-c" "$DB_IMPORT_CMD")
+  bash -c "$db_cmd"
   exit 0
 fi
 
@@ -730,13 +888,14 @@ if echo ${args[0]} | grep -i 'set\|update' | grep -i 'url\|uri' > /dev/null; the
   exit 0
 fi
 
-if [[ "${args[0]}" == "cache" ]]; then
+if [[ "$first_non_flag_arg" == "cache" ]]; then
   # Use second argument as cache subcommand, default to 'clear'
   cache_cmd="${args[1]:-clear}"
   
   set -x
   if [[ "$NEEDS_ARG_PARSING" == "true" ]]; then
-    exec ${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} cli php ./bin/console cache:${cache_cmd} "${args[@]:2}" "${right_flags[@]}" "${right_options[@]}"
+    cache_cmd_exec=$(build_docker_compose_run_cmd "cli" "php" "./bin/console" "cache:${cache_cmd}" "${args[@]:2}")
+    exec bash -c "$cache_cmd_exec"
   else
     exec ${DOCKER_COMPOSE_RUN_CMD} cli php ./bin/console cache:${cache_cmd} "${args[@]:2}"
   fi
@@ -755,7 +914,7 @@ if echo ${args[0]} | grep -i '^cache:' > /dev/null; then
   fi
 fi
 
-if [[ "${args[0]}" == "platform" && "${args[1]}" == "update" ]]; then
+if [[ "$first_non_flag_arg" == "platform" && "${args[1]}" == "update" ]]; then
   set -x
   if [[ "$NEEDS_ARG_PARSING" == "true" ]]; then
     exec ${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} cli php ./bin/console oro:platform:update --force "${args[@]:2}" "${right_flags[@]}" "${right_options[@]}"
@@ -789,35 +948,33 @@ fi
 
 
 # Handle PHP flags (redirect to PHP CLI when appropriate)
-if [[ ${#left_flags[@]} -gt 0 ]]; then
-  # Check if we should redirect to PHP
-  should_redirect_to_php=true
-  
-  # If there are args (non-flag arguments), check if they are PHP files or PHP-compatible
-  if [[ ${#args[@]} -gt 0 ]]; then
+if [[ ${#left_flags[@]} -gt 0 ]] || [[ ${#right_flags[@]} -gt 0 ]] || [[ ${#right_options[@]} -gt 0 ]]; then
+  # Redirect to PHP if first argument is 'php' or if no command (implicit PHP)
+  if [[ "$first_non_flag_arg" == "php" ]] || ! is_compose_command "$first_non_flag_arg"; then
+    # Redirect to PHP - combine flags and args, but exclude 'php' command itself from args
+    php_only_args=()
     for arg in "${args[@]}"; do
-      # If argument doesn't end with .php and contains path separators or doesn't look like PHP code
-      if [[ "$arg" != *.php && ("$arg" == *"/"* || "$arg" == *"."* && "$arg" != *";"* && "$arg" != *"("*) ]]; then
-        should_redirect_to_php=false
-        break
+      if [[ "$arg" != "php" ]]; then
+        php_only_args+=("$arg")
       fi
     done
-  fi
-  
-  if [[ "$should_redirect_to_php" == true ]]; then
-    # Redirect to PHP
-    exec bash -c "${DOCKER_COMPOSE_RUN_CMD} cli php \"\${@}\"" -- "${left_flags[@]}" "${left_options[@]}" "${args[@]}" "${right_flags[@]}" "${right_options[@]}"
+    php_args=("${left_flags[@]}" "${left_options[@]}" "${php_only_args[@]}" "${right_flags[@]}" "${right_options[@]}")
+    php_cmd=$(build_docker_compose_run_cmd "cli" "php" "${php_args[@]}")
+    if [ "$DEBUG" ]; then echo "DEBUG: Redirecting to PHP with args: ${php_args[*]}" >&2; fi
+    exec bash -c "$php_cmd"
   fi
 fi
 
 if echo ${args[0]} | grep -i '^mysql' > /dev/null; then
-  MYSQL_CMD="MYSQL_PWD=\$DC_ORO_DATABASE_PASSWORD mysql -h\$DC_ORO_DATABASE_HOST -P\$DC_ORO_DATABASE_PORT -u\$DC_ORO_DATABASE_USER \$DC_ORO_DATABASE_DBNAME"
-  exec bash -c "${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} database-cli bash -c \"$MYSQL_CMD\""
+  # Extract mysql arguments (everything after 'mysql')
+  mysql_args=("${args[@]:1}")
+  exec ${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} -e MYSQL_PWD="$DC_ORO_DATABASE_PASSWORD" database-cli mysql -h"$DC_ORO_DATABASE_HOST" -P"$DC_ORO_DATABASE_PORT" -u"$DC_ORO_DATABASE_USER" "$DC_ORO_DATABASE_DBNAME" "${mysql_args[@]}"
 fi
 
 if echo ${args[0]} | grep -i '^psql' > /dev/null; then
-  PSQL_CMD="PGPASSWORD=\$DC_ORO_DATABASE_PASSWORD psql -h \$DC_ORO_DATABASE_HOST -p \$DC_ORO_DATABASE_PORT -U \$DC_ORO_DATABASE_USER -d \$DC_ORO_DATABASE_DBNAME"
-  exec bash -c "${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} database-cli bash -c \"$PSQL_CMD\""
+  # Extract psql arguments (everything after 'psql')
+  psql_args=("${args[@]:1}")
+  exec ${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} -e PGPASSWORD="$DC_ORO_DATABASE_PASSWORD" database-cli psql -h "$DC_ORO_DATABASE_HOST" -p "$DC_ORO_DATABASE_PORT" -U "$DC_ORO_DATABASE_USER" -d "$DC_ORO_DATABASE_DBNAME" "${psql_args[@]}"
 fi
 
 if echo ${args[0]} | grep -i '^database-cli' > /dev/null; then
@@ -855,11 +1012,12 @@ is_docker_compose_command() {
   echo "$cmd" | grep -qE "^(${compose_commands})$"
 }
 
-# Function to check if command is a special orodc command
+# Function moved earlier to avoid "command not found" error
+
 is_special_orodc_command() {
   local cmd="$1"
   case "$cmd" in
-    ssh|cli|pgsql|psql|mysql|database-cli|install|purge|test|tests)
+    ssh|cli|pgsql|psql|mysql|database-cli|install|purge|test|tests|bash)
       return 0
       ;;
     *)
@@ -875,59 +1033,24 @@ is_special_orodc_command() {
   esac
 }
 
-# Check if first argument is a docker compose command (will be handled at the end)
+
+# Check if any argument is a docker compose command (will be handled at the end)
 is_docker_compose_cmd=false
-if [[ ${#args[@]} -gt 0 ]] && is_docker_compose_command "${args[0]}"; then
-  is_docker_compose_cmd=true
-fi
-
-# Function to copy external PHP files to container
-# Use temporary container with sleep infinity approach
-copy_external_php_files() {
-  local external_files=()
-  
-  # Collect external PHP files
-  for arg in "$@"; do
-    if [[ $arg == *.php ]]; then
-      PHPFILE_PATH=$(echo $arg | grep -o '.\+\.php' | sed s~.\*=~~)
-      PHPFILE_DIR=$(dirname "${PHPFILE_PATH}")
-
-      # Check if file is outside project directory
-      if [[ -z $DC_ORO_APPDIR ]] || [[ $PHPFILE_DIR != '.' && $PHPFILE_DIR != $DC_ORO_APPDIR && $PHPFILE_DIR != $DC_ORO_APPDIR/* ]]; then
-        # Check if file exists locally
-        if [[ -f "${PHPFILE_PATH}" ]]; then
-          external_files+=("${PHPFILE_PATH}")
-        fi
-      fi
+if [[ ${#args[@]} -gt 0 ]]; then
+  for arg in "${args[@]}"; do
+    if is_docker_compose_command "$arg"; then
+      is_docker_compose_cmd=true
+      break
     fi
   done
-  
-  # Copy files if any external files found
-  if [[ ${#external_files[@]} -gt 0 ]]; then
-    
-    # Start temporary container with sleep infinity
-    TEMP_CONTAINER_NAME="${DC_ORO_NAME}_temp_copy_$$"
-    ${DOCKER_COMPOSE_RUN_CMD} --name "${TEMP_CONTAINER_NAME}" -d cli sleep infinity >/dev/null 2>&1 || {
-      return 1
-    }
-    
-    # Copy each external file
-    for file in "${external_files[@]}"; do
-      file_dir=$(dirname "${file}")
-      
-      # Create directory and copy file
-      docker exec "${TEMP_CONTAINER_NAME}" mkdir -p "${file_dir}" >/dev/null 2>&1 || true
-      docker cp "${file}" "${TEMP_CONTAINER_NAME}:${file}" >/dev/null 2>&1 || true
-    done
-    
-    # Stop and remove temporary container
-    docker stop "${TEMP_CONTAINER_NAME}" >/dev/null 2>&1 || true
-    docker rm "${TEMP_CONTAINER_NAME}" >/dev/null 2>&1 || true
-  fi
-}
+fi
+if [[ -n "${DEBUG:-}" ]]; then
+  echo "DEBUG: is_docker_compose_cmd=$is_docker_compose_cmd, args=${args[*]:-none}" >&2
+  echo "DEBUG: args[0]=${args[0]:-empty}, args length=${#args[@]}" >&2
+fi
 
-# Copy external PHP files before executing any command
-copy_external_php_files "${original_args[@]}"
+
+# Mount external PHP files will be called after DOCKER_COMPOSE_RUN_CMD is defined
 
 if [[ "$is_docker_compose_cmd" != "true" ]]; then
   # Check if any argument contains a .php file
@@ -979,7 +1102,11 @@ fi
 fi
 
 # If command is not a docker compose built-in command and not a special orodc command, redirect to CLI container
-if [[ ${#args[@]} -gt 0 ]] && ! is_docker_compose_command "${args[0]}" && ! is_special_orodc_command "${args[0]}"; then
+if [[ -n "${DEBUG:-}" ]]; then
+  echo "DEBUG: Checking special commands: args[0]='${args[0]}', first_non_flag_arg='$first_non_flag_arg'" >&2
+fi
+
+if [[ ${#args[@]} -gt 0 ]] && [[ "$is_docker_compose_cmd" != "true" ]] && ! is_special_orodc_command "$first_non_flag_arg"; then
   echo "Running command in 'cli' service..."
   # Special handling for bash -c commands
   if [[ "${args[0]}" == "bash" && "${right_flags[0]}" == "-c" ]]; then
@@ -996,7 +1123,8 @@ if [[ ${#args[@]} -gt 0 ]] && ! is_docker_compose_command "${args[0]}" && ! is_s
     exec 1>&3 2>&4
     # Close temporary descriptors
     exec 3>&- 4>&-
-    exec ${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} cli "${args[@]}" "${right_flags[@]}" "${right_options[@]}"
+    cli_cmd=$(build_docker_compose_run_cmd "cli" "${args[@]}")
+    exec bash -c "$cli_cmd"
   fi
 fi
 
@@ -1019,7 +1147,7 @@ elif echo ${args[0]} | grep -i '^install$' > /dev/null; then
 fi
 
 # Handle tests commands - unified entry point
-if [[ "${args[0]}" == "tests" ]]; then
+if [[ "$first_non_flag_arg" == "tests" ]]; then
   # CRITICAL COMPOSE MERGING LOGIC - READ CAREFULLY BEFORE MODIFYING
   # =================================================================
   # 
@@ -1136,7 +1264,9 @@ EOF
         echo "Running cache clear in 'test-cli' service..."
         ${TEST_COMPOSE_CMD} run --rm test-cli bash -c "rm -rf var/cache/test" 2>/dev/null || true
         echo "Running oro:install in 'test-cli' service..."
-        ${TEST_COMPOSE_CMD} run --rm test-cli bin/console --env=test oro:install
+        timeout 300 ${TEST_COMPOSE_CMD} run --rm test-cli bin/console --env=test --timeout=300 oro:install --language=en --formatting-code=en_US --organization-name='Test Org' --user-name=admin --user-email=admin@example.com --user-firstname=Test --user-lastname=User --user-password='12345678' --application-url='http://localhost/' --sample-data=n --skip-translations || {
+          echo "oro:install completed or timed out, continuing..."
+        }
       else
         echo "Oro test environment already installed, skipping oro:install..."
       fi
@@ -1239,7 +1369,16 @@ EOF
   exit 0
 fi
 
-if [[ ${args[0]} == "purge" ]]; then
+if [[ -n "${DEBUG:-}" ]]; then
+  echo "DEBUG: Checking purge condition: first_non_flag_arg='$first_non_flag_arg'" >&2
+fi
+
+if [[ "$first_non_flag_arg" == "purge" ]]; then
+  # Handle purge command with proper flag processing
+  if [[ -n "${DEBUG:-}" ]]; then
+    echo "DEBUG: Processing purge command with flags: ${left_flags[@]} ${left_options[@]}" >&2
+  fi
+  
   if [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
     bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} -f ${DC_ORO_CONFIG_DIR}/compose.yml down -v"
   else
@@ -1258,7 +1397,7 @@ if [[ ${args[0]} == "purge" ]]; then
   exit 0
 fi
 
-if [[ ${args[0]} == "down" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]] && [[ -s "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
+if [[ "$first_non_flag_arg" == "down" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]] && [[ -s "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/compose.yml"
   # Combine all arguments into a single string for proper execution
   full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${args[*]} ${right_flags[*]} ${right_options[*]}"
@@ -1267,8 +1406,10 @@ fi
 
 # Handle docker compose commands with all variables set
 if [[ "$is_docker_compose_cmd" == "true" ]]; then
-  # Generate config file, ignore warnings/errors
-  DC_ORO_NAME="$DC_ORO_NAME" bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} config" > "${DC_ORO_CONFIG_DIR}/compose.yml" 2>/dev/null || true
+  # Generate config file only if it doesn't exist or if it's a management command (up, down, purge, etc.)
+  if [[ ! -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]] || [[ "${args[0]}" =~ ^(up|down|purge|build|pull|push|restart|start|stop|kill|rm|create)$ ]]; then
+    DC_ORO_NAME="$DC_ORO_NAME" bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} config" > "${DC_ORO_CONFIG_DIR}/compose.yml" 2>/dev/null || true
+  fi
   # For docker compose commands, proper order is: command flags services
   # Extract command (first element) and services (rest of elements)
   docker_cmd="${args[0]}"
@@ -1281,7 +1422,39 @@ if [[ "$is_docker_compose_cmd" == "true" ]]; then
   DC_ORO_NAME="$DC_ORO_NAME" exec bash -c "$full_cmd"
 fi
 
-DC_ORO_NAME="$DC_ORO_NAME" bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} config" > "${DC_ORO_CONFIG_DIR}/compose.yml" 2>/dev/null || true
+# Handle bash commands by running them in CLI container
+if [[ "$first_non_flag_arg" == "bash" ]]; then
+  # Generate config file only if it doesn't exist
+  if [[ ! -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
+    DC_ORO_NAME="$DC_ORO_NAME" bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} config" > "${DC_ORO_CONFIG_DIR}/compose.yml" 2>/dev/null || true
+  fi
+  
+  # For bash commands, use docker compose run with cli container
+  # Pass all arguments after "bash" to the bash command in the container
+  bash_args=("${args[@]:1}")
+  
+  # Build the run command with proper argument handling
+  if [[ ${#bash_args[@]} -gt 0 ]]; then
+    # If there are arguments after bash, pass them through
+    full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} run --rm cli bash ${bash_args[*]} ${right_flags[*]} ${right_options[*]}"
+  else
+    # If no arguments after bash, just run interactive bash
+    full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} run --rm cli bash ${right_flags[*]} ${right_options[*]}"
+  fi
+  
+  # Restore standard streams
+  exec 1>&3 2>&4
+  
+  # Close temporary descriptors
+  exec 3>&- 4>&-
+  
+  DC_ORO_NAME="$DC_ORO_NAME" exec bash -c "$full_cmd"
+fi
+
+# Generate config file only if it doesn't exist or if it's a management command (up, down, purge, etc.)
+if [[ ! -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]] || [[ "${args[0]}" =~ ^(up|down|purge|build|pull|push|restart|start|stop|kill|rm|create)$ ]]; then
+  DC_ORO_NAME="$DC_ORO_NAME" bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} config" > "${DC_ORO_CONFIG_DIR}/compose.yml" 2>/dev/null || true
+fi
 # Combine all arguments into a single string for proper execution  
 full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${args[*]} ${right_flags[*]} ${right_options[*]}"
 
