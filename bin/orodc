@@ -4,12 +4,12 @@ if [ "$DEBUG" ]; then set -x; fi
 
 # Setup logging only when OroDC is used as PHP binary
 setup_php_logging() {
-  exec 3>&1 4>&2
   mkdir -p /tmp/.orodc
-  touch /tmp/.orodc/$(basename $0).$(echo "$@" | md5sum - | awk '{ print $1 }').err
-  touch /tmp/.orodc/$(basename $0).$(echo "$@" | md5sum - | awk '{ print $1 }').log
-  exec 2> >(tee /tmp/.orodc/$(basename $0).$(echo "$@" | md5sum - | awk '{ print $1 }').err)
-  exec 1> >(tee /tmp/.orodc/$(basename $0).$(echo "$@" | md5sum - | awk '{ print $1 }').log)
+  local log_file="/tmp/.orodc/$(basename $0).$(echo "$@" | md5sum - | awk '{ print $1 }').log"
+  local err_file="/tmp/.orodc/$(basename $0).$(echo "$@" | md5sum - | awk '{ print $1 }').err"
+  touch "$log_file" "$err_file"
+  exec 1> >(tee "$log_file")
+  exec 2> >(tee "$err_file")
 }
 
 
@@ -1193,16 +1193,8 @@ if [[ "$has_php_file" == true ]]; then
             ;;
         esac
       done
-      # Restore standard streams
-      exec 1>&3 2>&4
-      # Close temporary descriptors
-      exec 3>&- 4>&-
       exec ${DOCKER_COMPOSE_RUN_CMD} "${docker_flags[@]}" "${left_options[@]}" cli php "${php_flags[@]}" "${right_flags[@]}" "${right_options[@]}" "${args[@]}"
     else
-      # Restore standard streams
-      exec 1>&3 2>&4
-      # Close temporary descriptors
-      exec 3>&- 4>&-
       exec ${DOCKER_COMPOSE_RUN_CMD} "${left_flags[@]}" "${left_options[@]}" cli "${args[@]}" "${right_flags[@]}" "${right_options[@]}"
     fi
   fi
@@ -1219,18 +1211,10 @@ if [[ ${#args[@]} -gt 0 ]] && [[ "$is_docker_compose_cmd" != "true" ]] && ! is_s
   # Special handling for bash -c commands
   if [[ "${args[0]}" == "bash" && "${right_flags[0]}" == "-c" ]]; then
     # For bash -c 'command', reconstruct proper argument order
-    # Restore standard streams
-    exec 1>&3 2>&4
-    # Close temporary descriptors
-    exec 3>&- 4>&-
     exec ${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} cli bash -c "${args[@]:1}" "${right_options[@]}"
   else
     # Pass arguments directly to docker compose exec without additional escaping
     # Combine args with right_flags and right_options in proper order
-    # Restore standard streams
-    exec 1>&3 2>&4
-    # Close temporary descriptors
-    exec 3>&- 4>&-
     cli_cmd=$(build_docker_compose_run_cmd "cli" "${args[@]}")
     exec bash -c "$cli_cmd"
   fi
@@ -1523,10 +1507,6 @@ if [[ "$is_docker_compose_cmd" == "true" ]]; then
   docker_cmd="${args[0]}"
   docker_services="${args[*]:1}"
   full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${docker_cmd} ${right_flags[*]} ${right_options[*]} ${docker_services}"
-  # Restore standard streams
-  exec 1>&3 2>&4
-  # Close temporary descriptors
-  exec 3>&- 4>&-
   DC_ORO_NAME="$DC_ORO_NAME" exec bash -c "$full_cmd"
 fi
 
@@ -1550,12 +1530,6 @@ if [[ "$first_non_flag_arg" == "bash" ]]; then
     full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} run --rm cli bash ${right_flags[*]} ${right_options[*]}"
   fi
   
-  # Restore standard streams
-  exec 1>&3 2>&4
-  
-  # Close temporary descriptors
-  exec 3>&- 4>&-
-  
   DC_ORO_NAME="$DC_ORO_NAME" exec bash -c "$full_cmd"
 fi
 
@@ -1566,10 +1540,5 @@ fi
 # Combine all arguments into a single string for proper execution  
 full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${args[*]} ${right_flags[*]} ${right_options[*]}"
 
-# Restore standard streams
-exec 1>&3 2>&4
-
-# Close temporary descriptors
-exec 3>&- 4>&-
 
 DC_ORO_NAME="$DC_ORO_NAME" exec bash -c "$full_cmd"

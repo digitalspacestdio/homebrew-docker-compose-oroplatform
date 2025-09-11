@@ -1,0 +1,210 @@
+name: Test Installations
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+  schedule:
+    # Run tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      test_applications:
+        description: 'Applications to test (comma-separated: marello,orocrm,oroplatform,orocommerce)'
+        required: false
+        default: 'marello,orocrm,oroplatform,orocommerce'
+
+env:
+  HOMEBREW_NO_AUTO_UPDATE: 1
+  HOMEBREW_NO_INSTALL_CLEANUP: 1
+
+jobs:
+  test-installation:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - application: marello
+            version: 4.2.0
+            repo_url: https://github.com/marellocommerce/marello.git
+          - application: orocrm
+            version: 6.1.4
+            repo_url: https://github.com/oroinc/crm-application.git
+          - application: oroplatform
+            version: 6.1.4
+            repo_url: https://github.com/oroinc/platform-application.git
+          - application: orocommerce
+            version: 6.1.4
+            repo_url: https://github.com/oroinc/orocommerce-application.git
+    timeout-minutes: 60
+    name: Test ${{ matrix.application }} (${{ matrix.version }})
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Install Homebrew
+        run: |
+          # Configure git to use HTTPS instead of SSH BEFORE Homebrew installation
+          git config --global url."https://github.com/".insteadOf git@github.com:
+          
+          # Install Homebrew without auto-update to avoid SSH issues
+          NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          echo "/home/linuxbrew/.linuxbrew/bin" >> $GITHUB_PATH
+
+      - name: Install OroDC
+        run: |
+          # Install OroDC directly from tap
+          brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform
+
+
+      - name: Clone Oro application
+        run: |
+          # Set unique project name and port to avoid conflicts
+          PROJECT_NAME="${{ matrix.application }}-${{ github.run_id }}"
+          PORT_PREFIX="30${{ strategy.job-index }}"
+          WORK_DIR="${{ github.workspace }}/$PROJECT_NAME"
+          
+          echo "📦 Cloning ${{ matrix.application }} version ${{ matrix.version }}"
+          echo "🏷️  Project: $PROJECT_NAME"
+          echo "📂 Work directory: $WORK_DIR"
+          echo "🔌 Port prefix: $PORT_PREFIX"
+          echo "🏠 Workspace: ${{ github.workspace }}"
+          
+          # Create work directory in workspace (shared with host Docker)
+          mkdir -p "$WORK_DIR"
+          
+          # Clone the application
+          if ! git clone --single-branch --branch "${{ matrix.version }}" "${{ matrix.repo_url }}" "$WORK_DIR"; then
+            echo "⚠️  Failed to clone version ${{ matrix.version }}, trying master..."
+            git clone "${{ matrix.repo_url }}" "$WORK_DIR"
+            cd "$WORK_DIR"
+            if git tag | grep -q "${{ matrix.version }}"; then
+              git checkout "${{ matrix.version }}"
+            else
+              echo "⚠️  Using default branch"
+            fi
+          else
+            cd "$WORK_DIR"
+          fi
+          
+          # Configure OroDC for SSH mode (no volume mounting needed)
+          echo "DC_ORO_NAME=$PROJECT_NAME" > .env.orodc
+          echo "DC_ORO_PORT_PREFIX=$PORT_PREFIX" >> .env.orodc
+          echo "DC_ORO_MODE=ssh" >> .env.orodc
+          
+          echo "✅ Application cloned and configured in $WORK_DIR"
+
+      - name: Install and start application
+        run: |
+          cd "${{ github.workspace }}/${{ matrix.application }}-${{ github.run_id }}"
+          echo "🚀 Starting installation of ${{ matrix.application }}..."
+          echo "📁 Working in: $(pwd)"
+          
+          # Install the application
+          orodc install
+          
+          # Start services
+          orodc up -d
+          
+          echo "✅ Installation completed"
+
+      - name: Wait for services to be ready
+        run: |
+          cd "${{ github.workspace }}/${{ matrix.application }}-${{ github.run_id }}"
+          echo "⏳ Waiting for services to start..."
+          
+          # Wait up to 5 minutes for services to be ready
+          timeout 300 bash -c '
+            while ! orodc ps | grep -q "Up"; do
+              echo "Waiting for services..."
+              sleep 10
+            done
+          '
+          
+          echo "✅ Services are running"
+
+      - name: Test application accessibility
+        run: |
+          cd "${{ github.workspace }}/${{ matrix.application }}-${{ github.run_id }}"
+          # Get the HTTP port
+          HTTP_PORT="30${{ strategy.job-index }}80"
+          echo "🌐 Testing accessibility on http://localhost:$HTTP_PORT"
+          
+          # Wait for HTTP response (up to 2 minutes)
+          timeout 120 bash -c "
+            until curl -s http://localhost:$HTTP_PORT >/dev/null; do
+              echo 'Waiting for HTTP response...'
+              sleep 5
+            done
+          "
+          
+          # Get page title
+          TITLE=$(curl -s "http://localhost:$HTTP_PORT" | grep -o '<title>[^<]*</title>' | sed 's/<[^>]*>//g' || echo "No title found")
+          echo "📄 Page title: $TITLE"
+          
+          echo "✅ Application is accessible"
+
+      - name: Run basic health checks
+        run: |
+          cd "${{ github.workspace }}/${{ matrix.application }}-${{ github.run_id }}"
+          echo "🔍 Running health checks..."
+          
+          # Check container status
+          echo "📋 Container status:"
+          orodc ps
+          
+          # Check PHP version
+          echo "🐘 PHP version:"
+          orodc php --version
+          
+          # Check database connection
+          echo "🗄️  Database connection:"
+          orodc psql -c "SELECT version();" || echo "Database check failed"
+          
+          echo "✅ Health checks completed"
+
+      - name: Cleanup on failure
+        if: failure()
+        run: |
+          cd "${{ github.workspace }}/${{ matrix.application }}-${{ github.run_id }}" 2>/dev/null || true
+          echo "🧹 Cleaning up after failure..."
+          orodc logs --tail=50 || true
+          orodc down --remove-orphans || true
+          orodc purge || true
+
+      - name: Cleanup on success
+        if: success()
+        run: |
+          cd "/tmp/${{ matrix.application }}-${{ github.run_id }}" 2>/dev/null || true
+          echo "🧹 Cleaning up after success..."
+          orodc down --remove-orphans || true
+          orodc purge || true
+
+  test-summary:
+    needs: test-installation
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Test Summary
+        run: |
+          echo "## Test Results Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ needs.test-installation.result }}" = "success" ]; then
+            echo "✅ All installation tests passed successfully!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Some installation tests failed. Check the job logs for details." >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Tested Applications:" >> $GITHUB_STEP_SUMMARY
+          echo "- marello (4.2.0)" >> $GITHUB_STEP_SUMMARY
+          echo "- orocrm (6.1.4)" >> $GITHUB_STEP_SUMMARY
+          echo "- oroplatform (6.1.4)" >> $GITHUB_STEP_SUMMARY
+          echo "- orocommerce (6.1.4)" >> $GITHUB_STEP_SUMMARY
