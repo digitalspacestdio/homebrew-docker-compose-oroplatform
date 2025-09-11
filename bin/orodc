@@ -930,8 +930,7 @@ if echo ${args[0]} | grep -i 'import' | grep -i 'db\|database' > /dev/null 2>&1 
   >&2 echo "/* Starting import of the database dump... */"
   >&2 echo "/* From: $DB_DUMP */"
 
-  db_cmd=$(build_docker_compose_run_cmd "database-cli" "-v" "${DB_DUMP}:/${DB_DUMP_BASENAME}" "bash" "-c" "$DB_IMPORT_CMD")
-  bash -c "$db_cmd"
+  exec bash -c "${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} -v \"${DB_DUMP}:/${DB_DUMP_BASENAME}\" database-cli bash -c \"$DB_IMPORT_CMD\""
   exit 0
 fi
 
