@@ -1474,7 +1474,18 @@ EOF
         sed -i "s|localhost:4444|test-selenium:4444|g" "$BEHAT_CONFIG_FILE"
         # Replace localhost:9515 with test-selenium:9515 for ChromeDriver host  
         sed -i "s|localhost:9515|test-selenium:9515|g" "$BEHAT_CONFIG_FILE"
-        echo "Generated behat.yml with test environment URLs"
+        
+        # Add necessary Chrome arguments for Docker environment to the main sessions (port 4444)
+        # This fixes the "DevToolsActivePort file doesn't exist" error
+        sed -i '/--load-extension.*chrome-extension/a\                                        - "--no-sandbox"\
+                                        - "--disable-gpu"\
+                                        - "--headless"\
+                                        - "--disable-dev-shm-usage"\
+                                        - "--no-first-run"\
+                                        - "--disable-extensions"\
+                                        - "--disable-renderer-backgrounding"' "$BEHAT_CONFIG_FILE"
+        
+        echo "Generated behat.yml with test environment URLs and Docker-compatible Chrome options"
       else
         echo "Warning: behat.yml.dist not found, skipping behat.yml generation"
       fi
