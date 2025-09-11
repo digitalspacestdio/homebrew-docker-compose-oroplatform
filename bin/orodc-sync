@@ -1919,7 +1919,9 @@ function PreInit {
 
 	## Ignore SSH known host verification
 	if [ "$SSH_IGNORE_KNOWN_HOSTS" == true ]; then
-		SSH_OPTS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no"
+		SSH_OPTS="-o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o 'ForwardAgent no' -o IdentitiesOnly=yes"
+	else
+		SSH_OPTS="-o 'ForwardAgent no' -o IdentitiesOnly=yes"
 	fi
 
 	## SSH ControlMaster Multiplexing
