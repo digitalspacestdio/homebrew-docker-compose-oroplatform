@@ -19,13 +19,23 @@
    git checkout -b update/component-name
    ```
 
-3. **Make commits in the branch:**
+3. **Update formula version (REQUIRED before each commit):**
+   ```bash
+   # Edit Formula/docker-compose-oroplatform.rb
+   # Increment version "X.Y.Z" -> "X.Y.Z+1" (e.g. "0.8.6" -> "0.8.7")
+   # For semantic versioning:
+   # - Patch: 0.8.6 -> 0.8.7 (bug fixes)
+   # - Minor: 0.8.6 -> 0.9.0 (new features)
+   # - Major: 0.8.6 -> 1.0.0 (breaking changes)
+   ```
+
+4. **Make commits in the branch:**
    ```bash
    git add .
    git commit -m "descriptive commit message"
    ```
 
-4. **Push branch for review:**
+5. **Push branch for review:**
    ```bash
    git push -u origin feature/descriptive-branch-name
    ```
@@ -62,5 +72,27 @@
 - `feature/php-auto-detection`
 - `docs/installation-guide`
 
+### 📦 **Formula Versioning Examples:**
+
+```ruby
+# Before (in Formula/docker-compose-oroplatform.rb)
+version "0.8.6"
+
+# After - Bug fix
+version "0.8.7"
+
+# After - New feature
+version "0.9.0"
+
+# After - Breaking change
+version "1.0.0"
+```
+
+### ⚠️ **CRITICAL: Version Update is Mandatory!**
+
+- **ALWAYS** update the version before committing changes to `compose/` or `bin/`
+- **NEVER** commit without version increment when modifying core functionality
+- Version updates ensure proper Homebrew package management
+
 ---
-**Remember: Branch first, commit later! 🌳**
+**Remember: Version first, branch first, commit later! 📦🌳**
