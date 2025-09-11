@@ -4,11 +4,16 @@
 
 **Modern CLI tool to run ORO applications locally or on a server.** Designed specifically for local development environments with enterprise-grade performance and developer experience.
 
+[![Version](https://img.shields.io/badge/Version-0.8.5-brightgreen.svg)](https://github.com/sergeycherepanov/homebrew-docker-compose-oroplatform/releases)
 [![Homebrew](https://img.shields.io/badge/Homebrew-Available-orange.svg)](https://brew.sh/)
 [![Docker](https://img.shields.io/badge/Docker-Required-blue.svg)](https://www.docker.com/)
 [![macOS](https://img.shields.io/badge/macOS-Supported-green.svg)](https://www.apple.com/macos/)
 [![Linux](https://img.shields.io/badge/Linux-Supported-green.svg)](https://www.linux.org/)
 [![Windows WSL2](https://img.shields.io/badge/Windows%20WSL2-Supported-green.svg)](https://docs.microsoft.com/en-us/windows/wsl/)
+
+[![Test Installations](https://github.com/sergeycherepanov/homebrew-docker-compose-oroplatform/actions/workflows/test-oro-installations.yml/badge.svg)](https://github.com/sergeycherepanov/homebrew-docker-compose-oroplatform/actions/workflows/test-oro-installations.yml)
+[![Update Versions](https://github.com/sergeycherepanov/homebrew-docker-compose-oroplatform/actions/workflows/update-versions.yml/badge.svg)](https://github.com/sergeycherepanov/homebrew-docker-compose-oroplatform/actions/workflows/update-versions.yml)
+[![Build Docker Images](https://github.com/sergeycherepanov/homebrew-docker-compose-oroplatform/actions/workflows/build-docker-php-node-symfony.yml/badge.svg)](https://github.com/sergeycherepanov/homebrew-docker-compose-oroplatform/actions/workflows/build-docker-php-node-symfony.yml)
 
 ## ✨ Key Features
 
