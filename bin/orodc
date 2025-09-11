@@ -2,13 +2,15 @@
 set -e
 if [ "$DEBUG" ]; then set -x; fi
 
-# Setup logging
-exec 3>&1 4>&2
-mkdir -p /tmp/.orodc
-touch /tmp/.orodc/$(basename $0).$(echo "$@" | md5sum - | awk '{ print $1 }').err
-touch /tmp/.orodc/$(basename $0).$(echo "$@" | md5sum - | awk '{ print $1 }').log
-exec 2> >(tee /tmp/.orodc/$(basename $0).$(echo "$@" | md5sum - | awk '{ print $1 }').err)
-exec 1> >(tee /tmp/.orodc/$(basename $0).$(echo "$@" | md5sum - | awk '{ print $1 }').log)
+# Setup logging only when OroDC is used as PHP binary
+setup_php_logging() {
+  exec 3>&1 4>&2
+  mkdir -p /tmp/.orodc
+  touch /tmp/.orodc/$(basename $0).$(echo "$@" | md5sum - | awk '{ print $1 }').err
+  touch /tmp/.orodc/$(basename $0).$(echo "$@" | md5sum - | awk '{ print $1 }').log
+  exec 2> >(tee /tmp/.orodc/$(basename $0).$(echo "$@" | md5sum - | awk '{ print $1 }').err)
+  exec 1> >(tee /tmp/.orodc/$(basename $0).$(echo "$@" | md5sum - | awk '{ print $1 }').log)
+}
 
 
 # Save original arguments before any processing
@@ -898,19 +900,19 @@ if [[ "$first_non_flag_arg" == "up" ]]; then
 fi
 
 
-if echo ${args[0]} | grep -i 'import' | grep -i 'db\|database' > /dev/null 2>&1 || false; then
-  if [[ -z $2 ]]; then
+if echo "$first_non_flag_arg" | grep -i 'import' | grep -i 'db\|database' > /dev/null 2>&1 || false; then
+  if [[ -z ${args[1]} ]]; then
     >&2 echo "Data file was not provided"
     exit 1
   fi
-  if [[ -r $2 ]]; then
-    DB_DUMP=$(realpath $2)
-  elif [[ -r "$DC_ORO_APPDIR/$2" ]]; then
-    DB_DUMP=$(realpath "$DC_ORO_APPDIR/$2")
+  if [[ -r ${args[1]} ]]; then
+    DB_DUMP=$(realpath ${args[1]})
+  elif [[ -r "$DC_ORO_APPDIR/${args[1]}" ]]; then
+    DB_DUMP=$(realpath "$DC_ORO_APPDIR/${args[1]}")
   fi
 
   if [[ -z "$DB_DUMP" ]] || [[ ! -r "$DB_DUMP" ]]; then
-    >&2 echo "Data file '$2' does not readable"
+    >&2 echo "Data file '${args[1]}' does not readable"
     exit 1
   fi
 
@@ -930,7 +932,7 @@ if echo ${args[0]} | grep -i 'import' | grep -i 'db\|database' > /dev/null 2>&1 
   >&2 echo "/* Starting import of the database dump... */"
   >&2 echo "/* From: $DB_DUMP */"
 
-  exec bash -c "${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} -v \"${DB_DUMP}:/${DB_DUMP_BASENAME}\" database-cli bash -c \"$DB_IMPORT_CMD\""
+  exec ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} run -i --rm -v "${DB_DUMP}:/${DB_DUMP_BASENAME}" database-cli bash -c "$DB_IMPORT_CMD"
   exit 0
 fi
 
@@ -957,15 +959,24 @@ if [[ "$first_non_flag_arg" == "cache" ]]; then
 fi
 
 # Handle cache:subcommand syntax (e.g., cache:clear, cache:warmup)
-if echo ${args[0]} | grep -i '^cache:' > /dev/null; then
+if echo "$first_non_flag_arg" | grep -i '^cache:' > /dev/null; then
   # Extract cache subcommand (everything after 'cache:')
-  cache_cmd="${args[0]#cache:}"
+  cache_cmd="${first_non_flag_arg#cache:}"
   
   set -x
   if [[ "$NEEDS_ARG_PARSING" == "true" ]]; then
     exec ${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} cli php ./bin/console cache:${cache_cmd} "${args[@]:1}" "${right_flags[@]}" "${right_options[@]}"
   else
     exec ${DOCKER_COMPOSE_RUN_CMD} cli php ./bin/console cache:${cache_cmd} "${args[@]:1}"
+  fi
+fi
+
+if echo "$first_non_flag_arg" | grep -i 'update' | grep -i 'platform' > /dev/null; then
+  set -x
+  if [[ "$NEEDS_ARG_PARSING" == "true" ]]; then
+    exec ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} run -i --rm cli bash -c "rm -rf var/cache/* || true; php bin/console oro:platform:update --force"
+  else
+    exec ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "rm -rf var/cache/* || true; php bin/console oro:platform:update --force"
   fi
 fi
 
@@ -985,7 +996,7 @@ if echo ${args[0]} | grep -i 'composer' | grep -i 'install' > /dev/null; then
   exit 0
 fi
 
-if echo ${args[0]} | grep -i 'export\|dump' | grep -i 'db\|database' > /dev/null; then
+if echo "$first_non_flag_arg" | grep -i 'export\|dump' | grep -i 'db\|database' > /dev/null; then
   DB_DUMP=$DC_ORO_APPDIR/database-$(date +'%Y%m%d%H%M%S').sql.gz
   DB_DUMP_BASENAME=$(echo "${DB_DUMP##*/}")
   touch "${DB_DUMP}"
@@ -1002,39 +1013,79 @@ fi
 
 
 
+# Check if command is a special OroDC command (not PHP, not Docker Compose)
+is_orodc_special_command() {
+  local cmd="$1"
+  case "$cmd" in
+    psql|mysql|database-cli|ssh|cli|install|purge|help|man|tests|test|bash)
+      return 0
+      ;;
+    # Database import/export commands
+    importdb|exportdb|databaseimport|databaseexport|dbimport|dbexport)
+      return 0
+      ;;
+    # Platform update commands
+    platformupdate|updateplatform)
+      return 0
+      ;;
+    *)
+      # Check pattern-based commands
+      if echo "$cmd" | grep -qi 'import.*\(db\|database\)'; then return 0; fi
+      if echo "$cmd" | grep -qi '\(export\|dump\).*\(db\|database\)'; then return 0; fi
+      if echo "$cmd" | grep -qi '\(db\|database\).*\(import\|export\)'; then return 0; fi
+      if echo "$cmd" | grep -qi 'update.*platform\|platform.*update'; then return 0; fi
+      if echo "$cmd" | grep -qi '^cache:'; then return 0; fi
+      if echo "$cmd" | grep -qi '\(set\|update\).*\(url\|uri\)'; then return 0; fi
+      if echo "$cmd" | grep -qi 'composer.*install'; then return 0; fi
+      return 1
+      ;;
+  esac
+}
+
 # Handle PHP flags (redirect to PHP CLI when appropriate)
-if [[ ${#left_flags[@]} -gt 0 ]] || [[ ${#right_flags[@]} -gt 0 ]] || [[ ${#right_options[@]} -gt 0 ]]; then
-  # Redirect to PHP if first argument is 'php' or if no command (implicit PHP)
-  if [[ "$first_non_flag_arg" == "php" ]] || ! is_compose_command "$first_non_flag_arg"; then
-    # Redirect to PHP - combine flags and args, but exclude 'php' command itself from args
-    php_only_args=()
-    for arg in "${args[@]}"; do
-      if [[ "$arg" != "php" ]]; then
-        php_only_args+=("$arg")
-      fi
-    done
-    php_args=("${left_flags[@]}" "${left_options[@]}" "${php_only_args[@]}" "${right_flags[@]}" "${right_options[@]}")
-    php_cmd=$(build_docker_compose_run_cmd "cli" "php" "${php_args[@]}")
-    if [ "$DEBUG" ]; then echo "DEBUG: Redirecting to PHP with args: ${php_args[*]}" >&2; fi
-    exec bash -c "$php_cmd"
-  fi
+# Only redirect with bash -c for implicit PHP commands (flags only, no command)
+# For explicit 'php' command, use direct exec for interactive mode
+if [[ "$first_non_flag_arg" == "php" ]]; then
+  # Explicit php command - use direct exec for interactive mode
+  php_only_args=()
+  for arg in "${args[@]}"; do
+    if [[ "$arg" != "php" ]]; then
+      php_only_args+=("$arg")
+    fi
+  done
+  php_args=("${left_flags[@]}" "${left_options[@]}" "${php_only_args[@]}" "${right_flags[@]}" "${right_options[@]}")
+  if [ "$DEBUG" ]; then echo "DEBUG: Direct PHP exec with args: ${php_args[*]}" >&2; fi
+  exec ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} run -i --rm cli php "${php_args[@]}"
+elif [[ -z "$first_non_flag_arg" ]] && ([[ ${#left_flags[@]} -gt 0 ]] || [[ ${#right_flags[@]} -gt 0 ]] || [[ ${#right_options[@]} -gt 0 ]]); then
+  # Only flags, no command - this is implicit PHP (orodc -v, orodc --version)
+  # Setup logging for PHP binary usage
+  setup_php_logging "$@"
+  php_args=("${left_flags[@]}" "${left_options[@]}" "${args[@]}" "${right_flags[@]}" "${right_options[@]}")
+  php_cmd=$(build_docker_compose_run_cmd "cli" "php" "${php_args[@]}")
+  if [ "$DEBUG" ]; then echo "DEBUG: Implicit PHP redirect with args: ${php_args[*]}" >&2; fi
+  exec bash -c "$php_cmd"
 fi
 
-if echo ${args[0]} | grep -i '^mysql' > /dev/null; then
+if echo "$first_non_flag_arg" | grep -i '^mysql' > /dev/null; then
   # Extract mysql arguments (everything after 'mysql')
   mysql_args=("${args[@]:1}")
-  exec ${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} -e MYSQL_PWD="$DC_ORO_DATABASE_PASSWORD" database-cli mysql -h"$DC_ORO_DATABASE_HOST" -P"$DC_ORO_DATABASE_PORT" -u"$DC_ORO_DATABASE_USER" "$DC_ORO_DATABASE_DBNAME" "${mysql_args[@]}"
+  exec ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} run -i --rm -e MYSQL_PWD="$DC_ORO_DATABASE_PASSWORD" database-cli mysql -h"$DC_ORO_DATABASE_HOST" -P"$DC_ORO_DATABASE_PORT" -u"$DC_ORO_DATABASE_USER" "$DC_ORO_DATABASE_DBNAME" "${mysql_args[@]}"
 fi
 
-if echo ${args[0]} | grep -i '^psql' > /dev/null; then
+if echo "$first_non_flag_arg" | grep -i '^psql' > /dev/null; then
   # Extract psql arguments (everything after 'psql')
   psql_args=("${args[@]:1}")
-  exec ${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} -e PGPASSWORD="$DC_ORO_DATABASE_PASSWORD" database-cli psql -h "$DC_ORO_DATABASE_HOST" -p "$DC_ORO_DATABASE_PORT" -U "$DC_ORO_DATABASE_USER" -d "$DC_ORO_DATABASE_DBNAME" "${psql_args[@]}"
+  exec ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} run -i --rm -e PGPASSWORD="$DC_ORO_DATABASE_PASSWORD" database-cli psql -h "$DC_ORO_DATABASE_HOST" -p "$DC_ORO_DATABASE_PORT" -U "$DC_ORO_DATABASE_USER" -d "$DC_ORO_DATABASE_DBNAME" "${psql_args[@]}"
 fi
 
-if echo ${args[0]} | grep -i '^database-cli' > /dev/null; then
-  PSQL_CMD="PGPASSWORD=\$DC_ORO_DATABASE_PASSWORD bash"
-  exec bash -c "${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} database-cli bash -c \"$PSQL_CMD\""
+if echo "$first_non_flag_arg" | grep -i '^database-cli' > /dev/null; then
+  # Extract database-cli arguments (everything after 'database-cli')
+  database_cli_args=("${args[@]:1}")
+  # If no arguments provided, default to bash
+  if [[ ${#database_cli_args[@]} -eq 0 ]]; then
+    database_cli_args=("bash")
+  fi
+  exec ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} run -i --rm -e PGPASSWORD="$DC_ORO_DATABASE_PASSWORD" database-cli "${database_cli_args[@]}"
 fi
 
 if [ $# -eq 0 ] || [ "${args[0]}" = "ssh" ]; then
