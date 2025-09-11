@@ -27,9 +27,6 @@ jobs:
       max-parallel: 1  # Run jobs sequentially to avoid conflicts
       matrix:
         include:
-          - application: marello
-            version: 4.2.0
-            repo_url: https://github.com/marellocommerce/marello.git
           - application: orocrm
             version: 6.1.4
             repo_url: https://github.com/oroinc/crm-application.git
@@ -39,6 +36,9 @@ jobs:
           - application: orocommerce
             version: 6.1.4
             repo_url: https://github.com/oroinc/orocommerce-application.git
+          - application: marello
+            version: 4.2.0
+            repo_url: https://github.com/marellocommerce/marello.git
     timeout-minutes: 60
     name: Test ${{ matrix.application }} (${{ matrix.version }})
     
