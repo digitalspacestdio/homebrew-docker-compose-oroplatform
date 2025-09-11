@@ -91,6 +91,10 @@ services:
     environment:
       - 'APP_DIR=${DC_ORO_APPDIR:-/var/www}'
       - 'DC_ORO_APPDIR=${DC_ORO_APPDIR:-/var/www}'
+    networks:
+      default:
+        aliases:
+          - localhost.com
     healthcheck:
       test: /bin/bash -c "</dev/tcp/localhost/80"
       start_period: 5s
@@ -111,6 +115,10 @@ services:
     restart: "no"
     # environment:
       # - SE_OPTS=--log-level FINE  # Not supported in Selenium 3.x
+    networks:
+      default:
+        aliases:
+          - localhost
     healthcheck:
       test: "curl -f http://localhost:4444/wd/hub/status || exit 1"
       start_period: 10s
@@ -135,8 +143,6 @@ services:
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
-      - "localhost.com:test-nginx"
-      - "localhost:test-selenium"
     environment:
       - 'APP_DIR=${DC_ORO_APPDIR:-/var/www}'
       - 'DC_ORO_APPDIR=${DC_ORO_APPDIR:-/var/www}'
