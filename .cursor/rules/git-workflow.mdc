@@ -1,3 +1,9 @@
+---
+description: Git Workflow Guidelines
+globs: 
+alwaysApply: true
+---
+
 # Git Workflow Guidelines
 
 ## 🌿 **ALWAYS work in branches!**
