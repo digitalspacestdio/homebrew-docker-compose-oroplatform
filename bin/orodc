@@ -749,22 +749,34 @@ detect_php_version_from_composer() {
     # Fallback: detect from Oro Platform version
     local oro_platform=$(jq -r '.require["oro/platform"] // empty' "$DC_ORO_APPDIR/composer.json" 2>/dev/null)
     if [[ -n "$oro_platform" ]]; then
-      # Extract Oro version (e.g., "6.0.*" -> "6.0", "^6.1" -> "6.1")
-      local oro_version=$(echo "$oro_platform" | sed -E 's/[^0-9.]*([0-9]+\.[0-9]+).*/\1/')
-      case "$oro_version" in
-        "6.0") echo "8.3" && return 0 ;;
-        "5.1") echo "8.1" && return 0 ;;
-        "5.0") echo "8.1" && return 0 ;;
-        "4.2") echo "8.1" && return 0 ;;
-        "4.1") echo "8.1" && return 0 ;;
-        "4.0") echo "7.4" && return 0 ;;
-        *) 
-          # For versions >= 6.1, use PHP 8.4
-          if [[ "$oro_version" > "6.0" ]]; then
-            echo "8.4" && return 0
-          fi
-          ;;
-      esac
+      # Extract full Oro version (e.g., "6.0.8", "^6.1.0" -> "6.1.0")
+      local oro_version=$(echo "$oro_platform" | sed -E 's/[^0-9.]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/')
+      # If no patch version found, try major.minor
+      if [[ ! "$oro_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+        oro_version=$(echo "$oro_platform" | sed -E 's/[^0-9.]*([0-9]+\.[0-9]+).*/\1/')
+      fi
+      
+      # Convert to comparable format and determine PHP version
+      local major=$(echo "$oro_version" | cut -d. -f1)
+      local minor=$(echo "$oro_version" | cut -d. -f2)
+      local patch=$(echo "$oro_version" | cut -d. -f3 2>/dev/null || echo "0")
+      
+      # Version comparison logic
+      if [[ $major -eq 6 && $minor -eq 0 ]]; then
+        echo "8.3" && return 0  # Oro 6.0.x uses PHP 8.3
+      elif [[ $major -eq 6 && $minor -ge 1 ]] || [[ $major -gt 6 ]]; then
+        echo "8.4" && return 0  # Oro 6.1+ uses PHP 8.4
+      elif [[ $major -eq 5 && $minor -eq 1 ]]; then
+        echo "8.1" && return 0
+      elif [[ $major -eq 5 && $minor -eq 0 ]]; then
+        echo "8.1" && return 0
+      elif [[ $major -eq 4 && $minor -eq 2 ]]; then
+        echo "8.1" && return 0
+      elif [[ $major -eq 4 && $minor -eq 1 ]]; then
+        echo "8.1" && return 0
+      elif [[ $major -eq 4 && $minor -eq 0 ]]; then
+        echo "7.4" && return 0
+      fi
     fi
   fi
   return 1
@@ -780,7 +792,7 @@ get_compatible_node_version() {
     "8.2") echo "20" ;;
     "8.1") echo "18" ;;
     "7.4") echo "16" ;;
-    *) echo "20" ;;  # Default to Node 20 for unknown PHP versions
+    *) echo "22" ;;  # Default to Node 22 for unknown PHP versions
   esac
 }
 
