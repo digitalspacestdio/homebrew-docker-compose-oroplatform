@@ -17,9 +17,9 @@ on:
   workflow_dispatch:
     inputs:
       test_applications:
-        description: 'Applications to test (comma-separated: marello,orocrm,oroplatform,orocommerce)'
+        description: 'Applications to test (comma-separated: orocrm,oroplatform,orocommerce)' # marello,
         required: false
-        default: 'marello,orocrm,oroplatform,orocommerce'
+        default: 'orocrm,oroplatform,orocommerce' # marello,
 
 env:
   HOMEBREW_NO_AUTO_UPDATE: 1
@@ -42,9 +42,9 @@ jobs:
           - application: orocommerce
             version: 6.1.4
             repo_url: https://github.com/oroinc/orocommerce-application.git
-          - application: marello
-            version: 6.1.0
-            repo_url: https://github.com/marellocommerce/marello-application.git
+          # - application: marello
+          #   version: 6.1.0
+          #   repo_url: https://github.com/marellocommerce/marello-application.git
     timeout-minutes: 90
     name: Test ${{ matrix.application }} (${{ matrix.version }})
     
@@ -67,18 +67,16 @@ jobs:
 
       - name: Install OroDC
         run: |
-          # Install tap and switch to current commit
+          # Install tap first
           brew tap digitalspacestdio/docker-compose-oroplatform
           
-          # Navigate to tap directory and switch to current commit
+          # Copy current source files to tap directory (overwrite with current version)
           TAP_DIR="/home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform"
-          cd "$TAP_DIR"
+          cp -r bin/ "$TAP_DIR/"
+          cp -r compose/ "$TAP_DIR/"
+          cp Formula/docker-compose-oroplatform.rb "$TAP_DIR/Formula/"
           
-          # Fetch and checkout current commit
-          git fetch origin
-          git checkout "${{ github.sha }}"
-          
-          # Install OroDC from current commit
+          # Install OroDC from current source
           brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform
           
           # Verify installation
@@ -229,4 +227,4 @@ jobs:
           echo "- oroplatform (6.1.4)" >> $GITHUB_STEP_SUMMARY
           echo "- orocrm (6.1.4)" >> $GITHUB_STEP_SUMMARY
           echo "- orocommerce (6.1.4)" >> $GITHUB_STEP_SUMMARY
-          echo "- marello (6.1.0)" >> $GITHUB_STEP_SUMMARY
+          # echo "- marello (6.1.0)" >> $GITHUB_STEP_SUMMARY

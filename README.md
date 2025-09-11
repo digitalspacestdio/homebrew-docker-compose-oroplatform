@@ -4,7 +4,7 @@
 
 **Modern CLI tool to run ORO applications locally or on a server.** Designed specifically for local development environments with enterprise-grade performance and developer experience.
 
-[![Version](https://img.shields.io/badge/Version-0.8.6-brightgreen.svg)](https://github.com/digitalspacestdio/homebrew-docker-compose-oroplatform/releases)
+[![Version](https://img.shields.io/badge/Version-0.9.0-brightgreen.svg)](https://github.com/digitalspacestdio/homebrew-docker-compose-oroplatform/releases)
 [![Homebrew](https://img.shields.io/badge/Homebrew-Available-orange.svg)](https://brew.sh/)
 [![Docker](https://img.shields.io/badge/Docker-Required-blue.svg)](https://www.docker.com/)
 [![macOS](https://img.shields.io/badge/macOS-Supported-green.svg)](https://www.apple.com/macos/)
@@ -13,6 +13,29 @@
 
 [![Test Installations](https://github.com/digitalspacestdio/homebrew-docker-compose-oroplatform/actions/workflows/test-oro-installations.yml/badge.svg)](https://github.com/digitalspacestdio/homebrew-docker-compose-oroplatform/actions/workflows/test-oro-installations.yml)
 [![Build Docker Images](https://github.com/digitalspacestdio/homebrew-docker-compose-oroplatform/actions/workflows/build-docker-php-node-symfony.yml/badge.svg)](https://github.com/digitalspacestdio/homebrew-docker-compose-oroplatform/actions/workflows/build-docker-php-node-symfony.yml)
+
+## 📋 Table of Contents
+
+- [✨ Key Features](#-key-features)
+- [🚀 Quick Start](#-quick-start)
+- [⚠️ Critical Testing Requirements](#️-critical-testing-requirements)
+- [🛠️ Installation](#️-installation)
+  - [Prerequisites](#prerequisites)
+  - [Install OroDC](#install-orodc)
+- [🏗️ Application Setup](#️-application-setup)
+  - [OroCommerce](#orocommerce)
+  - [OroPlatform](#oroplatform)
+  - [OroCRM](#orocrm)
+- [🧪 Testing](#-testing)
+  - [Test Environment Setup](#test-environment-setup)
+  - [Running Tests](#running-tests)
+  - [Available Test Commands](#available-test-commands)
+- [🎯 Smart Commands](#-smart-commands)
+- [🔧 Configuration](#-configuration)
+- [🆘 Troubleshooting](#-troubleshooting)
+- [📚 Documentation](#-documentation)
+
+---
 
 ## ✨ Key Features
 
@@ -38,6 +61,10 @@ cd ~/orocommerce
 # Install and start (one command!)
 orodc install && orodc up -d
 
+# Verify installation
+curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://localhost:30280
+# 2xx (200, 201, etc.) = OK, 3xx (301, 302, etc.) = Redirect (also OK)
+
 # Open your application
 open http://localhost:30280/
 
@@ -51,17 +78,39 @@ orodc bin/phpunit --testsuite=unit # Run PHPUnit tests
 orodc bin/behat --available-suites # Run Behat behavior tests
 ```
 
+## ⚠️ Critical Testing Requirements
+
+**BEFORE running ANY tests:**
+1. ✅ **MUST** run `orodc tests install` (independent setup)
+2. ✅ **MUST** use `orodc tests` prefix for ALL test commands
+3. ❌ **NEVER** run tests directly (e.g., `bin/phpunit`, `./bin/behat`)
+
+**Example:**
+```bash
+# ✅ CORRECT
+orodc tests install                       # Setup test environment
+orodc tests bin/phpunit --testsuite=unit  # Run tests
+
+# ❌ WRONG  
+orodc bin/phpunit --testsuite=unit        # Don't do this
+```
+
+**Important Notes:**
+- Test environment is **completely independent** from application installation
+- You can run `orodc tests install` even without installing the main application
+- Tests run in isolated containers separate from the main application
+
 ## 🎯 Smart PHP Integration
 
 OroDC automatically detects and redirects PHP commands to the CLI container:
 
 ```bash
 # All these work automatically - no need to specify 'cli'!
-orodc -v                    # → cli php -v
-orodc --version            # → cli php --version  
-orodc script.php           # → cli php script.php
-orodc -r 'phpinfo()'       # → cli php -r 'phpinfo()'
-orodc bin/console cache:clear  # → cli bin/console cache:clear
+orodc -v                      # → cli php -v
+orodc --version               # → cli php --version  
+orodc script.php              # → cli php script.php
+orodc -r 'phpinfo()'          # → cli php -r 'phpinfo()'
+orodc bin/console cache:clear # → cli bin/console cache:clear
 
 # Traditional way still works
 orodc cli php -v           # Still supported
@@ -153,25 +202,90 @@ orodc bin/console cache:clear
 orodc bin/console oro:user:create
 ```
 
-### 🧪 Testing Commands
+## 🧪 Testing
+
+### Test Environment Setup
+
+**CRITICAL**: Test environment is completely separate from your main application:
 
 ```bash
-# Setup test environment (one time)
+# Navigate to your Oro application directory
+cd ~/orocommerce
+
+# ⚠️ REQUIRED: Set up test environment (one-time setup)
 orodc tests install
+```
 
-# Run PHPUnit tests
+### Running Tests
+
+**ALL tests MUST use `orodc tests` prefix:**
+
+#### Unit Tests
+```bash
 orodc tests bin/phpunit --testsuite=unit
+orodc tests bin/phpunit --testsuite=unit --filter=UserTest
+orodc tests bin/phpunit src/Oro/Bundle/UserBundle/Tests/Unit/Entity/UserTest.php
+```
+
+#### Functional Tests
+```bash
 orodc tests bin/phpunit --testsuite=functional
-orodc tests bin/phpunit src/Oro/Bundle/UserBundle/Tests/Unit
+orodc tests bin/phpunit --testsuite=functional --filter=ApiTest
+```
 
-# Run Behat tests
+#### Behat Tests
+```bash
 orodc tests bin/behat --suite=OroUserBundle
+orodc tests bin/behat --suite=OroCustomerBundle
+orodc tests bin/behat features/user.feature
 orodc tests bin/behat --available-suites
+```
 
-# Test environment management
-orodc tests up -d            # Start test services
-orodc tests down             # Stop test services
-orodc tests purge            # Clean test environment
+### Available Test Commands
+
+#### Test Coverage
+```bash
+# Generate coverage report
+orodc tests bin/phpunit --testsuite=unit --coverage-html coverage/
+orodc tests bin/phpunit --coverage-text
+```
+
+#### Custom Test Configuration
+```bash
+# Run with specific configuration
+orodc tests bin/phpunit -c phpunit.xml.dist
+orodc tests bin/phpunit --bootstrap tests/bootstrap.php
+```
+
+#### Test Environment Management
+```bash
+# Check test environment status
+orodc tests ps
+
+# View test logs
+orodc tests logs
+orodc tests logs cli
+
+# Start/stop test services
+orodc tests up -d
+orodc tests down
+
+# Reset test environment
+orodc tests down
+orodc tests install  # Reinstall test environment
+
+# Clean test environment
+orodc tests purge
+```
+
+#### Test Database Operations
+```bash
+# Access test database
+orodc tests psql
+
+# Run test database commands
+orodc tests psql -c "SELECT version();"
+orodc tests psql -l  # List databases
 ```
 
 ### 🔧 Development Commands
