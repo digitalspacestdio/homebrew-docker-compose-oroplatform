@@ -17,9 +17,9 @@ on:
   workflow_dispatch:
     inputs:
       test_applications:
-        description: 'Applications to test (comma-separated: orocrm,oroplatform,orocommerce)' # marello,
+        description: 'Applications to test (comma-separated: orocrm,oroplatform,orocommerce,marello)'
         required: false
-        default: 'orocrm,oroplatform,orocommerce' # marello,
+        default: 'orocrm,oroplatform,orocommerce,marello'
 
 env:
   HOMEBREW_NO_AUTO_UPDATE: 1
@@ -42,9 +42,9 @@ jobs:
           - application: orocommerce
             version: 6.1.4
             repo_url: https://github.com/oroinc/orocommerce-application.git
-          # - application: marello
-          #   version: 6.1.0
-          #   repo_url: https://github.com/marellocommerce/marello-application.git
+          - application: marello
+            version: 6.1.0
+            repo_url: https://github.com/marellocommerce/marello-application.git
     timeout-minutes: 90
     name: Test ${{ matrix.application }} (${{ matrix.version }})
     
@@ -227,4 +227,4 @@ jobs:
           echo "- oroplatform (6.1.4)" >> $GITHUB_STEP_SUMMARY
           echo "- orocrm (6.1.4)" >> $GITHUB_STEP_SUMMARY
           echo "- orocommerce (6.1.4)" >> $GITHUB_STEP_SUMMARY
-          # echo "- marello (6.1.0)" >> $GITHUB_STEP_SUMMARY
+          echo "- marello (6.1.0)" >> $GITHUB_STEP_SUMMARY

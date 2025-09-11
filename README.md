@@ -74,8 +74,8 @@ orodc --version                    # Check PHP version
 orodc -r 'echo "Hello OroDC!";'    # Run PHP code directly
 orodc psql -l                      # List databases directly
 orodc psql -c "SELECT version();"  # Execute SQL commands
-orodc bin/phpunit --testsuite=unit # Run PHPUnit tests
-orodc bin/behat --available-suites # Run Behat behavior tests
+orodc tests bin/phpunit --testsuite=unit # Run PHPUnit tests
+orodc tests bin/behat --available-suites # Run Behat behavior tests
 ```
 
 ## ⚠️ Critical Testing Requirements
