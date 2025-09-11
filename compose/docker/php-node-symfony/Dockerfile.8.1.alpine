@@ -247,5 +247,10 @@ RUN mkdir -p ${APP_DIR}; \
 
 WORKDIR ${APP_DIR}
 USER ${PHP_USER_NAME}
+
+# Configure git to use HTTPS instead of SSH for GitHub and GitLab
+RUN git config --global url."https://github.com/".insteadOf git@github.com: \
+    && git config --global url."https://gitlab.com/".insteadOf git@gitlab.com:
+
 VOLUME "/home/${PHP_USER_NAME}" "/root" "${APP_DIR}"
 CMD [ "zsh" ]
