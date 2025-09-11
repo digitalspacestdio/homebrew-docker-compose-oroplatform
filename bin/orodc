@@ -1476,7 +1476,7 @@ EOF
         sed -i "s|localhost:9515|test-selenium:9515|g" "$BEHAT_CONFIG_FILE"
         
         # Fix base_url to point to admin panel for backend tests (only for OroCommerce)
-        if [[ -f "composer.json" ]] && grep -q "orocommerce" composer.json; then
+        if [[ -f "composer.json" ]] && grep -qi "orocommerce" composer.json; then
           sed -i "s|base_url: 'http://localhost.com/'|base_url: 'http://localhost.com/admin/'|g" "$BEHAT_CONFIG_FILE"
           echo "Detected OroCommerce - updated base_url to point to /admin/"
         else
