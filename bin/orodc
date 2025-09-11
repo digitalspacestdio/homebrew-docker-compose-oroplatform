@@ -1442,9 +1442,9 @@ EOF
             echo "==> Detected consumer message processing, stopping test-consumer..."
             # Wait for consumer processes to start
             for i in {1..10}; do
-              if ${TEST_COMPOSE_CMD} exec test-cli bash -c "ps aux | grep 'oro:message-queue:consume' | grep -v grep >/dev/null 2>&1"; then
+              if ${TEST_COMPOSE_CMD} exec -T test-cli bash -c "ps aux | grep 'oro:message-queue:consume' | grep -v grep >/dev/null 2>&1"; then
                 echo "Consumer processes found, stopping them..."
-                ${TEST_COMPOSE_CMD} exec test-cli bash -c "ps aux | grep 'oro:message-queue:consume' | grep -v grep | awk '{print \$2}' | xargs -r kill -9" 2>/dev/null || true
+                ${TEST_COMPOSE_CMD} exec -T test-cli bash -c "ps aux | grep 'oro:message-queue:consume' | grep -v grep | awk '{print \$2}' | xargs -r kill -9" 2>/dev/null || true
                 break
               fi
               echo "Waiting for consumer processes to start... ($i/10)"
