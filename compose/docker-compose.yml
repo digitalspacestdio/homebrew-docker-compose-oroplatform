@@ -8,16 +8,16 @@ services:
     healthcheck:
       test: "sh -c 'exit 0'"
   fpm:
-    container_name: "${DC_ORO_NAME:-unnamed}_fpm_${DC_ORO_PHP_VERSION:-8.3}-${DC_ORO_NODE_VERSION:-20}-${DC_ORO_COMPOSER_VERSION:-2}"
+    container_name: "${DC_ORO_NAME:-unnamed}_fpm_${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}"
     hostname: fpm.${DC_ORO_NAME:-unnamed}.docker.local
-    image: ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.3}-${DC_ORO_NODE_VERSION:-20}-${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}
+    image: ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}
     build:
-      dockerfile: Dockerfile.${DC_ORO_PHP_VERSION:-8.3}.${DC_ORO_PHP_DIST:-alpine}
+      dockerfile: Dockerfile.${DC_ORO_PHP_VERSION:-8.4}.${DC_ORO_PHP_DIST:-alpine}
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony"
       args:
         APP_DIR: "${DC_ORO_APPDIR:-/var/www}"
-        PHP_VERSION: "${DC_ORO_PHP_VERSION:-8.3}"
-        NODE_VERSION: "${DC_ORO_NODE_VERSION:-20}"
+        PHP_VERSION: "${DC_ORO_PHP_VERSION:-8.4}"
+        NODE_VERSION: "${DC_ORO_NODE_VERSION:-22}"
         PHP_USER_NAME: "${DC_ORO_PHP_USER_NAME:-developer}"
         PHP_USER_GROUP: "${DC_ORO_PHP_USER_GROUP:-developer}"
         PHP_UID: "${DC_ORO_PHP_UID:-1000}"
@@ -84,16 +84,16 @@ services:
         max-size: "10m"
 
   cli:
-    container_name: "${DC_ORO_NAME:-unnamed}_cli_${DC_ORO_PHP_VERSION:-8.3}-${DC_ORO_NODE_VERSION:-20}-${DC_ORO_COMPOSER_VERSION:-2}"
+    container_name: "${DC_ORO_NAME:-unnamed}_cli_${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}"
     hostname: cli.${DC_ORO_NAME:-unnamed}.docker.local
-    image: ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.3}-${DC_ORO_NODE_VERSION:-20}-${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}
+    image: ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}
     build:
-      dockerfile: Dockerfile.${DC_ORO_PHP_VERSION:-8.3}.${DC_ORO_PHP_DIST:-alpine}
+      dockerfile: Dockerfile.${DC_ORO_PHP_VERSION:-8.4}.${DC_ORO_PHP_DIST:-alpine}
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony"
       args:
         APP_DIR: "${DC_ORO_APPDIR:-/var/www}"
-        PHP_VERSION: "${DC_ORO_PHP_VERSION:-8.3}"
-        NODE_VERSION: "${DC_ORO_NODE_VERSION:-20}"
+        PHP_VERSION: "${DC_ORO_PHP_VERSION:-8.4}"
+        NODE_VERSION: "${DC_ORO_NODE_VERSION:-22}"
         PHP_USER_NAME: "${DC_ORO_PHP_USER_NAME:-developer}"
         PHP_USER_GROUP: "${DC_ORO_PHP_USER_GROUP:-developer}"
         PHP_UID: "${DC_ORO_PHP_UID:-1000}"
@@ -161,17 +161,17 @@ services:
         max-size: "10m"
 
   consumer:
-    container_name: "${DC_ORO_NAME:-unnamed}_consumer_${DC_ORO_PHP_VERSION:-8.3}-${DC_ORO_NODE_VERSION:-20}-${DC_ORO_COMPOSER_VERSION:-2}"
+    container_name: "${DC_ORO_NAME:-unnamed}_consumer_${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}"
     hostname: consumer.${DC_ORO_NAME:-unnamed}.docker.local
     profiles: ["consumer"]
-    image: ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.3}-${DC_ORO_NODE_VERSION:-20}-${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}
+    image: ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}
     build:
-      dockerfile: Dockerfile.${DC_ORO_PHP_VERSION:-8.3}.${DC_ORO_PHP_DIST:-alpine}
+      dockerfile: Dockerfile.${DC_ORO_PHP_VERSION:-8.4}.${DC_ORO_PHP_DIST:-alpine}
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony"
       args:
         APP_DIR: "${DC_ORO_APPDIR:-/var/www}"
-        PHP_VERSION: "${DC_ORO_PHP_VERSION:-8.3}"
-        NODE_VERSION: "${DC_ORO_NODE_VERSION:-20}"
+        PHP_VERSION: "${DC_ORO_PHP_VERSION:-8.4}"
+        NODE_VERSION: "${DC_ORO_NODE_VERSION:-22}"
         PHP_USER_NAME: "${DC_ORO_PHP_USER_NAME:-developer}"
         PHP_USER_GROUP: "${DC_ORO_PHP_USER_GROUP:-developer}"
         PHP_UID: "${DC_ORO_PHP_UID:-1000}"
@@ -237,17 +237,17 @@ services:
         max-size: "10m"
 
   websocket:
-    container_name: "${DC_ORO_NAME:-unnamed}_websocket_${DC_ORO_PHP_VERSION:-8.3}-${DC_ORO_NODE_VERSION:-20}-${DC_ORO_COMPOSER_VERSION:-2}"
+    container_name: "${DC_ORO_NAME:-unnamed}_websocket_${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}"
     hostname: websocket.${DC_ORO_NAME:-unnamed}.docker.local
     profiles: ["websocket"]
-    image: ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.3}-${DC_ORO_NODE_VERSION:-20}-${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}
+    image: ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}
     build:
-      dockerfile: Dockerfile.${DC_ORO_PHP_VERSION:-8.3}.${DC_ORO_PHP_DIST:-alpine}
+      dockerfile: Dockerfile.${DC_ORO_PHP_VERSION:-8.4}.${DC_ORO_PHP_DIST:-alpine}
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony"
       args:
         APP_DIR: "${DC_ORO_APPDIR:-/var/www}"
-        PHP_VERSION: "${DC_ORO_PHP_VERSION:-8.3}"
-        NODE_VERSION: "${DC_ORO_NODE_VERSION:-20}"
+        PHP_VERSION: "${DC_ORO_PHP_VERSION:-8.4}"
+        NODE_VERSION: "${DC_ORO_NODE_VERSION:-22}"
         PHP_USER_NAME: "${DC_ORO_PHP_USER_NAME:-developer}"
         PHP_USER_GROUP: "${DC_ORO_PHP_USER_GROUP:-developer}"
         PHP_UID: "${DC_ORO_PHP_UID:-1000}"
@@ -316,7 +316,7 @@ services:
       retries: 18
 
   xhgui:
-    image: "xhgui/xhgui:0.18.3"
+    image: "xhgui/xhgui:0.18.4"
     hostname: xhgui.${DC_ORO_NAME:-unnamed}.docker.local
     profiles: ["xhprof"]
     volumes:
@@ -472,16 +472,16 @@ services:
         max-size: "10m"
 
   ssh:
-    container_name: "${DC_ORO_NAME:-unnamed}_ssh_${DC_ORO_PHP_VERSION:-8.3}-${DC_ORO_NODE_VERSION:-20}-${DC_ORO_COMPOSER_VERSION:-2}"
+    container_name: "${DC_ORO_NAME:-unnamed}_ssh_${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}"
     hostname: ssh.${DC_ORO_NAME:-unnamed}.docker.local
-    image: ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.3}-${DC_ORO_NODE_VERSION:-20}-${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}
+    image: ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}
     build:
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony"
-      dockerfile: Dockerfile.${DC_ORO_PHP_VERSION:-8.3}.${DC_ORO_PHP_DIST:-alpine}
+      dockerfile: Dockerfile.${DC_ORO_PHP_VERSION:-8.4}.${DC_ORO_PHP_DIST:-alpine}
       args:
         APP_DIR: "${DC_ORO_APPDIR:-/var/www}"
-        PHP_VERSION: "${DC_ORO_PHP_VERSION:-8.3}"
-        NODE_VERSION: "${DC_ORO_NODE_VERSION:-20}"
+        PHP_VERSION: "${DC_ORO_PHP_VERSION:-8.4}"
+        NODE_VERSION: "${DC_ORO_NODE_VERSION:-22}"
         PHP_USER_NAME: "${DC_ORO_PHP_USER_NAME:-developer}"
         PHP_USER_GROUP: "${DC_ORO_PHP_USER_GROUP:-developer}"
         PHP_UID: "${DC_ORO_PHP_UID:-1000}"
