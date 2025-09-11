@@ -39,6 +39,7 @@ orodc install && orodc up -d
 open http://localhost:30280/
 
 # 🎯 New! Smart PHP Commands & Database Access
+orodc help                         # Get full documentation
 orodc --version                    # Check PHP version
 orodc -r 'echo "Hello OroDC!";'    # Run PHP code directly
 orodc psql -l                      # List databases directly
@@ -242,6 +243,11 @@ Updates are delivered via **Rsync** or **Mutagen** (optional).
 ### 🚀 Basic Commands
 
 ```bash
+# Get help and documentation
+orodc help                   # Show full documentation (README)
+orodc man                    # Alternative help command
+orodc version                # Show OroDC version
+
 # Start the environment
 orodc up -d
 

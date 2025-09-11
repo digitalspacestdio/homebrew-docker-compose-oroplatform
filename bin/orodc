@@ -85,7 +85,63 @@ if [[ "$1" == "version" ]]; then
   if [[ -n "$FORMULA_VERSION" ]]; then
     echo "orodc version $FORMULA_VERSION"
   else
-    echo "orodc version 0.8.2 (fallback)"
+    echo "orodc version 0.8.3 (fallback)"
+  fi
+  exit 0
+fi
+
+# Handle help/man command
+if [[ "$1" == "help" ]] || [[ "$1" == "man" ]]; then
+  # Try to find README.md file
+  README_FILE=""
+  SCRIPT_DIR="$(dirname "$0")"
+  
+  # Look for README.md in various locations
+  # 1. Relative to script directory (development)
+  if [[ -f "$SCRIPT_DIR/../README.md" ]]; then
+    README_FILE="$SCRIPT_DIR/../README.md"
+  elif [[ -f "$SCRIPT_DIR/README.md" ]]; then
+    README_FILE="$SCRIPT_DIR/README.md"
+  elif [[ -f "$SCRIPT_DIR/../../README.md" ]]; then
+    README_FILE="$SCRIPT_DIR/../../README.md"
+  fi
+  
+  # 2. Try to find in Homebrew tap directory
+  if [[ -z "$README_FILE" ]] && command -v brew >/dev/null 2>&1; then
+    BREW_REPO=$(brew --repository 2>/dev/null)
+    if [[ -n "$BREW_REPO" ]]; then
+      TAP_README="$BREW_REPO/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform/README.md"
+      if [[ -f "$TAP_README" ]]; then
+        README_FILE="$TAP_README"
+      fi
+    fi
+  fi
+  
+  # If README found, display it with pager
+  if [[ -n "$README_FILE" && -f "$README_FILE" ]]; then
+    echo "==> OroDC Documentation"
+    echo
+    if command -v less >/dev/null 2>&1; then
+      less "$README_FILE"
+    elif command -v more >/dev/null 2>&1; then
+      more "$README_FILE"
+    else
+      cat "$README_FILE"
+    fi
+  else
+    echo "==> OroDC Help"
+    echo
+    echo "📚 Documentation not found locally. Please visit:"
+    echo "   https://github.com/digitalspacestdio/homebrew-docker-compose-oroplatform"
+    echo
+    echo "🚀 Quick Commands:"
+    echo "   orodc version                    # Show version"
+    echo "   orodc install && orodc up -d     # Setup and start"
+    echo "   orodc --version                  # Check PHP version"
+    echo "   orodc psql -l                    # List databases"
+    echo "   orodc tests install              # Setup test environment"
+    echo
+    echo "💡 For full documentation, run: brew info docker-compose-oroplatform"
   fi
   exit 0
 fi
@@ -1017,7 +1073,7 @@ is_docker_compose_command() {
 is_special_orodc_command() {
   local cmd="$1"
   case "$cmd" in
-    ssh|cli|pgsql|psql|mysql|database-cli|install|purge|test|tests|bash)
+    ssh|cli|pgsql|psql|mysql|database-cli|install|purge|test|tests|bash|help|man)
       return 0
       ;;
     *)
