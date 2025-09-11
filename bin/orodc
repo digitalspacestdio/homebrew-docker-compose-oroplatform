@@ -1472,6 +1472,7 @@ EOF
         
         # Replace base_url for test environment - use localhost since socat proxies it to test-nginx
         sed -i "s|base_url: 'http://localhost.com/'|base_url: 'http://localhost/'|g" "$BEHAT_CONFIG_FILE"
+        sed -i "s|base_url: 'http://test-nginx/'|base_url: 'http://localhost/'|g" "$BEHAT_CONFIG_FILE"
         
         # Replace all Selenium WebDriver hosts for test environment
         sed -i "s|wd_host: 'http://localhost:4444/wd/hub'|wd_host: 'http://test-selenium:4444/wd/hub'|g" "$BEHAT_CONFIG_FILE"
