@@ -115,10 +115,6 @@ services:
     restart: "no"
     # environment:
       # - SE_OPTS=--log-level FINE  # Not supported in Selenium 3.x
-    networks:
-      default:
-        aliases:
-          - localhost
     healthcheck:
       test: "curl -f http://localhost:4444/wd/hub/status || exit 1"
       start_period: 10s
