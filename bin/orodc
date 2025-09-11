@@ -752,13 +752,18 @@ detect_php_version_from_composer() {
       # Extract Oro version (e.g., "6.0.*" -> "6.0", "^6.1" -> "6.1")
       local oro_version=$(echo "$oro_platform" | sed -E 's/[^0-9.]*([0-9]+\.[0-9]+).*/\1/')
       case "$oro_version" in
-        "6.1"|"6.2") echo "8.3" && return 0 ;;
-        "6.0") echo "8.2" && return 0 ;;
+        "6.0") echo "8.3" && return 0 ;;
         "5.1") echo "8.1" && return 0 ;;
-        "5.0") echo "8.0" && return 0 ;;
+        "5.0") echo "8.1" && return 0 ;;
         "4.2") echo "8.1" && return 0 ;;
-        "4.1") echo "8.0" && return 0 ;;
+        "4.1") echo "8.1" && return 0 ;;
         "4.0") echo "7.4" && return 0 ;;
+        *) 
+          # For versions >= 6.1, use PHP 8.4
+          if [[ "$oro_version" > "6.0" ]]; then
+            echo "8.4" && return 0
+          fi
+          ;;
       esac
     fi
   fi
@@ -774,7 +779,6 @@ get_compatible_node_version() {
     "8.3") echo "20" ;;
     "8.2") echo "20" ;;
     "8.1") echo "18" ;;
-    "8.0") echo "18" ;;
     "7.4") echo "16" ;;
     *) echo "20" ;;  # Default to Node 20 for unknown PHP versions
   esac
