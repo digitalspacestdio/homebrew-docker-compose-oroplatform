@@ -1475,6 +1475,9 @@ EOF
         # Replace localhost:9515 with test-selenium:9515 for ChromeDriver host  
         sed -i "s|localhost:9515|test-selenium:9515|g" "$BEHAT_CONFIG_FILE"
         
+        # Fix base_url to point to admin panel for backend tests
+        sed -i "s|base_url: 'http://localhost.com/'|base_url: 'http://localhost.com/admin/'|g" "$BEHAT_CONFIG_FILE"
+        
         # Add necessary Chrome arguments for Docker environment to the main sessions (port 4444)
         # This fixes the "DevToolsActivePort file doesn't exist" error
         sed -i '/--load-extension.*chrome-extension/a\                                        - "--no-sandbox"\
