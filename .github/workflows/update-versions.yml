@@ -94,27 +94,35 @@ jobs:
           
           # Replace the matrix section with static versions
           cat > temp_matrix.yml << 'EOF'
-  test-installation:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - application: marello
-            version: ${{ steps.fetch-versions.outputs.marello_version }}
-            repo_url: https://github.com/marellocommerce/marello.git
-          - application: orocrm
-            version: ${{ steps.fetch-versions.outputs.orocrm_version }}
-            repo_url: https://github.com/oroinc/crm-application.git
-          - application: oroplatform
-            version: ${{ steps.fetch-versions.outputs.oroplatform_version }}
-            repo_url: https://github.com/oroinc/platform-application.git
-          - application: orocommerce
-            version: ${{ steps.fetch-versions.outputs.orocommerce_version }}
-            repo_url: https://github.com/oroinc/orocommerce-application.git
-    timeout-minutes: 60
-    name: Test ${{ matrix.application }} (${{ matrix.version }})
-          EOF
+test-installation:
+  runs-on: ubuntu-latest
+  strategy:
+    fail-fast: false
+    matrix:
+      include:
+        - application: marello
+          version: MARELLO_VERSION_PLACEHOLDER
+          repo_url: https://github.com/marellocommerce/marello.git
+        - application: orocrm
+          version: OROCRM_VERSION_PLACEHOLDER
+          repo_url: https://github.com/oroinc/crm-application.git
+        - application: oroplatform
+          version: OROPLATFORM_VERSION_PLACEHOLDER
+          repo_url: https://github.com/oroinc/platform-application.git
+        - application: orocommerce
+          version: OROCOMMERCE_VERSION_PLACEHOLDER
+          repo_url: https://github.com/oroinc/orocommerce-application.git
+  timeout-minutes: 60
+  name: Test MATRIX_APPLICATION_PLACEHOLDER (MATRIX_VERSION_PLACEHOLDER)
+EOF
+          
+          # Replace placeholders with actual versions
+          sed -i "s/MARELLO_VERSION_PLACEHOLDER/${{ steps.fetch-versions.outputs.marello_version }}/" temp_matrix.yml
+          sed -i "s/OROCRM_VERSION_PLACEHOLDER/${{ steps.fetch-versions.outputs.orocrm_version }}/" temp_matrix.yml
+          sed -i "s/OROPLATFORM_VERSION_PLACEHOLDER/${{ steps.fetch-versions.outputs.oroplatform_version }}/" temp_matrix.yml
+          sed -i "s/OROCOMMERCE_VERSION_PLACEHOLDER/${{ steps.fetch-versions.outputs.orocommerce_version }}/" temp_matrix.yml
+          sed -i "s/MATRIX_APPLICATION_PLACEHOLDER/\${{ matrix.application }}/" temp_matrix.yml
+          sed -i "s/MATRIX_VERSION_PLACEHOLDER/\${{ matrix.version }}/" temp_matrix.yml
           
           # Replace versions in the workflow file
           sed -i "s/marello_version: .*/marello_version: ${{ steps.fetch-versions.outputs.marello_version }}/" "$WORKFLOW_FILE" || true
@@ -156,7 +164,7 @@ jobs:
             - **Marello**: `${{ steps.fetch-versions.outputs.marello_version }}`
             - **OroCRM**: `${{ steps.fetch-versions.outputs.orocrm_version }}`
             - **OroPlatform**: `${{ steps.fetch-versions.outputs.oroplatform_version }}`
-            - **OroCommerce**: `{{ steps.fetch-versions.outputs.orocommerce_version }}`
+            - **OroCommerce**: `${{ steps.fetch-versions.outputs.orocommerce_version }}`
             
             ### 🤖 Automated Process:
             - Versions fetched from GitHub releases API

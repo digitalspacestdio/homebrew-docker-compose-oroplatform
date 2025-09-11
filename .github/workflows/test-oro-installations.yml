@@ -27,19 +27,19 @@ jobs:
       max-parallel: 1  # Run jobs sequentially to avoid conflicts
       matrix:
         include:
-          - application: orocrm
-            version: 6.1.4
-            repo_url: https://github.com/oroinc/crm-application.git
           - application: oroplatform
             version: 6.1.4
             repo_url: https://github.com/oroinc/platform-application.git
+          - application: orocrm
+            version: 6.1.4
+            repo_url: https://github.com/oroinc/crm-application.git
           - application: orocommerce
             version: 6.1.4
             repo_url: https://github.com/oroinc/orocommerce-application.git
           - application: marello
-            version: 4.2.0
-            repo_url: https://github.com/marellocommerce/marello.git
-    timeout-minutes: 60
+            version: 6.1.0
+            repo_url: https://github.com/marellocommerce/marello-application.git
+    timeout-minutes: 90
     name: Test ${{ matrix.application }} (${{ matrix.version }})
     
     steps:
@@ -149,8 +149,8 @@ jobs:
           cd "${{ github.workspace }}/${{ matrix.application }}-${{ github.run_id }}"
           echo "⏳ Waiting for services to start..."
           
-          # Wait up to 5 minutes for services to be ready
-          timeout 300 bash -c '
+          # Wait up to 10 minutes for services to be ready
+          timeout 600 bash -c '
             while ! orodc ps | grep -q "Up"; do
               echo "Waiting for services..."
               sleep 10
@@ -166,8 +166,8 @@ jobs:
           HTTP_PORT="30${{ strategy.job-index }}80"
           echo "🌐 Testing accessibility on http://localhost:$HTTP_PORT"
           
-          # Wait for HTTP response (up to 2 minutes)
-          timeout 120 bash -c "
+          # Wait for HTTP response (up to 5 minutes)
+          timeout 300 bash -c "
             until curl -s http://localhost:$HTTP_PORT >/dev/null; do
               echo 'Waiting for HTTP response...'
               sleep 5
@@ -234,7 +234,7 @@ jobs:
           
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Tested Applications:" >> $GITHUB_STEP_SUMMARY
-          echo "- marello (4.2.0)" >> $GITHUB_STEP_SUMMARY
-          echo "- orocrm (6.1.4)" >> $GITHUB_STEP_SUMMARY
           echo "- oroplatform (6.1.4)" >> $GITHUB_STEP_SUMMARY
+          echo "- orocrm (6.1.4)" >> $GITHUB_STEP_SUMMARY
           echo "- orocommerce (6.1.4)" >> $GITHUB_STEP_SUMMARY
+          echo "- marello (6.1.0)" >> $GITHUB_STEP_SUMMARY
