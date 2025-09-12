@@ -91,6 +91,10 @@ services:
     environment:
       - 'APP_DIR=${DC_ORO_APPDIR:-/var/www}'
       - 'DC_ORO_APPDIR=${DC_ORO_APPDIR:-/var/www}'
+    networks:
+      default:
+        aliases:
+          - localhost.com
     healthcheck:
       test: /bin/bash -c "</dev/tcp/localhost/80"
       start_period: 5s
