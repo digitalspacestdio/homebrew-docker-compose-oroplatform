@@ -107,6 +107,6 @@ jobs:
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-${{ matrix.variant }}
           build-args: |
-            PHP_VERSION=${{ matrix.php }}
+            PHP_VERSION=8.5-rc
             NODE_VERSION=${{ matrix.node }}
             COMPOSER_VERSION=${{ matrix.composer }}
