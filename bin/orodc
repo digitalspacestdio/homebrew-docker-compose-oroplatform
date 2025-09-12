@@ -915,6 +915,56 @@ build_docker_compose_run_cmd() {
   fi
 }
 
+# Function to check if a container is running
+is_container_running() {
+  local service="$1"
+  local container_id
+  
+  # Get container ID for the service
+  container_id=$(${DOCKER_COMPOSE_BIN_CMD} ps -q "$service" 2>/dev/null)
+  
+  # Check if container exists and is running
+  if [[ -n "$container_id" ]] && ${DOCKER_BIN} inspect -f '{{.State.Running}}' "$container_id" 2>/dev/null | grep -q "true"; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+# Function to execute command in container (use ssh if available, otherwise cli)
+execute_in_container() {
+  local service="$1"
+  local cmd_args=("${@:2}")
+  
+  # For CLI commands, prefer SSH container if it's running (much faster)
+  if [[ "$service" == "cli" ]] && is_container_running "ssh"; then
+    if [ "$DEBUG" ]; then echo "DEBUG: Using SSH container for faster execution instead of CLI" >&2; fi
+    exec ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} exec "ssh" "${cmd_args[@]}" "${right_flags[@]}" "${right_options[@]}"
+  elif is_container_running "$service"; then
+    # Container is running, use exec for faster execution
+    if [ "$DEBUG" ]; then echo "DEBUG: Using docker compose exec for service: $service" >&2; fi
+    exec ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} exec "$service" "${cmd_args[@]}" "${right_flags[@]}" "${right_options[@]}"
+  else
+    # Container is not running, start it first then use exec
+    if [ "$DEBUG" ]; then echo "DEBUG: Starting service $service then using exec for better performance" >&2; fi
+    
+    # Start the service in background
+    ${DOCKER_COMPOSE_BIN_CMD} up -d "$service" >/dev/null 2>&1
+    
+    # Wait a moment for the service to be ready
+    sleep 1
+    
+    # Verify it's now running, if not fall back to run
+    if is_container_running "$service"; then
+      exec ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} exec "$service" "${cmd_args[@]}" "${right_flags[@]}" "${right_options[@]}"
+    else
+      # Fallback to run if start failed
+      if [ "$DEBUG" ]; then echo "DEBUG: Failed to start service $service, falling back to docker compose run" >&2; fi
+      exec ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} run -i --rm "$service" "${cmd_args[@]}" "${right_flags[@]}" "${right_options[@]}"
+    fi
+  fi
+}
+
 if ${DOCKER_BIN} system info --format '{{.SecurityOptions}}' 2>/dev/null | grep "name=rootless" > /dev/null; then
   DOCKER_COMPOSE_RUN_CMD="${DOCKER_COMPOSE_RUN_CMD} --user root"
 fi
@@ -1134,15 +1184,14 @@ if [[ "$first_non_flag_arg" == "php" ]]; then
   done
   php_args=("${left_flags[@]}" "${left_options[@]}" "${php_only_args[@]}" "${right_flags[@]}" "${right_options[@]}")
   if [ "$DEBUG" ]; then echo "DEBUG: Direct PHP exec with args: ${php_args[*]}" >&2; fi
-  exec ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} run -i --rm cli php "${php_args[@]}"
+  execute_in_container "cli" "php" "${php_args[@]}"
 elif [[ -z "$first_non_flag_arg" ]] && ([[ ${#left_flags[@]} -gt 0 ]] || [[ ${#right_flags[@]} -gt 0 ]] || [[ ${#right_options[@]} -gt 0 ]]); then
   # Only flags, no command - this is implicit PHP (orodc -v, orodc --version)
   # Setup logging for PHP binary usage
   setup_php_logging "$@"
   php_args=("${left_flags[@]}" "${left_options[@]}" "${args[@]}" "${right_flags[@]}" "${right_options[@]}")
-  php_cmd=$(build_docker_compose_run_cmd "cli" "php" "${php_args[@]}")
   if [ "$DEBUG" ]; then echo "DEBUG: Implicit PHP redirect with args: ${php_args[*]}" >&2; fi
-  exec bash -c "$php_cmd"
+  execute_in_container "cli" "php" "${php_args[@]}"
 fi
 
 if echo "$first_non_flag_arg" | grep -i '^mysql' > /dev/null; then
@@ -1272,9 +1321,9 @@ if [[ "$has_php_file" == true ]]; then
             ;;
         esac
       done
-      exec ${DOCKER_COMPOSE_RUN_CMD} "${docker_flags[@]}" "${left_options[@]}" cli php "${php_flags[@]}" "${right_flags[@]}" "${right_options[@]}" "${args[@]}"
+      execute_in_container "cli" "php" "${php_flags[@]}" "${right_flags[@]}" "${right_options[@]}" "${args[@]}"
     else
-      exec ${DOCKER_COMPOSE_RUN_CMD} "${left_flags[@]}" "${left_options[@]}" cli "${args[@]}" "${right_flags[@]}" "${right_options[@]}"
+      execute_in_container "cli" "${args[@]}" "${right_flags[@]}" "${right_options[@]}"
     fi
   fi
 fi
