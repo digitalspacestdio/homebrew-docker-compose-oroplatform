@@ -30,7 +30,7 @@ ENV PHP_USER_GROUP=${PHP_USER_GROUP}
 ARG EXT_REDIS_VERSION=6.2.0 
 ARG EXT_IGBINARY_VERSION=3.2.15
 ARG EXT_MONGODB_VERSION=1.21.0
-ARG EXT_XDEBUG_VERSION=3.4.2
+ARG EXT_XDEBUG_VERSION=3.4.5
 
 # persistent / runtime deps
 RUN apk add --no-cache \
@@ -109,21 +109,28 @@ RUN set -eux; \
   mkdir -p /usr/src/php/ext/igbinary; \
   curl -fsSL https://github.com/igbinary/igbinary/archive/$EXT_IGBINARY_VERSION.tar.gz | tar xvz -C /usr/src/php/ext/igbinary --strip 1; \
   docker-php-ext-install -j$(printf "2\n$(nproc)" | sort -g | head -n1) igbinary; \
+  rm -rf /usr/src/php/ext/igbinary; \
   \
   mkdir -p /usr/src/php/ext/redis; \
   curl -fsSL https://github.com/phpredis/phpredis/archive/$EXT_REDIS_VERSION.tar.gz | tar xvz -C /usr/src/php/ext/redis --strip 1; \
   docker-php-ext-configure redis --enable-redis-igbinary; \
   docker-php-ext-install -j$(printf "2\n$(nproc)" | sort -g | head -n1) redis; \
+  rm -rf /usr/src/php/ext/redis; \
   \
   mkdir -p /usr/src/php/ext/mongodb; \
-  git clone --recursive --branch $EXT_MONGODB_VERSION --depth 1 https://github.com/mongodb/mongo-php-driver.git /usr/src/php/ext/mongodb; \
+  git clone https://github.com/mongodb/mongo-php-driver.git /usr/src/php/ext/mongodb && \
+  cd /usr/src/php/ext/mongodb && \
+  git checkout $EXT_MONGODB_VERSION && \
+  git submodule update --init --recursive; \
   docker-php-ext-configure mongodb; \
   docker-php-ext-install -j$(printf "2\n$(nproc)" | sort -g | head -n1) mongodb; \
+  rm -rf /usr/src/php/ext/mongodb; \
   \
   mkdir -p /usr/src/php/ext/xdebug; \
   curl -fsSL https://github.com/xdebug/xdebug/archive/refs/tags/$EXT_XDEBUG_VERSION.tar.gz | tar xvz -C /usr/src/php/ext/xdebug --strip 1; \
   docker-php-ext-configure xdebug; \
   docker-php-ext-install -j$(printf "2\n$(nproc)" | sort -g | head -n1) xdebug; \
+  rm -rf /usr/src/php/ext/xdebug; \
   \
   docker-php-ext-install -j$(printf "2\n$(nproc)" | sort -g | head -n1) \
     pdo_pgsql \
