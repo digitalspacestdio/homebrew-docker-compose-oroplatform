@@ -931,12 +931,16 @@ is_container_running() {
   fi
 }
 
-# Function to execute command in container (exec if running, start+exec if not)
+# Function to execute command in container (use ssh if available, otherwise cli)
 execute_in_container() {
   local service="$1"
   local cmd_args=("${@:2}")
   
-  if is_container_running "$service"; then
+  # For CLI commands, prefer SSH container if it's running (much faster)
+  if [[ "$service" == "cli" ]] && is_container_running "ssh"; then
+    if [ "$DEBUG" ]; then echo "DEBUG: Using SSH container for faster execution instead of CLI" >&2; fi
+    exec ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} exec "ssh" "${cmd_args[@]}" "${right_flags[@]}" "${right_options[@]}"
+  elif is_container_running "$service"; then
     # Container is running, use exec for faster execution
     if [ "$DEBUG" ]; then echo "DEBUG: Using docker compose exec for service: $service" >&2; fi
     exec ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} exec "$service" "${cmd_args[@]}" "${right_flags[@]}" "${right_options[@]}"
