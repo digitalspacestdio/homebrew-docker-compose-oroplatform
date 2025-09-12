@@ -1520,22 +1520,42 @@ EOF
         cp "$BEHAT_DIST_FILE" "$BEHAT_CONFIG_FILE"
         
         # Replace localhost:4444 with test-selenium:4444 for WebDriver host
-        sed -i "s|localhost:4444|test-selenium:4444|g" "$BEHAT_CONFIG_FILE"
+        sed -i '' "s|localhost:4444|test-selenium:4444|g" "$BEHAT_CONFIG_FILE" 2>/dev/null || sed -i "s|localhost:4444|test-selenium:4444|g" "$BEHAT_CONFIG_FILE"
         # Replace localhost:9515 with test-selenium:9515 for ChromeDriver host  
-        sed -i "s|localhost:9515|test-selenium:9515|g" "$BEHAT_CONFIG_FILE"
+        sed -i '' "s|localhost:9515|test-selenium:9515|g" "$BEHAT_CONFIG_FILE" 2>/dev/null || sed -i "s|localhost:9515|test-selenium:9515|g" "$BEHAT_CONFIG_FILE"
         
         # Note: OroCommerce admin panel is accessible at root path, not /admin/
         echo "Keeping base_url as root path for admin panel access"
         
         # Add necessary Chrome arguments for Docker environment to the main sessions (port 4444)
         # This fixes the "DevToolsActivePort file doesn't exist" error
-        sed -i '/--load-extension.*chrome-extension/a\                                        - "--no-sandbox"\
-                                        - "--disable-gpu"\
-                                        - "--headless"\
-                                        - "--disable-dev-shm-usage"\
-                                        - "--no-first-run"\
-                                        - "--disable-extensions"\
-                                        - "--disable-renderer-backgrounding"' "$BEHAT_CONFIG_FILE"
+        if grep -q -- '--load-extension.*chrome-extension' "$BEHAT_CONFIG_FILE"; then
+          # Create temporary file with the Chrome arguments to add
+          TEMP_CHROME_ARGS=$(mktemp)
+          cat > "$TEMP_CHROME_ARGS" << 'EOF'
+                                        - "--no-sandbox"
+                                        - "--disable-gpu"
+                                        - "--headless"
+                                        - "--disable-dev-shm-usage"
+                                        - "--no-first-run"
+                                        - "--disable-extensions"
+                                        - "--disable-renderer-backgrounding"
+EOF
+          
+          # Use awk to insert the Chrome arguments after the line containing chrome-extension
+          awk '
+            /--load-extension.*chrome-extension/ {
+              print $0
+              while ((getline line < "'"$TEMP_CHROME_ARGS"'") > 0) print line
+              close("'"$TEMP_CHROME_ARGS"'")
+              next
+            }
+            { print }
+          ' "$BEHAT_CONFIG_FILE" > "${BEHAT_CONFIG_FILE}.tmp" && mv "${BEHAT_CONFIG_FILE}.tmp" "$BEHAT_CONFIG_FILE"
+          
+          # Clean up temporary file
+          rm -f "$TEMP_CHROME_ARGS"
+        fi
         
         echo "Generated behat.yml with test environment URLs and Docker-compatible Chrome options"
       else
