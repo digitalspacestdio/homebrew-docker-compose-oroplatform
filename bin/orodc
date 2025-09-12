@@ -936,50 +936,16 @@ execute_in_container() {
   local service="$1"
   local cmd_args=("${@:2}")
   
-  # For CLI commands, prefer SSH container if it's running (much faster)
-  if [[ "$service" == "cli" ]] && is_container_running "ssh"; then
-    if [ "$DEBUG" ]; then echo "DEBUG: Using SSH container for faster execution instead of CLI" >&2; fi
-    exec ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} exec "ssh" "${cmd_args[@]}" "${right_flags[@]}" "${right_options[@]}"
-  elif is_container_running "$service"; then
-    # Container is running, use exec for faster execution
-    if [ "$DEBUG" ]; then echo "DEBUG: Using docker compose exec for service: $service" >&2; fi
-    exec ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} exec "$service" "${cmd_args[@]}" "${right_flags[@]}" "${right_options[@]}"
-  else
-    # Container is not running, start it first then use exec
-    if [ "$DEBUG" ]; then echo "DEBUG: Starting service $service then using exec for better performance" >&2; fi
-    
-    # Start the service in background
-    ${DOCKER_COMPOSE_BIN_CMD} up -d "$service" >/dev/null 2>&1
-    
-    # Wait a moment for the service to be ready
-    sleep 1
-    
-    # Verify it's now running, if not fall back to run
-    if is_container_running "$service"; then
-      exec ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} exec "$service" "${cmd_args[@]}" "${right_flags[@]}" "${right_options[@]}"
-    else
-      # Fallback to run if start failed
-      if [ "$DEBUG" ]; then echo "DEBUG: Failed to start service $service, falling back to docker compose run" >&2; fi
-      exec ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} run -i --rm "$service" "${cmd_args[@]}" "${right_flags[@]}" "${right_options[@]}"
-    fi
-  fi
-}
-
-if ${DOCKER_BIN} system info --format '{{.SecurityOptions}}' 2>/dev/null | grep "name=rootless" > /dev/null; then
-  DOCKER_COMPOSE_RUN_CMD="${DOCKER_COMPOSE_RUN_CMD} --user root"
-fi
-
-# Function to mount external PHP files via volume mounts
-# Use volume mounts for external files
-mount_external_php_files() {
+  # Handle external PHP files for exec vs run scenarios
   local external_files=()
+  local updated_cmd_args=()
   
-  # Collect external PHP files
-  for arg in "$@"; do
+  # Collect external PHP files from command arguments
+  for arg in "${cmd_args[@]}"; do
     if [[ $arg == *.php ]]; then
       PHPFILE_PATH=$(echo $arg | grep -o '.\+\.php' | sed s~.\*=~~)
       PHPFILE_DIR=$(dirname "${PHPFILE_PATH}")
-
+      
       # Check if file is outside project directory
       if [[ -z $DC_ORO_APPDIR ]] || [[ $PHPFILE_DIR != '.' && $PHPFILE_DIR != $DC_ORO_APPDIR && $PHPFILE_DIR != $DC_ORO_APPDIR/* ]]; then
         # Check if file exists locally
@@ -988,21 +954,77 @@ mount_external_php_files() {
         fi
       fi
     fi
+    updated_cmd_args+=("$arg")
   done
   
-  # Prepare volume mounts for external files
-  if [[ ${#external_files[@]} -gt 0 ]]; then
-    # Build volume mount arguments for docker compose run
-    for file in "${external_files[@]}"; do
-      file_dir=$(dirname "${file}")
-      # Add bind mount for each external file directory
-      DOCKER_COMPOSE_RUN_CMD="${DOCKER_COMPOSE_RUN_CMD} -v ${file_dir}:${file_dir}:ro"
-    done
+  # For CLI commands, prefer SSH container if it's running (much faster)
+  if [[ "$service" == "cli" ]] && is_container_running "ssh"; then
+    # Handle external files for SSH exec - copy to shared volume
+    if [[ ${#external_files[@]} -gt 0 ]]; then
+      for file in "${external_files[@]}"; do
+        filename=$(basename "$file")
+        # Copy external file to shared-private volume via SSH container
+        if docker cp "$file" "${DC_ORO_NAME}_ssh_${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}:/private/$filename" 2>/dev/null; then
+          if [ "$DEBUG" ]; then echo "DEBUG: Copied external file $file to /private/$filename" >&2; fi
+          # Update command arguments to use shared volume path
+          for i in "${!updated_cmd_args[@]}"; do
+            if [[ "${updated_cmd_args[$i]}" == "$file" ]]; then
+              updated_cmd_args[$i]="/private/$filename"
+              break
+            fi
+          done
+        else
+          if [ "$DEBUG" ]; then echo "DEBUG: Failed to copy $file to SSH container, falling back to CLI run" >&2; fi
+          # Fall back to CLI run with volume mount
+          exec ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} run -i --rm -v "$(dirname "$file"):$(dirname "$file"):ro" "$service" "${cmd_args[@]}" "${right_flags[@]}" "${right_options[@]}"
+        fi
+      done
+    fi
+    
+    if [ "$DEBUG" ]; then echo "DEBUG: Using SSH container for faster execution instead of CLI" >&2; fi
+    exec ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} exec "ssh" "${updated_cmd_args[@]}" "${right_flags[@]}" "${right_options[@]}"
+  elif is_container_running "$service"; then
+    # Container is running, use exec for faster execution
+    if [ "$DEBUG" ]; then echo "DEBUG: Using docker compose exec for service: $service" >&2; fi
+    exec ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} exec "$service" "${updated_cmd_args[@]}" "${right_flags[@]}" "${right_options[@]}"
+  else
+    # Container is not running, use docker compose run with volume mounts for external files
+    local run_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} run -i --rm"
+    
+    # Add volume mounts for external files
+    if [[ ${#external_files[@]} -gt 0 ]]; then
+      for file in "${external_files[@]}"; do
+        file_dir=$(dirname "${file}")
+        run_cmd="$run_cmd -v ${file_dir}:${file_dir}:ro"
+        if [ "$DEBUG" ]; then echo "DEBUG: Adding volume mount for external file: -v ${file_dir}:${file_dir}:ro" >&2; fi
+      done
+    fi
+    
+    run_cmd="$run_cmd $service"
+    
+    # Start the service in background first
+    ${DOCKER_COMPOSE_BIN_CMD} up -d "$service" >/dev/null 2>&1
+    
+    # Wait a moment for the service to be ready
+    sleep 1
+    
+    # Verify it's now running, if so use exec, otherwise use run
+    if is_container_running "$service"; then
+      if [ "$DEBUG" ]; then echo "DEBUG: Service $service started, using exec" >&2; fi
+      exec ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} exec "$service" "${updated_cmd_args[@]}" "${right_flags[@]}" "${right_options[@]}"
+    else
+      # Fallback to run if start failed
+      if [ "$DEBUG" ]; then echo "DEBUG: Failed to start service $service, using run with volume mounts" >&2; fi
+      exec bash -c "$run_cmd ${cmd_args[*]} ${right_flags[*]} ${right_options[*]}"
+    fi
   fi
 }
 
-# Mount external PHP files before executing any command
-mount_external_php_files "${original_args[@]}"
+if ${DOCKER_BIN} system info --format '{{.SecurityOptions}}' 2>/dev/null | grep "name=rootless" > /dev/null; then
+  DOCKER_COMPOSE_RUN_CMD="${DOCKER_COMPOSE_RUN_CMD} --user root"
+fi
+
+# External PHP files are now handled in execute_in_container() function
 
 # Load cached profiles for all commands except 'up' (which saves new profiles)
 if [[ "$first_non_flag_arg" != "up" ]]; then
