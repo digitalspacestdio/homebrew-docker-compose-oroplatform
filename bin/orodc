@@ -1692,26 +1692,94 @@ if [[ -n "${DEBUG:-}" ]]; then
 fi
 
 if [[ "$first_non_flag_arg" == "purge" ]]; then
-  # Handle purge command with proper flag processing
+  # Handle purge command with comprehensive cleanup (like tests purge)
   if [[ -n "${DEBUG:-}" ]]; then
     echo "DEBUG: Processing purge command with flags: ${left_flags[@]} ${left_options[@]}" >&2
   fi
   
+  echo "Purging project environment..."
+  
+  # 1. Stop main environment with docker-compose
+  echo "Stopping main services..."
   if [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
-    bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} -f ${DC_ORO_CONFIG_DIR}/compose.yml down -v"
+    bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} -f ${DC_ORO_CONFIG_DIR}/compose.yml down -v" 2>/dev/null || true
   else
-    bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} down -v"
+    bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} down -v" 2>/dev/null || true
   fi
-
-  ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null && {
-    echo "Removing docker volume: ${DC_ORO_NAME}_appcode"
-    ${DOCKER_BIN} volume rm ${DC_ORO_NAME}'_appcode'
-  }
-
+  
+  # 2. Stop test environment if it exists
+  if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-test.yml" ]]; then
+    echo "Stopping test services..."
+    
+    # Build test compose command like in tests purge
+    TEST_COMPOSE_CMD="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose.yml"
+    
+    # Add database-specific compose file
+    if [[ "${DC_ORO_DATABASE_SCHEMA}" == "pgsql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgresql" ]]; then
+      TEST_COMPOSE_CMD="${TEST_COMPOSE_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-pgsql.yml"
+    elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "mariadb" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]]; then
+      TEST_COMPOSE_CMD="${TEST_COMPOSE_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-mysql.yml"
+    fi
+    
+    # Add user compose file if exists
+    if [[ -f "$DC_ORO_APPDIR/.docker-compose.user.yml" ]]; then
+      TEST_COMPOSE_CMD="${TEST_COMPOSE_CMD} -f $DC_ORO_APPDIR/.docker-compose.user.yml"
+    fi
+    
+    # Add test compose file
+    TEST_COMPOSE_CMD="${TEST_COMPOSE_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-test.yml"
+    
+    # Get and stop test services
+    TEST_SERVICES=$(yq e '.services | keys | .[]' "${DC_ORO_CONFIG_DIR}/docker-compose-test.yml" 2>/dev/null | tr '\n' ' ')
+    if [[ -n "$TEST_SERVICES" ]]; then
+      ${TEST_COMPOSE_CMD} stop $TEST_SERVICES 2>/dev/null || true
+      ${TEST_COMPOSE_CMD} rm -f $TEST_SERVICES 2>/dev/null || true
+    fi
+  fi
+  
+  # 3. Drop test database if exists
+  DC_ORO_TEST_DATABASE_DBNAME="${DC_ORO_TEST_DATABASE_DBNAME:-${DC_ORO_DATABASE_DBNAME:-oro_db}_test}"
+  if [[ -n "${DC_ORO_TEST_DATABASE_DBNAME}" ]] && [[ "${DC_ORO_TEST_DATABASE_DBNAME}" != "${DC_ORO_DATABASE_DBNAME}" ]]; then
+    echo "Dropping test database ${DC_ORO_TEST_DATABASE_DBNAME}..."
+    
+    # Build main compose command for database operations
+    MAIN_COMPOSE_CMD="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/docker-compose.yml"
+    
+    # Add database-specific compose file
+    if [[ "${DC_ORO_DATABASE_SCHEMA}" == "pgsql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgresql" ]]; then
+      MAIN_COMPOSE_CMD="${MAIN_COMPOSE_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-pgsql.yml"
+      # Drop PostgreSQL test database
+      ${MAIN_COMPOSE_CMD} run --rm database-cli bash -c "PGPASSWORD=\$DC_ORO_DATABASE_PASSWORD psql -h \$DC_ORO_DATABASE_HOST -p \$DC_ORO_DATABASE_PORT -U \$DC_ORO_DATABASE_USER -d \$DC_ORO_DATABASE_DBNAME -c 'SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '\''${DC_ORO_TEST_DATABASE_DBNAME}'\'';'" 2>/dev/null || true
+      ${MAIN_COMPOSE_CMD} run --rm database-cli bash -c "PGPASSWORD=\$DC_ORO_DATABASE_PASSWORD psql -h \$DC_ORO_DATABASE_HOST -p \$DC_ORO_DATABASE_PORT -U \$DC_ORO_DATABASE_USER -d \$DC_ORO_DATABASE_DBNAME -c 'DROP DATABASE IF EXISTS ${DC_ORO_TEST_DATABASE_DBNAME};'" 2>/dev/null || true
+    elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "mariadb" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]]; then
+      MAIN_COMPOSE_CMD="${MAIN_COMPOSE_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-mysql.yml"
+      # Drop MySQL/MariaDB test database
+      ${MAIN_COMPOSE_CMD} run --rm database-cli bash -c "MYSQL_PWD=\$DC_ORO_DATABASE_PASSWORD mysql -h\$DC_ORO_DATABASE_HOST -P\$DC_ORO_DATABASE_PORT -u\$DC_ORO_DATABASE_USER \$DC_ORO_DATABASE_DBNAME -e 'DROP DATABASE IF EXISTS ${DC_ORO_TEST_DATABASE_DBNAME};'" 2>/dev/null || true
+    fi
+  fi
+  
+  # 4. Clean up any remaining containers with project name
+  echo "Cleaning up remaining containers..."
+  REMAINING_CONTAINERS=$(${DOCKER_BIN} ps -a --filter "name=${DC_ORO_NAME}_" --format "{{.Names}}" 2>/dev/null || true)
+  if [[ -n "$REMAINING_CONTAINERS" ]]; then
+    echo "Removing containers: $REMAINING_CONTAINERS"
+    echo "$REMAINING_CONTAINERS" | xargs -r ${DOCKER_BIN} rm -f 2>/dev/null || true
+  fi
+  
+  # 5. Clean up any remaining volumes with project name
+  echo "Cleaning up remaining volumes..."
+  REMAINING_VOLUMES=$(${DOCKER_BIN} volume ls --filter "name=${DC_ORO_NAME}_" --format "{{.Name}}" 2>/dev/null || true)
+  if [[ -n "$REMAINING_VOLUMES" ]]; then
+    echo "Removing volumes: $REMAINING_VOLUMES"
+    echo "$REMAINING_VOLUMES" | xargs -r ${DOCKER_BIN} volume rm 2>/dev/null || true
+  fi
+  
+  # 6. Clean up configuration directory
   if [[ -d "${DC_ORO_CONFIG_DIR}" ]]; then
     rm -rf "${DC_ORO_CONFIG_DIR}"
   fi
-
+  
+  echo "Project environment purged completely!"
   exit 0
 fi
 
