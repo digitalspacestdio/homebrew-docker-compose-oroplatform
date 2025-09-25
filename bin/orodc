@@ -17,6 +17,11 @@ msg_info() {
   >&2 echo -e "\033[36m==> $1\033[0m"
 }
 
+# Function to display warning messages
+msg_warning() {
+  >&2 echo -e "\033[31m==> Warning: $1\033[0m"
+}
+
 # Save original arguments before any processing
 original_args=("$@")
 
@@ -623,7 +628,7 @@ if [[ -z $DC_ORO_COMPOSER_AUTH ]] && [[ -z $COMPOSER_AUTH ]]; then
   cd "${DC_ORO_CONFIG_DIR}"
   if which php > /dev/null 2>&1 && which composer > /dev/null 2>&1; then
     COMPOSER_HOME=$(php -d display_startup_errors=0 $(which composer) config --working-dir=/tmp --no-interaction --global home 2> /dev/null) || {
-      >&2 echo -e "\033[36m==> Can't find Composer home. Try setting COMPOSER_AUTH manually.\033[0m"
+      msg_info "Can't find Composer home. Try setting COMPOSER_AUTH manually."
     }
   fi
 
@@ -725,7 +730,7 @@ export DC_ORO_PHP_USER_GID=${DC_ORO_USER_GID}
 NETWORK_NAME="dc_shared_net"
 # Check if the Docker network already exists
 if ! docker network ls --format '{{.Name}}' | grep -qw "$NETWORK_NAME"; then
-  >&2 echo -e "\033[36m==> Creating Docker network: $NETWORK_NAME\033[0m"
+  msg_info "Creating Docker network: $NETWORK_NAME"
   docker network create "$NETWORK_NAME"
 else
   # Docker network already exists - skip message
@@ -767,7 +772,7 @@ if ${DOCKER_COMPOSE_BIN_CMD} ps --services 2>/dev/null | grep database > /dev/nu
 fi
 
 if [[ -f "$DC_ORO_APPDIR/.docker-compose.user.yml" ]]; then
-  >&2 echo -e "\033[36m==> Additional ${DOCKER_BIN} compose config will be used: $DC_ORO_APPDIR/.docker-compose.user.yml\033[0m"
+  msg_info "Additional ${DOCKER_BIN} compose config will be used: $DC_ORO_APPDIR/.docker-compose.user.yml"
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f $DC_ORO_APPDIR/.docker-compose.user.yml"
 fi
 
@@ -840,15 +845,15 @@ if [[ -z $DC_ORO_PHP_VERSION ]]; then
   # Priority 1: .php-version file
   if [[ -f "$DC_ORO_APPDIR/.php-version" ]]; then
     export DC_ORO_PHP_VERSION=$(cat $DC_ORO_APPDIR/.php-version | head -n1)
-    >&2 echo -e "\033[36m==> Found .php-version with following version: $DC_ORO_PHP_VERSION\033[0m"
+    msg_info "Found .php-version with following version: $DC_ORO_PHP_VERSION"
   # Priority 2: .phprc file
   elif [[ -f "$DC_ORO_APPDIR/.phprc" ]]; then
     export DC_ORO_PHP_VERSION=$(cat $DC_ORO_APPDIR/.phprc | head -n1)
-    >&2 echo -e "\033[36m==> Found .phprc with following version: $DC_ORO_PHP_VERSION\033[0m"
+    msg_info "Found .phprc with following version: $DC_ORO_PHP_VERSION"
   # Priority 3: composer.json
   elif DC_ORO_PHP_VERSION=$(detect_php_version_from_composer); then
     export DC_ORO_PHP_VERSION
-    >&2 echo -e "\033[36m==> Detected PHP version from composer.json: $DC_ORO_PHP_VERSION\033[0m"
+    msg_info "Detected PHP version from composer.json: $DC_ORO_PHP_VERSION"
   fi
 fi
 
@@ -857,11 +862,11 @@ if [[ -z $DC_ORO_NODE_VERSION ]]; then
   # Priority 1: .nvmrc file
   if [[ -f "$DC_ORO_APPDIR/.nvmrc" ]]; then
     export DC_ORO_NODE_VERSION=$(cat $DC_ORO_APPDIR/.nvmrc | head -n1)
-    >&2 echo -e "\033[36m==> Found .nvmrc with following version: $DC_ORO_NODE_VERSION\033[0m"
+    msg_info "Found .nvmrc with following version: $DC_ORO_NODE_VERSION"
   # Priority 2: Compatibility matrix based on detected PHP version
   elif [[ -n "$DC_ORO_PHP_VERSION" ]]; then
     export DC_ORO_NODE_VERSION=$(get_compatible_node_version "$DC_ORO_PHP_VERSION")
-    >&2 echo -e "\033[36m==> Using compatible Node.js version for PHP $DC_ORO_PHP_VERSION: $DC_ORO_NODE_VERSION\033[0m"
+    msg_info "Using compatible Node.js version for PHP $DC_ORO_PHP_VERSION: $DC_ORO_NODE_VERSION"
   fi
 fi
 
@@ -869,7 +874,7 @@ if [[ "${DC_ORO_MODE}" == "mutagen" ]] || [[ "${DC_ORO_MODE}" == "ssh" ]]; then
   if [[ ${args[0]} != "down" ]] && [[ ${args[0]} != "purge" ]]; then
     ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
       ${DOCKER_BIN} volume create "${DC_ORO_NAME}_appcode"  > /dev/null
-      >&2 echo -e "\033[36m==> Copying source code to the '${DC_ORO_NAME}_appcode' docker valume\033[0m"
+      msg_info "Copying source code to the '${DC_ORO_NAME}_appcode' docker volume"
       bash -c "${DOCKER_COMPOSE_BIN_CMD} up -d ssh"
       SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
       SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
@@ -1462,9 +1467,9 @@ if [[ "$first_non_flag_arg" == "tests" ]]; then
   # Generate properly merged compose.yml using 'docker compose config'
   # This command merges all compose files and resolves all references (volumes, networks, etc.)
   if DC_ORO_NAME="$DC_ORO_NAME" bash -c "${TEST_AWARE_COMPOSE_CMD} config" > "${DC_ORO_CONFIG_DIR}/compose.yml" 2>/dev/null; then
-    >&2 echo -e "\033[36m==> All services merged into compose.yml for persistent management\033[0m"
+    msg_info "All services merged into compose.yml for persistent management"
   else
-    >&2 echo -e "\033[31m==> Warning: Failed to merge compose files, falling back to test-only mode\033[0m"
+    msg_warning "Failed to merge compose files, falling back to test-only mode"
     # Fallback: create basic merged file (this will likely cause volume errors)
     # This fallback exists for edge cases but is not the intended path
     cat > "${DC_ORO_CONFIG_DIR}/compose.yml" << 'EOF'
@@ -1500,7 +1505,7 @@ EOF
   # Handle different test subcommands
   case "${args[1]}" in
     "install"|"setup")
-      >&2 echo -e "\033[36m==> Installing test environment and database...\033[0m"
+      msg_info "Installing test environment and database..."
       # Start all required services
       ${TEST_COMPOSE_CMD} up -d >/dev/null 2>&1
       
@@ -1543,7 +1548,7 @@ EOF
       
       # Clear test cache and install (only if database was created)
       if [[ "$DB_EXISTS" == "false" ]]; then
-        >&2 echo -e "\033[36m==> Setting up Oro test environment...\033[0m"
+        msg_info "Setting up Oro test environment..."
         echo "Running cache clear in 'test-cli' service..."
         ${TEST_COMPOSE_CMD} run --rm test-cli bash -c "rm -rf var/cache/test" 2>/dev/null || true
         echo "Running oro:install in 'test-cli' service..."
@@ -1569,12 +1574,12 @@ EOF
       fi
       
       # Warm up test environment caches
-      >&2 echo -e "\033[36m==> Warming up test environment caches...\033[0m"
+      msg_info "Warming up test environment caches..."
       echo "Warming up test cache..."
       ${TEST_COMPOSE_CMD} run --rm test-cli bin/console cache:warmup --env=test 2>/dev/null || true
 
       # Generate behat.yml with correct URLs for test environment
-      >&2 echo -e "\033[36m==> Generating behat.yml with test environment URLs...\033[0m"
+      msg_info "Generating behat.yml with test environment URLs..."
       BEHAT_DIST_FILE="${DC_ORO_APPDIR}/vendor/oro/platform/src/Oro/Bundle/TestFrameworkBundle/Resources/config/behat.yml.dist"
       BEHAT_CONFIG_FILE="${DC_ORO_APPDIR}/behat.yml"
       
@@ -1716,7 +1721,7 @@ EOF
     *)
       # Handle any other command by executing it in test-cli container
       # This makes 'orodc tests' a full replacement for 'orodc' but in test environment
-      >&2 echo -e "\033[36m==> Running command in 'test-cli' service...\033[0m"
+      msg_info "Running command in 'test-cli' service..."
       ${TEST_COMPOSE_CMD} up -d >/dev/null 2>&1
       
       # For tests command, use arguments after 'tests' without parsing
