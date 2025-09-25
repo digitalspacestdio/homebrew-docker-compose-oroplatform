@@ -29,8 +29,6 @@ services:
       - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
       - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
       - "home-root:/root"
-      - "shared-tmp:/tmp:rw"
-      - "shared-private:/private:rw"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -104,8 +102,6 @@ services:
       - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
       - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
       - "home-root:/root"
-      - "shared-tmp:/tmp:rw"
-      - "shared-private:/private:rw"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -183,8 +179,6 @@ services:
       - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
       - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
       - "home-root:/root"
-      - "shared-tmp:/tmp:rw"
-      - "shared-private:/private:rw"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     restart: always
     environment:
@@ -261,8 +255,6 @@ services:
       - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
       - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
       - "home-root:/root"
-      - "shared-tmp:/tmp:rw"
-      - "shared-private:/private:rw"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     restart: always
     environment:
@@ -500,7 +492,6 @@ services:
       - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
       - "home-root:/root"
       - "ssh-hostkeys:/etc/ssh/hostkeys"
-      - "shared-private:/private:rw"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     ports:
       - "${DC_ORO_SSH_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_SSH:-2222}:22"
@@ -582,8 +573,4 @@ volumes:
   home-root:
     driver: local
   search-data:
-    driver: local
-  shared-tmp:
-    driver: local
-  shared-private:
     driver: local
