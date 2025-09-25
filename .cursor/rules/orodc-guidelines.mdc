@@ -190,6 +190,8 @@ orodc ssh                         # Container access
 - Commands without setup context
 - Incomplete workflows
 - `[[ -n "${DEBUG:-}" ]]` syntax (causes script termination due to `set -e`)
+- Emojis in terminal commands or output
+- Shell syntax that isn't zsh compatible
 
 ### Ask User For:
 - Operating system
@@ -201,6 +203,36 @@ orodc ssh                         # Container access
 - Suggest using `~/oroplatform` test project
 - If it doesn't exist, offer to clone community OroPlatform
 - Always prefer `~/oroplatform` for consistent testing and troubleshooting
+
+## Shell Compatibility Requirements
+
+### Zsh Compatibility (CRITICAL)
+**All commands MUST be zsh compatible** to avoid shell escaping issues:
+
+```bash
+# ✅ CORRECT - Works in both bash and zsh
+echo "DC_ORO_MODE=mutagen" >> .env.orodc
+orodc bin/console cache:clear --env=prod
+
+# ❌ WRONG - May break in zsh due to quote escaping
+echo 'DC_ORO_MODE="mutagen"' >> .env.orodc  # Double quote escaping issues
+```
+
+### Terminal Output Rules
+- **NEVER use emojis** in terminal commands or output
+- **NEVER use Unicode symbols** that may not render properly
+- Use plain ASCII text for maximum compatibility
+- Use simple status indicators: `[OK]`, `[ERROR]`, `[INFO]`
+
+```bash
+# ✅ CORRECT
+echo "[OK] OroDC installation completed"
+echo "[ERROR] Port conflict detected"
+
+# ❌ WRONG  
+echo "✅ OroDC installation completed"
+echo "🚨 Port conflict detected"
+```
 
 ## Command Reference
 | Task | Command | Notes |
