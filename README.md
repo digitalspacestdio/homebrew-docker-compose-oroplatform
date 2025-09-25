@@ -19,21 +19,21 @@
 - [✨ Key Features](#-key-features)
 - [🚀 Quick Start](#-quick-start)
 - [⚠️ Critical Testing Requirements](#️-critical-testing-requirements)
-- [🛠️ Installation](#️-installation)
-  - [Prerequisites](#prerequisites)
-  - [Install OroDC](#install-orodc)
-- [🏗️ Application Setup](#️-application-setup)
-  - [OroCommerce](#orocommerce)
-  - [OroPlatform](#oroplatform)
-  - [OroCRM](#orocrm)
+- [🎯 Smart PHP Integration](#-smart-php-integration)
+- [🗄️ Smart Database Integration](#️-smart-database-integration)
+- [💻 Supported Systems](#-supported-systems)
+- [📦 Installation](#-installation)
+- [📖 Usage](#-usage)
 - [🧪 Testing](#-testing)
   - [Test Environment Setup](#test-environment-setup)
   - [Running Tests](#running-tests)
   - [Available Test Commands](#available-test-commands)
-- [🎯 Smart Commands](#-smart-commands)
-- [🔧 Configuration](#-configuration)
+- [🔧 Development Commands](#-development-commands)
+- [⚙️ Environment Variables](#️-environment-variables)
+- [🐳 Custom Docker Images](#-custom-docker-images)
+- [🐛 XDEBUG Configuration](#-xdebug-configuration)
+- [🔄 Working with Existing Projects](#-working-with-existing-projects)
 - [🆘 Troubleshooting](#-troubleshooting)
-- [📚 Documentation](#-documentation)
 
 ---
 
@@ -325,22 +325,73 @@ orodc --profile=consumer platformupdate
 
 ## ⚙️ Environment Variables
 
-### 🔧 Core Configuration
+### 🔧 Complete Environment Variables Reference
 
+#### 🏗️ Project Configuration
 ```bash
-# Project settings
-DC_ORO_NAME=myproject              # Project name
-DC_ORO_PORT_PREFIX=302             # Port prefix (302 → 30280)
+# Project identity
+DC_ORO_NAME=unnamed                # Project name (default: unnamed)
+DC_ORO_PORT_PREFIX=302             # Port prefix (302 → 30280, 30243, etc.)
 
-# PHP/Node versions
-DC_ORO_PHP_VERSION=8.3             # PHP version
-DC_ORO_NODE_VERSION=20             # Node.js version
+# Application directory
+DC_ORO_APPDIR=/var/www             # Application directory in container
+```
 
-# Sync mode
-DC_ORO_MODE=mutagen                # Sync mode (default/mutagen/ssh)
+#### 🐳 PHP & Runtime Configuration  
+```bash
+# PHP settings
+DC_ORO_PHP_VERSION=8.4             # PHP version (7.4, 8.1, 8.2, 8.3, 8.4, 8.5)
+DC_ORO_NODE_VERSION=22             # Node.js version (18, 20, 22)
+DC_ORO_COMPOSER_VERSION=2          # Composer version (1, 2)
+DC_ORO_PHP_DIST=alpine             # Base distribution (alpine)
 
-# Database
-DC_ORO_DATABASE_SCHEMA=postgres    # Database type
+# PHP user settings
+DC_ORO_PHP_USER_NAME=developer     # PHP user name
+DC_ORO_PHP_USER_GROUP=developer    # PHP user group
+DC_ORO_PHP_UID=1000                # PHP user UID
+DC_ORO_PHP_GID=1000                # PHP user GID
+DC_ORO_USER_NAME=developer         # Runtime user name
+```
+
+#### 🗄️ Database Configuration
+```bash
+# PostgreSQL settings (default database)
+DC_ORO_DATABASE_HOST=database      # Database host
+DC_ORO_DATABASE_PORT=5432          # Database port
+DC_ORO_DATABASE_USER=app           # Database user
+DC_ORO_DATABASE_PASSWORD=app       # Database password  
+DC_ORO_DATABASE_DBNAME=app         # Database name
+DC_ORO_DATABASE_SCHEMA=postgres    # Database type (postgres/mysql)
+
+# Connection URI (auto-generated)
+DC_ORO_DATABASE_URI=postgres://app:app@database:5432/app
+```
+
+#### 🔍 Search & Cache Configuration
+```bash
+# Elasticsearch settings
+DC_ORO_SEARCH_DSN=elastic-search://search:9200
+DC_ORO_SEARCH_URI=elastic-search://search:9200
+
+# Redis settings  
+DC_ORO_REDIS_URI=redis://redis:6379
+
+# Message Queue settings
+DC_ORO_MQ_URI=""                   # Message queue URI (empty = use DB)
+```
+
+#### 📧 Mail & Debugging
+```bash
+# Mail settings
+ORO_MAILER_DRIVER=smtp             # Mail driver
+ORO_MAILER_HOST=mail               # Mail host
+ORO_MAILER_PORT=1025               # Mail port
+
+# Security
+ORO_SECRET=ThisTokenIsNotSoSecretChangeIt  # Application secret
+
+# Composer
+DC_ORO_COMPOSER_AUTH=""            # Composer authentication JSON
 ```
 
 ### 📁 Sync Modes
@@ -371,6 +422,165 @@ brew install mutagen-io/mutagen/mutagen
 
 ```bash
 echo "DC_ORO_MODE=ssh" >> .env.orodc
+```
+
+## 🐳 Custom Docker Images
+
+### 🛠️ Building Custom PostgreSQL Image
+
+You can create custom Docker images for any service and use them with OroDC. Here's an example of creating a PostgreSQL image with additional extensions:
+
+#### 📋 Step 1: Create Dockerfile
+
+Create a `Dockerfile` with your custom configuration:
+
+```dockerfile
+FROM postgres:17.4
+RUN apt-get update -yqq && apt-get install -yqq --no-install-recommends postgresql-17-pgpool2
+```
+
+#### 🔨 Step 2: Build Custom Image
+
+Build your custom PostgreSQL image:
+
+```bash
+docker build -t mypgsql:17 .
+```
+
+#### ⚙️ Step 3: Configure OroDC
+
+Add the custom image configuration to your project's `.env.orodc` file:
+
+```bash
+# Use custom PostgreSQL image
+DC_ORO_PGSQL_IMAGE=mypgsql
+DC_ORO_PGSQL_VERSION=17
+```
+
+Or set it in your application's `app/.env.local` file:
+
+```bash
+# Custom PostgreSQL configuration
+DC_ORO_PGSQL_IMAGE=mypgsql  
+DC_ORO_PGSQL_VERSION=17
+```
+
+#### 🚀 Step 4: Start with Custom Image
+
+```bash
+# Restart OroDC to use the custom image
+orodc down
+orodc up -d
+```
+
+### 🔧 All Available Custom Images
+
+You can customize any service using these environment variables:
+
+#### 🐘 Database Services
+```bash
+# PostgreSQL (primary database)
+DC_ORO_PGSQL_IMAGE=mypgsql
+DC_ORO_PGSQL_VERSION=17
+
+# Redis (caching & sessions)  
+DC_ORO_REDIS_IMAGE=myredis
+DC_ORO_REDIS_VERSION=7.0
+
+# Elasticsearch (search engine)
+DC_ORO_ELASTICSEARCH_IMAGE=myelastic
+DC_ORO_ELASTICSEARCH_VERSION=8.10.3
+
+# MongoDB (for XHGui profiling)
+DC_ORO_MONGODB_IMAGE=mymongo
+DC_ORO_MONGODB_VERSION=4.4
+
+# RabbitMQ (message queue)
+DC_ORO_RABBITMQ_IMAGE=myrabbitmq
+DC_ORO_RABBITMQ_VERSION=3.9-management-alpine
+```
+
+#### 🐳 PHP & Application Services
+```bash
+# PHP base image (affects fpm, cli, consumer, websocket, ssh)
+DC_ORO_PHP_BASE_IMAGE=ghcr.io/digitalspacestdio/orodc-php-node-symfony
+DC_ORO_PHP_VERSION=8.4              # PHP version (7.4, 8.1, 8.2, 8.3, 8.4, 8.5)
+DC_ORO_NODE_VERSION=22              # Node.js version (18, 20, 22)  
+DC_ORO_COMPOSER_VERSION=2           # Composer version (1, 2)
+DC_ORO_PHP_DIST=alpine              # Base distribution (alpine)
+```
+
+#### 🌐 Web & Infrastructure Services
+```bash
+# Nginx (web server)
+DC_ORO_NGINX_IMAGE=mynginx
+DC_ORO_NGINX_VERSION=latest
+
+# MailHog (email testing)
+DC_ORO_MAILHOG_IMAGE=mymailhog
+DC_ORO_MAILHOG_VERSION=latest
+
+# XHGui (profiling interface)
+DC_ORO_XHGUI_IMAGE=myxhgui
+DC_ORO_XHGUI_VERSION=0.18.4
+```
+
+### 💡 Custom Image Tips
+
+- **Layer Caching**: Build images locally for faster iteration during development
+- **Registry**: Push custom images to a registry for team sharing
+- **Environment Specific**: Use different custom images for development, staging, and production
+- **Documentation**: Document custom image dependencies and build instructions
+
+## 🐛 XDEBUG Configuration
+
+### 🔍 XDEBUG Debugging Modes
+
+OroDC supports flexible XDEBUG configuration for different debugging scenarios:
+
+#### 📋 Enable XDEBUG for PHP-FPM Only
+For debugging web requests only:
+
+```bash
+XDEBUG_MODE_FPM=debug orodc up -d
+```
+
+#### 💻 Enable XDEBUG for CLI Only  
+For debugging console commands only:
+
+```bash
+XDEBUG_MODE_CLI=debug orodc up -d
+```
+
+#### 🌐 Enable XDEBUG Everywhere
+For debugging both web requests and console commands:
+
+```bash
+XDEBUG_MODE=debug orodc up -d
+```
+
+#### 🎯 Enable XDEBUG with Profile-Specific Control
+For debugging in CLI and FPM containers, but disable in consumer workers:
+
+```bash
+XDEBUG_MODE=debug XDEBUG_MODE_CONSUMER=off orodc --profile=consumer up -d
+```
+
+### 💡 XDEBUG Usage Tips
+
+- **Performance**: Only enable XDEBUG when debugging - it significantly impacts performance
+- **IDE Configuration**: Configure your IDE to listen on port 9003 (default XDEBUG 3.x port)
+- **Path Mapping**: Map local project path to container path `/var/www/html`
+- **Environment Persistence**: XDEBUG settings persist until containers are recreated
+
+### 🔧 Reset XDEBUG Configuration
+
+To disable XDEBUG and return to normal mode:
+
+```bash
+# Stop containers and restart without XDEBUG
+orodc down
+orodc up -d
 ```
 
 ## 🔄 Working with Existing Projects

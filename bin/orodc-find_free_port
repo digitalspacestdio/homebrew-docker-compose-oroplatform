@@ -112,10 +112,10 @@ get_port_usage_info() {
     done
   done <<< "$__DOCKER_CONTAINERS_CACHE"
   
-  # Check local processes
-  if lsof -t -i tcp:$port > /dev/null 2>&1; then
+  # Check local processes (only LISTEN state)
+  if lsof -t -i tcp:$port -sTCP:LISTEN > /dev/null 2>&1; then
     local process_info
-    process_info=$(lsof -i tcp:$port -P -n | tail -n +2 | head -1 | awk '{print $1 " (PID: " $2 ")"}')
+    process_info=$(lsof -i tcp:$port -P -n -sTCP:LISTEN | tail -n +2 | head -1 | awk '{print $1 " (PID: " $2 ")"}')
     if [[ -n "$process_info" ]]; then
       echo "local process: $process_info"
     else
@@ -259,8 +259,8 @@ is_port_used_batch() {
     return 1
   fi
   
-  # Check local processes only if not used by our project
-  if lsof -t -i tcp:$p > /dev/null 2>&1; then
+  # Check local processes only if not used by our project (only LISTEN state)
+  if lsof -t -i tcp:$p -sTCP:LISTEN > /dev/null 2>&1; then
     [[ "$DEBUG" == "1" ]] && echo "DEBUG: Port $p is used by local process (lsof)" >&2
     return 0
   fi
@@ -329,10 +329,11 @@ find_free_port() {
     SELECTED_PORT=$(yq '.services["'"$SERVICE_NAME"'"].ports[]? | select(.published) | .published' "$COMPOSE_FILE" 2>/dev/null)
   fi
 
-  # Check if the port is used by a local process
+  # Check if the port is used by a local process (only LISTEN state)
   is_port_used_by_local() {
     local p=$1
-    lsof -t -i tcp:$p > /dev/null 2>&1
+    # Only check for processes listening on the port, not client connections
+    lsof -t -i tcp:$p -sTCP:LISTEN > /dev/null 2>&1
   }
 
   # Check if the port is used by another Docker container
@@ -382,6 +383,7 @@ find_free_port() {
     fi
     
     # Check other projects
+    local found=1
     while read -r name ports; do
       local container_project
       local container_service
