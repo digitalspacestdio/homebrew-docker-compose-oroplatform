@@ -300,6 +300,40 @@ DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN-$(which docker) compose}";
 DOCKER_COMPOSE_BIN_CMD=${DOCKER_COMPOSE_BIN};
 DOCKER_COMPOSE_VERSION=$($DOCKER_COMPOSE_BIN_CMD version | grep '[0-9]\+\.[0-9]\+\.[0-9]\+' -o | head -1 |awk -F. '{ print $1 }')
 ${RSYNC_BIN} -r "${DIR}/compose/" "${DC_ORO_CONFIG_DIR}/"
+
+# Setup certificates synchronization
+setup_project_certificates() {
+  local project_crt_dir="${PWD}/.crt"
+  local build_crt_dir="${DC_ORO_CONFIG_DIR}/docker/project-php-node-symfony/.crt"
+  
+  # Remove old certificates directory
+  rm -rf "${build_crt_dir}"
+  
+  # Check if project has certificates
+  if [[ -d "${project_crt_dir}" ]]; then
+    local cert_count=$(find "${project_crt_dir}" -type f \( -name "*.crt" -o -name "*.pem" \) 2>/dev/null | wc -l)
+    
+    if [[ "${cert_count}" -gt 0 ]]; then
+      echo "🔒 Found ${cert_count} certificate(s) in ${project_crt_dir}"
+      echo "   Preparing project build context with custom certificates..."
+      
+      # Create .crt directory in build context
+      mkdir -p "${build_crt_dir}"
+      
+      # Copy certificates to build context
+      find "${project_crt_dir}" -type f \( -name "*.crt" -o -name "*.pem" \) -exec cp {} "${build_crt_dir}/" \;
+      
+      echo "   ✅ Certificates prepared for Docker build"
+    else
+      echo "ℹ️  .crt directory exists but contains no certificate files"
+    fi
+  else
+    echo "ℹ️  No .crt directory found - building standard image without custom certificates"
+  fi
+}
+
+# Call certificates setup after compose files are synced
+setup_project_certificates
 # Build the compose command by adding compose files in the correct order
 # This logic is reused in test merging - DO NOT duplicate this logic elsewhere
 if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose.yml" ]]; then

@@ -1,0 +1,94 @@
+# Project-specific Dockerfile that extends base PHP image
+# This Dockerfile can handle both cases: with and without certificates
+
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+
+# Switch to root to install certificates if they exist
+USER root
+
+# Ensure ca-certificates and NSS tools are installed
+RUN apk add --no-cache ca-certificates nss-tools
+
+# Copy certificates from build context .crt directory if it exists
+# This will be managed by orodc sync logic
+COPY . /tmp/build-context/
+
+# Install certificates if they exist
+RUN set -eux; \
+    if [ -d "/tmp/build-context/.crt" ] && [ "$(ls -A /tmp/build-context/.crt 2>/dev/null | wc -l)" -gt 0 ]; then \
+        echo "Found certificates, installing..."; \
+        mkdir -p /usr/local/share/ca-certificates; \
+        \
+        # Create NSS database for Firefox/Chrome certificate support
+        mkdir -p /etc/pki/nssdb; \
+        certutil -d /etc/pki/nssdb -N --empty-password; \
+        \
+        # Make NSS database accessible system-wide
+        mkdir -p /home/${PHP_USER_NAME:-developer}/.pki/nssdb; \
+        certutil -d sql:/home/${PHP_USER_NAME:-developer}/.pki/nssdb -N --empty-password; \
+        chown -R ${PHP_USER_NAME:-developer}:${PHP_USER_GROUP:-developer} /home/${PHP_USER_NAME:-developer}/.pki; \
+        \
+        cert_count=0; \
+        for cert_file in /tmp/build-context/.crt/*; do \
+            if [ -f "$cert_file" ]; then \
+                cert_name=$(basename "$cert_file"); \
+                cert_ext="${cert_name##*.}"; \
+                cert_base="${cert_name%.*}"; \
+                \
+                case "$cert_ext" in \
+                    pem|PEM) \
+                        # Install in system CA store
+                        cp "$cert_file" "/usr/local/share/ca-certificates/${cert_base}.crt"; \
+                        # Install in NSS databases (system and user)
+                        certutil -d /etc/pki/nssdb -A -t "C,," -n "Project Certificate: ${cert_base}" -i "$cert_file"; \
+                        certutil -d sql:/home/${PHP_USER_NAME:-developer}/.pki/nssdb -A -t "C,," -n "Project Certificate: ${cert_base}" -i "$cert_file"; \
+                        echo "✓ Installed PEM certificate: $cert_name -> ${cert_base}.crt (CA + NSS)"; \
+                        cert_count=$((cert_count + 1)); \
+                        ;; \
+                    crt|CRT) \
+                        # Install in system CA store
+                        cp "$cert_file" "/usr/local/share/ca-certificates/$cert_name"; \
+                        # Install in NSS databases (system and user)
+                        certutil -d /etc/pki/nssdb -A -t "C,," -n "Project Certificate: ${cert_base}" -i "$cert_file"; \
+                        certutil -d sql:/home/${PHP_USER_NAME:-developer}/.pki/nssdb -A -t "C,," -n "Project Certificate: ${cert_base}" -i "$cert_file"; \
+                        echo "✓ Installed CRT certificate: $cert_name (CA + NSS)"; \
+                        cert_count=$((cert_count + 1)); \
+                        ;; \
+                    *) \
+                        echo "⚠ Skipping unsupported certificate format: $cert_name"; \
+                        ;; \
+                esac; \
+            fi; \
+        done; \
+        \
+        if [ "$cert_count" -gt 0 ]; then \
+            echo "Updating certificate stores..."; \
+            # Update system CA certificates
+            update-ca-certificates; \
+            \
+            # Set Node.js environment variables for additional certificate support
+            echo "# Node.js certificate environment variables" >> /etc/environment; \
+            echo "NODE_EXTRA_CA_CERTS=/etc/ssl/certs/ca-certificates.crt" >> /etc/environment; \
+            echo "SSL_CERT_FILE=/etc/ssl/certs/ca-certificates.crt" >> /etc/environment; \
+            \
+            echo "=== Installed $cert_count project certificate(s) ==="; \
+            echo "System CA certificates:"; \
+            ls -la /usr/local/share/ca-certificates/ 2>/dev/null || true; \
+            echo "System NSS database certificates:"; \
+            certutil -d /etc/pki/nssdb -L 2>/dev/null || true; \
+            echo "User NSS database certificates:"; \
+            certutil -d sql:/home/${PHP_USER_NAME:-developer}/.pki/nssdb -L 2>/dev/null || true; \
+            echo "Node.js will use: /etc/ssl/certs/ca-certificates.crt"; \
+            echo "=================================================="; \
+        fi; \
+    else \
+        echo "No certificates found - continuing with base image"; \
+    fi; \
+    \
+    # Clean up build context
+    rm -rf /tmp/build-context
+
+# Switch back to application user
+ARG PHP_USER_NAME=developer
+USER ${PHP_USER_NAME}
