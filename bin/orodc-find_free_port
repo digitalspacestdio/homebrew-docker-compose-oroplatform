@@ -383,6 +383,7 @@ find_free_port() {
     fi
     
     # Check other projects
+    local found=1
     while read -r name ports; do
       local container_project
       local container_service
