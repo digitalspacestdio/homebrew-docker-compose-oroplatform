@@ -35,13 +35,15 @@ ARG EXT_XDEBUG_VERSION=3.1.6
 # persistent / runtime deps
 RUN apk add --no-cache \
     acl \
+    ca-certificates \
+    curl \
+    bash \
     fcgi \
     file \
     gettext \
     git \
+    nss-tools \
     openssh \
-    bash \
-    curl \
     msmtp-openrc \
     msmtp \
     jpegoptim \

@@ -1,14 +1,12 @@
 # Project-specific Dockerfile that extends base PHP image
 # This Dockerfile can handle both cases: with and without certificates
+# Note: ca-certificates and nss-tools are pre-installed in base images
 
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
 # Switch to root to install certificates if they exist
 USER root
-
-# Ensure ca-certificates and NSS tools are installed
-RUN apk add --no-cache ca-certificates nss-tools
 
 # Copy certificates from build context .crt directory if it exists
 # This will be managed by orodc sync logic
