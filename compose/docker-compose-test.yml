@@ -21,8 +21,6 @@ services:
       - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
       - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
       - "home-root:/root"
-      - "shared-tmp:/tmp:rw"
-      - "shared-private:/private:rw"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -134,8 +132,6 @@ services:
       - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
       - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
       - "home-root:/root"
-      - "shared-tmp:/tmp:rw"
-      - "shared-private:/private:rw"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -201,8 +197,6 @@ services:
       - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
       - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
       - "home-root:/root"
-      - "shared-tmp:/tmp:rw"
-      - "shared-private:/private:rw"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     restart: "no"
     environment:

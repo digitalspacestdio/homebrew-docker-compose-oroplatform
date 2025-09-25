@@ -69,6 +69,28 @@ cd ~/orocommerce
 orodc install && orodc up -d
 ```
 
+### Test Project Setup
+**For testing and development**, there's a dedicated OroPlatform project in `~/oroplatform`:
+
+```bash
+# If project doesn't exist, clone community OroPlatform
+if [ ! -d ~/oroplatform ]; then
+  git clone --single-branch --branch 6.1 https://github.com/oroinc/platform-application.git ~/oroplatform
+  cd ~/oroplatform
+  orodc install && orodc up -d
+fi
+
+# Use existing test project
+cd ~/oroplatform
+orodc up -d
+```
+
+**Benefits:**
+- Always available for quick testing
+- Isolated from main development projects  
+- Community version - no enterprise dependencies
+- Perfect for reproducing issues and testing features
+
 ### Development
 ```bash
 orodc up -d                                    # Start services
@@ -78,9 +100,15 @@ orodc bin/console oro:assets:build default -w # Watch assets
 
 ### Testing
 ```bash
+# In any OroPlatform project or use ~/oroplatform test project
+cd ~/oroplatform  # Use dedicated test project
 orodc tests install                            # Setup test env
-orodc tests bin/phpunit --testsuite=unit      # Run tests
+orodc tests bin/phpunit --testsuite=unit      # Unit tests
+orodc tests bin/phpunit --testsuite=functional # Functional tests
+orodc tests bin/behat --suite=OroUserBundle   # Behat tests
 ```
+
+**Note:** Use `~/oroplatform` for consistent testing environment across all OroDC development.
 
 ### Database
 ```bash
@@ -162,12 +190,49 @@ orodc ssh                         # Container access
 - Commands without setup context
 - Incomplete workflows
 - `[[ -n "${DEBUG:-}" ]]` syntax (causes script termination due to `set -e`)
+- Emojis in terminal commands or output
+- Shell syntax that isn't zsh compatible
 
 ### Ask User For:
 - Operating system
 - Current sync mode
 - Error messages
 - Output of `orodc ps`
+
+### When User Needs Test Environment:
+- Suggest using `~/oroplatform` test project
+- If it doesn't exist, offer to clone community OroPlatform
+- Always prefer `~/oroplatform` for consistent testing and troubleshooting
+
+## Shell Compatibility Requirements
+
+### Zsh Compatibility (CRITICAL)
+**All commands MUST be zsh compatible** to avoid shell escaping issues:
+
+```bash
+# ✅ CORRECT - Works in both bash and zsh
+echo "DC_ORO_MODE=mutagen" >> .env.orodc
+orodc bin/console cache:clear --env=prod
+
+# ❌ WRONG - May break in zsh due to quote escaping
+echo 'DC_ORO_MODE="mutagen"' >> .env.orodc  # Double quote escaping issues
+```
+
+### Terminal Output Rules
+- **NEVER use emojis** in terminal commands or output
+- **NEVER use Unicode symbols** that may not render properly
+- Use plain ASCII text for maximum compatibility
+- Use simple status indicators: `[OK]`, `[ERROR]`, `[INFO]`
+
+```bash
+# ✅ CORRECT
+echo "[OK] OroDC installation completed"
+echo "[ERROR] Port conflict detected"
+
+# ❌ WRONG  
+echo "✅ OroDC installation completed"
+echo "🚨 Port conflict detected"
+```
 
 ## Command Reference
 | Task | Command | Notes |
