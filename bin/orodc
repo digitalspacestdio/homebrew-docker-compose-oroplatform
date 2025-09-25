@@ -12,6 +12,10 @@ setup_php_logging() {
   exec 2> >(tee "$err_file")
 }
 
+# Function to display informational messages with consistent formatting
+msg_info() {
+  >&2 echo -e "\033[36m==> $1\033[0m"
+}
 
 # Save original arguments before any processing
 original_args=("$@")
@@ -328,7 +332,7 @@ setup_project_certificates() {
       echo "ℹ️  .crt directory exists but contains no certificate files"
     fi
   else
-    echo "ℹ️  No .crt directory found - building standard image without custom certificates"
+    # Skip certificate message - building standard image silently
   fi
 }
 
@@ -724,7 +728,8 @@ if ! docker network ls --format '{{.Name}}' | grep -qw "$NETWORK_NAME"; then
   >&2 echo -e "\033[36m==> Creating Docker network: $NETWORK_NAME\033[0m"
   docker network create "$NETWORK_NAME"
 else
-  >&2 echo -e "\033[36m==> Docker network '$NETWORK_NAME' already exists\033[0m"
+  # Docker network already exists - skip message
+  true
 fi
 
 if [[ -z $DC_ORO_MODE ]] && [[ "$OSTYPE" == "darwin"* ]]; then
@@ -1409,12 +1414,14 @@ if echo ${args[0]} | grep -i '^cli$' > /dev/null; then
 fi
 
 if echo ${args[0]} | grep -i '^install' | grep -i 'without' | grep -i 'demo' > /dev/null; then
+  msg_info "Starting OroPlatform installation without demo data..."
   export XDEBUG_MODE=off
   ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "[[ -d ${DC_ORO_APPDIR}/var/cache ]] && rm -rf ${DC_ORO_APPDIR}/var/cache/* || true"
   ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "composer install"
   ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "php bin/console --env=prod --timeout=1800 oro:install --language=en --formatting-code=en_US --organization-name='Acme Inc.' --user-name=admin --user-email=admin@example.com --user-firstname=John --user-lastname=Doe --user-password='\$ecretPassw0rd' --application-url='https://${DC_ORO_NAME:-unnamed}.docker.local/' --sample-data=n"
   exit 0
 elif echo ${args[0]} | grep -i '^install$' > /dev/null; then
+  msg_info "Starting OroPlatform installation with sample data..."
   export XDEBUG_MODE=off
   ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "[[ -d ${DC_ORO_APPDIR}/var/cache ]] && rm -rf ${DC_ORO_APPDIR}/var/cache/* || true"
   ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "composer install"
