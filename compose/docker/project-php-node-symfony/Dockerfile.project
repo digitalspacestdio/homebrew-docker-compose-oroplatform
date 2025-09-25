@@ -1,6 +1,7 @@
 # Project-specific Dockerfile that extends base PHP image
 # This Dockerfile can handle both cases: with and without certificates
 # Note: ca-certificates and nss-tools are pre-installed in base images
+# Uses wildcard pattern COPY .cr[t] to optionally copy .crt directory if present
 
 ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
@@ -8,13 +9,13 @@ FROM ${BASE_IMAGE}
 # Switch to root to install certificates if they exist
 USER root
 
-# Copy certificates from build context .crt directory if it exists
-# This will be managed by orodc sync logic
-COPY . /tmp/build-context/
+# Copy certificates from build context .crt directory if it exists (using wildcard pattern)
+# This will be managed by orodc sync logic - copies .crt directory only if present
+COPY .cr[t] /tmp/certs/
 
 # Install certificates if they exist
 RUN set -eux; \
-    if [ -d "/tmp/build-context/.crt" ] && [ "$(ls -A /tmp/build-context/.crt 2>/dev/null | wc -l)" -gt 0 ]; then \
+    if [ -d "/tmp/certs" ] && [ "$(ls -A /tmp/certs 2>/dev/null | wc -l)" -gt 0 ]; then \
         echo "Found certificates, installing..."; \
         mkdir -p /usr/local/share/ca-certificates; \
         \
@@ -28,7 +29,7 @@ RUN set -eux; \
         chown -R ${PHP_USER_NAME:-developer}:${PHP_USER_GROUP:-developer} /home/${PHP_USER_NAME:-developer}/.pki; \
         \
         cert_count=0; \
-        for cert_file in /tmp/build-context/.crt/*; do \
+        for cert_file in /tmp/certs/*; do \
             if [ -f "$cert_file" ]; then \
                 cert_name=$(basename "$cert_file"); \
                 cert_ext="${cert_name##*.}"; \
@@ -84,8 +85,8 @@ RUN set -eux; \
         echo "No certificates found - continuing with base image"; \
     fi; \
     \
-    # Clean up build context
-    rm -rf /tmp/build-context
+    # Clean up certificates directory
+    rm -rf /tmp/certs
 
 # Switch back to application user
 ARG PHP_USER_NAME=developer
