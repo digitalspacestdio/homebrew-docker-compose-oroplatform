@@ -1760,7 +1760,9 @@ if [[ "$first_non_flag_arg" == "purge" ]]; then
   
   # 4. Clean up any remaining containers with project name
   echo "Cleaning up remaining containers..."
-  REMAINING_CONTAINERS=$(${DOCKER_BIN} ps -a --filter "name=${DC_ORO_NAME}_" --format "{{.Names}}" 2>/dev/null || true)
+  # Match exact project name followed by underscore or dash (word boundary)
+  # Patterns: ${PROJECT_NAME}_ or ${PROJECT_NAME}-
+  REMAINING_CONTAINERS=$(${DOCKER_BIN} ps -a --format "{{.Names}}" 2>/dev/null | grep -E "^${DC_ORO_NAME}[_-]" || true)
   if [[ -n "$REMAINING_CONTAINERS" ]]; then
     echo "Removing containers: $REMAINING_CONTAINERS"
     echo "$REMAINING_CONTAINERS" | xargs -r ${DOCKER_BIN} rm -f 2>/dev/null || true
@@ -1768,7 +1770,9 @@ if [[ "$first_non_flag_arg" == "purge" ]]; then
   
   # 5. Clean up any remaining volumes with project name
   echo "Cleaning up remaining volumes..."
-  REMAINING_VOLUMES=$(${DOCKER_BIN} volume ls --filter "name=${DC_ORO_NAME}_" --format "{{.Name}}" 2>/dev/null || true)
+  # Match exact project name followed by underscore (word boundary)
+  # Pattern: ${PROJECT_NAME}_
+  REMAINING_VOLUMES=$(${DOCKER_BIN} volume ls --format "{{.Name}}" 2>/dev/null | grep -E "^${DC_ORO_NAME}_" || true)
   if [[ -n "$REMAINING_VOLUMES" ]]; then
     echo "Removing volumes: $REMAINING_VOLUMES"
     echo "$REMAINING_VOLUMES" | xargs -r ${DOCKER_BIN} volume rm 2>/dev/null || true
