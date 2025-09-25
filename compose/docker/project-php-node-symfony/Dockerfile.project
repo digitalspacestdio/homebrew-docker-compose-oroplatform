@@ -29,11 +29,7 @@ RUN set -eux; \
         chown -R ${PHP_USER_NAME:-developer}:${PHP_USER_GROUP:-developer} /home/${PHP_USER_NAME:-developer}/.pki; \
         \
         cert_count=0; \
-<<<<<<< HEAD
         for cert_file in /tmp/certs/*; do \
-=======
-        for cert_file in /tmp/build-context/.crt/*; do \
->>>>>>> a19b1f5 (feat: Add comprehensive proxy certificate support for PHP containers)
             if [ -f "$cert_file" ]; then \
                 cert_name=$(basename "$cert_file"); \
                 cert_ext="${cert_name##*.}"; \
@@ -89,13 +85,8 @@ RUN set -eux; \
         echo "No certificates found - continuing with base image"; \
     fi; \
     \
-<<<<<<< HEAD
     # Clean up certificates directory
     rm -rf /tmp/certs
-=======
-    # Clean up build context
-    rm -rf /tmp/build-context
->>>>>>> a19b1f5 (feat: Add comprehensive proxy certificate support for PHP containers)
 
 # Switch back to application user
 ARG PHP_USER_NAME=developer
