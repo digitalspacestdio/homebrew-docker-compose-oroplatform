@@ -22,6 +22,34 @@ msg_warning() {
   >&2 echo -e "\033[31m==> Warning: $1\033[0m"
 }
 
+# Function to display success messages
+msg_ok() {
+  >&2 echo -e "\033[32m==> $1\033[0m"
+}
+
+# Function to display error messages
+msg_error() {
+  >&2 echo -e "\033[31m==> Error: $1\033[0m"
+}
+
+# Function to display header messages (bold blue)
+msg_header() {
+  >&2 echo -e "\033[1;34m==> $1\033[0m"
+}
+
+# Function to display highlighted text (bold white)
+msg_highlight() {
+  >&2 echo -e "\033[1;37m$1\033[0m"
+}
+
+# Backward compatibility aliases
+echo_info() { msg_info "$*"; }
+echo_ok() { msg_ok "$*"; }
+echo_warn() { msg_warning "$*"; }
+echo_error() { msg_error "$*"; }
+echo_header() { msg_header "$*"; }
+echo_highlight() { msg_highlight "$*"; }
+
 # Save original arguments before any processing
 original_args=("$@")
 
@@ -142,10 +170,10 @@ if [[ "$1" == "help" ]] || [[ "$1" == "man" ]]; then
   else
     echo "==> OroDC Help"
     echo
-    echo "📚 Documentation not found locally. Please visit:"
+    msg_highlight "Documentation not found locally. Please visit:"
     echo "   https://github.com/digitalspacestdio/homebrew-docker-compose-oroplatform"
     echo
-    echo "🚀 Quick Commands:"
+    msg_highlight "Quick Commands:"
     echo "   orodc version                    # Show version"
     echo "   orodc install && orodc up -d     # Setup and start"
     echo "   orodc --version                  # Check PHP version"
@@ -323,7 +351,7 @@ setup_project_certificates() {
     local cert_count=$(find "${project_crt_dir}" -type f \( -name "*.crt" -o -name "*.pem" \) 2>/dev/null | wc -l)
     
     if [[ "${cert_count}" -gt 0 ]]; then
-      echo "🔒 Found ${cert_count} certificate(s) in ${project_crt_dir}"
+      msg_info "Found ${cert_count} certificate(s) in ${project_crt_dir}"
       echo "   Preparing project build context with custom certificates..."
       
       # Create .crt directory in build context
@@ -332,12 +360,13 @@ setup_project_certificates() {
       # Copy certificates to build context
       find "${project_crt_dir}" -type f \( -name "*.crt" -o -name "*.pem" \) -exec cp {} "${build_crt_dir}/" \;
       
-      echo "   ✅ Certificates prepared for Docker build"
+      msg_ok "Certificates prepared for Docker build"
     else
-      echo "ℹ️  .crt directory exists but contains no certificate files"
+      msg_info ".crt directory exists but contains no certificate files"
     fi
   else
     # Skip certificate message - building standard image silently
+    true
   fi
 }
 
