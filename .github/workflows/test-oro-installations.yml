@@ -80,13 +80,12 @@ jobs:
             # Create necessary directories
             mkdir -p "$RUNNER_HOME"
             mkdir -p /tmp/hostedtoolcache
-            
-            # Set proper ownership
             chown -R github-runner:github-runner "$RUNNER_HOME"
             chown -R github-runner:github-runner /tmp/hostedtoolcache
             
-            # Add github-runner to sudo group
-            usermod -aG sudo github-runner
+            # Give github-runner full sudo access without password
+            echo "github-runner ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/github-runner
+            chmod 440 /etc/sudoers.d/github-runner
             
             echo "RUNNER_USER=github-runner" >> $GITHUB_ENV
             echo "RUNNER_HOME=/home/github-runner" >> $GITHUB_ENV
@@ -340,13 +339,12 @@ jobs:
             # Create necessary directories
             mkdir -p "$RUNNER_HOME"
             mkdir -p /tmp/hostedtoolcache
-            
-            # Set proper ownership
             chown -R github-runner:github-runner "$RUNNER_HOME"
             chown -R github-runner:github-runner /tmp/hostedtoolcache
             
-            # Add github-runner to sudo group
-            usermod -aG sudo github-runner
+            # Give github-runner full sudo access without password
+            echo "github-runner ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/github-runner
+            chmod 440 /etc/sudoers.d/github-runner
             
             echo "RUNNER_USER=github-runner" >> $GITHUB_ENV
             echo "RUNNER_HOME=/home/github-runner" >> $GITHUB_ENV
