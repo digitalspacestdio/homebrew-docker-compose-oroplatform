@@ -57,7 +57,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Setup environment for self-hosted runner
+      - name: Setup non-root user for Homebrew
         run: |
           # Display current environment for debugging
           echo "Current user: $(whoami)"
@@ -65,53 +65,105 @@ jobs:
           echo "Current USER: ${USER:-'not set'}"
           echo "Current PWD: $(pwd)"
           
-          # Set HOME environment variable for self-hosted runners
-          if [ -z "$HOME" ]; then
-            if [ -n "$USER" ]; then
-              export HOME="/home/$USER"
-            else
-              export HOME="/tmp/github-runner-$(whoami)"
-              mkdir -p "$HOME"
+          # Create github-runner user if running as root
+          if [ "$(whoami)" = "root" ]; then
+            # Create user if doesn't exist
+            if ! id "github-runner" &>/dev/null; then
+              useradd -m -s /bin/bash github-runner
+              echo "Created github-runner user"
             fi
+            
+            # Set up environment for github-runner user
+            export RUNNER_USER="github-runner"
+            export RUNNER_HOME="/home/github-runner"
+            
+            # Create necessary directories
+            mkdir -p "$RUNNER_HOME"
+            mkdir -p /tmp/hostedtoolcache
+            
+            # Set proper ownership
+            chown -R github-runner:github-runner "$RUNNER_HOME"
+            chown -R github-runner:github-runner /tmp/hostedtoolcache
+            
+            # Add github-runner to sudo group
+            usermod -aG sudo github-runner
+            
+            echo "RUNNER_USER=github-runner" >> $GITHUB_ENV
+            echo "RUNNER_HOME=/home/github-runner" >> $GITHUB_ENV
+          else
+            # Already running as non-root user
+            export RUNNER_USER="$(whoami)"
+            export RUNNER_HOME="${HOME:-/home/$RUNNER_USER}"
+            
+            mkdir -p "$RUNNER_HOME"
+            mkdir -p /tmp/hostedtoolcache
+            
+            echo "RUNNER_USER=$RUNNER_USER" >> $GITHUB_ENV
+            echo "RUNNER_HOME=$RUNNER_HOME" >> $GITHUB_ENV
           fi
-          echo "HOME=$HOME" >> $GITHUB_ENV
-          echo "USER=$(whoami)" >> $GITHUB_ENV
           
-          # Create necessary directories with proper ownership
-          mkdir -p "$HOME"
-          mkdir -p /tmp/hostedtoolcache
-          
-          # Set proper permissions
-          chmod 755 "$HOME"
-          
-          echo "Environment setup complete: HOME=$HOME USER=$(whoami)"
+          echo "Setup complete: RUNNER_USER=$RUNNER_USER RUNNER_HOME=$RUNNER_HOME"
 
-      - name: Install Homebrew
+      - name: Install Homebrew as non-root user
         run: |
-          # Configure git to use HTTPS instead of SSH BEFORE Homebrew installation
-          git config --global url."https://github.com/".insteadOf git@github.com:
+          # Function to run commands as the runner user
+          run_as_user() {
+            if [ "$(whoami)" = "root" ]; then
+              sudo -u "$RUNNER_USER" -H "$@"
+            else
+              "$@"
+            fi
+          }
           
-          # Install Homebrew (always fresh installation)
-          echo "Installing Homebrew..."
-          NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          # Configure git to use HTTPS instead of SSH
+          run_as_user git config --global url."https://github.com/".insteadOf git@github.com:
+          
+          # Install Homebrew as non-root user
+          echo "Installing Homebrew as user: $RUNNER_USER"
+          run_as_user bash -c 'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+          
+          # Add Homebrew to PATH
           echo "/home/linuxbrew/.linuxbrew/bin" >> $GITHUB_PATH
+          
+          # Verify installation
+          run_as_user /home/linuxbrew/.linuxbrew/bin/brew --version || echo "Homebrew verification failed"
 
-      - name: Install OroDC
+      - name: Install OroDC as non-root user
         run: |
+          # Function to run commands as the runner user
+          run_as_user() {
+            if [ "$(whoami)" = "root" ]; then
+              sudo -u "$RUNNER_USER" -H "$@"
+            else
+              "$@"
+            fi
+          }
+          
           # Install tap first
-          brew tap digitalspacestdio/docker-compose-oroplatform
+          run_as_user /home/linuxbrew/.linuxbrew/bin/brew tap digitalspacestdio/docker-compose-oroplatform
           
           # Copy current source files to tap directory (overwrite with current version)
           TAP_DIR="/home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform"
+          
+          # Ensure tap directory is owned by runner user
+          if [ "$(whoami)" = "root" ]; then
+            chown -R "$RUNNER_USER:$RUNNER_USER" "$TAP_DIR"
+          fi
+          
           cp -r bin/ "$TAP_DIR/"
           cp -r compose/ "$TAP_DIR/"
           cp Formula/docker-compose-oroplatform.rb "$TAP_DIR/Formula/"
           
+          # Fix ownership after copying
+          if [ "$(whoami)" = "root" ]; then
+            chown -R "$RUNNER_USER:$RUNNER_USER" "$TAP_DIR"
+          fi
+          
           # Install OroDC from current source
-          brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform
+          run_as_user /home/linuxbrew/.linuxbrew/bin/brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform
           
           # Verify installation
-          orodc version
+          run_as_user /home/linuxbrew/.linuxbrew/bin/orodc version
 
       - name: Clone Oro application
         run: |
@@ -265,7 +317,7 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Setup environment for self-hosted runner
+      - name: Setup non-root user for Homebrew
         run: |
           # Display current environment for debugging
           echo "Current user: $(whoami)"
@@ -273,53 +325,105 @@ jobs:
           echo "Current USER: ${USER:-'not set'}"
           echo "Current PWD: $(pwd)"
           
-          # Set HOME environment variable for self-hosted runners
-          if [ -z "$HOME" ]; then
-            if [ -n "$USER" ]; then
-              export HOME="/home/$USER"
-            else
-              export HOME="/tmp/github-runner-$(whoami)"
-              mkdir -p "$HOME"
+          # Create github-runner user if running as root
+          if [ "$(whoami)" = "root" ]; then
+            # Create user if doesn't exist
+            if ! id "github-runner" &>/dev/null; then
+              useradd -m -s /bin/bash github-runner
+              echo "Created github-runner user"
             fi
+            
+            # Set up environment for github-runner user
+            export RUNNER_USER="github-runner"
+            export RUNNER_HOME="/home/github-runner"
+            
+            # Create necessary directories
+            mkdir -p "$RUNNER_HOME"
+            mkdir -p /tmp/hostedtoolcache
+            
+            # Set proper ownership
+            chown -R github-runner:github-runner "$RUNNER_HOME"
+            chown -R github-runner:github-runner /tmp/hostedtoolcache
+            
+            # Add github-runner to sudo group
+            usermod -aG sudo github-runner
+            
+            echo "RUNNER_USER=github-runner" >> $GITHUB_ENV
+            echo "RUNNER_HOME=/home/github-runner" >> $GITHUB_ENV
+          else
+            # Already running as non-root user
+            export RUNNER_USER="$(whoami)"
+            export RUNNER_HOME="${HOME:-/home/$RUNNER_USER}"
+            
+            mkdir -p "$RUNNER_HOME"
+            mkdir -p /tmp/hostedtoolcache
+            
+            echo "RUNNER_USER=$RUNNER_USER" >> $GITHUB_ENV
+            echo "RUNNER_HOME=$RUNNER_HOME" >> $GITHUB_ENV
           fi
-          echo "HOME=$HOME" >> $GITHUB_ENV
-          echo "USER=$(whoami)" >> $GITHUB_ENV
           
-          # Create necessary directories with proper ownership
-          mkdir -p "$HOME"
-          mkdir -p /tmp/hostedtoolcache
-          
-          # Set proper permissions
-          chmod 755 "$HOME"
-          
-          echo "Environment setup complete: HOME=$HOME USER=$(whoami)"
+          echo "Setup complete: RUNNER_USER=$RUNNER_USER RUNNER_HOME=$RUNNER_HOME"
 
-      - name: Install Homebrew
+      - name: Install Homebrew as non-root user
         run: |
-          # Configure git to use HTTPS instead of SSH BEFORE Homebrew installation
-          git config --global url."https://github.com/".insteadOf git@github.com:
+          # Function to run commands as the runner user
+          run_as_user() {
+            if [ "$(whoami)" = "root" ]; then
+              sudo -u "$RUNNER_USER" -H "$@"
+            else
+              "$@"
+            fi
+          }
           
-          # Install Homebrew (always fresh installation)
-          echo "Installing Homebrew..."
-          NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          # Configure git to use HTTPS instead of SSH
+          run_as_user git config --global url."https://github.com/".insteadOf git@github.com:
+          
+          # Install Homebrew as non-root user
+          echo "Installing Homebrew as user: $RUNNER_USER"
+          run_as_user bash -c 'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+          
+          # Add Homebrew to PATH
           echo "/home/linuxbrew/.linuxbrew/bin" >> $GITHUB_PATH
+          
+          # Verify installation
+          run_as_user /home/linuxbrew/.linuxbrew/bin/brew --version || echo "Homebrew verification failed"
 
-      - name: Install OroDC
+      - name: Install OroDC as non-root user
         run: |
+          # Function to run commands as the runner user
+          run_as_user() {
+            if [ "$(whoami)" = "root" ]; then
+              sudo -u "$RUNNER_USER" -H "$@"
+            else
+              "$@"
+            fi
+          }
+          
           # Install tap first
-          brew tap digitalspacestdio/docker-compose-oroplatform
+          run_as_user /home/linuxbrew/.linuxbrew/bin/brew tap digitalspacestdio/docker-compose-oroplatform
           
           # Copy current source files to tap directory (overwrite with current version)
           TAP_DIR="/home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform"
+          
+          # Ensure tap directory is owned by runner user
+          if [ "$(whoami)" = "root" ]; then
+            chown -R "$RUNNER_USER:$RUNNER_USER" "$TAP_DIR"
+          fi
+          
           cp -r bin/ "$TAP_DIR/"
           cp -r compose/ "$TAP_DIR/"
           cp Formula/docker-compose-oroplatform.rb "$TAP_DIR/Formula/"
           
+          # Fix ownership after copying
+          if [ "$(whoami)" = "root" ]; then
+            chown -R "$RUNNER_USER:$RUNNER_USER" "$TAP_DIR"
+          fi
+          
           # Install OroDC from current source
-          brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform
+          run_as_user /home/linuxbrew/.linuxbrew/bin/brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform
           
           # Verify installation
-          orodc version
+          run_as_user /home/linuxbrew/.linuxbrew/bin/orodc version
 
       - name: Clone Oro application
         run: |
