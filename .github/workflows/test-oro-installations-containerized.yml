@@ -30,8 +30,8 @@ env:
   DC_ORO_MODE: ssh
 
 jobs:
-  # Test installations in isolated containers  
-  test-installations:
+  # Test installations in isolated containers - X64
+  test-installations-x64:
     runs-on: [self-hosted, Linux, X64]
     strategy:
       fail-fast: false
@@ -62,7 +62,7 @@ jobs:
         DC_ORO_MODE: ssh
     
     timeout-minutes: 90
-    name: Test ${{ matrix.application }} (${{ matrix.version }}) [Containerized]
+    name: Test ${{ matrix.application }} (${{ matrix.version }}) [X64-Containerized]
     
     steps:
       - name: Checkout repository
@@ -205,3 +205,210 @@ jobs:
           rm -rf "$TEST_DIR" 2>/dev/null || true
           
           echo "✅ Cleanup completed for ${{ matrix.application }}"
+
+  # Test installations in isolated containers - ARM64
+  test-installations-arm64:
+    runs-on: [self-hosted, Linux, ARM64]
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include:
+          - application: oroplatform
+            version: 6.1.4
+            repo_url: https://github.com/oroinc/platform-application.git
+          - application: orocrm
+            version: 6.1.4
+            repo_url: https://github.com/oroinc/crm-application.git
+          - application: orocommerce
+            version: 6.1.4
+            repo_url: https://github.com/oroinc/orocommerce-application.git
+          - application: marello
+            version: 6.1.0
+            repo_url: https://github.com/marellocommerce/marello-application.git
+    
+    # Use containerized runner with Docker-in-Docker
+    container:
+      image: myoung34/github-runner:latest
+      options: --privileged -v /var/run/docker.sock:/var/run/docker.sock
+      env:
+        HOMEBREW_NO_AUTO_UPDATE: 1
+        HOMEBREW_NO_INSTALL_CLEANUP: 1
+        HOMEBREW_NO_ANALYTICS: 1
+        DC_ORO_MODE: ssh
+    
+    timeout-minutes: 90
+    name: Test ${{ matrix.application }} (${{ matrix.version }}) [ARM64-Containerized]
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        
+      - name: Setup container environment
+        run: |
+          echo "🏗️ Setting up containerized test environment [ARM64]"
+          echo "Application: ${{ matrix.application }}"
+          echo "Version: ${{ matrix.version }}"
+          echo "Current user: $(whoami)"
+          echo "Working directory: $(pwd)" 
+          echo "Docker version: $(docker --version || echo 'Docker not available')"
+          echo "Architecture: $(uname -m)"
+          echo "Available space: $(df -h /tmp 2>/dev/null || echo 'Cannot check space')"
+          
+          # Setup runner user if needed
+          if [ "$(whoami)" = "root" ]; then
+            useradd -m -s /bin/bash runner || true
+            usermod -aG docker runner 2>/dev/null || true
+            echo "Created runner user"
+          fi
+          
+      - name: Install Homebrew and OroDC
+        run: |
+          echo "🍺 Installing Homebrew in isolated container [ARM64]..."
+          
+          # Ensure we have a proper HOME directory
+          export HOME="${HOME:-/home/runner}"
+          mkdir -p "$HOME"
+          
+          # Install Homebrew if not present
+          if ! command -v brew &> /dev/null; then
+            echo "Installing Homebrew..."
+            NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+          fi
+          
+          # Setup Homebrew PATH
+          export PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:$PATH"
+          echo "PATH=$PATH" >> $GITHUB_ENV
+          
+          # Verify Homebrew
+          brew --version
+          
+          # Install OroDC tap
+          echo "📦 Installing OroDC tap..."
+          brew tap digitalspacestdio/docker-compose-oroplatform
+          
+          # Copy current source to tap directory for testing
+          TAP_DIR="/home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform"
+          echo "📁 Copying source to: $TAP_DIR"
+          cp -r "$GITHUB_WORKSPACE"/* "$TAP_DIR/"
+          
+          # Install OroDC
+          echo "🔧 Installing OroDC..."
+          brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform
+          
+          # Verify installation
+          /home/linuxbrew/.linuxbrew/bin/orodc version
+          echo "✅ OroDC installation completed [ARM64]"
+          
+      - name: Test ${{ matrix.application }} installation
+        run: |
+          echo "🚀 Testing ${{ matrix.application }} installation in isolated container [ARM64]..."
+          
+          # Setup PATH
+          export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
+          
+          # Create unique test workspace  
+          TEST_DIR="/tmp/${{ matrix.application }}-test-${{ github.run_id }}-arm64-$$"
+          mkdir -p "$TEST_DIR"
+          cd "$TEST_DIR"
+          echo "📁 Working in: $TEST_DIR [ARM64]"
+          
+          # Clone application
+          echo "📥 Cloning ${{ matrix.application }} v${{ matrix.version }}..."
+          git clone --single-branch --branch ${{ matrix.version }} \
+            ${{ matrix.repo_url }} .
+            
+          # Configure git for HTTPS
+          git config --global url."https://github.com/".insteadOf git@github.com:
+          
+          # Configure OroDC for containerized environment
+          echo "⚙️  Configuring OroDC for SSH mode..."
+          echo "DC_ORO_MODE=ssh" > .env.orodc
+          
+          # Install and start application
+          echo "⚙️  Installing ${{ matrix.application }}..."
+          orodc install
+          
+          echo "🚀 Starting services..."  
+          orodc up -d
+          
+          # Wait for services with timeout
+          echo "⏳ Waiting for services to start (max 5 minutes)..."
+          timeout 300 bash -c '
+            while ! orodc ps | grep -q "Up"; do
+              echo "Services starting... $(date)"
+              sleep 10
+            done
+          ' || {
+            echo "❌ Services failed to start within timeout"
+            orodc logs --tail=20
+            exit 1
+          }
+          
+          # Health checks
+          echo "🩺 Performing health checks [ARM64]..."
+          echo "Container status:"
+          orodc ps
+          
+          echo "PHP version:"
+          orodc php --version
+          
+          echo "Database connection:"
+          orodc psql -c "SELECT version();" || echo "⚠️  Database check failed"
+          
+          echo "✅ ${{ matrix.application }} test completed successfully [ARM64]!"
+          
+      - name: Cleanup test environment
+        if: always()
+        run: |
+          echo "🧹 Cleaning up ${{ matrix.application }} test environment [ARM64]..."
+          
+          export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
+          
+          # Navigate to test directory and cleanup
+          TEST_DIR="/tmp/${{ matrix.application }}-test-${{ github.run_id }}-arm64-$$"
+          cd "$TEST_DIR" 2>/dev/null || true
+          
+          # Stop and remove containers
+          orodc down --remove-orphans 2>/dev/null || true
+          orodc purge 2>/dev/null || true
+          
+          # Remove test directory
+          cd / 
+          rm -rf "$TEST_DIR" 2>/dev/null || true
+          
+          echo "✅ Cleanup completed for ${{ matrix.application }} [ARM64]"
+
+  # Test summary for both architectures
+  test-summary:
+    needs: [test-installations-x64, test-installations-arm64]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Test Summary
+        run: |
+          echo "## Containerized Installation Test Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          X64_RESULT="${{ needs.test-installations-x64.result }}"
+          ARM64_RESULT="${{ needs.test-installations-arm64.result }}"
+          
+          if [ "$X64_RESULT" = "success" ] && [ "$ARM64_RESULT" = "success" ]; then
+            echo "✅ All containerized installation tests passed successfully on both architectures!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Some containerized installation tests failed. Check the job logs for details." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Results by Architecture:" >> $GITHUB_STEP_SUMMARY
+            echo "- **X64 (AMD64)**: $X64_RESULT" >> $GITHUB_STEP_SUMMARY
+            echo "- **ARM64**: $ARM64_RESULT" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Tested Applications (Containerized):" >> $GITHUB_STEP_SUMMARY
+          echo "- 🏗️ **Isolation**: Each test runs in myoung34/github-runner container" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔧 **Mode**: OroDC SSH mode for Docker-in-Docker compatibility" >> $GITHUB_STEP_SUMMARY
+          echo "- 📦 **Applications**:" >> $GITHUB_STEP_SUMMARY  
+          echo "  - oroplatform (6.1.4) - tested on X64 and ARM64" >> $GITHUB_STEP_SUMMARY
+          echo "  - orocrm (6.1.4) - tested on X64 and ARM64" >> $GITHUB_STEP_SUMMARY
+          echo "  - orocommerce (6.1.4) - tested on X64 and ARM64" >> $GITHUB_STEP_SUMMARY
+          echo "  - marello (6.1.0) - tested on X64 and ARM64" >> $GITHUB_STEP_SUMMARY
