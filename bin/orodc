@@ -14,32 +14,32 @@ setup_php_logging() {
 
 # Function to display informational messages with consistent formatting
 msg_info() {
-  >&2 echo -e "\033[36m==> $1\033[0m"
+  echo -e "\033[36m==> $1\033[0m" >&2
 }
 
 # Function to display warning messages
 msg_warning() {
-  >&2 echo -e "\033[31m==> Warning: $1\033[0m"
+  echo -e "\033[31m==> Warning: $1\033[0m" >&2
 }
 
 # Function to display success messages
 msg_ok() {
-  >&2 echo -e "\033[32m==> $1\033[0m"
+  echo -e "\033[32m==> $1\033[0m" >&2
 }
 
 # Function to display error messages
 msg_error() {
-  >&2 echo -e "\033[31m==> Error: $1\033[0m"
+  echo -e "\033[31m==> Error: $1\033[0m" >&2
 }
 
 # Function to display header messages (bold blue)
 msg_header() {
-  >&2 echo -e "\033[1;34m==> $1\033[0m"
+  echo -e "\033[1;34m==> $1\033[0m" >&2
 }
 
 # Function to display highlighted text (bold white)
 msg_highlight() {
-  >&2 echo -e "\033[1;37m$1\033[0m"
+  echo -e "\033[1;37m$1\033[0m" >&2
 }
 
 # Backward compatibility aliases
@@ -72,7 +72,7 @@ resolve_bin() {
         if [[ -x "$brew_path" ]]; then
           found_path="$brew_path"
           msg_warning "$bin_name found at $found_path but not in PATH"
-          echo "   Add to PATH: export PATH=\"$(dirname "$found_path"):\$PATH\""
+          echo "   Add to PATH: export PATH=\"$(dirname "$found_path"):\$PATH\"" >&2
           echo "$found_path"
           return 0
         fi
@@ -95,33 +95,33 @@ resolve_bin() {
   msg_error "$bin_name not found in PATH or common locations"
   
   if [[ -n "$install_msg" ]]; then
-    echo "   $install_msg"
+    echo "   $install_msg" >&2
   else
     # Default install instructions
     case "$bin_name" in
       "docker")
-        echo "   Install: curl -fsSL https://get.docker.com | sh"
-        echo "   Or visit: https://docs.docker.com/engine/install/"
+        echo "   Install: curl -fsSL https://get.docker.com | sh" >&2
+        echo "   Or visit: https://docs.docker.com/engine/install/" >&2
         ;;
       "brew")
-        echo "   Install: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
-        echo "   Then add to PATH: export PATH=\"/home/linuxbrew/.linuxbrew/bin:\$PATH\""
+        echo "   Install: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\"" >&2
+        echo "   Then add to PATH: export PATH=\"/home/linuxbrew/.linuxbrew/bin:\$PATH\"" >&2
         ;;
       "rsync")
-        echo "   Install: sudo apt-get install rsync  # Ubuntu/Debian"
-        echo "   Or: brew install rsync"
+        echo "   Install: sudo apt-get install rsync  # Ubuntu/Debian" >&2
+        echo "   Or: brew install rsync" >&2
         ;;
       "jq")
-        echo "   Install: sudo apt-get install jq  # Ubuntu/Debian"
-        echo "   Or: brew install jq"
+        echo "   Install: sudo apt-get install jq  # Ubuntu/Debian" >&2
+        echo "   Or: brew install jq" >&2
         ;;
       *)
-        echo "   Please install $bin_name and ensure it's in your PATH"
+        echo "   Please install $bin_name and ensure it's in your PATH" >&2
         ;;
     esac
   fi
   
-  echo
+  echo >&2
   msg_error "OroDC cannot continue without $bin_name"
   exit 1
 }
