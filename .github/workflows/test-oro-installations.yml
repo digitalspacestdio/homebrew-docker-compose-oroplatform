@@ -32,7 +32,7 @@ jobs:
     runs-on: [self-hosted, Linux, X64]
     strategy:
       fail-fast: false
-      max-parallel: 2  # Run up to 2 jobs in parallel on X64
+      max-parallel: 4  # Run up to 4 jobs in parallel on X64
       matrix:
         include:
           - application: oroplatform
@@ -436,7 +436,7 @@ jobs:
     runs-on: [self-hosted, Linux, ARM64]
     strategy:
       fail-fast: false
-      max-parallel: 2  # Run up to 2 jobs in parallel on ARM64
+      max-parallel: 4  # Run up to 4 jobs in parallel on ARM64
       matrix:
         include:
           - application: oroplatform
