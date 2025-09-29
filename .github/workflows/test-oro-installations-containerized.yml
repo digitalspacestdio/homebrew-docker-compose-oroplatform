@@ -138,7 +138,7 @@ jobs:
           
             # Create unique test workspace with random port suffix to avoid conflicts
             RANDOM_SUFFIX=$(( RANDOM % 1000 ))
-            TEST_DIR="/tmp/${{ matrix.application }}-test-${{ github.run_id }}-${RANDOM_SUFFIX}-$$"
+            TEST_DIR="${{ github.workspace }}/${{ matrix.application }}-test-${{ github.run_id }}-${RANDOM_SUFFIX}"
             mkdir -p "$TEST_DIR"
             cd "$TEST_DIR"
             echo "📁 Working in: $TEST_DIR"
@@ -201,17 +201,17 @@ jobs:
           
           export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
           
-          # Navigate to test directory and cleanup
-          TEST_DIR="/tmp/${{ matrix.application }}-test-${{ github.run_id }}-$$"
-          cd "$TEST_DIR" 2>/dev/null || true
+          # Navigate to test directory and cleanup  
+          TEST_DIR="${{ github.workspace }}/${{ matrix.application }}-test-${{ github.run_id }}-*"
+          cd $(dirname "$TEST_DIR") 2>/dev/null || true
           
           # Stop and remove containers
           orodc down --remove-orphans 2>/dev/null || true
           orodc purge 2>/dev/null || true
           
-          # Remove test directory
-          cd / 
-          rm -rf "$TEST_DIR" 2>/dev/null || true
+          # Remove test directories
+          cd ${{ github.workspace }}
+          rm -rf ${{ matrix.application }}-test-${{ github.run_id }}-* 2>/dev/null || true
           
           # Cleanup Docker containers and volumes by build ID pattern
           echo "🐳 Cleaning up Docker containers for build ${{ github.run_id }}..."
@@ -337,7 +337,7 @@ jobs:
             
             # Create unique test workspace with random port suffix to avoid conflicts
             RANDOM_SUFFIX=$(( RANDOM % 1000 ))
-            TEST_DIR="/tmp/${{ matrix.application }}-test-${{ github.run_id }}-arm64-${RANDOM_SUFFIX}-$$"
+            TEST_DIR="${{ github.workspace }}/${{ matrix.application }}-test-${{ github.run_id }}-arm64-${RANDOM_SUFFIX}"
             mkdir -p "$TEST_DIR"
             cd "$TEST_DIR"
             echo "📁 Working in: $TEST_DIR [ARM64]"
@@ -397,16 +397,16 @@ jobs:
           export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
           
           # Navigate to test directory and cleanup
-          TEST_DIR="/tmp/${{ matrix.application }}-test-${{ github.run_id }}-arm64-$$"
-          cd "$TEST_DIR" 2>/dev/null || true
+          TEST_DIR="${{ github.workspace }}/${{ matrix.application }}-test-${{ github.run_id }}-arm64-*"
+          cd $(dirname "$TEST_DIR") 2>/dev/null || true
           
           # Stop and remove containers
           orodc down --remove-orphans 2>/dev/null || true
           orodc purge 2>/dev/null || true
           
-          # Remove test directory
-          cd / 
-          rm -rf "$TEST_DIR" 2>/dev/null || true
+          # Remove test directories
+          cd ${{ github.workspace }}
+          rm -rf ${{ matrix.application }}-test-${{ github.run_id }}-* 2>/dev/null || true
           
           # Cleanup Docker containers and volumes by build ID pattern
           echo "🐳 Cleaning up Docker containers for build ${{ github.run_id }} [ARM64]..."
