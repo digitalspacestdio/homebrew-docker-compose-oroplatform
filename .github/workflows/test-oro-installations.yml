@@ -24,6 +24,8 @@ on:
 env:
   HOMEBREW_NO_AUTO_UPDATE: 1
   HOMEBREW_NO_INSTALL_CLEANUP: 1
+  HOMEBREW_NO_ANALYTICS: 1
+  RUNNER_TOOL_CACHE: /tmp/hostedtoolcache
 
 jobs:
   test-installation-x64:
@@ -54,6 +56,35 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Setup environment for self-hosted runner
+        run: |
+          # Display current environment for debugging
+          echo "Current user: $(whoami)"
+          echo "Current HOME: ${HOME:-'not set'}"
+          echo "Current USER: ${USER:-'not set'}"
+          echo "Current PWD: $(pwd)"
+          
+          # Set HOME environment variable for self-hosted runners
+          if [ -z "$HOME" ]; then
+            if [ -n "$USER" ]; then
+              export HOME="/home/$USER"
+            else
+              export HOME="/tmp/github-runner-$(whoami)"
+              mkdir -p "$HOME"
+            fi
+          fi
+          echo "HOME=$HOME" >> $GITHUB_ENV
+          echo "USER=$(whoami)" >> $GITHUB_ENV
+          
+          # Create necessary directories with proper ownership
+          mkdir -p "$HOME"
+          mkdir -p /tmp/hostedtoolcache
+          
+          # Set proper permissions
+          chmod 755 "$HOME"
+          
+          echo "Environment setup complete: HOME=$HOME USER=$(whoami)"
 
       - name: Install Homebrew
         run: |
@@ -233,6 +264,35 @@ jobs:
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
+
+      - name: Setup environment for self-hosted runner
+        run: |
+          # Display current environment for debugging
+          echo "Current user: $(whoami)"
+          echo "Current HOME: ${HOME:-'not set'}"
+          echo "Current USER: ${USER:-'not set'}"
+          echo "Current PWD: $(pwd)"
+          
+          # Set HOME environment variable for self-hosted runners
+          if [ -z "$HOME" ]; then
+            if [ -n "$USER" ]; then
+              export HOME="/home/$USER"
+            else
+              export HOME="/tmp/github-runner-$(whoami)"
+              mkdir -p "$HOME"
+            fi
+          fi
+          echo "HOME=$HOME" >> $GITHUB_ENV
+          echo "USER=$(whoami)" >> $GITHUB_ENV
+          
+          # Create necessary directories with proper ownership
+          mkdir -p "$HOME"
+          mkdir -p /tmp/hostedtoolcache
+          
+          # Set proper permissions
+          chmod 755 "$HOME"
+          
+          echo "Environment setup complete: HOME=$HOME USER=$(whoami)"
 
       - name: Install Homebrew
         run: |
