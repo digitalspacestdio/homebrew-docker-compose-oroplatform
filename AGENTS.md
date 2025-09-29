@@ -48,6 +48,35 @@ This document contains guidelines for AI agents working with the homebrew-docker
 
 ### ❌ **NEVER work directly in master/main!**
 
+### 🚫 **CRITICAL: NEVER push directly to master/main!**
+
+**⛔ ABSOLUTELY FORBIDDEN:**
+```bash
+# NEVER DO THIS! NEVER!
+git checkout master
+git merge some-branch
+git push origin master     # ❌ FORBIDDEN!
+```
+
+**✅ ALWAYS use Pull Requests:**
+```bash
+# ✅ CORRECT: Push branch and create PR
+git push -u origin feature/my-feature
+# Then create Pull Request via GitHub interface
+```
+
+**Why this rule exists:**
+- 🔍 **Code Review**: Every change must be reviewed
+- 🛡️ **Quality Control**: Prevent breaking changes
+- 📝 **Documentation**: Maintain clear change history  
+- 🤝 **Collaboration**: Allow team discussion
+- 🔄 **CI/CD**: Automated testing before merge
+
+**⚠️ If you accidentally pushed to master:**
+1. Immediately notify the team
+2. Create rollback PR if needed
+3. Follow proper branch workflow for future changes
+
 ### 📛 If you accidentally worked in master:
 
 1. **Create a branch from current state:**
