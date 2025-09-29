@@ -26,6 +26,8 @@ env:
   HOMEBREW_NO_AUTO_UPDATE: 1
   HOMEBREW_NO_INSTALL_CLEANUP: 1
   HOMEBREW_NO_ANALYTICS: 1
+  # OroDC containerized mode
+  DC_ORO_MODE: ssh
 
 jobs:
   # Test installations in isolated containers  
@@ -57,6 +59,7 @@ jobs:
         HOMEBREW_NO_AUTO_UPDATE: 1
         HOMEBREW_NO_INSTALL_CLEANUP: 1
         HOMEBREW_NO_ANALYTICS: 1
+        DC_ORO_MODE: ssh
     
     timeout-minutes: 90
     name: Test ${{ matrix.application }} (${{ matrix.version }}) [Containerized]
@@ -140,6 +143,10 @@ jobs:
             
           # Configure git for HTTPS
           git config --global url."https://github.com/".insteadOf git@github.com:
+          
+          # Configure OroDC for containerized environment
+          echo "⚙️  Configuring OroDC for SSH mode..."
+          echo "DC_ORO_MODE=ssh" > .env.orodc
           
           # Install and start application
           echo "⚙️  Installing ${{ matrix.application }}..."
