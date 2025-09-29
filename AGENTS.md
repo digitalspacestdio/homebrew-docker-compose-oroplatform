@@ -6,14 +6,34 @@ This document contains guidelines for AI agents working with the homebrew-docker
 
 # Git Workflow Guidelines
 
+## 🔄 **Upstream Repository Management**
+
+### 📍 **CRITICAL: Identify Your Upstream**
+If you see a remote called `main` or `upstream` in your `git remote -v` output, this is the **main upstream repository**:
+```bash
+git remote -v
+# main      git@github.com:digitalspacestdio/homebrew-docker-compose-oroplatform.git
+# origin    git@github.com:YOUR-USERNAME/homebrew-docker-compose-oroplatform.git
+```
+
+**ALWAYS sync with the upstream FIRST:**
+```bash
+# Update from upstream (main remote)
+git fetch --all
+git checkout master
+git pull main master    # NOT origin master!
+git push origin master  # Update your fork
+```
+
 ## 🌿 **ALWAYS work in branches!**
 
 ### ✅ Correct workflow:
 
-1. **Start from master/main:**
+1. **Start from master/main (updated from upstream):**
    ```bash
    git checkout master
-   git pull origin master
+   git pull main master    # Pull from upstream, not origin
+   git push origin master  # Update your fork
    ```
 
 2. **Create a new branch for your task:**
