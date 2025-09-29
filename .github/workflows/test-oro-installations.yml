@@ -203,30 +203,61 @@ jobs:
 
       - name: Install and start application
         run: |
+          # Setup environment for this step
+          if [ "$(whoami)" = "root" ]; then
+            export RUNNER_USER="github-runner"
+            export RUNNER_HOME="/home/github-runner"
+            run_as_user() { sudo -u "$RUNNER_USER" -H "$@"; }
+          else
+            export RUNNER_USER="$(whoami)"
+            export RUNNER_HOME="${HOME:-/home/$RUNNER_USER}"
+            run_as_user() { "$@"; }
+          fi
+          
           cd "${{ github.workspace }}/${{ matrix.application }}-${{ github.run_id }}-x64"
           echo "🚀 Starting installation of ${{ matrix.application }} [X64]..."
           echo "📁 Working in: $(pwd)"
           
           # Install the application
-          orodc install
+          run_as_user /home/linuxbrew/.linuxbrew/bin/orodc install
           
           # Start services
-          orodc up -d
+          run_as_user /home/linuxbrew/.linuxbrew/bin/orodc up -d
           
           echo "✅ Installation completed [X64]"
 
       - name: Wait for services to be ready
         run: |
+          # Setup environment for this step
+          if [ "$(whoami)" = "root" ]; then
+            export RUNNER_USER="github-runner"
+            export RUNNER_HOME="/home/github-runner"
+            run_as_user() { sudo -u "$RUNNER_USER" -H "$@"; }
+          else
+            export RUNNER_USER="$(whoami)"
+            export RUNNER_HOME="${HOME:-/home/$RUNNER_USER}"
+            run_as_user() { "$@"; }
+          fi
+          
           cd "${{ github.workspace }}/${{ matrix.application }}-${{ github.run_id }}-x64"
           echo "⏳ Waiting for services to start [X64]..."
           
           # Wait up to 10 minutes for services to be ready
-          timeout 600 bash -c '
-            while ! orodc ps | grep -q "Up"; do
-              echo "Waiting for services..."
-              sleep 10
-            done
-          '
+          if [ "$(whoami)" = "root" ]; then
+            timeout 600 bash -c '
+              while ! sudo -u github-runner -H /home/linuxbrew/.linuxbrew/bin/orodc ps | grep -q "Up"; do
+                echo "Waiting for services..."
+                sleep 10
+              done
+            '
+          else
+            timeout 600 bash -c '
+              while ! /home/linuxbrew/.linuxbrew/bin/orodc ps | grep -q "Up"; do
+                echo "Waiting for services..."
+                sleep 10
+              done
+            '
+          fi
           
           echo "✅ Services are running [X64]"
 
@@ -253,39 +284,64 @@ jobs:
 
       - name: Run basic health checks
         run: |
+          # Setup environment for this step
+          if [ "$(whoami)" = "root" ]; then
+            export RUNNER_USER="github-runner"
+            export RUNNER_HOME="/home/github-runner"
+            run_as_user() { sudo -u "$RUNNER_USER" -H "$@"; }
+          else
+            export RUNNER_USER="$(whoami)"
+            export RUNNER_HOME="${HOME:-/home/$RUNNER_USER}"
+            run_as_user() { "$@"; }
+          fi
+          
           cd "${{ github.workspace }}/${{ matrix.application }}-${{ github.run_id }}-x64"
           echo "🔍 Running health checks [X64]..."
           
           # Check container status
           echo "📋 Container status:"
-          orodc ps
+          run_as_user /home/linuxbrew/.linuxbrew/bin/orodc ps
           
           # Check PHP version
           echo "🐘 PHP version:"
-          orodc php --version
+          run_as_user /home/linuxbrew/.linuxbrew/bin/orodc php --version
           
           # Check database connection
           echo "🗄️  Database connection:"
-          orodc psql -c "SELECT version();" || echo "Database check failed"
+          run_as_user /home/linuxbrew/.linuxbrew/bin/orodc psql -c "SELECT version();" || echo "Database check failed"
           
           echo "✅ Health checks completed [X64]"
 
       - name: Cleanup on failure
         if: failure()
         run: |
+          # Setup environment for this step
+          if [ "$(whoami)" = "root" ]; then
+            run_as_user() { sudo -u "github-runner" -H "$@"; }
+          else
+            run_as_user() { "$@"; }
+          fi
+          
           cd "${{ github.workspace }}/${{ matrix.application }}-${{ github.run_id }}-x64" 2>/dev/null || true
           echo "🧹 Cleaning up after failure [X64]..."
-          orodc logs --tail=50 || true
-          orodc down --remove-orphans || true
-          orodc purge || true
+          run_as_user /home/linuxbrew/.linuxbrew/bin/orodc logs --tail=50 || true
+          run_as_user /home/linuxbrew/.linuxbrew/bin/orodc down --remove-orphans || true
+          run_as_user /home/linuxbrew/.linuxbrew/bin/orodc purge || true
 
       - name: Cleanup on success
         if: success()
         run: |
+          # Setup environment for this step
+          if [ "$(whoami)" = "root" ]; then
+            run_as_user() { sudo -u "github-runner" -H "$@"; }
+          else
+            run_as_user() { "$@"; }
+          fi
+          
           cd "${{ github.workspace }}/${{ matrix.application }}-${{ github.run_id }}-x64" 2>/dev/null || true
           echo "🧹 Cleaning up after success [X64]..."
-          orodc down --remove-orphans || true
-          orodc purge || true
+          run_as_user /home/linuxbrew/.linuxbrew/bin/orodc down --remove-orphans || true
+          run_as_user /home/linuxbrew/.linuxbrew/bin/orodc purge || true
 
   test-installation-arm64:
     runs-on: [self-hosted, Linux, ARM64]
@@ -462,30 +518,61 @@ jobs:
 
       - name: Install and start application
         run: |
+          # Setup environment for this step
+          if [ "$(whoami)" = "root" ]; then
+            export RUNNER_USER="github-runner"
+            export RUNNER_HOME="/home/github-runner"
+            run_as_user() { sudo -u "$RUNNER_USER" -H "$@"; }
+          else
+            export RUNNER_USER="$(whoami)"
+            export RUNNER_HOME="${HOME:-/home/$RUNNER_USER}"
+            run_as_user() { "$@"; }
+          fi
+          
           cd "${{ github.workspace }}/${{ matrix.application }}-${{ github.run_id }}-arm64"
           echo "🚀 Starting installation of ${{ matrix.application }} [ARM64]..."
           echo "📁 Working in: $(pwd)"
           
           # Install the application
-          orodc install
+          run_as_user /home/linuxbrew/.linuxbrew/bin/orodc install
           
           # Start services
-          orodc up -d
+          run_as_user /home/linuxbrew/.linuxbrew/bin/orodc up -d
           
           echo "✅ Installation completed [ARM64]"
 
       - name: Wait for services to be ready
         run: |
+          # Setup environment for this step
+          if [ "$(whoami)" = "root" ]; then
+            export RUNNER_USER="github-runner"
+            export RUNNER_HOME="/home/github-runner"
+            run_as_user() { sudo -u "$RUNNER_USER" -H "$@"; }
+          else
+            export RUNNER_USER="$(whoami)"
+            export RUNNER_HOME="${HOME:-/home/$RUNNER_USER}"
+            run_as_user() { "$@"; }
+          fi
+          
           cd "${{ github.workspace }}/${{ matrix.application }}-${{ github.run_id }}-arm64"
           echo "⏳ Waiting for services to start [ARM64]..."
           
           # Wait up to 10 minutes for services to be ready
-          timeout 600 bash -c '
-            while ! orodc ps | grep -q "Up"; do
-              echo "Waiting for services..."
-              sleep 10
-            done
-          '
+          if [ "$(whoami)" = "root" ]; then
+            timeout 600 bash -c '
+              while ! sudo -u github-runner -H /home/linuxbrew/.linuxbrew/bin/orodc ps | grep -q "Up"; do
+                echo "Waiting for services..."
+                sleep 10
+              done
+            '
+          else
+            timeout 600 bash -c '
+              while ! /home/linuxbrew/.linuxbrew/bin/orodc ps | grep -q "Up"; do
+                echo "Waiting for services..."
+                sleep 10
+              done
+            '
+          fi
           
           echo "✅ Services are running [ARM64]"
 
@@ -512,39 +599,64 @@ jobs:
 
       - name: Run basic health checks
         run: |
+          # Setup environment for this step
+          if [ "$(whoami)" = "root" ]; then
+            export RUNNER_USER="github-runner"
+            export RUNNER_HOME="/home/github-runner"
+            run_as_user() { sudo -u "$RUNNER_USER" -H "$@"; }
+          else
+            export RUNNER_USER="$(whoami)"
+            export RUNNER_HOME="${HOME:-/home/$RUNNER_USER}"
+            run_as_user() { "$@"; }
+          fi
+          
           cd "${{ github.workspace }}/${{ matrix.application }}-${{ github.run_id }}-arm64"
           echo "🔍 Running health checks [ARM64]..."
           
           # Check container status
           echo "📋 Container status:"
-          orodc ps
+          run_as_user /home/linuxbrew/.linuxbrew/bin/orodc ps
           
           # Check PHP version
           echo "🐘 PHP version:"
-          orodc php --version
+          run_as_user /home/linuxbrew/.linuxbrew/bin/orodc php --version
           
           # Check database connection
           echo "🗄️  Database connection:"
-          orodc psql -c "SELECT version();" || echo "Database check failed"
+          run_as_user /home/linuxbrew/.linuxbrew/bin/orodc psql -c "SELECT version();" || echo "Database check failed"
           
           echo "✅ Health checks completed [ARM64]"
 
       - name: Cleanup on failure
         if: failure()
         run: |
+          # Setup environment for this step
+          if [ "$(whoami)" = "root" ]; then
+            run_as_user() { sudo -u "github-runner" -H "$@"; }
+          else
+            run_as_user() { "$@"; }
+          fi
+          
           cd "${{ github.workspace }}/${{ matrix.application }}-${{ github.run_id }}-arm64" 2>/dev/null || true
           echo "🧹 Cleaning up after failure [ARM64]..."
-          orodc logs --tail=50 || true
-          orodc down --remove-orphans || true
-          orodc purge || true
+          run_as_user /home/linuxbrew/.linuxbrew/bin/orodc logs --tail=50 || true
+          run_as_user /home/linuxbrew/.linuxbrew/bin/orodc down --remove-orphans || true
+          run_as_user /home/linuxbrew/.linuxbrew/bin/orodc purge || true
 
       - name: Cleanup on success
         if: success()
         run: |
+          # Setup environment for this step
+          if [ "$(whoami)" = "root" ]; then
+            run_as_user() { sudo -u "github-runner" -H "$@"; }
+          else
+            run_as_user() { "$@"; }
+          fi
+          
           cd "${{ github.workspace }}/${{ matrix.application }}-${{ github.run_id }}-arm64" 2>/dev/null || true
           echo "🧹 Cleaning up after success [ARM64]..."
-          orodc down --remove-orphans || true
-          orodc purge || true
+          run_as_user /home/linuxbrew/.linuxbrew/bin/orodc down --remove-orphans || true
+          run_as_user /home/linuxbrew/.linuxbrew/bin/orodc purge || true
 
   test-summary:
     needs: [test-installation-x64, test-installation-arm64]
