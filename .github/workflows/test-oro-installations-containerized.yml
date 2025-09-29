@@ -26,8 +26,8 @@ env:
   HOMEBREW_NO_AUTO_UPDATE: 1
   HOMEBREW_NO_INSTALL_CLEANUP: 1
   HOMEBREW_NO_ANALYTICS: 1
-  # OroDC containerized mode
-  DC_ORO_MODE: ssh
+  # OroDC containerized mode with path sync
+  DC_ORO_MODE: default
 
 jobs:
   # Test installations in isolated containers - X64
@@ -51,15 +51,15 @@ jobs:
             version: 6.1.0
             repo_url: https://github.com/marellocommerce/marello-application.git
     
-    # Use containerized runner with Docker-in-Docker
+    # Use containerized runner with Docker-in-Docker + Path Sync
     container:
       image: myoung34/github-runner:latest
-      options: --privileged -v /var/run/docker.sock:/var/run/docker.sock
+      options: --privileged -v /var/run/docker.sock:/var/run/docker.sock -v ${{ github.workspace }}:${{ github.workspace }} -w ${{ github.workspace }}
       env:
         HOMEBREW_NO_AUTO_UPDATE: 1
         HOMEBREW_NO_INSTALL_CLEANUP: 1
         HOMEBREW_NO_ANALYTICS: 1
-        DC_ORO_MODE: ssh
+        DC_ORO_MODE: default
     
     timeout-minutes: 90
     name: Test ${{ matrix.application }} (${{ matrix.version }}) [X64-Containerized]
@@ -145,8 +145,8 @@ jobs:
           git config --global url."https://github.com/".insteadOf git@github.com:
           
           # Configure OroDC for containerized environment
-          echo "⚙️  Configuring OroDC for SSH mode..."
-          echo "DC_ORO_MODE=ssh" > .env.orodc
+          echo "⚙️  Configuring OroDC for default mode with path sync..."
+          echo "DC_ORO_MODE=default" > .env.orodc
           
           # Install and start application
           echo "⚙️  Installing ${{ matrix.application }}..."
@@ -204,6 +204,19 @@ jobs:
           cd / 
           rm -rf "$TEST_DIR" 2>/dev/null || true
           
+          # Cleanup Docker containers and volumes by build ID pattern
+          echo "🐳 Cleaning up Docker containers for build ${{ github.run_id }}..."
+          BUILD_PATTERN="${{ matrix.application }}-${{ github.run_id }}"
+          
+          # Remove containers with build pattern
+          docker ps -a --filter "name=$BUILD_PATTERN" --format "{{.ID}}" | xargs -r docker rm -f 2>/dev/null || true
+          
+          # Remove volumes with build pattern  
+          docker volume ls --filter "name=$BUILD_PATTERN" --format "{{.Name}}" | xargs -r docker volume rm 2>/dev/null || true
+          
+          # Remove networks with build pattern
+          docker network ls --filter "name=$BUILD_PATTERN" --format "{{.Name}}" | xargs -r docker network rm 2>/dev/null || true
+          
           echo "✅ Cleanup completed for ${{ matrix.application }}"
 
   # Test installations in isolated containers - ARM64
@@ -227,15 +240,15 @@ jobs:
             version: 6.1.0
             repo_url: https://github.com/marellocommerce/marello-application.git
     
-    # Use containerized runner with Docker-in-Docker
+    # Use containerized runner with Docker-in-Docker + Path Sync
     container:
       image: myoung34/github-runner:latest
-      options: --privileged -v /var/run/docker.sock:/var/run/docker.sock
+      options: --privileged -v /var/run/docker.sock:/var/run/docker.sock -v ${{ github.workspace }}:${{ github.workspace }} -w ${{ github.workspace }}
       env:
         HOMEBREW_NO_AUTO_UPDATE: 1
         HOMEBREW_NO_INSTALL_CLEANUP: 1
         HOMEBREW_NO_ANALYTICS: 1
-        DC_ORO_MODE: ssh
+        DC_ORO_MODE: default
     
     timeout-minutes: 90
     name: Test ${{ matrix.application }} (${{ matrix.version }}) [ARM64-Containerized]
@@ -322,8 +335,8 @@ jobs:
           git config --global url."https://github.com/".insteadOf git@github.com:
           
           # Configure OroDC for containerized environment
-          echo "⚙️  Configuring OroDC for SSH mode..."
-          echo "DC_ORO_MODE=ssh" > .env.orodc
+          echo "⚙️  Configuring OroDC for default mode with path sync..."
+          echo "DC_ORO_MODE=default" > .env.orodc
           
           # Install and start application
           echo "⚙️  Installing ${{ matrix.application }}..."
@@ -377,6 +390,19 @@ jobs:
           cd / 
           rm -rf "$TEST_DIR" 2>/dev/null || true
           
+          # Cleanup Docker containers and volumes by build ID pattern
+          echo "🐳 Cleaning up Docker containers for build ${{ github.run_id }} [ARM64]..."
+          BUILD_PATTERN="${{ matrix.application }}-${{ github.run_id }}"
+          
+          # Remove containers with build pattern
+          docker ps -a --filter "name=$BUILD_PATTERN" --format "{{.ID}}" | xargs -r docker rm -f 2>/dev/null || true
+          
+          # Remove volumes with build pattern  
+          docker volume ls --filter "name=$BUILD_PATTERN" --format "{{.Name}}" | xargs -r docker volume rm 2>/dev/null || true
+          
+          # Remove networks with build pattern
+          docker network ls --filter "name=$BUILD_PATTERN" --format "{{.Name}}" | xargs -r docker network rm 2>/dev/null || true
+          
           echo "✅ Cleanup completed for ${{ matrix.application }} [ARM64]"
 
   # Test summary for both architectures
@@ -406,7 +432,8 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Tested Applications (Containerized):" >> $GITHUB_STEP_SUMMARY
           echo "- 🏗️ **Isolation**: Each test runs in myoung34/github-runner container" >> $GITHUB_STEP_SUMMARY
-          echo "- 🔧 **Mode**: OroDC SSH mode for Docker-in-Docker compatibility" >> $GITHUB_STEP_SUMMARY
+          echo "- 🔧 **Mode**: OroDC default mode with synchronized paths" >> $GITHUB_STEP_SUMMARY
+          echo "- 📁 **Path Sync**: Workspace mounted at same path in container" >> $GITHUB_STEP_SUMMARY
           echo "- 📦 **Applications**:" >> $GITHUB_STEP_SUMMARY  
           echo "  - oroplatform (6.1.4) - tested on X64 and ARM64" >> $GITHUB_STEP_SUMMARY
           echo "  - orocrm (6.1.4) - tested on X64 and ARM64" >> $GITHUB_STEP_SUMMARY
