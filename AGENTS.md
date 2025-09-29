@@ -430,6 +430,28 @@ echo "✅ OroDC installation completed"
 echo "🚨 Port conflict detected"
 ```
 
+## Containerized Testing
+
+### DC_ORO_MODE=ssh for Docker-in-Docker
+**CRITICAL for containerized environments (CI/CD containers):**
+
+```bash
+# Required in containerized testing environments
+echo "DC_ORO_MODE=ssh" > .env.orodc
+```
+
+**Why SSH mode in containers:**
+- **Docker-in-Docker limitation**: bind mount volumes from nested containers don't work properly
+- **Volume isolation**: SSH mode bypasses filesystem mount issues in nested Docker environments
+- **Required for**: GitHub Actions containers, CI/CD pipelines, isolated test runners
+
+**When to use:**
+- ✅ **CI/CD containers** (GitHub Actions, GitLab CI, etc.)
+- ✅ **Docker-in-Docker scenarios** (myoung34/github-runner)
+- ✅ **Containerized test environments**
+- ❌ **Local development** (use `default` or `mutagen`)
+- ❌ **Direct host runners** (non-containerized)
+
 ## Command Reference
 | Task | Command | Notes |
 |------|---------|-------|
