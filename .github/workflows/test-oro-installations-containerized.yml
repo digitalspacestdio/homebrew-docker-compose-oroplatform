@@ -188,9 +188,42 @@ jobs:
             echo "Database connection:"
             orodc psql -c "SELECT version();" || echo "⚠️  Database check failed"
             
-            # Test HTTP accessibility (if port is predictable)
+            # Test HTTP accessibility with actual port detection
             echo "🌐 Testing web accessibility..."
-            # This would depend on your orodc port configuration
+            
+            # Extract HTTP port from OroDC configuration
+            HTTP_PORT=$(orodc ps --format "table {{.Names}}\t{{.Ports}}" | grep nginx | grep -o '0.0.0.0:[0-9]*->80/tcp' | cut -d: -f2 | cut -d- -f1 || echo "")
+            
+            if [ -n "$HTTP_PORT" ]; then
+              echo "📡 Detected HTTP port: $HTTP_PORT"
+              
+              # Wait for HTTP response (up to 3 minutes)
+              echo "⏳ Waiting for HTTP response..."
+              timeout 180 bash -c "
+                while ! curl -s -o /dev/null -w '%{http_code}' http://localhost:$HTTP_PORT | grep -q '200\|301\|302'; do
+                  echo 'Waiting for HTTP response... $(date)'
+                  sleep 5
+                done
+              " && echo "✅ HTTP server is responding" || echo "⚠️  HTTP test failed or timeout"
+              
+              # Get actual HTTP response
+              echo "📄 HTTP Response:"
+              HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$HTTP_PORT" || echo "000")
+              echo "Status Code: $HTTP_CODE"
+              
+              if [ "$HTTP_CODE" != "000" ]; then
+                CONTENT_LENGTH=$(curl -s -w '%{size_download}' -o /dev/null "http://localhost:$HTTP_PORT" || echo "0")
+                echo "Content Length: $CONTENT_LENGTH bytes"
+                
+                # Get page title if available
+                TITLE=$(curl -s "http://localhost:$HTTP_PORT" | grep -o '<title>[^<]*</title>' | sed 's/<[^>]*>//g' || echo "No title found")
+                echo "Page title: $TITLE"
+              fi
+            else
+              echo "⚠️  Could not detect HTTP port from OroDC"
+              echo "📋 Available ports:"
+              orodc ps --format "table {{.Names}}\t{{.Ports}}" || echo "No containers found"
+            fi
             
             echo "✅ ${{ matrix.application }} test completed successfully!"
           
@@ -386,6 +419,43 @@ jobs:
             
             echo "Database connection:"
             orodc psql -c "SELECT version();" || echo "⚠️  Database check failed"
+            
+            # Test HTTP accessibility with actual port detection
+            echo "🌐 Testing web accessibility [ARM64]..."
+            
+            # Extract HTTP port from OroDC configuration
+            HTTP_PORT=$(orodc ps --format "table {{.Names}}\t{{.Ports}}" | grep nginx | grep -o '0.0.0.0:[0-9]*->80/tcp' | cut -d: -f2 | cut -d- -f1 || echo "")
+            
+            if [ -n "$HTTP_PORT" ]; then
+              echo "📡 Detected HTTP port: $HTTP_PORT [ARM64]"
+              
+              # Wait for HTTP response (up to 3 minutes)
+              echo "⏳ Waiting for HTTP response..."
+              timeout 180 bash -c "
+                while ! curl -s -o /dev/null -w '%{http_code}' http://localhost:$HTTP_PORT | grep -q '200\|301\|302'; do
+                  echo 'Waiting for HTTP response... $(date)'
+                  sleep 5
+                done
+              " && echo "✅ HTTP server is responding [ARM64]" || echo "⚠️  HTTP test failed or timeout [ARM64]"
+              
+              # Get actual HTTP response
+              echo "📄 HTTP Response:"
+              HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$HTTP_PORT" || echo "000")
+              echo "Status Code: $HTTP_CODE"
+              
+              if [ "$HTTP_CODE" != "000" ]; then
+                CONTENT_LENGTH=$(curl -s -w '%{size_download}' -o /dev/null "http://localhost:$HTTP_PORT" || echo "0")
+                echo "Content Length: $CONTENT_LENGTH bytes"
+                
+                # Get page title if available
+                TITLE=$(curl -s "http://localhost:$HTTP_PORT" | grep -o '<title>[^<]*</title>' | sed 's/<[^>]*>//g' || echo "No title found")
+                echo "Page title: $TITLE"
+              fi
+            else
+              echo "⚠️  Could not detect HTTP port from OroDC [ARM64]"
+              echo "📋 Available ports:"
+              orodc ps --format "table {{.Names}}\t{{.Ports}}" || echo "No containers found"
+            fi
             
             echo "✅ ${{ matrix.application }} test completed successfully [ARM64]!"
           
