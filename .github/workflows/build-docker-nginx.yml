@@ -65,7 +65,7 @@ jobs:
   create-nginx-manifest:
     name: Create multi-arch manifest
     needs: [build-nginx-amd64, build-nginx-arm64]
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ubuntu-latest
     steps:
       - name: Log in to GHCR
         uses: docker/login-action@v3
