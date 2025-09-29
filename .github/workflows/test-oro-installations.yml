@@ -73,6 +73,14 @@ jobs:
               echo "Created github-runner user"
             fi
             
+            # Add github-runner to docker group for Docker access
+            if getent group docker >/dev/null 2>&1; then
+              usermod -aG docker github-runner
+              echo "Added github-runner to docker group"
+            else
+              echo "Warning: docker group not found - Docker may not be properly installed"
+            fi
+            
             # Set up environment for github-runner user
             export RUNNER_USER="github-runner"
             export RUNNER_HOME="/home/github-runner"
@@ -467,6 +475,14 @@ jobs:
             if ! id "github-runner" &>/dev/null; then
               useradd -m -s /bin/bash github-runner
               echo "Created github-runner user"
+            fi
+            
+            # Add github-runner to docker group for Docker access
+            if getent group docker >/dev/null 2>&1; then
+              usermod -aG docker github-runner
+              echo "Added github-runner to docker group"
+            else
+              echo "Warning: docker group not found - Docker may not be properly installed"
             fi
             
             # Set up environment for github-runner user

@@ -97,6 +97,45 @@ git push -u origin feature/my-feature
 2. Create rollback PR if needed
 3. Follow proper branch workflow for future changes
 
+### 🔄 **CRITICAL: New Changes After Push Rule**
+
+**⛔ NEVER add new changes to already pushed branches:**
+
+If you've already pushed a branch and want to add MORE changes, **ALWAYS**:
+
+1. **Update from upstream first:**
+   ```bash
+   git fetch --all
+   git checkout master
+   git pull main master
+   git push origin master
+   ```
+
+2. **Create NEW branch for additional changes:**
+   ```bash
+   git checkout -b fix/additional-improvements
+   # Make your new changes
+   git commit -m "Additional improvements"
+   git push -u origin fix/additional-improvements
+   ```
+
+**⛔ NEVER do this after push:**
+```bash
+# ❌ WRONG: Adding to already pushed branch
+git checkout existing-pushed-branch
+# make changes
+git commit -m "more changes" 
+git push  # ❌ This creates messy history!
+```
+
+**Why this rule exists:**
+- 🔄 **Clean History**: Each branch represents one logical change
+- 🔍 **Clear Review**: Easier to review focused changes
+- 🛡️ **Safer Merges**: Avoid complex merge conflicts
+- 📝 **Better Tracking**: Each PR has clear scope and purpose
+
+**Exception:** Only add to pushed branches if explicitly fixing issues in the SAME Pull Request discussion.
+
 ### 📛 If you accidentally worked in master:
 
 1. **Create a branch from current state:**
