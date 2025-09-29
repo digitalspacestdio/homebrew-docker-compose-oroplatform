@@ -156,17 +156,11 @@ if [[ "$1" == "help" ]] || [[ "$1" == "man" ]]; then
     fi
   fi
   
-  # If README found, display it with pager
+  # If README found, display it without pager (always use cat)
   if [[ -n "$README_FILE" && -f "$README_FILE" ]]; then
     echo "==> OroDC Documentation"
     echo
-    if command -v less >/dev/null 2>&1; then
-      less "$README_FILE"
-    elif command -v more >/dev/null 2>&1; then
-      more "$README_FILE"
-    else
-      cat "$README_FILE"
-    fi
+    cat "$README_FILE"
   else
     echo "==> OroDC Help"
     echo
