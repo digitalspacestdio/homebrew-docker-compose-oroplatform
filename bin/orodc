@@ -48,6 +48,83 @@ echo_ok() { msg_ok "$*"; }
 echo_warn() { msg_warning "$*"; }
 echo_error() { msg_error "$*"; }
 echo_header() { msg_header "$*"; }
+
+# Function to resolve binary location with error handling
+# Usage: resolve_bin "binary_name" ["install_instructions"]
+resolve_bin() {
+  local bin_name="$1"
+  local install_msg="${2:-}"
+  local found_path=""
+  
+  # Try PATH first
+  if command -v "$bin_name" >/dev/null 2>&1; then
+    found_path=$(command -v "$bin_name")
+    if [ "$DEBUG" ]; then echo "DEBUG: Found $bin_name in PATH: $found_path" >&2; fi
+    echo "$found_path"
+    return 0
+  fi
+  
+  # Try common locations for specific binaries
+  case "$bin_name" in
+    "brew")
+      local brew_paths=("/opt/homebrew/bin/brew" "/usr/local/bin/brew" "/home/linuxbrew/.linuxbrew/bin/brew")
+      for brew_path in "${brew_paths[@]}"; do
+        if [[ -x "$brew_path" ]]; then
+          found_path="$brew_path"
+          msg_warning "$bin_name found at $found_path but not in PATH"
+          echo "   Add to PATH: export PATH=\"$(dirname "$found_path"):\$PATH\""
+          echo "$found_path"
+          return 0
+        fi
+      done
+      ;;
+    "docker")
+      local docker_paths=("/usr/bin/docker" "/usr/local/bin/docker" "/snap/bin/docker")
+      for docker_path in "${docker_paths[@]}"; do
+        if [[ -x "$docker_path" ]]; then
+          found_path="$docker_path"
+          msg_warning "$bin_name found at $found_path but not in PATH"
+          echo "$found_path"
+          return 0
+        fi
+      done
+      ;;
+  esac
+  
+  # Not found - show error and exit
+  msg_error "$bin_name not found in PATH or common locations"
+  
+  if [[ -n "$install_msg" ]]; then
+    echo "   $install_msg"
+  else
+    # Default install instructions
+    case "$bin_name" in
+      "docker")
+        echo "   Install: curl -fsSL https://get.docker.com | sh"
+        echo "   Or visit: https://docs.docker.com/engine/install/"
+        ;;
+      "brew")
+        echo "   Install: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+        echo "   Then add to PATH: export PATH=\"/home/linuxbrew/.linuxbrew/bin:\$PATH\""
+        ;;
+      "rsync")
+        echo "   Install: sudo apt-get install rsync  # Ubuntu/Debian"
+        echo "   Or: brew install rsync"
+        ;;
+      "jq")
+        echo "   Install: sudo apt-get install jq  # Ubuntu/Debian"
+        echo "   Or: brew install jq"
+        ;;
+      *)
+        echo "   Please install $bin_name and ensure it's in your PATH"
+        ;;
+    esac
+  fi
+  
+  echo
+  msg_error "OroDC cannot continue without $bin_name"
+  exit 1
+}
 echo_highlight() { msg_highlight "$*"; }
 
 # Save original arguments before any processing
@@ -308,27 +385,39 @@ if [[ -n "${DEBUG:-}" ]]; then
 fi
 
 
-BREW_BIN=$(which brew 2>/dev/null)
-if [ -z "${BREW_BIN}" ]; then
-  BREW_BIN=$(find /opt/homebrew/bin /usr/local/bin /home/linuxbrew/.linuxbrew/bin -name "brew" 2>/dev/null | head -1)
-  [ -f "${BREW_BIN}" ] \
-  && (echo; echo 'eval "$('${BREW_BIN}' shellenv)"') | tee -a $HOME/.zprofile | tee -a $HOME/.bashrc \
-  && eval "$(${BREW_BIN} shellenv)"
-fi
+# Resolve critical dependencies with helpful error messages
+BREW_BIN=$(resolve_bin "brew")
+DOCKER_BIN=$(resolve_bin "docker")
 
-# Use BREW_BIN consistently
-if [ -z "${BREW_BIN}" ]; then
-  echo "Error: brew not found. Please install Homebrew first." >&2
+# Check docker compose specifically (it's a subcommand, not a separate binary)
+if ! "$DOCKER_BIN" compose version >/dev/null 2>&1; then
+  msg_error "Docker Compose not found or outdated"
+  echo "   Docker Compose V2 is required (docker compose, not docker-compose)"
+  echo "   Update Docker: https://docs.docker.com/compose/install/"
+  echo
+  msg_error "OroDC cannot continue without Docker Compose"
   exit 1
 fi
 
-DIR=$(${BREW_BIN} --prefix docker-compose-oroplatform)/share/docker-compose-oroplatform
-RSYNC_BIN=$(${BREW_BIN} --prefix rsync)/bin/rsync
-DOCKER_BIN="${DOCKER_BIN-$(which docker)}";
-DOCKER_COMPOSE_BIN="${DOCKER_COMPOSE_BIN-$(which docker) compose}";
-# DOCKER_COMPOSE_BIN_CMD is the main command that gets built up with compose files
+# Set up Homebrew environment if needed
+if [[ "$BREW_BIN" != *"/usr/local/bin/brew"* ]] && [[ "$BREW_BIN" != *"/opt/homebrew/bin/brew"* ]]; then
+  # For non-standard locations, ensure environment is set up
+  eval "$("$BREW_BIN" shellenv)" 2>/dev/null || true
+fi
+
+DIR=$("$BREW_BIN" --prefix docker-compose-oroplatform)/share/docker-compose-oroplatform
+
+# Try to get rsync from Homebrew, fallback to system rsync
+RSYNC_BIN="$("$BREW_BIN" --prefix rsync)/bin/rsync"
+if [[ ! -x "$RSYNC_BIN" ]]; then
+  RSYNC_BIN=$(resolve_bin "rsync")
+fi
+
+# Set up Docker Compose command
+DOCKER_COMPOSE_BIN="$DOCKER_BIN compose"
+# DOCKER_COMPOSE_BIN_CMD is the main command that gets built up with compose files  
 # This variable is reused throughout the script and in the test merging logic
-DOCKER_COMPOSE_BIN_CMD=${DOCKER_COMPOSE_BIN};
+DOCKER_COMPOSE_BIN_CMD="$DOCKER_COMPOSE_BIN"
 DOCKER_COMPOSE_VERSION=$($DOCKER_COMPOSE_BIN_CMD version | grep '[0-9]\+\.[0-9]\+\.[0-9]\+' -o | head -1 |awk -F. '{ print $1 }')
 ${RSYNC_BIN} -r "${DIR}/compose/" "${DC_ORO_CONFIG_DIR}/"
 

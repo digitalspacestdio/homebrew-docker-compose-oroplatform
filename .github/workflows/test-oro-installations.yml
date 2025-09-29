@@ -124,6 +124,16 @@ jobs:
           # Add Homebrew to PATH
           echo "/home/linuxbrew/.linuxbrew/bin" >> $GITHUB_PATH
           
+          # PATH Diagnostics - Critical Issue Investigation
+          echo "=== PATH Diagnosis AFTER Adding to GITHUB_PATH ==="
+          echo "Current PATH: $PATH"
+          echo "GITHUB_PATH content:"
+          cat "$GITHUB_PATH" || echo "❌ GITHUB_PATH not readable"
+          echo "Checking if brew is in PATH:"
+          which brew || echo "❌ brew still NOT found in PATH (this is the problem!)"
+          echo "Homebrew directory listing:"
+          ls -la /home/linuxbrew/.linuxbrew/bin/ || echo "❌ Homebrew bin directory not found"
+          
           # Verify installation
           run_as_user /home/linuxbrew/.linuxbrew/bin/brew --version || echo "Homebrew verification failed"
 
@@ -509,6 +519,16 @@ jobs:
           
           # Add Homebrew to PATH
           echo "/home/linuxbrew/.linuxbrew/bin" >> $GITHUB_PATH
+          
+          # PATH Diagnostics - Critical Issue Investigation
+          echo "=== PATH Diagnosis AFTER Adding to GITHUB_PATH ==="
+          echo "Current PATH: $PATH"
+          echo "GITHUB_PATH content:"
+          cat "$GITHUB_PATH" || echo "❌ GITHUB_PATH not readable"
+          echo "Checking if brew is in PATH:"
+          which brew || echo "❌ brew still NOT found in PATH (this is the problem!)"
+          echo "Homebrew directory listing:"
+          ls -la /home/linuxbrew/.linuxbrew/bin/ || echo "❌ Homebrew bin directory not found"
           
           # Verify installation
           run_as_user /home/linuxbrew/.linuxbrew/bin/brew --version || echo "Homebrew verification failed"
