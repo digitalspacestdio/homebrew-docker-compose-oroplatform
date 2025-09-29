@@ -838,7 +838,7 @@ jobs:
 
   test-summary:
     needs: [test-installation-x64, test-installation-arm64]
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ubuntu-latest
     if: always()
     steps:
       - name: Test Summary
