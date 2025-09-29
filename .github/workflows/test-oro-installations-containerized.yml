@@ -124,66 +124,75 @@ jobs:
           echo "✅ OroDC installation completed"
           
       - name: Test ${{ matrix.application }} installation
-        run: |
-          echo "🚀 Testing ${{ matrix.application }} installation in isolated container..."
-          
-          # Setup PATH
-          export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
-          
-          # Create unique test workspace  
-          TEST_DIR="/tmp/${{ matrix.application }}-test-${{ github.run_id }}-$$"
-          mkdir -p "$TEST_DIR"
-          cd "$TEST_DIR"
-          echo "📁 Working in: $TEST_DIR"
-          
-          # Clone application
-          echo "📥 Cloning ${{ matrix.application }} v${{ matrix.version }}..."
-          git clone --single-branch --branch ${{ matrix.version }} \
-            ${{ matrix.repo_url }} .
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 15
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: |
+            echo "🚀 Testing ${{ matrix.application }} installation in isolated container..."
+            echo "🔄 Attempt ${{ github.run_attempt }} of 3 (retry logic active for port conflicts)"
             
-          # Configure git for HTTPS
-          git config --global url."https://github.com/".insteadOf git@github.com:
+            # Setup PATH
+            export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
           
-          # Configure OroDC for containerized environment
-          echo "⚙️  Configuring OroDC for default mode with path sync..."
-          echo "DC_ORO_MODE=default" > .env.orodc
-          
-          # Install and start application
-          echo "⚙️  Installing ${{ matrix.application }}..."
-          orodc install
-          
-          echo "🚀 Starting services..."  
-          orodc up -d
-          
-          # Wait for services with timeout
-          echo "⏳ Waiting for services to start (max 5 minutes)..."
-          timeout 300 bash -c '
-            while ! orodc ps | grep -q "Up"; do
-              echo "Services starting... $(date)"
-              sleep 10
-            done
-          ' || {
-            echo "❌ Services failed to start within timeout"
-            orodc logs --tail=20
-            exit 1
-          }
-          
-          # Health checks
-          echo "🩺 Performing health checks..."
-          echo "Container status:"
-          orodc ps
-          
-          echo "PHP version:"
-          orodc php --version
-          
-          echo "Database connection:"
-          orodc psql -c "SELECT version();" || echo "⚠️  Database check failed"
-          
-          # Test HTTP accessibility (if port is predictable)
-          echo "🌐 Testing web accessibility..."
-          # This would depend on your orodc port configuration
-          
-          echo "✅ ${{ matrix.application }} test completed successfully!"
+            # Create unique test workspace with random port suffix to avoid conflicts
+            RANDOM_SUFFIX=$(( RANDOM % 1000 ))
+            TEST_DIR="/tmp/${{ matrix.application }}-test-${{ github.run_id }}-${RANDOM_SUFFIX}-$$"
+            mkdir -p "$TEST_DIR"
+            cd "$TEST_DIR"
+            echo "📁 Working in: $TEST_DIR"
+            
+            # Clone application
+            echo "📥 Cloning ${{ matrix.application }} v${{ matrix.version }}..."
+            git clone --single-branch --branch ${{ matrix.version }} \
+              ${{ matrix.repo_url }} .
+              
+            # Configure git for HTTPS
+            git config --global url."https://github.com/".insteadOf git@github.com:
+            
+            # Configure OroDC for containerized environment with random port to avoid conflicts
+            echo "⚙️  Configuring OroDC for default mode with path sync..."
+            echo "DC_ORO_NAME=${{ matrix.application }}-${{ github.run_id }}-${RANDOM_SUFFIX}" > .env.orodc
+            echo "DC_ORO_PORT_PREFIX=$(( 300 + ( ${{ github.run_id }} % 99 ) + ( RANDOM_SUFFIX % 10 ) ))" >> .env.orodc
+            echo "DC_ORO_MODE=default" >> .env.orodc
+            
+            # Install and start application
+            echo "⚙️  Installing ${{ matrix.application }}..."
+            orodc install
+            
+            echo "🚀 Starting services..."  
+            orodc up -d
+            
+            # Wait for services with timeout
+            echo "⏳ Waiting for services to start (max 5 minutes)..."
+            timeout 300 bash -c '
+              while ! orodc ps | grep -q "Up"; do
+                echo "Services starting... $(date)"
+                sleep 10
+              done
+            ' || {
+              echo "❌ Services failed to start within timeout"
+              orodc logs --tail=20
+              exit 1
+            }
+            
+            # Health checks
+            echo "🩺 Performing health checks..."
+            echo "Container status:"
+            orodc ps
+            
+            echo "PHP version:"
+            orodc php --version
+            
+            echo "Database connection:"
+            orodc psql -c "SELECT version();" || echo "⚠️  Database check failed"
+            
+            # Test HTTP accessibility (if port is predictable)
+            echo "🌐 Testing web accessibility..."
+            # This would depend on your orodc port configuration
+            
+            echo "✅ ${{ matrix.application }} test completed successfully!"
           
       - name: Cleanup test environment
         if: always()
@@ -314,62 +323,71 @@ jobs:
           echo "✅ OroDC installation completed [ARM64]"
           
       - name: Test ${{ matrix.application }} installation
-        run: |
-          echo "🚀 Testing ${{ matrix.application }} installation in isolated container [ARM64]..."
-          
-          # Setup PATH
-          export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
-          
-          # Create unique test workspace  
-          TEST_DIR="/tmp/${{ matrix.application }}-test-${{ github.run_id }}-arm64-$$"
-          mkdir -p "$TEST_DIR"
-          cd "$TEST_DIR"
-          echo "📁 Working in: $TEST_DIR [ARM64]"
-          
-          # Clone application
-          echo "📥 Cloning ${{ matrix.application }} v${{ matrix.version }}..."
-          git clone --single-branch --branch ${{ matrix.version }} \
-            ${{ matrix.repo_url }} .
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 15
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: |
+            echo "🚀 Testing ${{ matrix.application }} installation in isolated container [ARM64]..."
+            echo "🔄 Attempt ${{ github.run_attempt }} of 3 (retry logic active for port conflicts)"
             
-          # Configure git for HTTPS
-          git config --global url."https://github.com/".insteadOf git@github.com:
-          
-          # Configure OroDC for containerized environment
-          echo "⚙️  Configuring OroDC for default mode with path sync..."
-          echo "DC_ORO_MODE=default" > .env.orodc
-          
-          # Install and start application
-          echo "⚙️  Installing ${{ matrix.application }}..."
-          orodc install
-          
-          echo "🚀 Starting services..."  
-          orodc up -d
-          
-          # Wait for services with timeout
-          echo "⏳ Waiting for services to start (max 5 minutes)..."
-          timeout 300 bash -c '
-            while ! orodc ps | grep -q "Up"; do
-              echo "Services starting... $(date)"
-              sleep 10
-            done
-          ' || {
-            echo "❌ Services failed to start within timeout"
-            orodc logs --tail=20
-            exit 1
-          }
-          
-          # Health checks
-          echo "🩺 Performing health checks [ARM64]..."
-          echo "Container status:"
-          orodc ps
-          
-          echo "PHP version:"
-          orodc php --version
-          
-          echo "Database connection:"
-          orodc psql -c "SELECT version();" || echo "⚠️  Database check failed"
-          
-          echo "✅ ${{ matrix.application }} test completed successfully [ARM64]!"
+            # Setup PATH
+            export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
+            
+            # Create unique test workspace with random port suffix to avoid conflicts
+            RANDOM_SUFFIX=$(( RANDOM % 1000 ))
+            TEST_DIR="/tmp/${{ matrix.application }}-test-${{ github.run_id }}-arm64-${RANDOM_SUFFIX}-$$"
+            mkdir -p "$TEST_DIR"
+            cd "$TEST_DIR"
+            echo "📁 Working in: $TEST_DIR [ARM64]"
+            
+            # Clone application
+            echo "📥 Cloning ${{ matrix.application }} v${{ matrix.version }}..."
+            git clone --single-branch --branch ${{ matrix.version }} \
+              ${{ matrix.repo_url }} .
+              
+            # Configure git for HTTPS
+            git config --global url."https://github.com/".insteadOf git@github.com:
+            
+            # Configure OroDC for containerized environment with random port to avoid conflicts
+            echo "⚙️  Configuring OroDC for default mode with path sync..."
+            echo "DC_ORO_NAME=${{ matrix.application }}-${{ github.run_id }}-arm64-${RANDOM_SUFFIX}" > .env.orodc
+            echo "DC_ORO_PORT_PREFIX=$(( 400 + ( ${{ github.run_id }} % 99 ) + ( RANDOM_SUFFIX % 10 ) ))" >> .env.orodc
+            echo "DC_ORO_MODE=default" >> .env.orodc  
+            
+            # Install and start application
+            echo "⚙️  Installing ${{ matrix.application }}..."
+            orodc install
+            
+            echo "🚀 Starting services..."  
+            orodc up -d
+            
+            # Wait for services with timeout
+            echo "⏳ Waiting for services to start (max 5 minutes)..."
+            timeout 300 bash -c '
+              while ! orodc ps | grep -q "Up"; do
+                echo "Services starting... $(date)"
+                sleep 10
+              done
+            ' || {
+              echo "❌ Services failed to start within timeout"
+              orodc logs --tail=20
+              exit 1
+            }
+            
+            # Health checks
+            echo "🩺 Performing health checks [ARM64]..."
+            echo "Container status:"
+            orodc ps
+            
+            echo "PHP version:"
+            orodc php --version
+            
+            echo "Database connection:"
+            orodc psql -c "SELECT version();" || echo "⚠️  Database check failed"
+            
+            echo "✅ ${{ matrix.application }} test completed successfully [ARM64]!"
           
       - name: Cleanup test environment
         if: always()
