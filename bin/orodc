@@ -72,7 +72,7 @@ resolve_bin() {
         if [[ -x "$brew_path" ]]; then
           found_path="$brew_path"
           msg_warning "$bin_name found at $found_path but not in PATH"
-          echo "   Add to PATH: export PATH=\"$(dirname "$found_path"):\$PATH\""
+          echo "   Add to PATH: export PATH=\"$(dirname "$found_path"):\$PATH\"" >&2
           echo "$found_path"
           return 0
         fi
