@@ -175,42 +175,42 @@ jobs:
             echo "DC_ORO_PORT_PREFIX=$(( 300 + ( ${{ github.run_id }} % 99 ) + ( RANDOM_SUFFIX % 10 ) ))" >> .env.orodc
             echo "DC_ORO_MODE=default" >> .env.orodc
             
-            # Install and start application
+            # Install and start application (as runner user, not root)
             echo "⚙️  Installing ${{ matrix.application }}..."
-            orodc install
+            su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc install' runner
             
             echo "🚀 Starting services..."  
-            orodc up -d
+            su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc up -d' runner
             
             # Wait for services with timeout
             echo "⏳ Waiting for services to start (max 5 minutes)..."
             timeout 300 bash -c '
-              while ! orodc ps | grep -q "Up"; do
+              while ! su -c "cd \"'"$TEST_DIR"'\" && eval \"\$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)\" && orodc ps" runner | grep -q "Up"; do
                 echo "Services starting... $(date)"
                 sleep 10
               done
             ' || {
               echo "❌ Services failed to start within timeout"
-              orodc logs --tail=20
+              su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc logs --tail=20' runner
               exit 1
             }
             
             # Health checks
             echo "🩺 Performing health checks..."
             echo "Container status:"
-            orodc ps
+            su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc ps' runner
             
             echo "PHP version:"
-            orodc php --version
+            su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc php --version' runner
             
             echo "Database connection:"
-            orodc psql -c "SELECT version();" || echo "⚠️  Database check failed"
+            su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc psql -c "SELECT version();"' runner || echo "⚠️  Database check failed"
             
             # Test HTTP accessibility with actual port detection
             echo "🌐 Testing web accessibility..."
             
             # Extract HTTP port from OroDC configuration
-            HTTP_PORT=$(orodc ps --format "table {{.Names}}\t{{.Ports}}" | grep nginx | grep -o '0.0.0.0:[0-9]*->80/tcp' | cut -d: -f2 | cut -d- -f1 || echo "")
+            HTTP_PORT=$(su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc ps --format "table {{.Names}}\t{{.Ports}}"' runner | grep nginx | grep -o '0.0.0.0:[0-9]*->80/tcp' | cut -d: -f2 | cut -d- -f1 || echo "")
             
             if [ -n "$HTTP_PORT" ]; then
               echo "📡 Detected HTTP port: $HTTP_PORT"
@@ -240,7 +240,7 @@ jobs:
             else
               echo "⚠️  Could not detect HTTP port from OroDC"
               echo "📋 Available ports:"
-              orodc ps --format "table {{.Names}}\t{{.Ports}}" || echo "No containers found"
+              su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc ps --format "table {{.Names}}\t{{.Ports}}"' runner || echo "No containers found"
             fi
             
             echo "✅ ${{ matrix.application }} test completed successfully!"
@@ -417,23 +417,23 @@ jobs:
             echo "DC_ORO_PORT_PREFIX=$(( 400 + ( ${{ github.run_id }} % 99 ) + ( RANDOM_SUFFIX % 10 ) ))" >> .env.orodc
             echo "DC_ORO_MODE=default" >> .env.orodc  
             
-            # Install and start application
+            # Install and start application (as runner user, not root)
             echo "⚙️  Installing ${{ matrix.application }}..."
-            orodc install
+            su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc install' runner
             
             echo "🚀 Starting services..."  
-            orodc up -d
+            su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc up -d' runner
             
             # Wait for services with timeout
             echo "⏳ Waiting for services to start (max 5 minutes)..."
             timeout 300 bash -c '
-              while ! orodc ps | grep -q "Up"; do
+              while ! su -c "cd \"'"$TEST_DIR"'\" && eval \"\$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)\" && orodc ps" runner | grep -q "Up"; do
                 echo "Services starting... $(date)"
                 sleep 10
               done
             ' || {
               echo "❌ Services failed to start within timeout"
-              orodc logs --tail=20
+              su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc logs --tail=20' runner
               exit 1
             }
             
@@ -452,7 +452,7 @@ jobs:
             echo "🌐 Testing web accessibility [ARM64]..."
             
             # Extract HTTP port from OroDC configuration
-            HTTP_PORT=$(orodc ps --format "table {{.Names}}\t{{.Ports}}" | grep nginx | grep -o '0.0.0.0:[0-9]*->80/tcp' | cut -d: -f2 | cut -d- -f1 || echo "")
+            HTTP_PORT=$(su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc ps --format "table {{.Names}}\t{{.Ports}}"' runner | grep nginx | grep -o '0.0.0.0:[0-9]*->80/tcp' | cut -d: -f2 | cut -d- -f1 || echo "")
             
             if [ -n "$HTTP_PORT" ]; then
               echo "📡 Detected HTTP port: $HTTP_PORT [ARM64]"
