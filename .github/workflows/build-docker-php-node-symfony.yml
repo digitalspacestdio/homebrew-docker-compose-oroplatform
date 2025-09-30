@@ -1,9 +1,10 @@
-name: Build & Publish php with nodejs multi-arch images to GHCR
+name: Build & Publish PHP Base and PHP+Node.js multi-arch images to GHCR
 
 on:
   push:
     branches: [ master ]
     paths:
+      - 'compose/docker/php/**'
       - 'compose/docker/php-node-symfony/**'
   workflow_dispatch:
 
@@ -11,11 +12,308 @@ permissions:
   contents: read
   packages: write
 
+concurrency:
+  group: docker-build-${{ github.job }}-${{ github.ref_name }}
+  cancel-in-progress: true
+
 jobs:
-  build-7-4-amd64:
-    name: Build PHP 7.4 images (AMD64)
+  # ========================================
+  # STAGE 1: BASE PHP IMAGES
+  # ========================================
+  
+  build-php-7-4-amd64:
+    name: Build PHP 7.4 Base (AMD64)
     runs-on: [self-hosted, Linux, X64]
     strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        php:      ["7.4"]
+        composer: ["2"]
+        variant:  ["alpine"]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build & Push PHP Base ${{ matrix.php }}-composer${{ matrix.composer }}-${{ matrix.variant }} (AMD64)
+        uses: docker/build-push-action@v5
+        with:
+          context: compose/docker/php
+          file: compose/docker/php/Dockerfile.${{ matrix.php }}.${{ matrix.variant }}
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-amd64
+          build-args: |
+            PHP_VERSION=${{ matrix.php }}
+            COMPOSER_VERSION=${{ matrix.composer }}
+          cache-from: type=gha,scope=php-base-${{ matrix.php }}-amd64
+          cache-to: type=gha,mode=max,scope=php-base-${{ matrix.php }}-amd64
+
+  build-php-7-4-arm64:
+    name: Build PHP 7.4 Base (ARM64)
+    runs-on: [self-hosted, Linux, ARM64]
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        php:      ["7.4"]
+        composer: ["2"]
+        variant:  ["alpine"]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build & Push PHP Base ${{ matrix.php }}-composer${{ matrix.composer }}-${{ matrix.variant }} (ARM64)
+        uses: docker/build-push-action@v5
+        with:
+          context: compose/docker/php
+          file: compose/docker/php/Dockerfile.${{ matrix.php }}.${{ matrix.variant }}
+          platforms: linux/arm64
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-arm64
+          build-args: |
+            PHP_VERSION=${{ matrix.php }}
+            COMPOSER_VERSION=${{ matrix.composer }}
+          cache-from: type=gha,scope=php-base-${{ matrix.php }}-arm64
+          cache-to: type=gha,mode=max,scope=php-base-${{ matrix.php }}-arm64
+
+  create-php-7-4-manifest:
+    name: Create PHP 7.4 Base multi-arch manifests
+    needs: [build-php-7-4-amd64, build-php-7-4-arm64]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        php:      ["7.4"]
+        variant:  ["alpine"]
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create multi-arch manifest for PHP Base ${{ matrix.php }}-${{ matrix.variant }}
+        run: |
+          docker buildx imagetools create \
+            --tag ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }} \
+            ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-amd64 \
+            ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-arm64
+
+  build-php-8-x-amd64:
+    name: Build PHP 8.x Base (AMD64)
+    runs-on: [self-hosted, Linux, X64]
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        php:      ["8.1","8.2","8.3","8.4"]
+        composer: ["2"]
+        variant:  ["alpine"]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build & Push PHP Base ${{ matrix.php }}-composer${{ matrix.composer }}-${{ matrix.variant }} (AMD64)
+        uses: docker/build-push-action@v5
+        with:
+          context: compose/docker/php
+          file: compose/docker/php/Dockerfile.${{ matrix.php }}.${{ matrix.variant }}
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-amd64
+          build-args: |
+            PHP_VERSION=${{ matrix.php }}
+            COMPOSER_VERSION=${{ matrix.composer }}
+          cache-from: type=gha,scope=php-base-${{ matrix.php }}-amd64
+          cache-to: type=gha,mode=max,scope=php-base-${{ matrix.php }}-amd64
+
+  build-php-8-x-arm64:
+    name: Build PHP 8.x Base (ARM64)
+    runs-on: [self-hosted, Linux, ARM64]
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        php:      ["8.1","8.2","8.3","8.4"]
+        composer: ["2"]
+        variant:  ["alpine"]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build & Push PHP Base ${{ matrix.php }}-composer${{ matrix.composer }}-${{ matrix.variant }} (ARM64)
+        uses: docker/build-push-action@v5
+        with:
+          context: compose/docker/php
+          file: compose/docker/php/Dockerfile.${{ matrix.php }}.${{ matrix.variant }}
+          platforms: linux/arm64
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-arm64
+          build-args: |
+            PHP_VERSION=${{ matrix.php }}
+            COMPOSER_VERSION=${{ matrix.composer }}
+          cache-from: type=gha,scope=php-base-${{ matrix.php }}-arm64
+          cache-to: type=gha,mode=max,scope=php-base-${{ matrix.php }}-arm64
+
+  create-php-8-x-manifest:
+    name: Create PHP 8.x Base multi-arch manifests
+    needs: [build-php-8-x-amd64, build-php-8-x-arm64]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        php:      ["8.1","8.2","8.3","8.4"]
+        variant:  ["alpine"]
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create multi-arch manifest for PHP Base ${{ matrix.php }}-${{ matrix.variant }}
+        run: |
+          docker buildx imagetools create \
+            --tag ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }} \
+            ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-amd64 \
+            ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-arm64
+
+  build-php-8-5-amd64:
+    name: Build PHP 8.5 Base (AMD64)
+    runs-on: [self-hosted, Linux, X64]
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        php:      ["8.5"]
+        composer: ["2"]
+        variant:  ["alpine"]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build & Push PHP Base ${{ matrix.php }}-composer${{ matrix.composer }}-${{ matrix.variant }} (AMD64)
+        uses: docker/build-push-action@v5
+        with:
+          context: compose/docker/php
+          file: compose/docker/php/Dockerfile.${{ matrix.php }}.${{ matrix.variant }}
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-amd64
+          build-args: |
+            PHP_VERSION=8.5-rc
+            COMPOSER_VERSION=${{ matrix.composer }}
+          cache-from: type=gha,scope=php-base-${{ matrix.php }}-amd64
+          cache-to: type=gha,mode=max,scope=php-base-${{ matrix.php }}-amd64
+
+  build-php-8-5-arm64:
+    name: Build PHP 8.5 Base (ARM64)
+    runs-on: [self-hosted, Linux, ARM64]
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        php:      ["8.5"]
+        composer: ["2"]
+        variant:  ["alpine"]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+      - name: Build & Push PHP Base ${{ matrix.php }}-composer${{ matrix.composer }}-${{ matrix.variant }} (ARM64)
+        uses: docker/build-push-action@v5
+        with:
+          context: compose/docker/php
+          file: compose/docker/php/Dockerfile.${{ matrix.php }}.${{ matrix.variant }}
+          platforms: linux/arm64
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-arm64
+          build-args: |
+            PHP_VERSION=8.5-rc
+            COMPOSER_VERSION=${{ matrix.composer }}
+          cache-from: type=gha,scope=php-base-${{ matrix.php }}-arm64
+          cache-to: type=gha,mode=max,scope=php-base-${{ matrix.php }}-arm64
+
+  create-php-8-5-manifest:
+    name: Create PHP 8.5 Base multi-arch manifests
+    needs: [build-php-8-5-amd64, build-php-8-5-arm64]
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        php:      ["8.5"]
+        variant:  ["alpine"]
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Create multi-arch manifest for PHP Base ${{ matrix.php }}-${{ matrix.variant }}
+        run: |
+          docker buildx imagetools create \
+            --tag ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }} \
+            ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-amd64 \
+            ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-arm64
+
+  # ========================================
+  # STAGE 2: FINAL PHP+NODE.JS IMAGES
+  # ========================================
+  
+  build-php-node-7-4-amd64:
+    name: Build PHP 7.4 + Node.js images (AMD64)
+    needs: [create-php-7-4-manifest]
+    runs-on: [self-hosted, Linux, X64]
+    strategy:
+      fail-fast: false
+      max-parallel: 4
       matrix:
         php:      ["7.4"]
         node:     ["16","18"]
@@ -47,10 +345,13 @@ jobs:
           cache-from: type=gha,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-amd64
           cache-to: type=gha,mode=max,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-amd64
 
-  build-7-4-arm64:
-    name: Build PHP 7.4 images (ARM64)
+  build-php-node-7-4-arm64:
+    name: Build PHP 7.4 + Node.js images (ARM64)
+    needs: [create-php-7-4-manifest]
     runs-on: [self-hosted, Linux, ARM64]
     strategy:
+      fail-fast: false
+      max-parallel: 4
       matrix:
         php:      ["7.4"]
         node:     ["16","18"]
@@ -82,11 +383,13 @@ jobs:
           cache-from: type=gha,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-arm64
           cache-to: type=gha,mode=max,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-arm64
 
-  create-7-4-manifest:
-    name: Create PHP 7.4 multi-arch manifests
-    needs: [build-7-4-amd64, build-7-4-arm64]
+  create-php-node-7-4-manifest:
+    name: Create PHP 7.4 + Node.js multi-arch manifests
+    needs: [build-php-node-7-4-amd64, build-php-node-7-4-arm64]
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
+      max-parallel: 4
       matrix:
         php:      ["7.4"]
         node:     ["16","18"]
@@ -106,10 +409,13 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-${{ matrix.variant }}-amd64 \
             ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-${{ matrix.variant }}-arm64
 
-  build-8-x-amd64:
-    name: Build PHP 8.x images (AMD64)
+  build-php-node-8-x-amd64:
+    name: Build PHP 8.x + Node.js images (AMD64)
+    needs: [create-php-8-x-manifest]
     runs-on: [self-hosted, Linux, X64]
     strategy:
+      fail-fast: false
+      max-parallel: 4
       matrix:
         php:      ["8.1","8.2","8.3","8.4"]
         node:     ["18","20","22"]
@@ -141,10 +447,13 @@ jobs:
           cache-from: type=gha,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-amd64
           cache-to: type=gha,mode=max,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-amd64
 
-  build-8-x-arm64:
-    name: Build PHP 8.x images (ARM64)
+  build-php-node-8-x-arm64:
+    name: Build PHP 8.x + Node.js images (ARM64)
+    needs: [create-php-8-x-manifest]
     runs-on: [self-hosted, Linux, ARM64]
     strategy:
+      fail-fast: false
+      max-parallel: 4
       matrix:
         php:      ["8.1","8.2","8.3","8.4"]
         node:     ["18","20","22"]
@@ -176,11 +485,13 @@ jobs:
           cache-from: type=gha,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-arm64
           cache-to: type=gha,mode=max,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-arm64
 
-  create-8-x-manifest:
-    name: Create PHP 8.x multi-arch manifests
-    needs: [build-8-x-amd64, build-8-x-arm64]
+  create-php-node-8-x-manifest:
+    name: Create PHP 8.x + Node.js multi-arch manifests
+    needs: [build-php-node-8-x-amd64, build-php-node-8-x-arm64]
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
+      max-parallel: 4
       matrix:
         php:      ["8.1","8.2","8.3","8.4"]
         node:     ["18","20","22"]
@@ -200,10 +511,13 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-${{ matrix.variant }}-amd64 \
             ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-${{ matrix.variant }}-arm64
 
-  build-8-5-amd64:
-    name: Build PHP 8.5 images (AMD64)
+  build-php-node-8-5-amd64:
+    name: Build PHP 8.5 + Node.js images (AMD64)
+    needs: [create-php-8-5-manifest]
     runs-on: [self-hosted, Linux, X64]
     strategy:
+      fail-fast: false
+      max-parallel: 4
       matrix:
         php:      ["8.5"]
         node:     ["22","24"]
@@ -235,10 +549,13 @@ jobs:
           cache-from: type=gha,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-amd64
           cache-to: type=gha,mode=max,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-amd64
 
-  build-8-5-arm64:
-    name: Build PHP 8.5 images (ARM64)
+  build-php-node-8-5-arm64:
+    name: Build PHP 8.5 + Node.js images (ARM64)
+    needs: [create-php-8-5-manifest]
     runs-on: [self-hosted, Linux, ARM64]
     strategy:
+      fail-fast: false
+      max-parallel: 4
       matrix:
         php:      ["8.5"]
         node:     ["22","24"]
@@ -270,11 +587,13 @@ jobs:
           cache-from: type=gha,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-arm64
           cache-to: type=gha,mode=max,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-arm64
 
-  create-8-5-manifest:
-    name: Create PHP 8.5 multi-arch manifests
-    needs: [build-8-5-amd64, build-8-5-arm64]
+  create-php-node-8-5-manifest:
+    name: Create PHP 8.5 + Node.js multi-arch manifests
+    needs: [build-php-node-8-5-amd64, build-php-node-8-5-arm64]
     runs-on: ubuntu-latest
     strategy:
+      fail-fast: false
+      max-parallel: 4
       matrix:
         php:      ["8.5"]
         node:     ["22","24"]

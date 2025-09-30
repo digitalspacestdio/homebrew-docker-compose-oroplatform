@@ -141,7 +141,10 @@ args_input=("$@")
 # Save and load XDEBUG_MODE* environment variables
 export PWD=$(pwd)
 export DC_ORO_NAME=${DC_ORO_NAME-$(basename $(pwd))}
-export DC_ORO_CONFIG_DIR="$HOME/.$(basename $0)/${DC_ORO_NAME}"
+# Allow override of config directory via environment variable
+if [[ -z "${DC_ORO_CONFIG_DIR}" ]]; then
+  export DC_ORO_CONFIG_DIR="$HOME/.$(basename $0)/${DC_ORO_NAME}"
+fi
 
 if [[ ! -d "${DC_ORO_CONFIG_DIR}" ]]; then
     mkdir -p "${DC_ORO_CONFIG_DIR}"
