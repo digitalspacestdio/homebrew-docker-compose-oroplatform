@@ -54,7 +54,7 @@ jobs:
     # Use containerized runner with Docker-in-Docker + Path Sync
     container:
       image: myoung34/github-runner:latest
-      options: --privileged -v /var/run/docker.sock:/var/run/docker.sock -v ${{ github.workspace }}:${{ github.workspace }} -w ${{ github.workspace }}
+      options: --privileged -v /var/run/docker.sock:/var/run/docker.sock -v ${{ github.workspace }}:${{ github.workspace }} -v /home/runner:/home/runner -w ${{ github.workspace }}
       env:
         HOMEBREW_NO_AUTO_UPDATE: 1
         HOMEBREW_NO_INSTALL_CLEANUP: 1
@@ -324,7 +324,7 @@ jobs:
     # Use containerized runner with Docker-in-Docker + Path Sync
     container:
       image: myoung34/github-runner:latest
-      options: --privileged -v /var/run/docker.sock:/var/run/docker.sock -v ${{ github.workspace }}:${{ github.workspace }} -w ${{ github.workspace }}
+      options: --privileged -v /var/run/docker.sock:/var/run/docker.sock -v ${{ github.workspace }}:${{ github.workspace }} -v /home/runner:/home/runner -w ${{ github.workspace }}
       env:
         HOMEBREW_NO_AUTO_UPDATE: 1
         HOMEBREW_NO_INSTALL_CLEANUP: 1
