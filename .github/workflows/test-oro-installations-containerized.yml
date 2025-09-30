@@ -1,10 +1,5 @@
 name: Test Oro Installations (Containerized)
 
-# Prevent parallel runs of the same tests - wait for previous to complete
-concurrency:
-  group: containerized-tests-${{ github.ref_name }}
-  cancel-in-progress: false  # Wait for previous run to complete instead of canceling
-
 on:
   push:
     branches: [ main, master, develop ]
@@ -40,7 +35,6 @@ jobs:
     runs-on: ${{ matrix.arch.runner }}
     strategy:
       fail-fast: false
-      max-parallel: 4
       matrix:
         arch:
           - runner: [self-hosted, Linux, X64]
@@ -88,7 +82,7 @@ jobs:
           echo "Setting up containerized environment..."
           
           echo "🏗️ Setting up containerized test environment"
-          echo "Application: ${{ matrix.application }}"
+          echo "Application: ${{ matrix.application.name }}"
           echo "Version: ${{ matrix.version }}"
           echo "Current user: $(whoami)"
           echo "Working directory: $(pwd)" 
@@ -183,7 +177,7 @@ jobs:
           su -c 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc version' runner
           echo "✅ OroDC installation completed"
           
-      - name: Test ${{ matrix.application }} installation
+      - name: Test ${{ matrix.application.name }} installation
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 15
@@ -319,9 +313,9 @@ jobs:
             echo "⏳ Waiting for services to start (max 5 minutes)..."
             timeout 300 bash -c '
               set -e
-              while [ $(docker ps --filter "name=${{ matrix.application }}" --format "{{.Status}}" | grep -c -E "(Up|healthy)" ) -lt 6 ]; do
+              while [ $(docker ps --filter "name=${UNIQUE_PROJECT_NAME}" --format "{{.Status}}" | grep -c -E "(Up|healthy)" ) -lt 6 ]; do
                 echo "Services starting... $(date)"
-                echo "Current status: $(docker ps --filter "name=${{ matrix.application }}" --format "{{.Names}}: {{.Status}}" | head -3)"
+                echo "Current status: $(docker ps --filter "name=${UNIQUE_PROJECT_NAME}" --format "{{.Names}}: {{.Status}}" | head -3)"
                 sleep 10
               done
             ' || {
@@ -490,7 +484,7 @@ jobs:
       - name: Setup container environment
         run: |
           echo "🏗️ Setting up containerized test environment [ARM64]"
-          echo "Application: ${{ matrix.application }}"
+          echo "Application: ${{ matrix.application.name }}"
           echo "Version: ${{ matrix.version }}"
           echo "Current user: $(whoami)"
           echo "Working directory: $(pwd)" 
@@ -581,7 +575,7 @@ jobs:
           su -c 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc version' runner
           echo "✅ OroDC installation completed [ARM64]"
           
-      - name: Test ${{ matrix.application }} installation
+      - name: Test ${{ matrix.application.name }} installation
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 15
@@ -589,7 +583,7 @@ jobs:
           retry_wait_seconds: 30
           command: |
             set -e
-            echo "🚀 Testing ${{ matrix.application }} installation in isolated container [ARM64]..."
+            echo "🚀 Testing ${{ matrix.application.name }} installation in isolated container [ARM64]..."
             echo "🔄 Attempt ${{ github.run_attempt }} of 3 (retry logic active for port conflicts)"
             
             # Setup PATH
@@ -603,7 +597,7 @@ jobs:
             echo "📁 Working in: $TEST_DIR [ARM64]"
             
             # Clone application
-            echo "📥 Cloning ${{ matrix.application }} v${{ matrix.version }}..."
+            echo "📥 Cloning ${{ matrix.application.name }} v${{ matrix.application.version }}..."
             git clone --single-branch --branch ${{ matrix.version }} \
               ${{ matrix.repo_url }} .
               
@@ -657,9 +651,9 @@ jobs:
             echo "⏳ Waiting for services to start (max 5 minutes)..."
             timeout 300 bash -c '
               set -e
-              while [ $(docker ps --filter "name=${{ matrix.application }}" --format "{{.Status}}" | grep -c -E "(Up|healthy)" ) -lt 6 ]; do
+              while [ $(docker ps --filter "name=${UNIQUE_PROJECT_NAME}" --format "{{.Status}}" | grep -c -E "(Up|healthy)" ) -lt 6 ]; do
                 echo "Services starting... $(date)"
-                echo "Current status: $(docker ps --filter "name=${{ matrix.application }}" --format "{{.Names}}: {{.Status}}" | head -3)"
+                echo "Current status: $(docker ps --filter "name=${UNIQUE_PROJECT_NAME}" --format "{{.Names}}: {{.Status}}" | head -3)"
                 sleep 10
               done
             ' || {
