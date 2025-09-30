@@ -194,7 +194,7 @@ jobs:
             # Wait for services with timeout
             echo "⏳ Waiting for services to start (max 5 minutes)..."
             timeout 300 bash -c '
-              while ! su -c "cd \"'"$TEST_DIR"'\" && eval \"\$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)\" && orodc ps" runner | grep -q "Up"; do
+              while ! docker ps --filter "name=${{ matrix.application }}-${{ github.run_id }}-${RANDOM_SUFFIX}-${TIMESTAMP}" --format "{{.Status}}" | grep -q "Up"; do
                 echo "Services starting... $(date)"
                 sleep 10
               done
@@ -444,7 +444,7 @@ jobs:
             # Wait for services with timeout
             echo "⏳ Waiting for services to start (max 5 minutes)..."
             timeout 300 bash -c '
-              while ! su -c "cd \"'"$TEST_DIR"'\" && eval \"\$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)\" && orodc ps" runner | grep -q "Up"; do
+              while ! docker ps --filter "name=${{ matrix.application }}-${{ github.run_id }}-${RANDOM_SUFFIX}-${TIMESTAMP}" --format "{{.Status}}" | grep -q "Up"; do
                 echo "Services starting... $(date)"
                 sleep 10
               done
