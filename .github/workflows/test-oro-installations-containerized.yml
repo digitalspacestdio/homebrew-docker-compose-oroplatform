@@ -383,9 +383,62 @@ jobs:
           
           echo "✅ Cleanup completed for ${{ matrix.application }} [${{ matrix.arch.name }}]"
   
+  # Cleanup workers after all tests complete
+  cleanup-workers:
+    needs: [test-installations] 
+    if: always()
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: 
+          - [self-hosted, Linux, X64]
+          - [self-hosted, Linux, ARM64]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    name: Cleanup Docker Resources [${{ matrix.runner[2] }}]
+    
+    steps:
+      - name: Cleanup Docker Resources
+        run: |
+          echo "🧹 Cleaning up Docker resources on ${{ matrix.runner[2] }} worker..."
+          
+          # Stop and remove all containers (except currently running essential ones)
+          echo "🔄 Stopping and removing old containers..."
+          docker ps -aq --filter "status=exited" | xargs -r docker rm 2>/dev/null || true
+          docker ps -aq --filter "status=created" | xargs -r docker rm 2>/dev/null || true
+          
+          # Remove unused networks (keep default ones)
+          echo "🌐 Cleaning up unused networks..."
+          docker network prune -f 2>/dev/null || true
+          
+          # Remove unused volumes 
+          echo "📁 Cleaning up unused volumes..."
+          docker volume prune -f 2>/dev/null || true
+          
+          # Remove unused images (keep base images, remove dangling)
+          echo "🖼️ Cleaning up unused images..."
+          docker image prune -f 2>/dev/null || true
+          
+          # Clean build cache
+          echo "🔨 Cleaning up build cache..."
+          docker builder prune -f 2>/dev/null || true
+          
+          # System cleanup (comprehensive but safe)
+          echo "🧽 Final system cleanup..."
+          docker system prune -f 2>/dev/null || true
+          
+          # Show final stats
+          echo "📊 Final Docker resource usage:"
+          echo "Containers: $(docker ps -aq | wc -l) total"
+          echo "Images: $(docker images -aq | wc -l) total" 
+          echo "Volumes: $(docker volume ls -q | wc -l) total"
+          echo "Networks: $(docker network ls -q | wc -l) total"
+          
+          echo "✅ Docker cleanup completed on ${{ matrix.runner[2] }}"
+
   # Test summary for all architectures
   test-summary:
-    needs: [test-installations]
+    needs: [test-installations, cleanup-workers]
     runs-on: ubuntu-latest
     if: always()
     
