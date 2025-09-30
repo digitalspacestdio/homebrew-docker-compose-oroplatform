@@ -67,6 +67,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          clean: false  # Don't clean .orodc mounted volume
         
       - name: Setup container environment
         run: |
@@ -341,6 +343,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          clean: false  # Don't clean .orodc mounted volume
         
       - name: Setup container environment
         run: |
