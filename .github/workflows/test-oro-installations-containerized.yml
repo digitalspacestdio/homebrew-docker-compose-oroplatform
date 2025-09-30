@@ -184,6 +184,10 @@ jobs:
             echo "DC_ORO_PORT_PREFIX=$(( 300 + ( ${{ github.run_id }} % 99 ) + ( RANDOM_SUFFIX % 10 ) ))" >> .env.orodc
             echo "DC_ORO_MODE=default" >> .env.orodc
             
+            # Cleanup Docker networks to prevent address pool exhaustion
+            echo "🧹 Cleaning up unused Docker networks..."
+            docker network prune -f 2>/dev/null || true
+            
             # Install and start application (as runner user, not root)
             echo "⚙️  Installing ${{ matrix.application }}..."
             su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc install' runner
@@ -194,6 +198,7 @@ jobs:
             # Wait for services with timeout
             echo "⏳ Waiting for services to start (max 5 minutes)..."
             timeout 300 bash -c '
+              set -e
               while [ $(docker ps --filter "name=${{ matrix.application }}-${{ github.run_id }}-${RANDOM_SUFFIX}-${TIMESTAMP}" --format "{{.Status}}" | grep -c -E "(Up|healthy)" ) -lt 6 ]; do
                 echo "Services starting... $(date)"
                 echo "Current status: $(docker ps --filter "name=${{ matrix.application }}-${{ github.run_id }}-${RANDOM_SUFFIX}-${TIMESTAMP}" --format "{{.Names}}: {{.Status}}" | head -3)"
@@ -435,6 +440,10 @@ jobs:
             echo "DC_ORO_PORT_PREFIX=$(( 400 + ( ${{ github.run_id }} % 99 ) + ( RANDOM_SUFFIX % 10 ) ))" >> .env.orodc
             echo "DC_ORO_MODE=default" >> .env.orodc  
             
+            # Cleanup Docker networks to prevent address pool exhaustion
+            echo "🧹 Cleaning up unused Docker networks..."
+            docker network prune -f 2>/dev/null || true
+            
             # Install and start application (as runner user, not root)
             echo "⚙️  Installing ${{ matrix.application }}..."
             su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc install' runner
@@ -445,6 +454,7 @@ jobs:
             # Wait for services with timeout
             echo "⏳ Waiting for services to start (max 5 minutes)..."
             timeout 300 bash -c '
+              set -e
               while [ $(docker ps --filter "name=${{ matrix.application }}-${{ github.run_id }}-${RANDOM_SUFFIX}-${TIMESTAMP}" --format "{{.Status}}" | grep -c -E "(Up|healthy)" ) -lt 6 ]; do
                 echo "Services starting... $(date)"
                 echo "Current status: $(docker ps --filter "name=${{ matrix.application }}-${{ github.run_id }}-${RANDOM_SUFFIX}-${TIMESTAMP}" --format "{{.Names}}: {{.Status}}" | head -3)"
