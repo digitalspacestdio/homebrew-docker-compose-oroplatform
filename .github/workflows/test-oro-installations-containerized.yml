@@ -174,9 +174,9 @@ jobs:
             # Architecture-specific configuration
             ARCH_NAME="${{ matrix.arch.name }}"
             PORT_BASE="${{ matrix.arch.port_base }}"
-          
-          echo "🚀 Testing ${{ matrix.application }} installation in isolated container [$ARCH_NAME]..."
-          echo "🔄 Attempt ${{ github.run_attempt }} of 3 (retry logic active for port conflicts)"
+            
+            echo "🚀 Testing ${{ matrix.application }} installation in isolated container [$ARCH_NAME]..."
+            echo "🔄 Attempt ${{ github.run_attempt }} of 3 (retry logic active for port conflicts)"
             
             # Create unique test workspace with shorter names to avoid hostname issues
             RANDOM_SUFFIX=$(( RANDOM % 900 + 100 ))  # Use 100-999 range for shorter names
