@@ -86,8 +86,16 @@ jobs:
               groupadd -g 1000 runner 2>/dev/null || true
               useradd -u 1000 -g 1000 -m -s /bin/bash runner 2>/dev/null || true
             }
-            usermod -aG docker runner 2>/dev/null || true
-            echo "Created runner user with UID=1000"
+            
+            # Ensure docker group exists and add runner to it
+            getent group docker >/dev/null || groupadd docker
+            usermod -aG docker runner
+            
+            # Fix Docker socket permissions for runner user
+            chown root:docker /var/run/docker.sock
+            chmod 660 /var/run/docker.sock
+            
+            echo "Created runner user with UID=1000 and Docker access"
           fi
           
           # Fix workspace permissions
@@ -336,8 +344,16 @@ jobs:
               groupadd -g 1000 runner 2>/dev/null || true
               useradd -u 1000 -g 1000 -m -s /bin/bash runner 2>/dev/null || true
             }
-            usermod -aG docker runner 2>/dev/null || true
-            echo "Created runner user with UID=1000 [ARM64]"
+            
+            # Ensure docker group exists and add runner to it
+            getent group docker >/dev/null || groupadd docker
+            usermod -aG docker runner
+            
+            # Fix Docker socket permissions for runner user
+            chown root:docker /var/run/docker.sock
+            chmod 660 /var/run/docker.sock
+            
+            echo "Created runner user with UID=1000 and Docker access [ARM64]"
           fi
           
           # Fix workspace permissions
