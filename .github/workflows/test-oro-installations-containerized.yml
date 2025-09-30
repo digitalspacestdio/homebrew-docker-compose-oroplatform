@@ -112,6 +112,9 @@ jobs:
           mkdir -p "${{ github.workspace }}/.orodc"
           chown -R 1000:1000 "${{ github.workspace }}/.orodc" 2>/dev/null || true
           
+          # Create symlink from ~/.orodc to workspace .orodc (OroDC expects config in HOME)
+          ln -sf "${{ github.workspace }}/.orodc" "/home/runner/.orodc" 2>/dev/null || true
+          
           # Install Homebrew if not present (as runner user with UID=1000)
           if ! command -v /home/linuxbrew/.linuxbrew/bin/brew &> /dev/null; then
             echo "Installing Homebrew as UID=1000 user..."
@@ -383,6 +386,9 @@ jobs:
           mkdir -p "$HOME" "$HOME/.cache" 2>/dev/null || true
           mkdir -p "${{ github.workspace }}/.orodc"
           chown -R 1000:1000 "${{ github.workspace }}/.orodc" 2>/dev/null || true
+          
+          # Create symlink from ~/.orodc to workspace .orodc (OroDC expects config in HOME)
+          ln -sf "${{ github.workspace }}/.orodc" "/home/runner/.orodc" 2>/dev/null || true
           
           # Install Homebrew if not present (as runner user with UID=1000)
           if ! command -v brew &> /dev/null; then
