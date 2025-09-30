@@ -160,8 +160,9 @@ jobs:
             export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
             
             # Create unique test workspace with random port suffix to avoid conflicts
-            RANDOM_SUFFIX=$(( RANDOM % 1000 ))
-            TEST_DIR="${{ github.workspace }}/${{ matrix.application }}-test-${{ github.run_id }}-${RANDOM_SUFFIX}"
+            RANDOM_SUFFIX=$(( RANDOM % 1000 + 1000 ))  # Use 1000-1999 range for better uniqueness
+            TIMESTAMP=$(date +%s)
+            TEST_DIR="${{ github.workspace }}/${{ matrix.application }}-test-${{ github.run_id }}-${RANDOM_SUFFIX}-${TIMESTAMP}"
             
             # Create directory with proper ownership
             mkdir -p "$TEST_DIR"
@@ -179,7 +180,7 @@ jobs:
             
             # Configure OroDC for containerized environment with random port to avoid conflicts
             echo "⚙️  Configuring OroDC for default mode with path sync..."
-            echo "DC_ORO_NAME=${{ matrix.application }}-${{ github.run_id }}-${RANDOM_SUFFIX}" > .env.orodc
+            echo "DC_ORO_NAME=${{ matrix.application }}-${{ github.run_id }}-${RANDOM_SUFFIX}-${TIMESTAMP}" > .env.orodc
             echo "DC_ORO_PORT_PREFIX=$(( 300 + ( ${{ github.run_id }} % 99 ) + ( RANDOM_SUFFIX % 10 ) ))" >> .env.orodc
             echo "DC_ORO_MODE=default" >> .env.orodc
             
@@ -248,7 +249,7 @@ jobs:
             else
               echo "⚠️  Could not detect HTTP port from OroDC"
               echo "📋 Available ports:"
-              su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc ps --format "table {{.Names}}\t{{.Ports}}"' runner || echo "No containers found"
+              su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc ps' runner || echo "No containers found"
             fi
             
             echo "✅ ${{ matrix.application }} test completed successfully!"
