@@ -32,7 +32,6 @@ env:
 jobs:
   # Test installations in isolated containers - Universal (X64 + ARM64)
   test-installations:
-    timeout-minutes: 30
     runs-on: ${{ matrix.arch.runner }}
     strategy:
       fail-fast: false
@@ -304,7 +303,6 @@ jobs:
   
   # Cleanup workers after all tests complete
   cleanup-workers:
-    timeout-minutes: 30
     needs: [test-installations] 
     if: always()
     strategy:
