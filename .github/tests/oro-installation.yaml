@@ -1,0 +1,10 @@
+# Goss test file for OroDC installation verification
+# Simple test - just check main page accessibility
+
+# Test HTTP endpoints
+http:
+  # Main application page - should return redirect (302) to HTTPS
+  "http://localhost:HTTP_PORT":
+    status: 302
+    timeout: 30000
+    no-follow-redirects: true

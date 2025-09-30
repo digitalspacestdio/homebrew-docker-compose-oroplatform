@@ -1,10 +1,5 @@
 name: Test Oro Installations (Containerized)
 
-# Prevent parallel runs of the same tests - wait for previous to complete
-concurrency:
-  group: containerized-tests-${{ github.ref_name }}
-  cancel-in-progress: false  # Wait for previous run to complete instead of canceling
-
 on:
   push:
     branches: [ main, master, develop ]
@@ -40,7 +35,6 @@ jobs:
     runs-on: ${{ matrix.arch.runner }}
     strategy:
       fail-fast: false
-      max-parallel: 4
       matrix:
         arch:
           - runner: [self-hosted, Linux, X64]
@@ -63,10 +57,10 @@ jobs:
             version: 6.1.0
             repo_url: https://github.com/marellocommerce/marello-application.git
     
-    # Use containerized runner with Docker-in-Docker + Path Sync
+    # Use containerized runner with Docker-in-Docker + Path Sync + Host Network
     container:
       image: myoung34/github-runner:latest
-      options: --privileged -v /var/run/docker.sock:/var/run/docker.sock -v ${{ github.workspace }}:${{ github.workspace }} -w ${{ github.workspace }}
+      options: --privileged --network host -v /var/run/docker.sock:/var/run/docker.sock -v ${{ github.workspace }}:${{ github.workspace }} -w ${{ github.workspace }}
       env:
         HOMEBREW_NO_AUTO_UPDATE: 1
         HOMEBREW_NO_INSTALL_CLEANUP: 1
@@ -88,8 +82,8 @@ jobs:
           echo "Setting up containerized environment..."
           
           echo "🏗️ Setting up containerized test environment"
-          echo "Application: ${{ matrix.application }}"
-          echo "Version: ${{ matrix.version }}"
+          echo "Application: ${{ matrix.application.name }}"
+          echo "Version: ${{ matrix.application.version }}"
           echo "Current user: $(whoami)"
           echo "Working directory: $(pwd)" 
           echo "Docker version: $(docker --version || echo 'Docker not available')"
@@ -168,23 +162,12 @@ jobs:
           chown -R runner:runner "$TAP_DIR"
           chmod -R 755 "$TAP_DIR"
           
-          # Verify we're testing the correct commit hash
-          echo "🔍 Verifying commit hash in tap directory..."
-          cd "$TAP_DIR"
           # Fix git ownership issues in CI environment (for both root and runner users)
+          echo "🔍 Configuring git ownership for tap directory..."
+          cd "$TAP_DIR"
           git config --global --add safe.directory "$TAP_DIR"
           su -c "git config --global --add safe.directory '$TAP_DIR'" runner || true
-          CURRENT_HASH=$(git rev-parse HEAD)
-          EXPECTED_HASH="${{ github.sha }}"
-          echo "Expected hash: $EXPECTED_HASH"
-          echo "Current hash:  $CURRENT_HASH"
-          if [[ "$CURRENT_HASH" == "$EXPECTED_HASH" ]]; then
-            echo "✅ Hash verification successful - testing correct commit"
-          else
-            echo "⚠️  Hash mismatch detected - updating to expected commit"
-            git checkout "$EXPECTED_HASH" || git reset --hard "$EXPECTED_HASH"
-            echo "✅ Updated to expected commit: $EXPECTED_HASH"
-          fi
+          echo "✅ Using copied source code for testing"
           
           # Install OroDC (with proper environment)
           echo "🔧 Installing OroDC..."
@@ -194,7 +177,7 @@ jobs:
           su -c 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc version' runner
           echo "✅ OroDC installation completed"
           
-      - name: Test ${{ matrix.application }} installation
+      - name: Install and test ${{ matrix.application.name }}
         uses: nick-fields/retry@v3
         with:
           timeout_minutes: 15
@@ -203,122 +186,61 @@ jobs:
           command: |
             set -e
             
-            # Setup PATH and run as runner user (UID=1000) for correct permissions
+            # Setup PATH and architecture-specific configuration
             export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
-            
-            # Architecture-specific configuration
             ARCH_NAME="${{ matrix.arch.name }}"
             PORT_BASE="${{ matrix.arch.port_base }}"
             
-            echo "🚀 Testing ${{ matrix.application.name }} installation in isolated container [$ARCH_NAME]..."
+            echo "🚀 Installing and testing ${{ matrix.application.name }} [$ARCH_NAME]..."
             echo "🔄 Attempt ${{ github.run_attempt }} of 3 (retry logic active for port conflicts)"
             
             # Create unique test workspace with shorter names to avoid hostname issues
-            RANDOM_SUFFIX=$(( RANDOM % 900 + 100 ))  # Use 100-999 range for shorter names
-            RUN_SHORT=$(echo "${{ github.run_id }}" | tail -c 6)  # Last 5 digits of run_id
+            RANDOM_SUFFIX=$(( RANDOM % 900 + 100 ))
+            RUN_SHORT=$(echo "${{ github.run_id }}" | tail -c 6)
             TEST_BASE_DIR="${{ github.workspace }}/test-${RUN_SHORT}-${RANDOM_SUFFIX}"
             PROJECT_DIR="${TEST_BASE_DIR}/${{ matrix.application.name }}"
             
-            # Export variables so they persist across all operations
-            export TEST_BASE_DIR
-            export PROJECT_DIR
-            export RANDOM_SUFFIX
-            export RUN_SHORT
+            # Create directories with proper ownership
+            mkdir -p "$TEST_BASE_DIR" "$PROJECT_DIR"
+            chown -R 1000:1000 "$TEST_BASE_DIR"
+            chmod -R 755 "$TEST_BASE_DIR"
             
-            # Debug: Check variable values
-            echo "🐛 DEBUG: TEST_BASE_DIR='$TEST_BASE_DIR'"
-            echo "🐛 DEBUG: PROJECT_DIR='$PROJECT_DIR'"
-            echo "🐛 DEBUG: RANDOM_SUFFIX='$RANDOM_SUFFIX'"
-            echo "🐛 DEBUG: RUN_SHORT='$RUN_SHORT'"
-            
-            # Create directories with proper ownership from the start
-            if [ -n "$TEST_BASE_DIR" ]; then
-              mkdir -p "$TEST_BASE_DIR"
-              chown -R 1000:1000 "$TEST_BASE_DIR"
-              chmod -R 755 "$TEST_BASE_DIR"
-            else
-              echo "❌ ERROR: TEST_BASE_DIR is empty!"
-              exit 1
-            fi
-            
-            if [ -n "$PROJECT_DIR" ]; then
-              mkdir -p "$PROJECT_DIR"
-              echo "📁 Working in: $PROJECT_DIR [$ARCH_NAME] (UID=1000)"
-            else
-              echo "❌ ERROR: PROJECT_DIR is empty!"
-              exit 1
-            fi
-            
-            # Clone application into named subdirectory
             echo "📥 Cloning ${{ matrix.application.name }} v${{ matrix.application.version }}..."
             git clone --single-branch --branch ${{ matrix.application.version }} \
               ${{ matrix.application.repo_url }} "$PROJECT_DIR"
               
-            cd "$PROJECT_DIR"
-              
             # Configure git for HTTPS
             git config --global url."https://github.com/".insteadOf git@github.com:
             
-            # Configure OroDC for containerized environment
-            echo "⚙️  Configuring OroDC for default mode with path sync..."
-            # Configure unique project name to avoid port conflicts with other tests
+            # Configure unique project name to avoid port conflicts  
             UNIQUE_PROJECT_NAME="${{ matrix.application.name }}-${RUN_SHORT}-${RANDOM_SUFFIX}"
             PORT_PREFIX=$(( ${PORT_BASE} + ( ${RUN_SHORT} % 99 ) + ( RANDOM_SUFFIX % 10 ) ))
             
-            # Export all OroDC configuration as environment variables (no .env.orodc file needed)
+            # Export OroDC configuration as environment variables
             export DC_ORO_NAME="${UNIQUE_PROJECT_NAME}"
             export DC_ORO_PORT_PREFIX="${PORT_PREFIX}"
             export DC_ORO_MODE=default
             export DC_ORO_CONFIG_DIR="${TEST_BASE_DIR}/.orodc"
             
-            # Debug: Show unique project configuration
-            echo "🐛 DEBUG: Unique project name: ${UNIQUE_PROJECT_NAME}"
-            echo "🐛 DEBUG: Port prefix: ${PORT_PREFIX}"
-            echo "🐛 DEBUG: Config dir: ${TEST_BASE_DIR}/.orodc"
-            
-            # Create OroDC config directory at base level (above project sources)
-            # CRITICAL: Must be inside GitHub workspace for Docker volume mounting
-            echo "🔍 DEBUG: Workspace location: ${{ github.workspace }}"
-            echo "🔍 DEBUG: Config directory: ${TEST_BASE_DIR}/.orodc"
-            echo "🔍 DEBUG: Checking if .orodc is inside workspace..."
-            if [[ "${TEST_BASE_DIR}/.orodc" == "${{ github.workspace }}"* ]]; then
-              echo "✅ .orodc is correctly inside workspace"
-            else
-              echo "❌ ERROR: .orodc is outside workspace - Docker mounting will fail!"
-              exit 1
-            fi
-            
-            # Create as root first, then fix ownership - more reliable than su -c
+            # Create OroDC config directory
             mkdir -p "${TEST_BASE_DIR}/.orodc"
             chown -R 1000:1000 "${TEST_BASE_DIR}/.orodc"
             chmod -R 777 "${TEST_BASE_DIR}/.orodc"
             
-            # Verify .orodc permissions
-            echo "🔍 DEBUG: .orodc permissions:"
-            ls -la "${TEST_BASE_DIR}/.orodc" || echo "❌ Cannot access .orodc"
-            
-            # Cleanup Docker networks to prevent address pool exhaustion
-            echo "🧹 Cleaning up unused Docker networks..."
+            # Cleanup Docker networks
             docker network prune -f 2>/dev/null || true
             
-            # Fix all permissions recursively for Composer and OroDC operations
-            echo "🔧 Setting proper permissions for installation..."
-            if [ -n "$PROJECT_DIR" ]; then
-              chown -R 1000:1000 "$PROJECT_DIR"
-              chmod -R 755 "$PROJECT_DIR"
-            else
-              echo "❌ ERROR: PROJECT_DIR is empty in permissions fix!"
-              exit 1
-            fi
+            echo "⚙️  Installing ${{ matrix.application.name }}..."
             
-            # Install and start application (as runner user, not root)
-            echo "⚙️  Installing ${{ matrix.application.name }} with fresh environment..."
-            # Ensure config directory exists before purge to prevent global cleanup
-            su -c 'mkdir -p "'"${TEST_BASE_DIR}/.orodc"'"' runner
-            # First purge any existing installation to ensure clean state (with proper project isolation)
-            su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_NAME="'"${UNIQUE_PROJECT_NAME}"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc purge' runner || true
-            # Then install fresh (with proper project isolation)
-            su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_NAME="'"${UNIQUE_PROJECT_NAME}"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc install' runner
+            # Fix all permissions recursively for Composer and OroDC operations
+            chown -R 1000:1000 "$PROJECT_DIR"
+            chmod -R 755 "$PROJECT_DIR"
+            
+            # Purge any existing installation to ensure clean state
+            su -c 'cd "'"$PROJECT_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc purge' runner || true
+            
+            # Install fresh with proper environment  
+            su -c 'cd "'"$PROJECT_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc install' runner
             
             echo "🚀 Starting services..."  
             su -c 'cd "'"$PROJECT_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc up -d' runner
@@ -327,71 +249,30 @@ jobs:
             echo "⏳ Waiting for services to start (max 5 minutes)..."
             timeout 300 bash -c '
               set -e
-              while [ $(docker ps --filter "name=${{ matrix.application }}" --format "{{.Status}}" | grep -c -E "(Up|healthy)" ) -lt 6 ]; do
+              while [ $(docker ps --filter "name=${UNIQUE_PROJECT_NAME}" --format "{{.Status}}" | grep -c -E "(Up|healthy)" ) -lt 6 ]; do
                 echo "Services starting... $(date)"
-                echo "Current status: $(docker ps --filter "name=${{ matrix.application }}" --format "{{.Names}}: {{.Status}}" | head -3)"
+                echo "Current status: $(docker ps --filter "name=${UNIQUE_PROJECT_NAME}" --format "{{.Names}}: {{.Status}}" | head -3)"
                 sleep 10
               done
             ' || {
               echo "❌ Services failed to start within timeout"
-              su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_NAME="'"${UNIQUE_PROJECT_NAME}"'" && export DC_ORO_PORT_PREFIX="'"${PORT_PREFIX}"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc logs --tail=20' runner
+              su -c 'cd "'"$PROJECT_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc logs --tail=20' runner
               exit 1
             }
             
-            # Health checks
-            echo "🩺 Performing health checks..."
-            echo "Container status:"
-            echo "🐛 DEBUG: Looking for containers with pattern: ${UNIQUE_PROJECT_NAME}"
-            docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}" | grep "${UNIQUE_PROJECT_NAME}" || echo "No containers found with pattern"
-            echo "🐛 DEBUG: All running containers:"
-            docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+            # Run comprehensive tests using Goss
+            echo "🧪 Running OroDC installation verification with Goss..."
             
-            echo "PHP version:"
-            su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_NAME="'"${UNIQUE_PROJECT_NAME}"'" && export DC_ORO_PORT_PREFIX="'"${PORT_PREFIX}"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc php --version' runner
+            # Export environment variables for Goss script  
+            export UNIQUE_PROJECT_NAME="${UNIQUE_PROJECT_NAME}"
+            export PROJECT_DIR="$PROJECT_DIR"
+            export GITHUB_WORKSPACE="${GITHUB_WORKSPACE:-$(pwd)}"
             
-            echo "Database connection:"
-            su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_NAME="'"${UNIQUE_PROJECT_NAME}"'" && export DC_ORO_PORT_PREFIX="'"${PORT_PREFIX}"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc psql -c "SELECT version();"' runner || echo "⚠️  Database check failed"
+            # Run Goss tests
+            chmod +x "${GITHUB_WORKSPACE}/.github/scripts/run-goss-tests.sh"
+            "${GITHUB_WORKSPACE}/.github/scripts/run-goss-tests.sh"
             
-            # Test HTTP accessibility with actual port detection
-            echo "🌐 Testing web accessibility..."
-            
-            # Extract HTTP port from OroDC configuration
-            HTTP_PORT=$(su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_NAME="'"${UNIQUE_PROJECT_NAME}"'" && export DC_ORO_PORT_PREFIX="'"${PORT_PREFIX}"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc ps --format "table {{.Names}}\t{{.Ports}}"' runner 2>/dev/null | grep nginx | grep -o '0.0.0.0:[0-9]*->80/tcp' | cut -d: -f2 | cut -d- -f1 2>/dev/null || echo "")
-            
-            if [ -n "$HTTP_PORT" ]; then
-              echo "📡 Detected HTTP port: $HTTP_PORT"
-              
-              # Wait for HTTP response (up to 3 minutes)
-              echo "⏳ Waiting for HTTP response..."
-              timeout 180 bash -c "
-                while ! curl -s -o /dev/null -w '%{http_code}' http://localhost:$HTTP_PORT | grep -q '200\|301\|302'; do
-                  echo 'Waiting for HTTP response... $(date)'
-                  sleep 5
-                done
-              " && echo "✅ HTTP server is responding" || echo "⚠️  HTTP test failed or timeout"
-              
-              # Get actual HTTP response
-              echo "📄 HTTP Response:"
-              HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$HTTP_PORT" || echo "000")
-              echo "Status Code: $HTTP_CODE"
-              
-              if [ "$HTTP_CODE" != "000" ]; then
-                CONTENT_LENGTH=$(curl -s -w '%{size_download}' -o /dev/null "http://localhost:$HTTP_PORT" || echo "0")
-                echo "Content Length: $CONTENT_LENGTH bytes"
-                
-                # Get page title if available
-                TITLE=$(curl -s "http://localhost:$HTTP_PORT" | grep -o '<title>[^<]*</title>' | sed 's/<[^>]*>//g' || echo "No title found")
-                echo "Page title: $TITLE"
-              fi
-            else
-              echo "⚠️  Could not detect HTTP port from OroDC"
-              echo "📋 Available ports:"
-              docker ps --format "table {{.Names}}\t{{.Ports}}" | grep -i nginx || echo "No nginx containers found"
-              echo "📋 All container ports:"
-              docker ps --format "table {{.Names}}\t{{.Ports}}"
-            fi
-            
-            echo "✅ ${{ matrix.application.name }} test completed successfully [$ARCH_NAME]!"
+            echo "✅ ${{ matrix.application.name }} installation and tests completed successfully [$ARCH_NAME]!"
           
       - name: Cleanup test environment
         if: always()
@@ -400,21 +281,14 @@ jobs:
           
           export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
           
-          # Navigate to test directory and cleanup
-          TEST_BASE_DIR="${{ github.workspace }}/test-${RUN_SHORT}-*"
-          cd $(dirname "$TEST_DIR") 2>/dev/null || true
-          
-          # Stop and remove containers
-          orodc down --remove-orphans 2>/dev/null || true
-          orodc purge 2>/dev/null || true
-          
-          # Remove test directories
+          # Cleanup test directories with wildcard pattern  
+          RUN_SHORT=$(echo "${{ github.run_id }}" | tail -c 6)
           cd ${{ github.workspace }}
-                 rm -rf ${{ matrix.application }}-${RUN_SHORT}-* 2>/dev/null || true
+          rm -rf test-${RUN_SHORT}-* 2>/dev/null || true
           
           # Cleanup Docker containers and volumes by build ID pattern
           echo "🐳 Cleaning up Docker containers for build ${{ github.run_id }}..."
-                 BUILD_PATTERN="${{ matrix.application }}-${RUN_SHORT}"
+          BUILD_PATTERN="${{ matrix.application.name }}-${RUN_SHORT}"
           
           # Remove containers with build pattern
           docker ps -a --filter "name=$BUILD_PATTERN" --format "{{.ID}}" | xargs -r docker rm -f 2>/dev/null || true
@@ -425,7 +299,7 @@ jobs:
           # Remove networks with build pattern
           docker network ls --filter "name=$BUILD_PATTERN" --format "{{.Name}}" | xargs -r docker network rm 2>/dev/null || true
           
-          echo "✅ Cleanup completed for ${{ matrix.application }} [${{ matrix.arch.name }}]"
+          echo "✅ Cleanup completed for ${{ matrix.application.name }} [${{ matrix.arch.name }}]"
   
   # Cleanup workers after all tests complete
   cleanup-workers:
@@ -485,311 +359,48 @@ jobs:
 
   # Test summary for all architectures
   test-summary:
+    timeout-minutes: 30
     needs: [test-installations, cleanup-workers]
     runs-on: ubuntu-latest
     if: always()
     
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          clean: false  # Don't clean .orodc mounted volume
-        
-      - name: Setup container environment
+      - name: Generate test summary
         run: |
-          echo "🏗️ Setting up containerized test environment [ARM64]"
-          echo "Application: ${{ matrix.application }}"
-          echo "Version: ${{ matrix.version }}"
-          echo "Current user: $(whoami)"
-          echo "Working directory: $(pwd)" 
-          echo "Docker version: $(docker --version || echo 'Docker not available')"
-          echo "Architecture: $(uname -m)"
-          echo "Available space: $(df -h /tmp 2>/dev/null || echo 'Cannot check space')"
-          
-          # Setup runner user with correct UID/GID for permissions
-          if [ "$(whoami)" = "root" ]; then
-            # Create user with UID=1000 for workspace permissions compatibility
-            useradd -u 1000 -g 1000 -m -s /bin/bash runner 2>/dev/null || {
-              # If group 1000 doesn't exist, create it
-              groupadd -g 1000 runner 2>/dev/null || true
-              useradd -u 1000 -g 1000 -m -s /bin/bash runner 2>/dev/null || true
-            }
-            
-            # Ensure docker group exists and add runner to it
-            getent group docker >/dev/null || groupadd docker
-            usermod -aG docker runner
-            
-            # Fix Docker socket permissions for runner user
-            chown root:docker /var/run/docker.sock
-            chmod 660 /var/run/docker.sock
-            
-            echo "Created runner user with UID=1000 and Docker access [ARM64]"
-          fi
-          
-          # Fix workspace permissions
-          chown -R 1000:1000 ${{ github.workspace }} 2>/dev/null || true
-          echo "Fixed workspace permissions for UID=1000 [ARM64]"
-          
-      - name: Install Homebrew and OroDC
-        run: |
-          echo "🍺 Installing Homebrew in isolated container [ARM64]..."
-          
-          # Ensure we have proper HOME and OroDC cache directory with correct ownership
-          export HOME="${HOME:-/home/runner}"
-          mkdir -p "$HOME" "$HOME/.cache" 2>/dev/null || true
-          # OroDC config directories will be created per-project in TEST_DIR
-          echo "OroDC configs will be project-local for Docker compatibility"
-          
-          # Install Homebrew if not present (as runner user with UID=1000)
-          if ! command -v brew &> /dev/null; then
-            echo "Installing Homebrew as UID=1000 user..."
-            su -c 'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"' runner
-          fi
-          
-          # Setup Homebrew PATH
-          export PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:$PATH"
-          echo "PATH=$PATH" >> $GITHUB_ENV
-          
-          # Verify Homebrew
-          brew --version
-          
-          # Install OroDC tap (with proper environment)
-          echo "📦 Installing OroDC tap..."
-          su -c 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && brew tap digitalspacestdio/docker-compose-oroplatform' runner
-          
-          # Preemptively fix git ownership issues for tap directory
-          TAP_DIR="/home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform"
-          echo "🔧 Configuring git safe directories..."
-          git config --global --add safe.directory "$TAP_DIR" || true
-          su -c "git config --global --add safe.directory '$TAP_DIR'" runner || true
-          
-          # Copy current source to tap directory for testing
-          TAP_DIR="/home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform"
-          echo "📁 Copying source to: $TAP_DIR"
-          cp -r "$GITHUB_WORKSPACE"/* "$TAP_DIR/"
-          
-          # SECURITY: Fix ownership of entire tap directory to ensure no sharing between containers
-          # This prevents permission issues and ensures complete isolation between parallel test runs
-          echo "🔐 Setting proper ownership of tap directory..."
-          chown -R runner:runner "$TAP_DIR"
-          chmod -R 755 "$TAP_DIR"
-          
-          # Verify we're testing the correct commit hash
-          echo "🔍 Verifying commit hash in tap directory..."
-          cd "$TAP_DIR"
-          # Fix git ownership issues in CI environment (for both root and runner users)
-          git config --global --add safe.directory "$TAP_DIR"
-          su -c "git config --global --add safe.directory '$TAP_DIR'" runner || true
-          CURRENT_HASH=$(git rev-parse HEAD)
-          EXPECTED_HASH="${{ github.sha }}"
-          echo "Expected hash: $EXPECTED_HASH"
-          echo "Current hash:  $CURRENT_HASH"
-          if [[ "$CURRENT_HASH" == "$EXPECTED_HASH" ]]; then
-            echo "✅ Hash verification successful - testing correct commit"
-          else
-            echo "⚠️  Hash mismatch detected - updating to expected commit"
-            git checkout "$EXPECTED_HASH" || git reset --hard "$EXPECTED_HASH"
-            echo "✅ Updated to expected commit: $EXPECTED_HASH"
-          fi
-          
-          # Install OroDC (with proper environment)
-          echo "🔧 Installing OroDC..."
-          su -c 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform' runner
-          
-          # Verify installation
-          su -c 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc version' runner
-          echo "✅ OroDC installation completed [ARM64]"
-          
-      - name: Test ${{ matrix.application }} installation
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 15
-          max_attempts: 3
-          retry_wait_seconds: 30
-          command: |
-            set -e
-            echo "🚀 Testing ${{ matrix.application }} installation in isolated container [ARM64]..."
-            echo "🔄 Attempt ${{ github.run_attempt }} of 3 (retry logic active for port conflicts)"
-            
-            # Setup PATH
-            export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
-            
-            # Create unique test workspace with random port suffix to avoid conflicts
-            RANDOM_SUFFIX=$(( RANDOM % 1000 ))
-            TEST_DIR="${{ github.workspace }}/${{ matrix.application }}-${RUN_SHORT}-arm64-${RANDOM_SUFFIX}"
-            mkdir -p "$TEST_DIR"
-            cd "$TEST_DIR"
-            echo "📁 Working in: $TEST_DIR [ARM64]"
-            
-            # Clone application
-            echo "📥 Cloning ${{ matrix.application }} v${{ matrix.version }}..."
-            git clone --single-branch --branch ${{ matrix.version }} \
-              ${{ matrix.repo_url }} .
-              
-            # Configure git for HTTPS
-            git config --global url."https://github.com/".insteadOf git@github.com:
-            
-            # Configure OroDC for containerized environment with random port to avoid conflicts
-            echo "⚙️  Configuring OroDC for default mode with path sync..."
-            # Configure unique project name to avoid port conflicts with other tests  
-            UNIQUE_PROJECT_NAME="${{ matrix.application }}-${RUN_SHORT}-arm64-${RANDOM_SUFFIX}"
-            PORT_PREFIX=$(( 400 + ( ${{ github.run_id }} % 99 ) + ( RANDOM_SUFFIX % 10 ) ))
-            
-            # Export all OroDC configuration as environment variables (no .env.orodc file needed)
-            export DC_ORO_NAME="${UNIQUE_PROJECT_NAME}"
-            export DC_ORO_PORT_PREFIX="${PORT_PREFIX}"
-            export DC_ORO_MODE=default
-            export DC_ORO_CONFIG_DIR="${TEST_BASE_DIR}/.orodc"
-            
-            # Debug: Show unique project configuration
-            echo "🐛 DEBUG: Unique project name: ${UNIQUE_PROJECT_NAME}"
-            echo "🐛 DEBUG: Port prefix: ${PORT_PREFIX}"
-            echo "🐛 DEBUG: Config dir: ${TEST_BASE_DIR}/.orodc"  
-            
-            # Cleanup Docker networks to prevent address pool exhaustion
-            echo "🧹 Cleaning up unused Docker networks..."
-            docker network prune -f 2>/dev/null || true
-            
-            # Fix all permissions recursively for Composer and OroDC operations
-            echo "🔧 Setting proper permissions for installation..."
-            if [ -n "$PROJECT_DIR" ]; then
-              chown -R 1000:1000 "$PROJECT_DIR"
-              chmod -R 755 "$PROJECT_DIR"
-            else
-              echo "❌ ERROR: PROJECT_DIR is empty in permissions fix!"
-              exit 1
-            fi
-            
-            # Install and start application (as runner user, not root)
-            echo "⚙️  Installing ${{ matrix.application.name }} with fresh environment..."
-            # Ensure config directory exists before purge to prevent global cleanup
-            su -c 'mkdir -p "'"${TEST_BASE_DIR}/.orodc"'"' runner
-            # First purge any existing installation to ensure clean state (with proper project isolation)
-            su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_NAME="'"${UNIQUE_PROJECT_NAME}"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc purge' runner || true
-            # Then install fresh (with proper project isolation)
-            su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_NAME="'"${UNIQUE_PROJECT_NAME}"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc install' runner
-            
-            echo "🚀 Starting services..."  
-            su -c 'cd "'"$PROJECT_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc up -d' runner
-            
-            # Wait for services with timeout
-            echo "⏳ Waiting for services to start (max 5 minutes)..."
-            timeout 300 bash -c '
-              set -e
-              while [ $(docker ps --filter "name=${{ matrix.application }}" --format "{{.Status}}" | grep -c -E "(Up|healthy)" ) -lt 6 ]; do
-                echo "Services starting... $(date)"
-                echo "Current status: $(docker ps --filter "name=${{ matrix.application }}" --format "{{.Names}}: {{.Status}}" | head -3)"
-                sleep 10
-              done
-            ' || {
-              echo "❌ Services failed to start within timeout"
-              su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_NAME="'"${UNIQUE_PROJECT_NAME}"'" && export DC_ORO_PORT_PREFIX="'"${PORT_PREFIX}"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc logs --tail=20' runner
-              exit 1
-            }
-            
-            # Health checks
-            echo "🩺 Performing health checks [ARM64]..."
-            echo "Container status:"
-            orodc ps
-            
-            echo "PHP version:"
-            orodc php --version
-            
-            echo "Database connection:"
-            orodc psql -c "SELECT version();" || echo "⚠️  Database check failed"
-            
-            # Test HTTP accessibility with actual port detection
-            echo "🌐 Testing web accessibility [ARM64]..."
-            
-            # Extract HTTP port from OroDC configuration
-            HTTP_PORT=$(su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_NAME="'"${UNIQUE_PROJECT_NAME}"'" && export DC_ORO_PORT_PREFIX="'"${PORT_PREFIX}"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc ps --format "table {{.Names}}\t{{.Ports}}"' runner 2>/dev/null | grep nginx | grep -o '0.0.0.0:[0-9]*->80/tcp' | cut -d: -f2 | cut -d- -f1 2>/dev/null || echo "")
-            
-            if [ -n "$HTTP_PORT" ]; then
-              echo "📡 Detected HTTP port: $HTTP_PORT [ARM64]"
-              
-              # Wait for HTTP response (up to 3 minutes)
-              echo "⏳ Waiting for HTTP response..."
-              timeout 180 bash -c "
-                while ! curl -s -o /dev/null -w '%{http_code}' http://localhost:$HTTP_PORT | grep -q '200\|301\|302'; do
-                  echo 'Waiting for HTTP response... $(date)'
-                  sleep 5
-                done
-              " && echo "✅ HTTP server is responding [ARM64]" || echo "⚠️  HTTP test failed or timeout [ARM64]"
-              
-              # Get actual HTTP response
-              echo "📄 HTTP Response:"
-              HTTP_CODE=$(curl -s -o /dev/null -w '%{http_code}' "http://localhost:$HTTP_PORT" || echo "000")
-              echo "Status Code: $HTTP_CODE"
-              
-              if [ "$HTTP_CODE" != "000" ]; then
-                CONTENT_LENGTH=$(curl -s -w '%{size_download}' -o /dev/null "http://localhost:$HTTP_PORT" || echo "0")
-                echo "Content Length: $CONTENT_LENGTH bytes"
-                
-                # Get page title if available
-                TITLE=$(curl -s "http://localhost:$HTTP_PORT" | grep -o '<title>[^<]*</title>' | sed 's/<[^>]*>//g' || echo "No title found")
-                echo "Page title: $TITLE"
-              fi
-            else
-              echo "⚠️  Could not detect HTTP port from OroDC [ARM64]"
-              echo "📋 Available ports:"
-              orodc ps --format "table {{.Names}}\t{{.Ports}}" || echo "No containers found"
-            fi
-            
-            echo "✅ ${{ matrix.application }} test completed successfully [ARM64]!"
-          
-      - name: Cleanup test environment
-        if: always()
-        run: |
-          echo "🧹 Cleaning up ${{ matrix.application }} test environment [ARM64]..."
-          
-          export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
-          
-          # Navigate to test directory and cleanup
-            TEST_DIR="${{ github.workspace }}/${{ matrix.application }}-${RUN_SHORT}-arm64-*"
-          cd $(dirname "$TEST_DIR") 2>/dev/null || true
-          
-          # Stop and remove containers
-          orodc down --remove-orphans 2>/dev/null || true
-          orodc purge 2>/dev/null || true
-          
-          # Remove test directories
-          cd ${{ github.workspace }}
-                 rm -rf ${{ matrix.application }}-${RUN_SHORT}-* 2>/dev/null || true
-          
-          # Cleanup Docker containers and volumes by build ID pattern
-          echo "🐳 Cleaning up Docker containers for build ${{ github.run_id }} [ARM64]..."
-                 BUILD_PATTERN="${{ matrix.application }}-${RUN_SHORT}"
-          
-          # Remove containers with build pattern
-          docker ps -a --filter "name=$BUILD_PATTERN" --format "{{.ID}}" | xargs -r docker rm -f 2>/dev/null || true
-          
-          # Remove volumes with build pattern  
-          docker volume ls --filter "name=$BUILD_PATTERN" --format "{{.Name}}" | xargs -r docker volume rm 2>/dev/null || true
-          
-          # Remove networks with build pattern
-          docker network ls --filter "name=$BUILD_PATTERN" --format "{{.Name}}" | xargs -r docker network rm 2>/dev/null || true
-          
-          echo "✅ Cleanup completed for ${{ matrix.application.name }} [${{ matrix.arch.name }}]"
-          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "📊 OroDC Containerized Installation Tests Summary"
+          echo ""
+          echo "🏗️ **Test Infrastructure:**"
+          echo "- Isolation: Each test runs in myoung34/github-runner container"
+          echo "- Mode: OroDC default mode with synchronized paths"
+          echo "- Architecture: X64 and ARM64 tested in parallel"
+          echo ""
+          echo "🧪 **Testing Framework:**"
+          echo "- Goss-based comprehensive verification"
+          echo "- Structured YAML test definitions"
+          echo "- JUnit XML reports generated"
+          echo ""
+          echo "📦 **Applications Tested:**"
+          echo "- oroplatform (6.1.4)"
+          echo "- orocrm (6.1.4)"  
+          echo "- orocommerce (6.1.4)"
+          echo "- marello (6.1.0)"
+          echo ""
           
           TEST_RESULT="${{ needs.test-installations.result }}"
+          echo "🎯 **Overall Result:** $TEST_RESULT"
           
+          # Add to GitHub step summary
+          echo "" >> $GITHUB_STEP_SUMMARY
           if [ "$TEST_RESULT" = "success" ]; then
             echo "✅ All containerized installation tests passed successfully on all architectures!" >> $GITHUB_STEP_SUMMARY
           else
             echo "❌ Some containerized installation tests failed. Check the job logs for details." >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### Test Result:" >> $GITHUB_STEP_SUMMARY
             echo "- **Status**: $TEST_RESULT" >> $GITHUB_STEP_SUMMARY
           fi
           
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Tested Applications (Containerized):" >> $GITHUB_STEP_SUMMARY
           echo "- 🏗️ **Isolation**: Each test runs in myoung34/github-runner container" >> $GITHUB_STEP_SUMMARY
+          echo "- 🧪 **Testing**: Goss-based comprehensive verification with structured YAML tests" >> $GITHUB_STEP_SUMMARY
           echo "- 🔧 **Mode**: OroDC default mode with synchronized paths" >> $GITHUB_STEP_SUMMARY
-          echo "- 📁 **Path Sync**: Workspace mounted at same path in container" >> $GITHUB_STEP_SUMMARY
-          echo "- 📦 **Applications**:" >> $GITHUB_STEP_SUMMARY  
-          echo "  - oroplatform (6.1.4) - tested on X64 and ARM64" >> $GITHUB_STEP_SUMMARY
-          echo "  - orocrm (6.1.4) - tested on X64 and ARM64" >> $GITHUB_STEP_SUMMARY
-          echo "  - orocommerce (6.1.4) - tested on X64 and ARM64" >> $GITHUB_STEP_SUMMARY
-          echo "  - marello (6.1.0) - tested on X64 and ARM64" >> $GITHUB_STEP_SUMMARY
+          echo "- 📦 **Applications**: oroplatform, orocrm, orocommerce, marello (all on X64 + ARM64)" >> $GITHUB_STEP_SUMMARY
