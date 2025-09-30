@@ -156,9 +156,17 @@ jobs:
           echo "📁 Copying source to: $TAP_DIR"
           cp -r "$GITHUB_WORKSPACE"/* "$TAP_DIR/"
           
+          # SECURITY: Fix ownership of entire tap directory to ensure no sharing between containers
+          # This prevents permission issues and ensures complete isolation between parallel test runs
+          echo "🔐 Setting proper ownership of tap directory..."
+          chown -R runner:runner "$TAP_DIR"
+          chmod -R 755 "$TAP_DIR"
+          
           # Verify we're testing the correct commit hash
           echo "🔍 Verifying commit hash in tap directory..."
           cd "$TAP_DIR"
+          # Fix git ownership issues in CI environment
+          git config --global --add safe.directory "$TAP_DIR"
           CURRENT_HASH=$(git rev-parse HEAD)
           EXPECTED_HASH="${{ github.sha }}"
           echo "Expected hash: $EXPECTED_HASH"
@@ -547,9 +555,17 @@ jobs:
           echo "📁 Copying source to: $TAP_DIR"
           cp -r "$GITHUB_WORKSPACE"/* "$TAP_DIR/"
           
+          # SECURITY: Fix ownership of entire tap directory to ensure no sharing between containers
+          # This prevents permission issues and ensures complete isolation between parallel test runs
+          echo "🔐 Setting proper ownership of tap directory..."
+          chown -R runner:runner "$TAP_DIR"
+          chmod -R 755 "$TAP_DIR"
+          
           # Verify we're testing the correct commit hash
           echo "🔍 Verifying commit hash in tap directory..."
           cd "$TAP_DIR"
+          # Fix git ownership issues in CI environment
+          git config --global --add safe.directory "$TAP_DIR"
           CURRENT_HASH=$(git rev-parse HEAD)
           EXPECTED_HASH="${{ github.sha }}"
           echo "Expected hash: $EXPECTED_HASH"
