@@ -199,9 +199,10 @@ jobs:
             export DC_ORO_CONFIG_DIR="${TEST_BASE_DIR}/.orodc"
             
             # Create OroDC config directory at base level (above project sources)
-            mkdir -p "${TEST_BASE_DIR}/.orodc"
+            # Must be created as runner user (UID=1000) to avoid rsync permission issues
+            su -c 'mkdir -p "'"${TEST_BASE_DIR}/.orodc"'"' runner
             chown -R 1000:1000 "${TEST_BASE_DIR}/.orodc" 2>/dev/null || true
-            chmod -R 755 "${TEST_BASE_DIR}/.orodc" 2>/dev/null || true
+            chmod -R 777 "${TEST_BASE_DIR}/.orodc" 2>/dev/null || true
             
             # Cleanup Docker networks to prevent address pool exhaustion
             echo "🧹 Cleaning up unused Docker networks..."
