@@ -151,14 +151,29 @@ jobs:
           echo "📦 Installing OroDC tap..."
           su -c 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && brew tap digitalspacestdio/docker-compose-oroplatform' runner
           
+          # Preemptively fix git ownership issues for tap directory
+          TAP_DIR="/home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform"
+          echo "🔧 Configuring git safe directories..."
+          git config --global --add safe.directory "$TAP_DIR" || true
+          su -c "git config --global --add safe.directory '$TAP_DIR'" runner || true
+          
           # Copy current source to tap directory for testing
           TAP_DIR="/home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform"
           echo "📁 Copying source to: $TAP_DIR"
           cp -r "$GITHUB_WORKSPACE"/* "$TAP_DIR/"
           
+          # SECURITY: Fix ownership of entire tap directory to ensure no sharing between containers
+          # This prevents permission issues and ensures complete isolation between parallel test runs
+          echo "🔐 Setting proper ownership of tap directory..."
+          chown -R runner:runner "$TAP_DIR"
+          chmod -R 755 "$TAP_DIR"
+          
           # Verify we're testing the correct commit hash
           echo "🔍 Verifying commit hash in tap directory..."
           cd "$TAP_DIR"
+          # Fix git ownership issues in CI environment (for both root and runner users)
+          git config --global --add safe.directory "$TAP_DIR"
+          su -c "git config --global --add safe.directory '$TAP_DIR'" runner || true
           CURRENT_HASH=$(git rev-parse HEAD)
           EXPECTED_HASH="${{ github.sha }}"
           echo "Expected hash: $EXPECTED_HASH"
@@ -542,14 +557,29 @@ jobs:
           echo "📦 Installing OroDC tap..."
           su -c 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && brew tap digitalspacestdio/docker-compose-oroplatform' runner
           
+          # Preemptively fix git ownership issues for tap directory
+          TAP_DIR="/home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform"
+          echo "🔧 Configuring git safe directories..."
+          git config --global --add safe.directory "$TAP_DIR" || true
+          su -c "git config --global --add safe.directory '$TAP_DIR'" runner || true
+          
           # Copy current source to tap directory for testing
           TAP_DIR="/home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform"
           echo "📁 Copying source to: $TAP_DIR"
           cp -r "$GITHUB_WORKSPACE"/* "$TAP_DIR/"
           
+          # SECURITY: Fix ownership of entire tap directory to ensure no sharing between containers
+          # This prevents permission issues and ensures complete isolation between parallel test runs
+          echo "🔐 Setting proper ownership of tap directory..."
+          chown -R runner:runner "$TAP_DIR"
+          chmod -R 755 "$TAP_DIR"
+          
           # Verify we're testing the correct commit hash
           echo "🔍 Verifying commit hash in tap directory..."
           cd "$TAP_DIR"
+          # Fix git ownership issues in CI environment (for both root and runner users)
+          git config --global --add safe.directory "$TAP_DIR"
+          su -c "git config --global --add safe.directory '$TAP_DIR'" runner || true
           CURRENT_HASH=$(git rev-parse HEAD)
           EXPECTED_HASH="${{ github.sha }}"
           echo "Expected hash: $EXPECTED_HASH"
