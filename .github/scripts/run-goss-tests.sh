@@ -78,6 +78,39 @@ prepare_goss_file() {
     echo "🌐 Testing URL: http://localhost:$HTTP_PORT"
 }
 
+# Function to wait for HTTP port to be ready
+wait_for_http_port() {
+    echo "⏳ Waiting for HTTP service on port $HTTP_PORT to be ready..."
+    
+    local max_attempts=30
+    local attempt=1
+    
+    while [ $attempt -le $max_attempts ]; do
+        echo "📡 Attempt $attempt/$max_attempts: Testing HTTP port $HTTP_PORT..."
+        
+        # Test HTTP connectivity with curl
+        if curl -s -f -m 5 "http://localhost:$HTTP_PORT" >/dev/null 2>&1; then
+            echo "✅ HTTP service is ready on port $HTTP_PORT!"
+            return 0
+        fi
+        
+        # Fallback: test TCP connection
+        if timeout 5 bash -c "</dev/tcp/localhost/$HTTP_PORT" >/dev/null 2>&1; then
+            echo "✅ HTTP port $HTTP_PORT is accepting connections!"
+            return 0
+        fi
+        
+        if [ $attempt -eq $max_attempts ]; then
+            echo "❌ HTTP service failed to become ready after $max_attempts attempts"
+            return 1
+        fi
+        
+        echo "⏸️  HTTP not ready yet, waiting 10 seconds..."
+        sleep 10
+        attempt=$((attempt + 1))
+    done
+}
+
 # Function to run Goss tests
 run_goss_tests() {
     echo "🚀 Running Goss tests..."
@@ -124,7 +157,10 @@ main() {
     # Step 3: Prepare Goss test file  
     prepare_goss_file
     
-    # Step 4: Run tests
+    # Step 4: Wait for HTTP service to be ready
+    wait_for_http_port
+    
+    # Step 5: Run tests
     run_goss_tests
     
     echo ""
