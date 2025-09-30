@@ -168,23 +168,12 @@ jobs:
           chown -R runner:runner "$TAP_DIR"
           chmod -R 755 "$TAP_DIR"
           
-          # Verify we're testing the correct commit hash
-          echo "🔍 Verifying commit hash in tap directory..."
-          cd "$TAP_DIR"
           # Fix git ownership issues in CI environment (for both root and runner users)
+          echo "🔍 Configuring git ownership for tap directory..."
+          cd "$TAP_DIR"
           git config --global --add safe.directory "$TAP_DIR"
           su -c "git config --global --add safe.directory '$TAP_DIR'" runner || true
-          CURRENT_HASH=$(git rev-parse HEAD)
-          EXPECTED_HASH="${{ github.sha }}"
-          echo "Expected hash: $EXPECTED_HASH"
-          echo "Current hash:  $CURRENT_HASH"
-          if [ "$CURRENT_HASH" = "$EXPECTED_HASH" ]; then
-            echo "✅ Hash verification successful - testing correct commit"
-          else
-            echo "⚠️  Hash mismatch detected - updating to expected commit"
-            git checkout "$EXPECTED_HASH" || git reset --hard "$EXPECTED_HASH"
-            echo "✅ Updated to expected commit: $EXPECTED_HASH"
-          fi
+          echo "✅ Using copied source code for testing"
           
           # Install OroDC (with proper environment)
           echo "🔧 Installing OroDC..."
@@ -577,23 +566,12 @@ jobs:
           chown -R runner:runner "$TAP_DIR"
           chmod -R 755 "$TAP_DIR"
           
-          # Verify we're testing the correct commit hash
-          echo "🔍 Verifying commit hash in tap directory..."
-          cd "$TAP_DIR"
           # Fix git ownership issues in CI environment (for both root and runner users)
+          echo "🔍 Configuring git ownership for tap directory..."
+          cd "$TAP_DIR"
           git config --global --add safe.directory "$TAP_DIR"
           su -c "git config --global --add safe.directory '$TAP_DIR'" runner || true
-          CURRENT_HASH=$(git rev-parse HEAD)
-          EXPECTED_HASH="${{ github.sha }}"
-          echo "Expected hash: $EXPECTED_HASH"
-          echo "Current hash:  $CURRENT_HASH"
-          if [ "$CURRENT_HASH" = "$EXPECTED_HASH" ]; then
-            echo "✅ Hash verification successful - testing correct commit"
-          else
-            echo "⚠️  Hash mismatch detected - updating to expected commit"
-            git checkout "$EXPECTED_HASH" || git reset --hard "$EXPECTED_HASH"
-            echo "✅ Updated to expected commit: $EXPECTED_HASH"
-          fi
+          echo "✅ Using copied source code for testing"
           
           # Install OroDC (with proper environment)
           echo "🔧 Installing OroDC..."

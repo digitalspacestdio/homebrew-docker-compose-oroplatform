@@ -299,6 +299,8 @@ orodc tests bin/behat --suite=OroUserBundle   # Behat tests
 
 **Note:** Use `~/oroplatform` for consistent testing environment across all OroDC development.
 
+**📋 For comprehensive local testing guidance:** See [LOCAL-TESTING.md](LOCAL-TESTING.md) for detailed testing methods, including quick commands, manual testing, and GitHub Actions locally with Act.
+
 ### Database
 ```bash
 orodc psql                         # PostgreSQL access
@@ -392,6 +394,7 @@ orodc ssh                         # Container access
 - Suggest using `~/oroplatform` test project
 - If it doesn't exist, offer to clone community OroPlatform
 - Always prefer `~/oroplatform` for consistent testing and troubleshooting
+- **For detailed testing methods:** Refer user to [LOCAL-TESTING.md](LOCAL-TESTING.md) for comprehensive local testing guide
 
 ### Repository Management (CRITICAL):
 - **ALWAYS merge/pull ONLY from remote repositories** (origin, main, upstream)
