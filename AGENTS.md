@@ -400,6 +400,45 @@ orodc ssh                         # Container access
 - When updating branches: always sync with remote first, then rebase feature branches
 - Exception: Only merge local branches if user explicitly asks for local branch operations
 
+## OroDC Configuration Directory Customization
+
+### DC_ORO_CONFIG_DIR Environment Variable
+**NEW FEATURE**: OroDC now supports custom configuration directory location via `DC_ORO_CONFIG_DIR` environment variable.
+
+**Usage:**
+```bash
+# Default behavior (unchanged)
+orodc install  # Uses ~/.orodc/{project_name}
+
+# Custom config directory
+export DC_ORO_CONFIG_DIR="/path/to/custom/config"
+orodc install  # Uses /path/to/custom/config
+
+# Project-local config (recommended for CI/CD)
+export DC_ORO_CONFIG_DIR="$(pwd)/.orodc"
+orodc install  # Uses ./.orodc in current project
+```
+
+**Benefits:**
+- 🏠 **Project-local configs**: Store OroDC config alongside project sources
+- 🐳 **Docker-friendly**: Eliminates complex volume mounting in containerized environments
+- 🔒 **Better isolation**: Each project can have completely isolated OroDC configuration
+- 📁 **Version controllable**: OroDC configs can be committed to git if desired
+- 🚀 **CI/CD compatible**: Perfect for automated testing environments
+
+### Recommended Project Structure
+```
+my-oro-project/
+├── .orodc/                  # OroDC configuration & data
+│   ├── docker-compose.yml   # Generated Docker configuration
+│   ├── ssh_id_ed25519       # SSH keys for remote mode
+│   └── .cached_profiles     # Cached Docker profiles
+├── src/                     # Oro application sources
+├── vendor/                  # Composer dependencies
+├── .env.orodc              # OroDC environment variables
+└── .gitignore              # Add .orodc/ if you don't want to version control it
+```
+
 ## Shell Compatibility Requirements
 
 ### Zsh Compatibility (CRITICAL)
@@ -432,25 +471,49 @@ echo "🚨 Port conflict detected"
 
 ## Containerized Testing
 
-### DC_ORO_MODE=ssh for Docker-in-Docker
-**CRITICAL for containerized environments (CI/CD containers):**
+### DC_ORO_MODE Configuration for Different Environments
 
+#### Local Development
 ```bash
-# Required in containerized testing environments
-echo "DC_ORO_MODE=ssh" > .env.orodc
+# Linux/WSL2 (fastest)
+echo "DC_ORO_MODE=default" >> .env.orodc
+
+# macOS (avoid slow Docker filesystem)  
+echo "DC_ORO_MODE=mutagen" >> .env.orodc
+brew install mutagen-io/mutagen/mutagen
 ```
 
-**Why SSH mode in containers:**
-- **Docker-in-Docker limitation**: bind mount volumes from nested containers don't work properly
-- **Volume isolation**: SSH mode bypasses filesystem mount issues in nested Docker environments
-- **Required for**: GitHub Actions containers, CI/CD pipelines, isolated test runners
+#### Containerized Environments (CI/CD)
+**RECOMMENDED: Use project-local config directory with default mode**
 
-**When to use:**
-- ✅ **CI/CD containers** (GitHub Actions, GitLab CI, etc.)
-- ✅ **Docker-in-Docker scenarios** (myoung34/github-runner)
-- ✅ **Containerized test environments**
-- ❌ **Local development** (use `default` or `mutagen`)
-- ❌ **Direct host runners** (non-containerized)
+```bash
+# Modern approach (recommended)
+export DC_ORO_CONFIG_DIR="$(pwd)/.orodc"
+echo "DC_ORO_MODE=default" >> .env.orodc
+```
+
+**Benefits of project-local config:**
+- ✅ **No volume mounting complexity**: Config lives alongside project sources
+- ✅ **Docker-in-Docker compatible**: Works in nested container scenarios  
+- ✅ **Zero git conflicts**: No workspace interference with checkout operations
+- ✅ **Better isolation**: Each test gets completely separate OroDC instance
+- ✅ **Portable**: Config travels with project code
+
+#### Legacy: SSH Mode for Docker-in-Docker (deprecated)
+```bash
+# Only use if project-local config doesn't work
+echo "DC_ORO_MODE=ssh" >> .env.orodc
+```
+
+**When SSH mode was needed:**
+- **Docker-in-Docker limitation**: bind mount volumes from nested containers didn't work properly
+- **Volume isolation**: SSH mode bypassed filesystem mount issues in nested Docker environments
+
+**Why project-local config is better:**
+- Eliminates need for SSH mode complexity
+- Faster setup and execution  
+- No SSH key management required
+- Works reliably in all containerized environments
 
 ## Command Reference
 | Task | Command | Notes |
