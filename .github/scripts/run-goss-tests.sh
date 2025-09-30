@@ -20,8 +20,26 @@ install_goss() {
     fi
     
     echo "📦 Installing Goss..."
+    
+    # Detect architecture
+    ARCH=$(uname -m)
+    case $ARCH in
+        x86_64)
+            GOSS_ARCH="amd64"
+            ;;
+        aarch64|arm64)
+            GOSS_ARCH="arm64"
+            ;;
+        *)
+            echo "❌ Unsupported architecture: $ARCH"
+            exit 1
+            ;;
+    esac
+    
+    echo "🔍 Detected architecture: $ARCH → using goss-linux-$GOSS_ARCH"
+    
     GOSS_VERSION="0.4.7"
-    curl -fsSL https://github.com/goss-org/goss/releases/download/v${GOSS_VERSION}/goss-linux-amd64 -o /tmp/goss
+    curl -fsSL https://github.com/goss-org/goss/releases/download/v${GOSS_VERSION}/goss-linux-${GOSS_ARCH} -o /tmp/goss
     chmod +x /tmp/goss
     sudo mv /tmp/goss /usr/local/bin/goss
     echo "✅ Goss installed: $(goss --version)"
