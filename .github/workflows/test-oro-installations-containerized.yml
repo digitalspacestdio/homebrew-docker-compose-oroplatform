@@ -1,5 +1,10 @@
 name: Test Oro Installations (Containerized)
 
+# Prevent parallel runs of the same tests - wait for previous to complete
+concurrency:
+  group: containerized-tests-${{ github.ref_name }}
+  cancel-in-progress: false  # Wait for previous run to complete instead of canceling
+
 on:
   push:
     branches: [ main, master, develop ]
