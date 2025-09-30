@@ -170,10 +170,10 @@ jobs:
             
             # Setup PATH and run as runner user (UID=1000) for correct permissions
             export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
-          
-          # Architecture-specific configuration
-          ARCH_NAME="${{ matrix.arch.name }}"
-          PORT_BASE="${{ matrix.arch.port_base }}"
+            
+            # Architecture-specific configuration
+            ARCH_NAME="${{ matrix.arch.name }}"
+            PORT_BASE="${{ matrix.arch.port_base }}"
           
           echo "🚀 Testing ${{ matrix.application }} installation in isolated container [$ARCH_NAME]..."
           echo "🔄 Attempt ${{ github.run_attempt }} of 3 (retry logic active for port conflicts)"
