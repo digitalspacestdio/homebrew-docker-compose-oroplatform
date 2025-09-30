@@ -230,7 +230,7 @@ jobs:
               done
             ' || {
               echo "❌ Services failed to start within timeout"
-              su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc logs --tail=20' runner
+              su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc logs --tail=20' runner
               exit 1
             }
             
@@ -240,16 +240,16 @@ jobs:
             docker ps --filter "name=${{ matrix.application }}-${RUN_SHORT}-${RANDOM_SUFFIX}" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
             
             echo "PHP version:"
-            su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc php --version' runner
+            su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc php --version' runner
             
             echo "Database connection:"
-            su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc psql -c "SELECT version();"' runner || echo "⚠️  Database check failed"
+            su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc psql -c "SELECT version();"' runner || echo "⚠️  Database check failed"
             
             # Test HTTP accessibility with actual port detection
             echo "🌐 Testing web accessibility..."
             
             # Extract HTTP port from OroDC configuration
-            HTTP_PORT=$(su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc ps --format "table {{.Names}}\t{{.Ports}}"' runner 2>/dev/null | grep nginx | grep -o '0.0.0.0:[0-9]*->80/tcp' | cut -d: -f2 | cut -d- -f1 2>/dev/null || echo "")
+            HTTP_PORT=$(su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc ps --format "table {{.Names}}\t{{.Ports}}"' runner 2>/dev/null | grep nginx | grep -o '0.0.0.0:[0-9]*->80/tcp' | cut -d: -f2 | cut -d- -f1 2>/dev/null || echo "")
             
             if [ -n "$HTTP_PORT" ]; then
               echo "📡 Detected HTTP port: $HTTP_PORT"
@@ -495,7 +495,7 @@ jobs:
               done
             ' || {
               echo "❌ Services failed to start within timeout"
-              su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc logs --tail=20' runner
+              su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc logs --tail=20' runner
               exit 1
             }
             
@@ -514,7 +514,7 @@ jobs:
             echo "🌐 Testing web accessibility [ARM64]..."
             
             # Extract HTTP port from OroDC configuration
-            HTTP_PORT=$(su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc ps --format "table {{.Names}}\t{{.Ports}}"' runner 2>/dev/null | grep nginx | grep -o '0.0.0.0:[0-9]*->80/tcp' | cut -d: -f2 | cut -d- -f1 2>/dev/null || echo "")
+            HTTP_PORT=$(su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc ps --format "table {{.Names}}\t{{.Ports}}"' runner 2>/dev/null | grep nginx | grep -o '0.0.0.0:[0-9]*->80/tcp' | cut -d: -f2 | cut -d- -f1 2>/dev/null || echo "")
             
             if [ -n "$HTTP_PORT" ]; then
               echo "📡 Detected HTTP port: $HTTP_PORT [ARM64]"
