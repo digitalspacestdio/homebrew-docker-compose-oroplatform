@@ -61,7 +61,7 @@ RUN set -eux; \
     wget \
   ; \
   \
-  wget -O redis.tar.gz "$REDIS_DOWNLOAD_URL"; \
+  wget --progress=dot:giga -O redis.tar.gz "$REDIS_DOWNLOAD_URL"; \
   mkdir -p /usr/src/redis; \
   tar -xzf redis.tar.gz -C /usr/src/redis --strip-components=1; \
   rm redis.tar.gz; \
