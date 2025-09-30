@@ -72,16 +72,16 @@ jobs:
         
       - name: Setup container environment
         run: |
-        # Set OroDC to use project-local config directory
-        echo "DC_ORO_CONFIG_DIR=${{ github.workspace }}/.orodc" >> $GITHUB_ENV
-        
-        echo "🏗️ Setting up containerized test environment"
-        echo "Application: ${{ matrix.application }}"
-        echo "Version: ${{ matrix.version }}"
-        echo "Current user: $(whoami)"
-        echo "Working directory: $(pwd)" 
-        echo "Docker version: $(docker --version || echo 'Docker not available')"
-        echo "Available space: $(df -h /tmp 2>/dev/null || echo 'Cannot check space')"
+          # OroDC config will be set per-project in TEST_DIR (not global)
+          echo "Setting up containerized environment..."
+          
+          echo "🏗️ Setting up containerized test environment"
+          echo "Application: ${{ matrix.application }}"
+          echo "Version: ${{ matrix.version }}"
+          echo "Current user: $(whoami)"
+          echo "Working directory: $(pwd)" 
+          echo "Docker version: $(docker --version || echo 'Docker not available')"
+          echo "Available space: $(df -h /tmp 2>/dev/null || echo 'Cannot check space')"
           
           # Setup runner user with correct UID/GID for permissions
           if [ "$(whoami)" = "root" ]; then
@@ -114,9 +114,8 @@ jobs:
           # Ensure we have proper HOME and OroDC cache directory with correct ownership
           export HOME="${HOME:-/home/runner}"
           mkdir -p "$HOME" "$HOME/.cache" 2>/dev/null || true
-          # Create OroDC config directory in project (no symlinks needed)
-          mkdir -p "${{ github.workspace }}/.orodc"
-          chown -R 1000:1000 "${{ github.workspace }}/.orodc" 2>/dev/null || true
+          # OroDC config directories will be created per-project in TEST_DIR
+          echo "OroDC configs will be project-local for Docker compatibility"
           
           # Install Homebrew if not present (as runner user with UID=1000)
           if ! command -v /home/linuxbrew/.linuxbrew/bin/brew &> /dev/null; then
@@ -170,27 +169,34 @@ jobs:
             # Create unique test workspace with shorter names to avoid hostname issues
             RANDOM_SUFFIX=$(( RANDOM % 900 + 100 ))  # Use 100-999 range for shorter names
             RUN_SHORT=$(echo "${{ github.run_id }}" | tail -c 6)  # Last 5 digits of run_id
-            TEST_DIR="${{ github.workspace }}/${{ matrix.application }}-${RUN_SHORT}-${RANDOM_SUFFIX}"
+            TEST_BASE_DIR="${{ github.workspace }}/test-${RUN_SHORT}-${RANDOM_SUFFIX}"
+            PROJECT_DIR="${TEST_BASE_DIR}/${{ matrix.application }}"
             
-            # Create directory with proper ownership
-            mkdir -p "$TEST_DIR"
-            chown -R 1000:1000 "$TEST_DIR"
-            cd "$TEST_DIR"
-            echo "📁 Working in: $TEST_DIR (UID=1000)"
+            # Create directories with proper ownership
+            mkdir -p "$PROJECT_DIR"
+            chown -R 1000:1000 "$TEST_BASE_DIR"
+            echo "📁 Working in: $PROJECT_DIR (UID=1000)"
             
-            # Clone application
+            # Clone application into named subdirectory
             echo "📥 Cloning ${{ matrix.application }} v${{ matrix.version }}..."
             git clone --single-branch --branch ${{ matrix.version }} \
-              ${{ matrix.repo_url }} .
+              ${{ matrix.repo_url }} "$PROJECT_DIR"
+              
+            cd "$PROJECT_DIR"
               
             # Configure git for HTTPS
             git config --global url."https://github.com/".insteadOf git@github.com:
             
-            # Configure OroDC for containerized environment with shorter names
+            # Configure OroDC for containerized environment
             echo "⚙️  Configuring OroDC for default mode with path sync..."
-            echo "DC_ORO_NAME=${{ matrix.application }}-${RUN_SHORT}-${RANDOM_SUFFIX}" > .env.orodc
-            echo "DC_ORO_PORT_PREFIX=$(( 300 + ( ${RUN_SHORT} % 99 ) + ( RANDOM_SUFFIX % 10 ) ))" >> .env.orodc
+            # OroDC will auto-detect project name from directory: ${{ matrix.application }}
+            echo "DC_ORO_PORT_PREFIX=$(( 300 + ( ${RUN_SHORT} % 99 ) + ( RANDOM_SUFFIX % 10 ) ))" > .env.orodc
             echo "DC_ORO_MODE=default" >> .env.orodc
+            echo "DC_ORO_CONFIG_DIR=${TEST_BASE_DIR}/.orodc" >> .env.orodc
+            
+            # Create OroDC config directory at base level (above project sources)
+            mkdir -p "${TEST_BASE_DIR}/.orodc"
+            chown -R 1000:1000 "${TEST_BASE_DIR}/.orodc" 2>/dev/null || true
             
             # Cleanup Docker networks to prevent address pool exhaustion
             echo "🧹 Cleaning up unused Docker networks..."
@@ -203,18 +209,18 @@ jobs:
             
             # Install and start application (as runner user, not root)
             echo "⚙️  Installing ${{ matrix.application }}..."
-            su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc install' runner
+            su -c 'cd "'"$PROJECT_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc install' runner
             
             echo "🚀 Starting services..."  
-            su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc up -d' runner
+            su -c 'cd "'"$PROJECT_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc up -d' runner
             
             # Wait for services with timeout
             echo "⏳ Waiting for services to start (max 5 minutes)..."
             timeout 300 bash -c '
               set -e
-              while [ $(docker ps --filter "name=${{ matrix.application }}-${RUN_SHORT}-${RANDOM_SUFFIX}" --format "{{.Status}}" | grep -c -E "(Up|healthy)" ) -lt 6 ]; do
+              while [ $(docker ps --filter "name=${{ matrix.application }}" --format "{{.Status}}" | grep -c -E "(Up|healthy)" ) -lt 6 ]; do
                 echo "Services starting... $(date)"
-                echo "Current status: $(docker ps --filter "name=${{ matrix.application }}-${RUN_SHORT}-${RANDOM_SUFFIX}" --format "{{.Names}}: {{.Status}}" | head -3)"
+                echo "Current status: $(docker ps --filter "name=${{ matrix.application }}" --format "{{.Names}}: {{.Status}}" | head -3)"
                 sleep 10
               done
             ' || {
@@ -389,9 +395,8 @@ jobs:
           # Ensure we have proper HOME and OroDC cache directory with correct ownership
           export HOME="${HOME:-/home/runner}"
           mkdir -p "$HOME" "$HOME/.cache" 2>/dev/null || true
-          # Create OroDC config directory in project (no symlinks needed)
-          mkdir -p "${{ github.workspace }}/.orodc"
-          chown -R 1000:1000 "${{ github.workspace }}/.orodc" 2>/dev/null || true
+          # OroDC config directories will be created per-project in TEST_DIR
+          echo "OroDC configs will be project-local for Docker compatibility"
           
           # Install Homebrew if not present (as runner user with UID=1000)
           if ! command -v brew &> /dev/null; then
@@ -469,18 +474,18 @@ jobs:
             
             # Install and start application (as runner user, not root)
             echo "⚙️  Installing ${{ matrix.application }}..."
-            su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc install' runner
+            su -c 'cd "'"$PROJECT_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc install' runner
             
             echo "🚀 Starting services..."  
-            su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc up -d' runner
+            su -c 'cd "'"$PROJECT_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc up -d' runner
             
             # Wait for services with timeout
             echo "⏳ Waiting for services to start (max 5 minutes)..."
             timeout 300 bash -c '
               set -e
-              while [ $(docker ps --filter "name=${{ matrix.application }}-${RUN_SHORT}-${RANDOM_SUFFIX}" --format "{{.Status}}" | grep -c -E "(Up|healthy)" ) -lt 6 ]; do
+              while [ $(docker ps --filter "name=${{ matrix.application }}" --format "{{.Status}}" | grep -c -E "(Up|healthy)" ) -lt 6 ]; do
                 echo "Services starting... $(date)"
-                echo "Current status: $(docker ps --filter "name=${{ matrix.application }}-${RUN_SHORT}-${RANDOM_SUFFIX}" --format "{{.Names}}: {{.Status}}" | head -3)"
+                echo "Current status: $(docker ps --filter "name=${{ matrix.application }}" --format "{{.Names}}: {{.Status}}" | head -3)"
                 sleep 10
               done
             ' || {
