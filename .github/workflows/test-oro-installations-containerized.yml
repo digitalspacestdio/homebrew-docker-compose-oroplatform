@@ -156,6 +156,21 @@ jobs:
           echo "📁 Copying source to: $TAP_DIR"
           cp -r "$GITHUB_WORKSPACE"/* "$TAP_DIR/"
           
+          # Verify we're testing the correct commit hash
+          echo "🔍 Verifying commit hash in tap directory..."
+          cd "$TAP_DIR"
+          CURRENT_HASH=$(git rev-parse HEAD)
+          EXPECTED_HASH="${{ github.sha }}"
+          echo "Expected hash: $EXPECTED_HASH"
+          echo "Current hash:  $CURRENT_HASH"
+          if [[ "$CURRENT_HASH" == "$EXPECTED_HASH" ]]; then
+            echo "✅ Hash verification successful - testing correct commit"
+          else
+            echo "⚠️  Hash mismatch detected - updating to expected commit"
+            git checkout "$EXPECTED_HASH" || git reset --hard "$EXPECTED_HASH"
+            echo "✅ Updated to expected commit: $EXPECTED_HASH"
+          fi
+          
           # Install OroDC (with proper environment)
           echo "🔧 Installing OroDC..."
           su -c 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform' runner
@@ -514,6 +529,21 @@ jobs:
           TAP_DIR="/home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform"
           echo "📁 Copying source to: $TAP_DIR"
           cp -r "$GITHUB_WORKSPACE"/* "$TAP_DIR/"
+          
+          # Verify we're testing the correct commit hash
+          echo "🔍 Verifying commit hash in tap directory..."
+          cd "$TAP_DIR"
+          CURRENT_HASH=$(git rev-parse HEAD)
+          EXPECTED_HASH="${{ github.sha }}"
+          echo "Expected hash: $EXPECTED_HASH"
+          echo "Current hash:  $CURRENT_HASH"
+          if [[ "$CURRENT_HASH" == "$EXPECTED_HASH" ]]; then
+            echo "✅ Hash verification successful - testing correct commit"
+          else
+            echo "⚠️  Hash mismatch detected - updating to expected commit"
+            git checkout "$EXPECTED_HASH" || git reset --hard "$EXPECTED_HASH"
+            echo "✅ Updated to expected commit: $EXPECTED_HASH"
+          fi
           
           # Install OroDC (with proper environment)
           echo "🔧 Installing OroDC..."
