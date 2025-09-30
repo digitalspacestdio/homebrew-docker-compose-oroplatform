@@ -54,7 +54,7 @@ jobs:
     # Use containerized runner with Docker-in-Docker + Path Sync
     container:
       image: myoung34/github-runner:latest
-      options: --privileged -v /var/run/docker.sock:/var/run/docker.sock -v ${{ github.workspace }}:${{ github.workspace }} -w ${{ github.workspace }}
+      options: --privileged -v /var/run/docker.sock:/var/run/docker.sock -v ${{ github.workspace }}:${{ github.workspace }}:Z -w ${{ github.workspace }}
       env:
         HOMEBREW_NO_AUTO_UPDATE: 1
         HOMEBREW_NO_INSTALL_CLEANUP: 1
@@ -67,6 +67,30 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        
+      - name: Fix workspace permissions
+        run: |
+          # Fix workspace ownership and permissions for containerized access
+          echo "🔧 Fixing workspace permissions for UID=1000..."
+          echo "Current workspace: ${{ github.workspace }}"
+          echo "Current permissions:"
+          ls -la ${{ github.workspace }}/ || true
+          
+          # Method 1: Try to change ownership to 1000:1000
+          chown -R 1000:1000 ${{ github.workspace }} 2>/dev/null && echo "✅ Changed ownership to 1000:1000" || {
+            echo "⚠️  Cannot change ownership, setting permissions to 777..."
+            # Method 2: If ownership change fails, set permissions to 777
+            chmod -R 777 ${{ github.workspace }} 2>/dev/null && echo "✅ Set permissions to 777" || {
+              echo "⚠️  Cannot change permissions, trying alternative approach..."
+              # Method 3: Create world-writable subdirectory
+              mkdir -p ${{ github.workspace }}/tmp-workspace
+              chmod 777 ${{ github.workspace }}/tmp-workspace
+              echo "✅ Created writable tmp-workspace"
+            }
+          }
+          
+          echo "Final permissions:"
+          ls -la ${{ github.workspace }}/ || true
         
       - name: Setup container environment
         run: |
@@ -298,7 +322,7 @@ jobs:
     # Use containerized runner with Docker-in-Docker + Path Sync
     container:
       image: myoung34/github-runner:latest
-      options: --privileged -v /var/run/docker.sock:/var/run/docker.sock -v ${{ github.workspace }}:${{ github.workspace }} -w ${{ github.workspace }}
+      options: --privileged -v /var/run/docker.sock:/var/run/docker.sock -v ${{ github.workspace }}:${{ github.workspace }}:Z -w ${{ github.workspace }}
       env:
         HOMEBREW_NO_AUTO_UPDATE: 1
         HOMEBREW_NO_INSTALL_CLEANUP: 1
@@ -311,6 +335,30 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        
+      - name: Fix workspace permissions
+        run: |
+          # Fix workspace ownership and permissions for containerized access
+          echo "🔧 Fixing workspace permissions for UID=1000..."
+          echo "Current workspace: ${{ github.workspace }}"
+          echo "Current permissions:"
+          ls -la ${{ github.workspace }}/ || true
+          
+          # Method 1: Try to change ownership to 1000:1000
+          chown -R 1000:1000 ${{ github.workspace }} 2>/dev/null && echo "✅ Changed ownership to 1000:1000" || {
+            echo "⚠️  Cannot change ownership, setting permissions to 777..."
+            # Method 2: If ownership change fails, set permissions to 777
+            chmod -R 777 ${{ github.workspace }} 2>/dev/null && echo "✅ Set permissions to 777" || {
+              echo "⚠️  Cannot change permissions, trying alternative approach..."
+              # Method 3: Create world-writable subdirectory
+              mkdir -p ${{ github.workspace }}/tmp-workspace
+              chmod 777 ${{ github.workspace }}/tmp-workspace
+              echo "✅ Created writable tmp-workspace"
+            }
+          }
+          
+          echo "Final permissions:"
+          ls -la ${{ github.workspace }}/ || true
         
       - name: Setup container environment
         run: |
