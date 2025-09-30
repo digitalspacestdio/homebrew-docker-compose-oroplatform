@@ -1,5 +1,5 @@
 ARG ALPINE_VERSION=3.21
-ARG PHP_VERSION=8.5
+ARG PHP_VERSION=8.5-rc
 ARG COMPOSER_VERSION=2
 
 # Composer image
@@ -8,38 +8,41 @@ FROM composer:${COMPOSER_VERSION} AS composer_app
 # Php base image - minimal, close to official php:fpm-alpine
 FROM php:${PHP_VERSION}-fpm-alpine${ALPINE_VERSION}
 
-ARG EXT_REDIS_VERSION=6.2.0
-ARG EXT_IGBINARY_VERSION=3.2.15
-ARG EXT_MONGODB_VERSION=1.21.0
-ARG EXT_XDEBUG_VERSION=3.4.5
+# Original extension versions that were tested with PHP 8.5-rc (from Git history)
+ARG EXT_IMAP_VERSION=1.0.3
+ARG EXT_REDIS_VERSION=1d07c3a07efaa7cf9e9a9e9c7f31834f285e4436
+ARG EXT_IGBINARY_VERSION=c7fe8aad3d7894bb85f5a189eba60dec9203950d
+ARG EXT_MONGODB_VERSION=049a2bf76b9419cbe5de100d912d648e0c38e10a
+ARG EXT_XDEBUG_VERSION=2d01ef1408eb8e350a3fef78b3db6d3da10c8620
 
 # Minimal runtime deps required for PHP extensions
 RUN apk add --no-cache \
     libpq \
     icu-data-full \
     icu-libs \
-    freetype \
-    libpng \
-    libjpeg-turbo \
-    libwebp \
     libzip \
     libxml2 \
     libxslt \
     openldap \
+    freetype \
+    libjpeg-turbo \
+    libpng \
+    libwebp \
     gmp \
     tidyhtml-libs \
-    c-client \
+    imap \
     oniguruma \
-  ;
+    git \
+    curl \
+    wget
 
 ARG REDIS_VERSION="6.2.9"
-ARG REDIS_DOWNLOAD_URL="http://download.redis.io/releases/redis-${REDIS_VERSION}.tar.gz"  
+ARG REDIS_DOWNLOAD_URL="http://download.redis.io/releases/redis-${REDIS_VERSION}.tar.gz"
 
 RUN set -eux; \
   apk add --no-cache --virtual .build-deps \
     $PHPIZE_DEPS \
     linux-headers \
-    icu-data-full \
     icu-dev \
     libzip-dev \
     zlib-dev \
@@ -58,9 +61,6 @@ RUN set -eux; \
     musl-dev \
     gcc \
     make \
-    git \
-    curl \
-    wget \
   ; \
   \
   wget -O redis.tar.gz "$REDIS_DOWNLOAD_URL"; \
@@ -72,8 +72,13 @@ RUN set -eux; \
   \
   docker-php-source extract; \
   docker-php-ext-configure zip; \
-  docker-php-ext-configure imap --with-imap --with-imap-ssl; \
   docker-php-ext-configure gd --with-freetype --with-webp --with-jpeg; \
+  \
+  mkdir -p /usr/src/php/ext/imap; \
+  git clone --recursive --branch $EXT_IMAP_VERSION --depth 1 https://github.com/php/pecl-mail-imap.git /usr/src/php/ext/imap; \
+  docker-php-ext-configure imap --with-imap --with-imap-ssl; \
+  docker-php-ext-install -j$(printf "2\n$(nproc)" | sort -g | head -n1) imap; \
+  rm -rf /usr/src/php/ext/imap; \
   \
   mkdir -p /usr/src/php/ext/igbinary; \
   curl -fsSL https://github.com/igbinary/igbinary/archive/$EXT_IGBINARY_VERSION.tar.gz | tar xvz -C /usr/src/php/ext/igbinary --strip 1; \
@@ -96,12 +101,10 @@ RUN set -eux; \
   rm -rf /usr/src/php/ext/mongodb; \
   \
   mkdir -p /usr/src/php/ext/xdebug; \
-  curl -fsSL https://github.com/xdebug/xdebug/archive/refs/tags/$EXT_XDEBUG_VERSION.tar.gz | tar xvz -C /usr/src/php/ext/xdebug --strip 1; \
+  curl -fsSL https://github.com/xdebug/xdebug/archive/$EXT_XDEBUG_VERSION.tar.gz | tar xvz -C /usr/src/php/ext/xdebug --strip 1; \
   docker-php-ext-configure xdebug; \
   docker-php-ext-install -j$(printf "2\n$(nproc)" | sort -g | head -n1) xdebug; \
   rm -rf /usr/src/php/ext/xdebug; \
-  \
-  \
   \
   docker-php-ext-install -j$(printf "2\n$(nproc)" | sort -g | head -n1) \
     pdo_pgsql \
@@ -115,11 +118,9 @@ RUN set -eux; \
     xsl \
     tidy \
     pcntl \
-    imap \
     sockets \
     bcmath \
     mbstring \
-    opcache \
   ; \
   docker-php-source delete; \
   \
@@ -133,14 +134,15 @@ RUN set -eux; \
   \
   apk del .build-deps
 
-# Install composer
-# https://getcomposer.org/doc/03-cli.md#composer-allow-superuser
-ENV COMPOSER_ALLOW_SUPERUSER=1
-ENV PATH="${PATH}:/root/.composer/vendor/bin"
+# Add redis bin
+RUN apk add --no-cache redis
+
+# Install Composer
 COPY --from=composer_app /usr/bin/composer /usr/bin/composer
 
-# Disable XDebug by default
-ENV XDEBUG_MODE=off
+# Set working directory
+WORKDIR /var/www
 
-# Keep standard php-fpm behavior
+# Expose port 9000 and start php-fpm server
+EXPOSE 9000
 CMD ["php-fpm"]

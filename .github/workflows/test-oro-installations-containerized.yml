@@ -178,7 +178,7 @@ jobs:
           EXPECTED_HASH="${{ github.sha }}"
           echo "Expected hash: $EXPECTED_HASH"
           echo "Current hash:  $CURRENT_HASH"
-          if [[ "$CURRENT_HASH" == "$EXPECTED_HASH" ]]; then
+          if [ "$CURRENT_HASH" = "$EXPECTED_HASH" ]; then
             echo "✅ Hash verification successful - testing correct commit"
           else
             echo "⚠️  Hash mismatch detected - updating to expected commit"
@@ -281,12 +281,15 @@ jobs:
             echo "🔍 DEBUG: Workspace location: ${{ github.workspace }}"
             echo "🔍 DEBUG: Config directory: ${TEST_BASE_DIR}/.orodc"
             echo "🔍 DEBUG: Checking if .orodc is inside workspace..."
-            if [[ "${TEST_BASE_DIR}/.orodc" == "${{ github.workspace }}"* ]]; then
-              echo "✅ .orodc is correctly inside workspace"
-            else
-              echo "❌ ERROR: .orodc is outside workspace - Docker mounting will fail!"
-              exit 1
-            fi
+            case "${TEST_BASE_DIR}/.orodc" in
+              "${{ github.workspace }}"*)
+                echo "✅ .orodc is correctly inside workspace"
+                ;;
+              *)
+                echo "❌ ERROR: .orodc is outside workspace - Docker mounting will fail!"
+                exit 1
+                ;;
+            esac
             
             # Create as root first, then fix ownership - more reliable than su -c
             mkdir -p "${TEST_BASE_DIR}/.orodc"
@@ -584,7 +587,7 @@ jobs:
           EXPECTED_HASH="${{ github.sha }}"
           echo "Expected hash: $EXPECTED_HASH"
           echo "Current hash:  $CURRENT_HASH"
-          if [[ "$CURRENT_HASH" == "$EXPECTED_HASH" ]]; then
+          if [ "$CURRENT_HASH" = "$EXPECTED_HASH" ]; then
             echo "✅ Hash verification successful - testing correct commit"
           else
             echo "⚠️  Hash mismatch detected - updating to expected commit"
