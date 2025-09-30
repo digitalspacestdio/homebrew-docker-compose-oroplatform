@@ -54,7 +54,7 @@ jobs:
     # Use containerized runner with Docker-in-Docker + Path Sync
     container:
       image: myoung34/github-runner:latest
-      options: --privileged -v /var/run/docker.sock:/var/run/docker.sock -v ${{ github.workspace }}:${{ github.workspace }} -v /tmp/orodc-${{ github.run_id }}:/tmp/orodc-${{ github.run_id }} -w ${{ github.workspace }}
+      options: --privileged -v /var/run/docker.sock:/var/run/docker.sock -v ${{ github.workspace }}:${{ github.workspace }} -w ${{ github.workspace }}
       env:
         HOMEBREW_NO_AUTO_UPDATE: 1
         HOMEBREW_NO_INSTALL_CLEANUP: 1
@@ -72,9 +72,8 @@ jobs:
         
       - name: Setup container environment
         run: |
-        # Create OroDC cache directory in /tmp (outside workspace)
-        mkdir -p /tmp/orodc-${{ github.run_id }}
-        chmod 777 /tmp/orodc-${{ github.run_id }}
+        # Set OroDC to use project-local config directory
+        echo "DC_ORO_CONFIG_DIR=${{ github.workspace }}/.orodc" >> $GITHUB_ENV
         
         echo "🏗️ Setting up containerized test environment"
         echo "Application: ${{ matrix.application }}"
@@ -115,8 +114,9 @@ jobs:
           # Ensure we have proper HOME and OroDC cache directory with correct ownership
           export HOME="${HOME:-/home/runner}"
           mkdir -p "$HOME" "$HOME/.cache" 2>/dev/null || true
-          # Create symlink from ~/.orodc to /tmp OroDC cache (OroDC expects config in HOME)
-          ln -sf "/tmp/orodc-${{ github.run_id }}" "/home/runner/.orodc" 2>/dev/null || true
+          # Create OroDC config directory in project (no symlinks needed)
+          mkdir -p "${{ github.workspace }}/.orodc"
+          chown -R 1000:1000 "${{ github.workspace }}/.orodc" 2>/dev/null || true
           
           # Install Homebrew if not present (as runner user with UID=1000)
           if ! command -v /home/linuxbrew/.linuxbrew/bin/brew &> /dev/null; then
@@ -331,7 +331,7 @@ jobs:
     # Use containerized runner with Docker-in-Docker + Path Sync
     container:
       image: myoung34/github-runner:latest
-      options: --privileged -v /var/run/docker.sock:/var/run/docker.sock -v ${{ github.workspace }}:${{ github.workspace }} -v /tmp/orodc-${{ github.run_id }}:/tmp/orodc-${{ github.run_id }} -w ${{ github.workspace }}
+      options: --privileged -v /var/run/docker.sock:/var/run/docker.sock -v ${{ github.workspace }}:${{ github.workspace }} -w ${{ github.workspace }}
       env:
         HOMEBREW_NO_AUTO_UPDATE: 1
         HOMEBREW_NO_INSTALL_CLEANUP: 1
@@ -389,8 +389,9 @@ jobs:
           # Ensure we have proper HOME and OroDC cache directory with correct ownership
           export HOME="${HOME:-/home/runner}"
           mkdir -p "$HOME" "$HOME/.cache" 2>/dev/null || true
-          # Create symlink from ~/.orodc to /tmp OroDC cache (OroDC expects config in HOME)
-          ln -sf "/tmp/orodc-${{ github.run_id }}" "/home/runner/.orodc" 2>/dev/null || true
+          # Create OroDC config directory in project (no symlinks needed)
+          mkdir -p "${{ github.workspace }}/.orodc"
+          chown -R 1000:1000 "${{ github.workspace }}/.orodc" 2>/dev/null || true
           
           # Install Homebrew if not present (as runner user with UID=1000)
           if ! command -v brew &> /dev/null; then
