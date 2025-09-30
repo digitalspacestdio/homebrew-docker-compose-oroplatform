@@ -152,10 +152,10 @@ jobs:
           timeout_minutes: 15
           max_attempts: 3
           retry_wait_seconds: 30
-               command: |
-                 set -e
-                 echo "🚀 Testing ${{ matrix.application }} installation in isolated container..."
-                 echo "🔄 Attempt ${{ github.run_attempt }} of 3 (retry logic active for port conflicts)"
+          command: |
+            set -e
+            echo "🚀 Testing ${{ matrix.application }} installation in isolated container..."
+            echo "🔄 Attempt ${{ github.run_attempt }} of 3 (retry logic active for port conflicts)"
             
             # Setup PATH and run as runner user (UID=1000) for correct permissions
             export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
@@ -413,10 +413,10 @@ jobs:
           timeout_minutes: 15
           max_attempts: 3
           retry_wait_seconds: 30
-               command: |
-                 set -e
-                 echo "🚀 Testing ${{ matrix.application }} installation in isolated container [ARM64]..."
-                 echo "🔄 Attempt ${{ github.run_attempt }} of 3 (retry logic active for port conflicts)"
+          command: |
+            set -e
+            echo "🚀 Testing ${{ matrix.application }} installation in isolated container [ARM64]..."
+            echo "🔄 Attempt ${{ github.run_attempt }} of 3 (retry logic active for port conflicts)"
             
             # Setup PATH
             export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
