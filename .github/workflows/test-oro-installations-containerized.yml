@@ -363,9 +363,9 @@ jobs:
           # Remove networks with build pattern
           docker network ls --filter "name=$BUILD_PATTERN" --format "{{.Name}}" | xargs -r docker network rm 2>/dev/null || true
           
-          echo "✅ Cleanup completed for ${{ matrix.application }}"
-
-  # Test installations in isolated containers - ARM64
+          echo "✅ Cleanup completed for ${{ matrix.application }} [${{ matrix.arch.name }}]"
+  
+  # Test summary for all architectures
   test-installations-arm64:
     runs-on: [self-hosted, Linux, ARM64]
     strategy:
@@ -635,9 +635,9 @@ jobs:
           
           echo "✅ Cleanup completed for ${{ matrix.application }} [ARM64]"
 
-  # Test summary for both architectures
+  # Test summary for all architectures  
   test-summary:
-    needs: [test-installations-x64, test-installations-arm64]
+    needs: [test-installations]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -646,18 +646,16 @@ jobs:
           echo "## Containerized Installation Test Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-          X64_RESULT="${{ needs.test-installations-x64.result }}"
-          ARM64_RESULT="${{ needs.test-installations-arm64.result }}"
-          
-          if [ "$X64_RESULT" = "success" ] && [ "$ARM64_RESULT" = "success" ]; then
-            echo "✅ All containerized installation tests passed successfully on both architectures!" >> $GITHUB_STEP_SUMMARY
-          else
-            echo "❌ Some containerized installation tests failed. Check the job logs for details." >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "### Results by Architecture:" >> $GITHUB_STEP_SUMMARY
-            echo "- **X64 (AMD64)**: $X64_RESULT" >> $GITHUB_STEP_SUMMARY
-            echo "- **ARM64**: $ARM64_RESULT" >> $GITHUB_STEP_SUMMARY
-          fi
+        TEST_RESULT="${{ needs.test-installations.result }}"
+        
+        if [ "$TEST_RESULT" = "success" ]; then
+          echo "✅ All containerized installation tests passed successfully on all architectures!" >> $GITHUB_STEP_SUMMARY
+        else
+          echo "❌ Some containerized installation tests failed. Check the job logs for details." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Test Result:" >> $GITHUB_STEP_SUMMARY
+          echo "- **Status**: $TEST_RESULT" >> $GITHUB_STEP_SUMMARY
+        fi
           
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Tested Applications (Containerized):" >> $GITHUB_STEP_SUMMARY
