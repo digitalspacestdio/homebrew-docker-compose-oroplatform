@@ -72,13 +72,16 @@ jobs:
         
       - name: Setup container environment
         run: |
-          echo "🏗️ Setting up containerized test environment"
-          echo "Application: ${{ matrix.application }}"
-          echo "Version: ${{ matrix.version }}"
-          echo "Current user: $(whoami)"
-          echo "Working directory: $(pwd)" 
-          echo "Docker version: $(docker --version || echo 'Docker not available')"
-          echo "Available space: $(df -h /tmp 2>/dev/null || echo 'Cannot check space')"
+        # Clean .orodc to avoid Docker volume mount conflicts
+        rm -rf ${{ github.workspace }}/.orodc 2>/dev/null || true
+        
+        echo "🏗️ Setting up containerized test environment"
+        echo "Application: ${{ matrix.application }}"
+        echo "Version: ${{ matrix.version }}"
+        echo "Current user: $(whoami)"
+        echo "Working directory: $(pwd)" 
+        echo "Docker version: $(docker --version || echo 'Docker not available')"
+        echo "Available space: $(df -h /tmp 2>/dev/null || echo 'Cannot check space')"
           
           # Setup runner user with correct UID/GID for permissions
           if [ "$(whoami)" = "root" ]; then
