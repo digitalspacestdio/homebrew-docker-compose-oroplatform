@@ -194,9 +194,14 @@ jobs:
             echo "DC_ORO_MODE=default" >> .env.orodc
             echo "DC_ORO_CONFIG_DIR=${TEST_BASE_DIR}/.orodc" >> .env.orodc
             
+            # Ensure DC_ORO_MODE is set in environment (not just .env.orodc file)
+            export DC_ORO_MODE=default
+            export DC_ORO_CONFIG_DIR="${TEST_BASE_DIR}/.orodc"
+            
             # Create OroDC config directory at base level (above project sources)
             mkdir -p "${TEST_BASE_DIR}/.orodc"
             chown -R 1000:1000 "${TEST_BASE_DIR}/.orodc" 2>/dev/null || true
+            chmod -R 755 "${TEST_BASE_DIR}/.orodc" 2>/dev/null || true
             
             # Cleanup Docker networks to prevent address pool exhaustion
             echo "🧹 Cleaning up unused Docker networks..."
