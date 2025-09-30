@@ -78,25 +78,35 @@ jobs:
           echo "Docker version: $(docker --version || echo 'Docker not available')"
           echo "Available space: $(df -h /tmp 2>/dev/null || echo 'Cannot check space')"
           
-          # Setup runner user if needed
+          # Setup runner user with correct UID/GID for permissions
           if [ "$(whoami)" = "root" ]; then
-            useradd -m -s /bin/bash runner || true
+            # Create user with UID=1000 for workspace permissions compatibility
+            useradd -u 1000 -g 1000 -m -s /bin/bash runner 2>/dev/null || {
+              # If group 1000 doesn't exist, create it
+              groupadd -g 1000 runner 2>/dev/null || true
+              useradd -u 1000 -g 1000 -m -s /bin/bash runner 2>/dev/null || true
+            }
             usermod -aG docker runner 2>/dev/null || true
-            echo "Created runner user"
+            echo "Created runner user with UID=1000"
           fi
+          
+          # Fix workspace permissions
+          chown -R 1000:1000 ${{ github.workspace }} 2>/dev/null || true
+          echo "Fixed workspace permissions for UID=1000"
           
       - name: Install Homebrew and OroDC
         run: |
           echo "🍺 Installing Homebrew in isolated container..."
           
-          # Ensure we have a proper HOME directory
+          # Ensure we have a proper HOME directory with correct ownership
           export HOME="${HOME:-/home/runner}"
           mkdir -p "$HOME"
+          chown -R 1000:1000 "$HOME" 2>/dev/null || true
           
-          # Install Homebrew if not present
+          # Install Homebrew if not present (as runner user with UID=1000)
           if ! command -v brew &> /dev/null; then
-            echo "Installing Homebrew..."
-            NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            echo "Installing Homebrew as UID=1000 user..."
+            su -c 'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"' runner
           fi
           
           # Setup Homebrew PATH
@@ -106,21 +116,21 @@ jobs:
           # Verify Homebrew
           brew --version
           
-          # Install OroDC tap
+          # Install OroDC tap (as runner user with UID=1000)
           echo "📦 Installing OroDC tap..."
-          brew tap digitalspacestdio/docker-compose-oroplatform
+          su -c 'brew tap digitalspacestdio/docker-compose-oroplatform' runner
           
           # Copy current source to tap directory for testing
           TAP_DIR="/home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform"
           echo "📁 Copying source to: $TAP_DIR"
           cp -r "$GITHUB_WORKSPACE"/* "$TAP_DIR/"
           
-          # Install OroDC
+          # Install OroDC (as runner user with UID=1000)
           echo "🔧 Installing OroDC..."
-          brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform
+          su -c 'brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform' runner
           
           # Verify installation
-          /home/linuxbrew/.linuxbrew/bin/orodc version
+          su -c '/home/linuxbrew/.linuxbrew/bin/orodc version' runner
           echo "✅ OroDC installation completed"
           
       - name: Test ${{ matrix.application }} installation
@@ -133,15 +143,18 @@ jobs:
             echo "🚀 Testing ${{ matrix.application }} installation in isolated container..."
             echo "🔄 Attempt ${{ github.run_attempt }} of 3 (retry logic active for port conflicts)"
             
-            # Setup PATH
+            # Setup PATH and run as runner user (UID=1000) for correct permissions
             export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
-          
+            
             # Create unique test workspace with random port suffix to avoid conflicts
             RANDOM_SUFFIX=$(( RANDOM % 1000 ))
             TEST_DIR="${{ github.workspace }}/${{ matrix.application }}-test-${{ github.run_id }}-${RANDOM_SUFFIX}"
+            
+            # Create directory with proper ownership
             mkdir -p "$TEST_DIR"
+            chown -R 1000:1000 "$TEST_DIR"
             cd "$TEST_DIR"
-            echo "📁 Working in: $TEST_DIR"
+            echo "📁 Working in: $TEST_DIR (UID=1000)"
             
             # Clone application
             echo "📥 Cloning ${{ matrix.application }} v${{ matrix.version }}..."
@@ -310,25 +323,35 @@ jobs:
           echo "Architecture: $(uname -m)"
           echo "Available space: $(df -h /tmp 2>/dev/null || echo 'Cannot check space')"
           
-          # Setup runner user if needed
+          # Setup runner user with correct UID/GID for permissions
           if [ "$(whoami)" = "root" ]; then
-            useradd -m -s /bin/bash runner || true
+            # Create user with UID=1000 for workspace permissions compatibility
+            useradd -u 1000 -g 1000 -m -s /bin/bash runner 2>/dev/null || {
+              # If group 1000 doesn't exist, create it
+              groupadd -g 1000 runner 2>/dev/null || true
+              useradd -u 1000 -g 1000 -m -s /bin/bash runner 2>/dev/null || true
+            }
             usermod -aG docker runner 2>/dev/null || true
-            echo "Created runner user"
+            echo "Created runner user with UID=1000 [ARM64]"
           fi
+          
+          # Fix workspace permissions
+          chown -R 1000:1000 ${{ github.workspace }} 2>/dev/null || true
+          echo "Fixed workspace permissions for UID=1000 [ARM64]"
           
       - name: Install Homebrew and OroDC
         run: |
           echo "🍺 Installing Homebrew in isolated container [ARM64]..."
           
-          # Ensure we have a proper HOME directory
+          # Ensure we have a proper HOME directory with correct ownership
           export HOME="${HOME:-/home/runner}"
           mkdir -p "$HOME"
+          chown -R 1000:1000 "$HOME" 2>/dev/null || true
           
-          # Install Homebrew if not present
+          # Install Homebrew if not present (as runner user with UID=1000)
           if ! command -v brew &> /dev/null; then
-            echo "Installing Homebrew..."
-            NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            echo "Installing Homebrew as UID=1000 user..."
+            su -c 'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"' runner
           fi
           
           # Setup Homebrew PATH
@@ -338,21 +361,21 @@ jobs:
           # Verify Homebrew
           brew --version
           
-          # Install OroDC tap
+          # Install OroDC tap (as runner user with UID=1000)
           echo "📦 Installing OroDC tap..."
-          brew tap digitalspacestdio/docker-compose-oroplatform
+          su -c 'brew tap digitalspacestdio/docker-compose-oroplatform' runner
           
           # Copy current source to tap directory for testing
           TAP_DIR="/home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform"
           echo "📁 Copying source to: $TAP_DIR"
           cp -r "$GITHUB_WORKSPACE"/* "$TAP_DIR/"
           
-          # Install OroDC
+          # Install OroDC (as runner user with UID=1000)
           echo "🔧 Installing OroDC..."
-          brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform
+          su -c 'brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform' runner
           
           # Verify installation
-          /home/linuxbrew/.linuxbrew/bin/orodc version
+          su -c '/home/linuxbrew/.linuxbrew/bin/orodc version' runner
           echo "✅ OroDC installation completed [ARM64]"
           
       - name: Test ${{ matrix.application }} installation
