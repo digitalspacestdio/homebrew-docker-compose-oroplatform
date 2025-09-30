@@ -204,8 +204,8 @@ jobs:
             
             # Fix all permissions recursively for Composer and OroDC operations
             echo "🔧 Setting proper permissions for installation..."
-            chown -R 1000:1000 "$TEST_DIR"
-            chmod -R 755 "$TEST_DIR"
+            chown -R 1000:1000 "$PROJECT_DIR"
+            chmod -R 755 "$PROJECT_DIR"
             
             # Install and start application (as runner user, not root)
             echo "⚙️  Installing ${{ matrix.application }}..."
@@ -469,8 +469,8 @@ jobs:
             
             # Fix all permissions recursively for Composer and OroDC operations
             echo "🔧 Setting proper permissions for installation..."
-            chown -R 1000:1000 "$TEST_DIR"
-            chmod -R 755 "$TEST_DIR"
+            chown -R 1000:1000 "$PROJECT_DIR"
+            chmod -R 755 "$PROJECT_DIR"
             
             # Install and start application (as runner user, not root)
             echo "⚙️  Installing ${{ matrix.application }}..."
