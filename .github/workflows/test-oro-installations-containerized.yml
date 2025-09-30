@@ -54,7 +54,7 @@ jobs:
     # Use containerized runner with Docker-in-Docker + Path Sync
     container:
       image: myoung34/github-runner:latest
-      options: --privileged -v /var/run/docker.sock:/var/run/docker.sock -v ${{ github.workspace }}:${{ github.workspace }} -v /home/runner:/home/runner -w ${{ github.workspace }}
+      options: --privileged -v /var/run/docker.sock:/var/run/docker.sock -v ${{ github.workspace }}:${{ github.workspace }} -v ${{ github.workspace }}/.orodc-cache:/home/runner/.orodc -w ${{ github.workspace }}
       env:
         HOMEBREW_NO_AUTO_UPDATE: 1
         HOMEBREW_NO_INSTALL_CLEANUP: 1
@@ -106,10 +106,11 @@ jobs:
         run: |
           echo "🍺 Installing Homebrew in isolated container..."
           
-          # Ensure we have a proper HOME directory with correct ownership
-          export HOME="${HOME:-/home/runner}"
-          mkdir -p "$HOME"
-          chown -R 1000:1000 "$HOME" 2>/dev/null || true
+        # Ensure we have proper HOME and OroDC cache directory with correct ownership
+        export HOME="${HOME:-/home/runner}"
+        mkdir -p "$HOME" "$HOME/.cache" 2>/dev/null || true
+        mkdir -p "${{ github.workspace }}/.orodc-cache"
+        chown -R 1000:1000 "${{ github.workspace }}/.orodc-cache" 2>/dev/null || true
           
           # Install Homebrew if not present (as runner user with UID=1000)
           if ! command -v /home/linuxbrew/.linuxbrew/bin/brew &> /dev/null; then
@@ -324,7 +325,7 @@ jobs:
     # Use containerized runner with Docker-in-Docker + Path Sync
     container:
       image: myoung34/github-runner:latest
-      options: --privileged -v /var/run/docker.sock:/var/run/docker.sock -v ${{ github.workspace }}:${{ github.workspace }} -v /home/runner:/home/runner -w ${{ github.workspace }}
+      options: --privileged -v /var/run/docker.sock:/var/run/docker.sock -v ${{ github.workspace }}:${{ github.workspace }} -v ${{ github.workspace }}/.orodc-cache:/home/runner/.orodc -w ${{ github.workspace }}
       env:
         HOMEBREW_NO_AUTO_UPDATE: 1
         HOMEBREW_NO_INSTALL_CLEANUP: 1
@@ -377,10 +378,11 @@ jobs:
         run: |
           echo "🍺 Installing Homebrew in isolated container [ARM64]..."
           
-          # Ensure we have a proper HOME directory with correct ownership
-          export HOME="${HOME:-/home/runner}"
-          mkdir -p "$HOME"
-          chown -R 1000:1000 "$HOME" 2>/dev/null || true
+        # Ensure we have proper HOME and OroDC cache directory with correct ownership
+        export HOME="${HOME:-/home/runner}"
+        mkdir -p "$HOME" "$HOME/.cache" 2>/dev/null || true
+        mkdir -p "${{ github.workspace }}/.orodc-cache"
+        chown -R 1000:1000 "${{ github.workspace }}/.orodc-cache" 2>/dev/null || true
           
           # Install Homebrew if not present (as runner user with UID=1000)
           if ! command -v brew &> /dev/null; then
