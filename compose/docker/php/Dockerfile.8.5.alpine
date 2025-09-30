@@ -1,50 +1,77 @@
 ARG ALPINE_VERSION=3.21
-ARG PHP_VERSION=8.5
+ARG PHP_VERSION=8.5-rc
 ARG COMPOSER_VERSION=2
+
 
 # Composer image
 FROM composer:${COMPOSER_VERSION} AS composer_app
 
-# Php base image - minimal, close to official php:fpm-alpine
-FROM php:${PHP_VERSION}-fpm-alpine${ALPINE_VERSION}
+FROM php:${PHP_VERSION}-fpm-alpine${ALPINE_VERSION} AS app_php
 
-# Set shell with pipefail option for better error handling
-SHELL ["/bin/ash", "-o", "pipefail", "-c"]
-# Original extension versions that were tested with PHP 8.5 (from Git history)
+ARG STABILITY="stable"
+ENV STABILIT=${STABILITY}
+
+ARG PHP_UID=1000
+ENV PHP_UID=${PHP_UID}
+
+ARG PHP_GID=1000
+ENV PHP_GID=${PHP_GID}
+
+ARG PHP_USER_NAME=developer
+ENV PHP_USER_NAME=${PHP_USER_NAME}
+
+ARG PHP_USER_GROUP=developer
+ENV PHP_USER_GROUP=${PHP_USER_GROUP}
 ARG EXT_IMAP_VERSION=1.0.3
 ARG EXT_REDIS_VERSION=1d07c3a07efaa7cf9e9a9e9c7f31834f285e4436
 ARG EXT_IGBINARY_VERSION=c7fe8aad3d7894bb85f5a189eba60dec9203950d
 ARG EXT_MONGODB_VERSION=049a2bf76b9419cbe5de100d912d648e0c38e10a
 ARG EXT_XDEBUG_VERSION=2d01ef1408eb8e350a3fef78b3db6d3da10c8620
 
-# Minimal runtime deps required for PHP extensions
+# persistent / runtime deps
 RUN apk add --no-cache \
-    libpq \
-    icu-data-full \
-    icu-libs \
-    libzip \
-    libxml2 \
-    libxslt \
-    openldap \
-    freetype \
-    libjpeg-turbo \
-    libpng \
-    libwebp \
-    gmp \
-    tidyhtml-libs \
-    imap \
-    oniguruma \
-    git \
+    acl \
+    ca-certificates \
     curl \
-    wget
+    bash \
+    fcgi \
+    file \
+    gettext \
+    git \
+    nss-tools \
+    openssh \
+    msmtp-openrc \
+    msmtp \
+    jpegoptim \
+    pngquant \
+    optipng \
+    gifsicle \
+    libstdc++ \
+    libxext \
+    libxrender \
+    libxtst \
+    libxi \
+    freetype \
+    procps \
+    gcompat \
+    rsync \
+    libpq \
+    vim \
+    micro \
+    postgresql-client \
+    mysql-client \
+    util-linux \
+    patch \
+  ;
 
 ARG REDIS_VERSION="6.2.9"
-ARG REDIS_DOWNLOAD_URL="http://download.redis.io/releases/redis-${REDIS_VERSION}.tar.gz"
+ARG REDIS_DOWNLOAD_URL="http://download.redis.io/releases/redis-${REDIS_VERSION}.tar.gz"  
 
 RUN set -eux; \
   apk add --no-cache --virtual .build-deps \
     $PHPIZE_DEPS \
     linux-headers \
+    icu-data-full \
     icu-dev \
     libzip-dev \
     zlib-dev \
@@ -60,12 +87,12 @@ RUN set -eux; \
     tidyhtml-dev \
     imap-dev \
     oniguruma-dev \
-    musl-dev \
+    musl-dev \ 
     gcc \
     make \
   ; \
   \
-  wget --progress=dot:giga -O redis.tar.gz "$REDIS_DOWNLOAD_URL"; \
+  wget -O redis.tar.gz "$REDIS_DOWNLOAD_URL"; \
   mkdir -p /usr/src/redis; \
   tar -xzf redis.tar.gz -C /usr/src/redis --strip-components=1; \
   rm redis.tar.gz; \
@@ -136,15 +163,35 @@ RUN set -eux; \
   \
   apk del .build-deps
 
-# Add redis bin
-RUN apk add --no-cache redis
+RUN echo 'export JAVA_HOME=/opt/jbr' >> /etc/profile.d/java.sh; \
+    echo 'export PATH=$JAVA_HOME/bin:$PATH' >> /etc/profile.d/java.sh; \
+    ln -s /opt/jbr/bin/java /usr/bin/java
 
-# Install Composer
-COPY --from=composer_app /usr/bin/composer /usr/bin/composer
+RUN addgroup -g $PHP_GID ${PHP_USER_GROUP} \
+    && adduser -u $PHP_UID -G ${PHP_USER_GROUP} -s /bin/sh -D ${PHP_USER_NAME} \
+    && rm -rf /var/www/*  \
+    && chown ${PHP_USER_NAME}:${PHP_USER_GROUP} /var/www
 
-# Set working directory
-WORKDIR /var/www
+RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
 
-# Expose port 9000 and start php-fpm server
-EXPOSE 9000
-CMD ["php-fpm"]
+RUN mkdir -p /var/run/php
+
+COPY --chmod=0755 docker-healthcheck.sh /usr/local/bin/docker-healthcheck
+COPY --chmod=0755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint
+COPY --chmod=0755 docker-sshd.sh /usr/local/bin/docker-sshd
+
+COPY --chmod=0755 docker-psql.sh /usr/local/bin/psql
+COPY --chmod=0755 docker-mysql.sh /usr/local/bin/mysql
+
+ENTRYPOINT ["docker-entrypoint"]
+
+RUN rm -f $PHP_INI_DIR/conf.d/app.prod.ini; \
+  mv "$PHP_INI_DIR/php.ini" "$PHP_INI_DIR/php.ini-production"; \
+  mv "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini"
+
+COPY app.ini $PHP_INI_DIR/conf.d/
+COPY app.opcache.ini $PHP_INI_DIR/conf.d/
+COPY app.msmtp.ini $PHP_INI_DIR/conf.d/
+COPY app.xdebug.ini $PHP_INI_DIR/conf.d/
+COPY php-fpm.conf /usr/local/etc/php-fpm.conf
+
