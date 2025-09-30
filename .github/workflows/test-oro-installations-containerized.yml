@@ -376,38 +376,10 @@ jobs:
           echo "✅ Cleanup completed for ${{ matrix.application }} [${{ matrix.arch.name }}]"
   
   # Test summary for all architectures
-  test-installations-arm64:
-    runs-on: [self-hosted, Linux, ARM64]
-    strategy:
-      fail-fast: false
-      max-parallel: 4
-      matrix:
-        include:
-          - application: oroplatform
-            version: 6.1.4
-            repo_url: https://github.com/oroinc/platform-application.git
-          - application: orocrm
-            version: 6.1.4
-            repo_url: https://github.com/oroinc/crm-application.git
-          - application: orocommerce
-            version: 6.1.4
-            repo_url: https://github.com/oroinc/orocommerce-application.git
-          - application: marello
-            version: 6.1.0
-            repo_url: https://github.com/marellocommerce/marello-application.git
-    
-    # Use containerized runner with Docker-in-Docker + Path Sync
-    container:
-      image: myoung34/github-runner:latest
-      options: --privileged -v /var/run/docker.sock:/var/run/docker.sock -v ${{ github.workspace }}:${{ github.workspace }} -w ${{ github.workspace }}
-      env:
-        HOMEBREW_NO_AUTO_UPDATE: 1
-        HOMEBREW_NO_INSTALL_CLEANUP: 1
-        HOMEBREW_NO_ANALYTICS: 1
-        DC_ORO_MODE: default
-    
-    timeout-minutes: 90
-    name: Test ${{ matrix.application }} (${{ matrix.version }}) [ARM64-Containerized]
+  test-summary:
+    needs: [test-installations]
+    runs-on: ubuntu-latest
+    if: always()
     
     steps:
       - name: Checkout repository
@@ -644,28 +616,20 @@ jobs:
           docker network ls --filter "name=$BUILD_PATTERN" --format "{{.Name}}" | xargs -r docker network rm 2>/dev/null || true
           
           echo "✅ Cleanup completed for ${{ matrix.application }} [ARM64]"
-
-  # Test summary for all architectures  
-  test-summary:
-    needs: [test-installations]
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - name: Test Summary
         run: |
           echo "## Containerized Installation Test Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
-        TEST_RESULT="${{ needs.test-installations.result }}"
-        
-        if [ "$TEST_RESULT" = "success" ]; then
-          echo "✅ All containerized installation tests passed successfully on all architectures!" >> $GITHUB_STEP_SUMMARY
-        else
-          echo "❌ Some containerized installation tests failed. Check the job logs for details." >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### Test Result:" >> $GITHUB_STEP_SUMMARY
-          echo "- **Status**: $TEST_RESULT" >> $GITHUB_STEP_SUMMARY
-        fi
+          TEST_RESULT="${{ needs.test-installations.result }}"
+          
+          if [ "$TEST_RESULT" = "success" ]; then
+            echo "✅ All containerized installation tests passed successfully on all architectures!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ Some containerized installation tests failed. Check the job logs for details." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Test Result:" >> $GITHUB_STEP_SUMMARY
+            echo "- **Status**: $TEST_RESULT" >> $GITHUB_STEP_SUMMARY
+          fi
           
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Tested Applications (Containerized):" >> $GITHUB_STEP_SUMMARY
