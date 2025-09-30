@@ -218,9 +218,14 @@ jobs:
             export DC_ORO_CONFIG_DIR="${TEST_BASE_DIR}/.orodc"
             
             # Create OroDC config directory at base level (above project sources)
-            # Since TEST_BASE_DIR already has proper ownership, runner can create .orodc
-            su -c 'mkdir -p "'"${TEST_BASE_DIR}/.orodc"'"' runner
-            chmod -R 777 "${TEST_BASE_DIR}/.orodc" 2>/dev/null || true
+            # Create as root first, then fix ownership - more reliable than su -c
+            mkdir -p "${TEST_BASE_DIR}/.orodc"
+            chown -R 1000:1000 "${TEST_BASE_DIR}/.orodc"
+            chmod -R 777 "${TEST_BASE_DIR}/.orodc"
+            
+            # Verify .orodc permissions
+            echo "🔍 DEBUG: .orodc permissions:"
+            ls -la "${TEST_BASE_DIR}/.orodc" || echo "❌ Cannot access .orodc"
             
             # Cleanup Docker networks to prevent address pool exhaustion
             echo "🧹 Cleaning up unused Docker networks..."
