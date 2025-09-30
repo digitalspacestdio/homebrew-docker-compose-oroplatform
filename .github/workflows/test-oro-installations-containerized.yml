@@ -269,7 +269,7 @@ jobs:
           export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
           
           # Navigate to test directory and cleanup  
-          TEST_DIR="${{ github.workspace }}/${{ matrix.application }}-test-${{ github.run_id }}-*"
+            TEST_DIR="${{ github.workspace }}/${{ matrix.application }}-${RUN_SHORT}-*"
           cd $(dirname "$TEST_DIR") 2>/dev/null || true
           
           # Stop and remove containers
@@ -423,7 +423,7 @@ jobs:
             
             # Create unique test workspace with random port suffix to avoid conflicts
             RANDOM_SUFFIX=$(( RANDOM % 1000 ))
-            TEST_DIR="${{ github.workspace }}/${{ matrix.application }}-test-${{ github.run_id }}-arm64-${RANDOM_SUFFIX}"
+            TEST_DIR="${{ github.workspace }}/${{ matrix.application }}-${RUN_SHORT}-arm64-${RANDOM_SUFFIX}"
             mkdir -p "$TEST_DIR"
             cd "$TEST_DIR"
             echo "📁 Working in: $TEST_DIR [ARM64]"
@@ -438,7 +438,7 @@ jobs:
             
             # Configure OroDC for containerized environment with random port to avoid conflicts
             echo "⚙️  Configuring OroDC for default mode with path sync..."
-            echo "DC_ORO_NAME=${{ matrix.application }}-${{ github.run_id }}-arm64-${RANDOM_SUFFIX}" > .env.orodc
+            echo "DC_ORO_NAME=${{ matrix.application }}-${RUN_SHORT}-arm64-${RANDOM_SUFFIX}" > .env.orodc
             echo "DC_ORO_PORT_PREFIX=$(( 400 + ( ${{ github.run_id }} % 99 ) + ( RANDOM_SUFFIX % 10 ) ))" >> .env.orodc
             echo "DC_ORO_MODE=default" >> .env.orodc  
             
@@ -526,7 +526,7 @@ jobs:
           export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
           
           # Navigate to test directory and cleanup
-          TEST_DIR="${{ github.workspace }}/${{ matrix.application }}-test-${{ github.run_id }}-arm64-*"
+            TEST_DIR="${{ github.workspace }}/${{ matrix.application }}-${RUN_SHORT}-arm64-*"
           cd $(dirname "$TEST_DIR") 2>/dev/null || true
           
           # Stop and remove containers
