@@ -57,10 +57,10 @@ jobs:
             version: 6.1.0
             repo_url: https://github.com/marellocommerce/marello-application.git
     
-    # Use containerized runner with Docker-in-Docker + Path Sync
+    # Use containerized runner with Docker-in-Docker + Path Sync + Host Network
     container:
       image: myoung34/github-runner:latest
-      options: --privileged -v /var/run/docker.sock:/var/run/docker.sock -v ${{ github.workspace }}:${{ github.workspace }} -w ${{ github.workspace }}
+      options: --privileged --network host -v /var/run/docker.sock:/var/run/docker.sock -v ${{ github.workspace }}:${{ github.workspace }} -w ${{ github.workspace }}
       env:
         HOMEBREW_NO_AUTO_UPDATE: 1
         HOMEBREW_NO_INSTALL_CLEANUP: 1
