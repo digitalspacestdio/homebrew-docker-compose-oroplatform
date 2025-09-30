@@ -4,6 +4,32 @@ This document contains guidelines for AI agents working with the homebrew-docker
 
 ---
 
+# 🚨 **CRITICAL: PRE-PUSH MANDATORY SYNC!**
+
+## ⚡ **BEFORE ANY BRANCH CREATION - MANDATORY STEPS:**
+
+```bash
+# ✅ ALWAYS DO THIS FIRST! EVERY TIME! NO EXCEPTIONS!
+git fetch --all
+git checkout master  
+git pull main master    # NOT origin master!
+git push origin master  # Update your fork
+
+# ❌ ONLY AFTER SYNC - create branch:
+git checkout -b feature/your-branch-name
+```
+
+**🔥 FAILURE TO SYNC CAUSES:**
+- Merge conflicts
+- Divergent branches  
+- Failed CI/CD
+- Broken Pull Requests
+- Wasted time debugging
+
+**⛔ NEVER SKIP THIS STEP!**
+
+---
+
 # Git Workflow Guidelines
 
 ## 🔄 **Upstream Repository Management**

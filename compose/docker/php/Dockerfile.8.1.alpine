@@ -1,8 +1,6 @@
 ARG ALPINE_VERSION=3.18
 ARG PHP_VERSION=8.1
 ARG COMPOSER_VERSION=2
-
-
 # Composer image
 FROM composer:${COMPOSER_VERSION} AS composer_app
 
@@ -168,30 +166,3 @@ RUN addgroup -g $PHP_GID ${PHP_USER_GROUP} \
 RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
 
 RUN mkdir -p /var/run/php
-
-COPY --chmod=0755 docker-healthcheck.sh /usr/local/bin/docker-healthcheck
-COPY --chmod=0755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint
-COPY --chmod=0755 docker-sshd.sh /usr/local/bin/docker-sshd
-
-COPY --chmod=0755 docker-psql.sh /usr/local/bin/psql
-COPY --chmod=0755 docker-mysql.sh /usr/local/bin/mysql
-
-ENTRYPOINT ["docker-entrypoint"]
-
-RUN rm -f $PHP_INI_DIR/conf.d/app.prod.ini; \
-  mv "$PHP_INI_DIR/php.ini" "$PHP_INI_DIR/php.ini-production"; \
-  mv "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini"
-
-COPY app.ini $PHP_INI_DIR/conf.d/
-COPY app.opcache.ini $PHP_INI_DIR/conf.d/
-COPY app.msmtp.ini $PHP_INI_DIR/conf.d/
-COPY app.xdebug.ini $PHP_INI_DIR/conf.d/
-COPY php-fpm.conf /usr/local/etc/php-fpm.conf
-
-# Copy nodejs binaries
-
- # smoke test
-RUN node --version && npm --version && yarn --version
-
-# Install ofelia
-COPY --from=mcuadros/ofelia:latest /usr/bin/ofelia /usr/bin/ofelia
