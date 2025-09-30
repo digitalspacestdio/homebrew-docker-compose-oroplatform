@@ -219,7 +219,7 @@ jobs:
             echo "🌐 Testing web accessibility..."
             
             # Extract HTTP port from OroDC configuration
-            HTTP_PORT=$(su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc ps --format "table {{.Names}}\t{{.Ports}}"' runner | grep nginx | grep -o '0.0.0.0:[0-9]*->80/tcp' | cut -d: -f2 | cut -d- -f1 || echo "")
+            HTTP_PORT=$(su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc ps --format "table {{.Names}}\t{{.Ports}}"' runner 2>/dev/null | grep nginx | grep -o '0.0.0.0:[0-9]*->80/tcp' | cut -d: -f2 | cut -d- -f1 2>/dev/null || echo "")
             
             if [ -n "$HTTP_PORT" ]; then
               echo "📡 Detected HTTP port: $HTTP_PORT"
@@ -469,7 +469,7 @@ jobs:
             echo "🌐 Testing web accessibility [ARM64]..."
             
             # Extract HTTP port from OroDC configuration
-            HTTP_PORT=$(su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc ps --format "table {{.Names}}\t{{.Ports}}"' runner | grep nginx | grep -o '0.0.0.0:[0-9]*->80/tcp' | cut -d: -f2 | cut -d- -f1 || echo "")
+            HTTP_PORT=$(su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc ps --format "table {{.Names}}\t{{.Ports}}"' runner 2>/dev/null | grep nginx | grep -o '0.0.0.0:[0-9]*->80/tcp' | cut -d: -f2 | cut -d- -f1 2>/dev/null || echo "")
             
             if [ -n "$HTTP_PORT" ]; then
               echo "📡 Detected HTTP port: $HTTP_PORT [ARM64]"
