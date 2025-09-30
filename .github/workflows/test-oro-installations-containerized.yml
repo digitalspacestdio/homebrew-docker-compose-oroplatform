@@ -165,11 +165,11 @@ jobs:
           timeout_minutes: 15
           max_attempts: 3
           retry_wait_seconds: 30
-        command: |
-          set -e
-          
-          # Setup PATH and run as runner user (UID=1000) for correct permissions
-          export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
+          command: |
+            set -e
+            
+            # Setup PATH and run as runner user (UID=1000) for correct permissions
+            export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
           
           # Architecture-specific configuration
           ARCH_NAME="${{ matrix.arch.name }}"
@@ -616,8 +616,6 @@ jobs:
           docker network ls --filter "name=$BUILD_PATTERN" --format "{{.Name}}" | xargs -r docker network rm 2>/dev/null || true
           
           echo "✅ Cleanup completed for ${{ matrix.application }} [ARM64]"
-        run: |
-          echo "## Containerized Installation Test Results" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           TEST_RESULT="${{ needs.test-installations.result }}"
