@@ -88,13 +88,13 @@ run_goss_tests() {
     fi
     
     # Run Goss with custom test file
-    if goss --gossfile "$GOSS_FILE" validate --format junit > "/tmp/goss-results-${UNIQUE_PROJECT_NAME}.xml"; then
+    if goss -g "$GOSS_FILE" validate --format junit > "/tmp/goss-results-${UNIQUE_PROJECT_NAME}.xml"; then
         echo "✅ All Goss tests PASSED!"
         
-        # Also run with pretty output for console
+        # Also run with documentation output for console
         echo ""
         echo "📊 Detailed test results:"
-        goss --gossfile "$GOSS_FILE" validate --format pretty || true
+        goss -g "$GOSS_FILE" validate --format documentation || true
         
         return 0
     else
@@ -103,7 +103,7 @@ run_goss_tests() {
         # Show detailed results even on failure
         echo ""
         echo "📊 Detailed test results:"
-        goss --gossfile "$GOSS_FILE" validate --format pretty || true
+        goss -g "$GOSS_FILE" validate --format documentation || true
         
         return 1
     fi
