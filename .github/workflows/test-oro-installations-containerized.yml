@@ -30,13 +30,20 @@ env:
   DC_ORO_MODE: default
 
 jobs:
-  # Test installations in isolated containers - X64
-  test-installations-x64:
-    runs-on: [self-hosted, Linux, X64]
+  # Test installations in isolated containers - Universal (X64 + ARM64)
+  test-installations:
+    runs-on: ${{ matrix.arch.runner }}
     strategy:
       fail-fast: false
       max-parallel: 4
       matrix:
+        arch:
+          - runner: [self-hosted, Linux, X64]
+            name: X64
+            port_base: 300
+          - runner: [self-hosted, Linux, ARM64] 
+            name: ARM64
+            port_base: 400
         include:
           - application: oroplatform
             version: 6.1.4
@@ -62,7 +69,7 @@ jobs:
         DC_ORO_MODE: default
     
     timeout-minutes: 90
-    name: Test ${{ matrix.application }} (${{ matrix.version }}) [X64-Containerized]
+    name: Test ${{ matrix.application }} (${{ matrix.version }}) [${{ matrix.arch.name }}]
     
     steps:
       - name: Checkout repository
@@ -160,11 +167,15 @@ jobs:
           retry_wait_seconds: 30
           command: |
             set -e
-            echo "🚀 Testing ${{ matrix.application }} installation in isolated container..."
-            echo "🔄 Attempt ${{ github.run_attempt }} of 3 (retry logic active for port conflicts)"
+          echo "🚀 Testing ${{ matrix.application }} installation in isolated container [$ARCH_NAME]..."
+          echo "🔄 Attempt ${{ github.run_attempt }} of 3 (retry logic active for port conflicts)"
             
-            # Setup PATH and run as runner user (UID=1000) for correct permissions
-            export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
+          # Setup PATH and run as runner user (UID=1000) for correct permissions
+          export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
+          
+          # Architecture-specific configuration
+          ARCH_NAME="${{ matrix.arch.name }}"
+          PORT_BASE="${{ matrix.arch.port_base }}"
             
             # Create unique test workspace with shorter names to avoid hostname issues
             RANDOM_SUFFIX=$(( RANDOM % 900 + 100 ))  # Use 100-999 range for shorter names
@@ -196,7 +207,7 @@ jobs:
             
             if [ -n "$PROJECT_DIR" ]; then
               mkdir -p "$PROJECT_DIR"
-              echo "📁 Working in: $PROJECT_DIR (UID=1000)"
+              echo "📁 Working in: $PROJECT_DIR [$ARCH_NAME] (UID=1000)"
             else
               echo "❌ ERROR: PROJECT_DIR is empty!"
               exit 1
@@ -215,7 +226,7 @@ jobs:
             # Configure OroDC for containerized environment
             echo "⚙️  Configuring OroDC for default mode with path sync..."
             # OroDC will auto-detect project name from directory: ${{ matrix.application }}
-            echo "DC_ORO_PORT_PREFIX=$(( 300 + ( ${RUN_SHORT} % 99 ) + ( RANDOM_SUFFIX % 10 ) ))" > .env.orodc
+            echo "DC_ORO_PORT_PREFIX=$(( ${PORT_BASE} + ( ${RUN_SHORT} % 99 ) + ( RANDOM_SUFFIX % 10 ) ))" > .env.orodc
             echo "DC_ORO_MODE=default" >> .env.orodc
             echo "DC_ORO_CONFIG_DIR=${TEST_BASE_DIR}/.orodc" >> .env.orodc
             
@@ -317,12 +328,12 @@ jobs:
               docker ps --filter "name=${{ matrix.application }}-${RUN_SHORT}-${RANDOM_SUFFIX}" --format "table {{.Names}}\t{{.Ports}}" || echo "No containers found"
             fi
             
-            echo "✅ ${{ matrix.application }} test completed successfully!"
+            echo "✅ ${{ matrix.application }} test completed successfully [$ARCH_NAME]!"
           
       - name: Cleanup test environment
         if: always()
         run: |
-          echo "🧹 Cleaning up ${{ matrix.application }} test environment..."
+          echo "🧹 Cleaning up ${{ matrix.application }} test environment [${{ matrix.arch.name }}]..."
           
           export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
           
