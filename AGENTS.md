@@ -422,9 +422,23 @@ orodc install  # Uses ./.orodc in current project
 **Benefits:**
 - 🏠 **Project-local configs**: Store OroDC config alongside project sources
 - 🐳 **Docker-friendly**: Eliminates complex volume mounting in containerized environments
-- 🔒 **Better isolation**: Each project can have completely isolated OroDC configuration
-- 📁 **Version controllable**: OroDC configs can be committed to git if desired
-- 🚀 **CI/CD compatible**: Perfect for automated testing environments
+- 🔒 **Better isolation**: Each project has completely separate OroDC configuration
+
+**CRITICAL for CI/CD and Containerized Environments:**
+- **DC_ORO_CONFIG_DIR MUST be inside the workspace/project directory**
+- **Required for Docker volume mounting to work properly**
+- **Use unique suffixes for parallel test runs to prevent conflicts**
+- **Never use .env.orodc file in CI - only environment variables**
+
+**CI/CD Example:**
+```bash
+# ✅ CORRECT - config inside workspace
+export DC_ORO_CONFIG_DIR="${GITHUB_WORKSPACE}/test-${BUILD_ID}/.orodc"
+export DC_ORO_NAME="myproject-${BUILD_ID}-${RANDOM}"
+
+# ❌ WRONG - config outside workspace
+export DC_ORO_CONFIG_DIR="/tmp/.orodc"  # Docker mounting fails!
+```
 
 ### Recommended Project Structure
 ```

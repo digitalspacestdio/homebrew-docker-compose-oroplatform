@@ -248,19 +248,31 @@ jobs:
             echo "⚙️  Configuring OroDC for default mode with path sync..."
             # Configure unique project name to avoid port conflicts with other tests
             UNIQUE_PROJECT_NAME="${{ matrix.application.name }}-${RUN_SHORT}-${RANDOM_SUFFIX}"
-            echo "DC_ORO_NAME=${UNIQUE_PROJECT_NAME}" > .env.orodc
-            echo "DC_ORO_PORT_PREFIX=$(( ${PORT_BASE} + ( ${RUN_SHORT} % 99 ) + ( RANDOM_SUFFIX % 10 ) ))" >> .env.orodc
-            echo "DC_ORO_MODE=default" >> .env.orodc
-            echo "DC_ORO_CONFIG_DIR=${TEST_BASE_DIR}/.orodc" >> .env.orodc
+            PORT_PREFIX=$(( ${PORT_BASE} + ( ${RUN_SHORT} % 99 ) + ( RANDOM_SUFFIX % 10 ) ))
             
-            # Debug: Show unique project configuration
-            echo "🐛 DEBUG: Unique project name: ${UNIQUE_PROJECT_NAME}"
-            
-            # Ensure DC_ORO_MODE is set in environment (not just .env.orodc file)
+            # Export all OroDC configuration as environment variables (no .env.orodc file needed)
+            export DC_ORO_NAME="${UNIQUE_PROJECT_NAME}"
+            export DC_ORO_PORT_PREFIX="${PORT_PREFIX}"
             export DC_ORO_MODE=default
             export DC_ORO_CONFIG_DIR="${TEST_BASE_DIR}/.orodc"
             
+            # Debug: Show unique project configuration
+            echo "🐛 DEBUG: Unique project name: ${UNIQUE_PROJECT_NAME}"
+            echo "🐛 DEBUG: Port prefix: ${PORT_PREFIX}"
+            echo "🐛 DEBUG: Config dir: ${TEST_BASE_DIR}/.orodc"
+            
             # Create OroDC config directory at base level (above project sources)
+            # CRITICAL: Must be inside GitHub workspace for Docker volume mounting
+            echo "🔍 DEBUG: Workspace location: ${{ github.workspace }}"
+            echo "🔍 DEBUG: Config directory: ${TEST_BASE_DIR}/.orodc"
+            echo "🔍 DEBUG: Checking if .orodc is inside workspace..."
+            if [[ "${TEST_BASE_DIR}/.orodc" == "${{ github.workspace }}"* ]]; then
+              echo "✅ .orodc is correctly inside workspace"
+            else
+              echo "❌ ERROR: .orodc is outside workspace - Docker mounting will fail!"
+              exit 1
+            fi
+            
             # Create as root first, then fix ownership - more reliable than su -c
             mkdir -p "${TEST_BASE_DIR}/.orodc"
             chown -R 1000:1000 "${TEST_BASE_DIR}/.orodc"
@@ -286,10 +298,12 @@ jobs:
             
             # Install and start application (as runner user, not root)
             echo "⚙️  Installing ${{ matrix.application.name }} with fresh environment..."
-            # First purge any existing installation to ensure clean state
-            su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc purge' runner || true
-            # Then install fresh
-            su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc install' runner
+            # Ensure config directory exists before purge to prevent global cleanup
+            su -c 'mkdir -p "'"${TEST_BASE_DIR}/.orodc"'"' runner
+            # First purge any existing installation to ensure clean state (with proper project isolation)
+            su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_NAME="'"${UNIQUE_PROJECT_NAME}"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc purge' runner || true
+            # Then install fresh (with proper project isolation)
+            su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_NAME="'"${UNIQUE_PROJECT_NAME}"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc install' runner
             
             echo "🚀 Starting services..."  
             su -c 'cd "'"$PROJECT_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc up -d' runner
@@ -305,7 +319,7 @@ jobs:
               done
             ' || {
               echo "❌ Services failed to start within timeout"
-              su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc logs --tail=20' runner
+              su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_NAME="'"${UNIQUE_PROJECT_NAME}"'" && export DC_ORO_PORT_PREFIX="'"${PORT_PREFIX}"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc logs --tail=20' runner
               exit 1
             }
             
@@ -318,16 +332,16 @@ jobs:
             docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
             
             echo "PHP version:"
-            su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc php --version' runner
+            su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_NAME="'"${UNIQUE_PROJECT_NAME}"'" && export DC_ORO_PORT_PREFIX="'"${PORT_PREFIX}"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc php --version' runner
             
             echo "Database connection:"
-            su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc psql -c "SELECT version();"' runner || echo "⚠️  Database check failed"
+            su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_NAME="'"${UNIQUE_PROJECT_NAME}"'" && export DC_ORO_PORT_PREFIX="'"${PORT_PREFIX}"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc psql -c "SELECT version();"' runner || echo "⚠️  Database check failed"
             
             # Test HTTP accessibility with actual port detection
             echo "🌐 Testing web accessibility..."
             
             # Extract HTTP port from OroDC configuration
-            HTTP_PORT=$(su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc ps --format "table {{.Names}}\t{{.Ports}}"' runner 2>/dev/null | grep nginx | grep -o '0.0.0.0:[0-9]*->80/tcp' | cut -d: -f2 | cut -d- -f1 2>/dev/null || echo "")
+            HTTP_PORT=$(su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_NAME="'"${UNIQUE_PROJECT_NAME}"'" && export DC_ORO_PORT_PREFIX="'"${PORT_PREFIX}"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc ps --format "table {{.Names}}\t{{.Ports}}"' runner 2>/dev/null | grep nginx | grep -o '0.0.0.0:[0-9]*->80/tcp' | cut -d: -f2 | cut -d- -f1 2>/dev/null || echo "")
             
             if [ -n "$HTTP_PORT" ]; then
               echo "📡 Detected HTTP port: $HTTP_PORT"
@@ -417,10 +431,13 @@ jobs:
         run: |
           echo "🧹 Cleaning up Docker resources on ${{ matrix.runner[2] }} worker..."
           
-          # Stop and remove all containers (except currently running essential ones)
-          echo "🔄 Stopping and removing old containers..."
-          docker ps -aq --filter "status=exited" | xargs -r docker rm 2>/dev/null || true
-          docker ps -aq --filter "status=created" | xargs -r docker rm 2>/dev/null || true
+          # Stop and remove only test-related containers (safer approach)
+          echo "🔄 Stopping and removing test containers..."
+          # Only remove containers from our CI builds (with run ID pattern)
+          RUN_SHORT=$(echo "${{ github.run_id }}" | tail -c 6)
+          docker ps -aq --filter "name=oroplatform-${RUN_SHORT}" | xargs -r docker rm -f 2>/dev/null || true
+          docker ps -aq --filter "name=orocommerce-${RUN_SHORT}" | xargs -r docker rm -f 2>/dev/null || true
+          docker ps -aq --filter "name=marello-${RUN_SHORT}" | xargs -r docker rm -f 2>/dev/null || true
           
           # Remove unused networks (keep default ones)
           echo "🌐 Cleaning up unused networks..."
@@ -584,9 +601,20 @@ jobs:
             
             # Configure OroDC for containerized environment with random port to avoid conflicts
             echo "⚙️  Configuring OroDC for default mode with path sync..."
-            echo "DC_ORO_NAME=${{ matrix.application }}-${RUN_SHORT}-arm64-${RANDOM_SUFFIX}" > .env.orodc
-            echo "DC_ORO_PORT_PREFIX=$(( 400 + ( ${{ github.run_id }} % 99 ) + ( RANDOM_SUFFIX % 10 ) ))" >> .env.orodc
-            echo "DC_ORO_MODE=default" >> .env.orodc  
+            # Configure unique project name to avoid port conflicts with other tests  
+            UNIQUE_PROJECT_NAME="${{ matrix.application }}-${RUN_SHORT}-arm64-${RANDOM_SUFFIX}"
+            PORT_PREFIX=$(( 400 + ( ${{ github.run_id }} % 99 ) + ( RANDOM_SUFFIX % 10 ) ))
+            
+            # Export all OroDC configuration as environment variables (no .env.orodc file needed)
+            export DC_ORO_NAME="${UNIQUE_PROJECT_NAME}"
+            export DC_ORO_PORT_PREFIX="${PORT_PREFIX}"
+            export DC_ORO_MODE=default
+            export DC_ORO_CONFIG_DIR="${TEST_BASE_DIR}/.orodc"
+            
+            # Debug: Show unique project configuration
+            echo "🐛 DEBUG: Unique project name: ${UNIQUE_PROJECT_NAME}"
+            echo "🐛 DEBUG: Port prefix: ${PORT_PREFIX}"
+            echo "🐛 DEBUG: Config dir: ${TEST_BASE_DIR}/.orodc"  
             
             # Cleanup Docker networks to prevent address pool exhaustion
             echo "🧹 Cleaning up unused Docker networks..."
@@ -604,10 +632,12 @@ jobs:
             
             # Install and start application (as runner user, not root)
             echo "⚙️  Installing ${{ matrix.application.name }} with fresh environment..."
-            # First purge any existing installation to ensure clean state
-            su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc purge' runner || true
-            # Then install fresh
-            su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc install' runner
+            # Ensure config directory exists before purge to prevent global cleanup
+            su -c 'mkdir -p "'"${TEST_BASE_DIR}/.orodc"'"' runner
+            # First purge any existing installation to ensure clean state (with proper project isolation)
+            su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_NAME="'"${UNIQUE_PROJECT_NAME}"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc purge' runner || true
+            # Then install fresh (with proper project isolation)
+            su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_NAME="'"${UNIQUE_PROJECT_NAME}"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc install' runner
             
             echo "🚀 Starting services..."  
             su -c 'cd "'"$PROJECT_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc up -d' runner
@@ -623,7 +653,7 @@ jobs:
               done
             ' || {
               echo "❌ Services failed to start within timeout"
-              su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc logs --tail=20' runner
+              su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_NAME="'"${UNIQUE_PROJECT_NAME}"'" && export DC_ORO_PORT_PREFIX="'"${PORT_PREFIX}"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc logs --tail=20' runner
               exit 1
             }
             
@@ -642,7 +672,7 @@ jobs:
             echo "🌐 Testing web accessibility [ARM64]..."
             
             # Extract HTTP port from OroDC configuration
-            HTTP_PORT=$(su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc ps --format "table {{.Names}}\t{{.Ports}}"' runner 2>/dev/null | grep nginx | grep -o '0.0.0.0:[0-9]*->80/tcp' | cut -d: -f2 | cut -d- -f1 2>/dev/null || echo "")
+            HTTP_PORT=$(su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_NAME="'"${UNIQUE_PROJECT_NAME}"'" && export DC_ORO_PORT_PREFIX="'"${PORT_PREFIX}"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc ps --format "table {{.Names}}\t{{.Ports}}"' runner 2>/dev/null | grep nginx | grep -o '0.0.0.0:[0-9]*->80/tcp' | cut -d: -f2 | cut -d- -f1 2>/dev/null || echo "")
             
             if [ -n "$HTTP_PORT" ]; then
               echo "📡 Detected HTTP port: $HTTP_PORT [ARM64]"
