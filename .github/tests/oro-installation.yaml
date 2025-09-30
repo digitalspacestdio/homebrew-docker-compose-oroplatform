@@ -3,7 +3,8 @@
 
 # Test HTTP endpoints
 http:
-  # Main application page - should return 200 OK or redirect (301/302)
+  # Main application page - should return redirect (302) to HTTPS
   "http://localhost:HTTP_PORT":
-    status: [200, 301, 302]
+    status: 302
     timeout: 30000
+    no-follow-redirects: true
