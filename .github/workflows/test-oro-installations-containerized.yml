@@ -172,6 +172,12 @@ jobs:
             TEST_BASE_DIR="${{ github.workspace }}/test-${RUN_SHORT}-${RANDOM_SUFFIX}"
             PROJECT_DIR="${TEST_BASE_DIR}/${{ matrix.application }}"
             
+            # Export variables so they persist across all operations
+            export TEST_BASE_DIR
+            export PROJECT_DIR
+            export RANDOM_SUFFIX
+            export RUN_SHORT
+            
             # Debug: Check variable values
             echo "🐛 DEBUG: TEST_BASE_DIR='$TEST_BASE_DIR'"
             echo "🐛 DEBUG: PROJECT_DIR='$PROJECT_DIR'"
