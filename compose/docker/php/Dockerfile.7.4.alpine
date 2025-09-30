@@ -1,33 +1,23 @@
 ARG ALPINE_VERSION=3.15
 ARG PHP_VERSION=7.4
 ARG COMPOSER_VERSION=2
-
-
 # Composer image
 FROM composer:${COMPOSER_VERSION} AS composer_app
-
 FROM php:${PHP_VERSION}-fpm-alpine${ALPINE_VERSION} AS app_php
-
 ARG STABILITY="stable"
 ENV STABILIT=${STABILITY}
-
 ARG PHP_UID=1000
 ENV PHP_UID=${PHP_UID}
-
 ARG PHP_GID=1000
 ENV PHP_GID=${PHP_GID}
-
 ARG PHP_USER_NAME=developer
 ENV PHP_USER_NAME=${PHP_USER_NAME}
-
 ARG PHP_USER_GROUP=developer
 ENV PHP_USER_GROUP=${PHP_USER_GROUP}
-
 ARG EXT_REDIS_VERSION=5.3.7
 ARG EXT_IGBINARY_VERSION=3.2.15
 ARG EXT_MONGODB_VERSION=1.19.4
 ARG EXT_XDEBUG_VERSION=3.1.6
-
 # persistent / runtime deps
 RUN apk add --no-cache \
     acl \
@@ -63,10 +53,8 @@ RUN apk add --no-cache \
     util-linux \
     patch \
   ;
-
 ARG REDIS_VERSION="6.2.9"
 ARG REDIS_DOWNLOAD_URL="http://download.redis.io/releases/redis-${REDIS_VERSION}.tar.gz"  
-
 RUN set -eux; \
   apk add --no-cache --virtual .build-deps \
     $PHPIZE_DEPS \
@@ -159,39 +147,9 @@ RUN set -eux; \
   apk add --no-cache --virtual .app-phpexts-rundeps $runDeps; \
   \
   apk del .build-deps
-
 RUN addgroup -g $PHP_GID ${PHP_USER_GROUP} \
     && adduser -u $PHP_UID -G ${PHP_USER_GROUP} -s /bin/sh -D ${PHP_USER_NAME} \
     && rm -rf /var/www/*  \
     && chown ${PHP_USER_NAME}:${PHP_USER_GROUP} /var/www
-
 RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
-
-COPY app.ini $PHP_INI_DIR/conf.d/
-COPY php-fpm.conf /usr/local/etc/php-fpm.conf
-
 RUN mkdir -p /var/run/php
-
-COPY --chmod=0755 docker-healthcheck.sh /usr/local/bin/docker-healthcheck
-COPY --chmod=0755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint
-COPY --chmod=0755 docker-sshd.sh /usr/local/bin/docker-sshd
-
-COPY --chmod=0755 docker-psql.sh /usr/local/bin/psql
-COPY --chmod=0755 docker-mysql.sh /usr/local/bin/mysql
-
-ENTRYPOINT ["docker-entrypoint"]
-
-RUN rm -f $PHP_INI_DIR/conf.d/app.prod.ini; \
-  mv "$PHP_INI_DIR/php.ini" "$PHP_INI_DIR/php.ini-production"; \
-  mv "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini"
-
-COPY app.ini $PHP_INI_DIR/conf.d/
-COPY app.opcache.ini $PHP_INI_DIR/conf.d/
-COPY app.msmtp.ini $PHP_INI_DIR/conf.d/
-COPY app.xdebug.ini $PHP_INI_DIR/conf.d/
-COPY php-fpm.conf /usr/local/etc/php-fpm.conf
-
-# Copy nodejs binaries
-
- # smoke test
-RUN node --version && npm --version && yarn --version
