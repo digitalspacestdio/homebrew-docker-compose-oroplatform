@@ -172,13 +172,29 @@ jobs:
             TEST_BASE_DIR="${{ github.workspace }}/test-${RUN_SHORT}-${RANDOM_SUFFIX}"
             PROJECT_DIR="${TEST_BASE_DIR}/${{ matrix.application }}"
             
-            # Create directories with proper ownership from the start
-            mkdir -p "$TEST_BASE_DIR"
-            chown -R 1000:1000 "$TEST_BASE_DIR"
-            chmod -R 755 "$TEST_BASE_DIR"
+            # Debug: Check variable values
+            echo "🐛 DEBUG: TEST_BASE_DIR='$TEST_BASE_DIR'"
+            echo "🐛 DEBUG: PROJECT_DIR='$PROJECT_DIR'"
+            echo "🐛 DEBUG: RANDOM_SUFFIX='$RANDOM_SUFFIX'"
+            echo "🐛 DEBUG: RUN_SHORT='$RUN_SHORT'"
             
-            mkdir -p "$PROJECT_DIR"
-            echo "📁 Working in: $PROJECT_DIR (UID=1000)"
+            # Create directories with proper ownership from the start
+            if [ -n "$TEST_BASE_DIR" ]; then
+              mkdir -p "$TEST_BASE_DIR"
+              chown -R 1000:1000 "$TEST_BASE_DIR"
+              chmod -R 755 "$TEST_BASE_DIR"
+            else
+              echo "❌ ERROR: TEST_BASE_DIR is empty!"
+              exit 1
+            fi
+            
+            if [ -n "$PROJECT_DIR" ]; then
+              mkdir -p "$PROJECT_DIR"
+              echo "📁 Working in: $PROJECT_DIR (UID=1000)"
+            else
+              echo "❌ ERROR: PROJECT_DIR is empty!"
+              exit 1
+            fi
             
             # Clone application into named subdirectory
             echo "📥 Cloning ${{ matrix.application }} v${{ matrix.version }}..."
@@ -212,8 +228,13 @@ jobs:
             
             # Fix all permissions recursively for Composer and OroDC operations
             echo "🔧 Setting proper permissions for installation..."
-            chown -R 1000:1000 "$PROJECT_DIR"
-            chmod -R 755 "$PROJECT_DIR"
+            if [ -n "$PROJECT_DIR" ]; then
+              chown -R 1000:1000 "$PROJECT_DIR"
+              chmod -R 755 "$PROJECT_DIR"
+            else
+              echo "❌ ERROR: PROJECT_DIR is empty in permissions fix!"
+              exit 1
+            fi
             
             # Install and start application (as runner user, not root)
             echo "⚙️  Installing ${{ matrix.application }}..."
@@ -477,8 +498,13 @@ jobs:
             
             # Fix all permissions recursively for Composer and OroDC operations
             echo "🔧 Setting proper permissions for installation..."
-            chown -R 1000:1000 "$PROJECT_DIR"
-            chmod -R 755 "$PROJECT_DIR"
+            if [ -n "$PROJECT_DIR" ]; then
+              chown -R 1000:1000 "$PROJECT_DIR"
+              chmod -R 755 "$PROJECT_DIR"
+            else
+              echo "❌ ERROR: PROJECT_DIR is empty in permissions fix!"
+              exit 1
+            fi
             
             # Install and start application (as runner user, not root)
             echo "⚙️  Installing ${{ matrix.application }}..."
