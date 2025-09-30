@@ -172,9 +172,12 @@ jobs:
             TEST_BASE_DIR="${{ github.workspace }}/test-${RUN_SHORT}-${RANDOM_SUFFIX}"
             PROJECT_DIR="${TEST_BASE_DIR}/${{ matrix.application }}"
             
-            # Create directories with proper ownership
-            mkdir -p "$PROJECT_DIR"
+            # Create directories with proper ownership from the start
+            mkdir -p "$TEST_BASE_DIR"
             chown -R 1000:1000 "$TEST_BASE_DIR"
+            chmod -R 755 "$TEST_BASE_DIR"
+            
+            mkdir -p "$PROJECT_DIR"
             echo "📁 Working in: $PROJECT_DIR (UID=1000)"
             
             # Clone application into named subdirectory
@@ -199,9 +202,8 @@ jobs:
             export DC_ORO_CONFIG_DIR="${TEST_BASE_DIR}/.orodc"
             
             # Create OroDC config directory at base level (above project sources)
-            # Must be created as runner user (UID=1000) to avoid rsync permission issues
+            # Since TEST_BASE_DIR already has proper ownership, runner can create .orodc
             su -c 'mkdir -p "'"${TEST_BASE_DIR}/.orodc"'"' runner
-            chown -R 1000:1000 "${TEST_BASE_DIR}/.orodc" 2>/dev/null || true
             chmod -R 777 "${TEST_BASE_DIR}/.orodc" 2>/dev/null || true
             
             # Cleanup Docker networks to prevent address pool exhaustion
