@@ -278,11 +278,11 @@ jobs:
           
           # Remove test directories
           cd ${{ github.workspace }}
-          rm -rf ${{ matrix.application }}-test-${{ github.run_id }}-* 2>/dev/null || true
+                 rm -rf ${{ matrix.application }}-${RUN_SHORT}-* 2>/dev/null || true
           
           # Cleanup Docker containers and volumes by build ID pattern
           echo "🐳 Cleaning up Docker containers for build ${{ github.run_id }}..."
-          BUILD_PATTERN="${{ matrix.application }}-${{ github.run_id }}"
+                 BUILD_PATTERN="${{ matrix.application }}-${RUN_SHORT}"
           
           # Remove containers with build pattern
           docker ps -a --filter "name=$BUILD_PATTERN" --format "{{.ID}}" | xargs -r docker rm -f 2>/dev/null || true
@@ -535,11 +535,11 @@ jobs:
           
           # Remove test directories
           cd ${{ github.workspace }}
-          rm -rf ${{ matrix.application }}-test-${{ github.run_id }}-* 2>/dev/null || true
+                 rm -rf ${{ matrix.application }}-${RUN_SHORT}-* 2>/dev/null || true
           
           # Cleanup Docker containers and volumes by build ID pattern
           echo "🐳 Cleaning up Docker containers for build ${{ github.run_id }} [ARM64]..."
-          BUILD_PATTERN="${{ matrix.application }}-${{ github.run_id }}"
+                 BUILD_PATTERN="${{ matrix.application }}-${RUN_SHORT}"
           
           # Remove containers with build pattern
           docker ps -a --filter "name=$BUILD_PATTERN" --format "{{.ID}}" | xargs -r docker rm -f 2>/dev/null || true
