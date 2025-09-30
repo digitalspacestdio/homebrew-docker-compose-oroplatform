@@ -104,33 +104,38 @@ jobs:
           chown -R 1000:1000 "$HOME" 2>/dev/null || true
           
           # Install Homebrew if not present (as runner user with UID=1000)
-          if ! command -v brew &> /dev/null; then
+          if ! command -v /home/linuxbrew/.linuxbrew/bin/brew &> /dev/null; then
             echo "Installing Homebrew as UID=1000 user..."
             su -c 'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"' runner
+            
+            # Setup Homebrew environment for runner user
+            su -c 'echo '\''eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"'\'' >> /home/runner/.profile' runner
+            echo "Homebrew PATH configured for runner user"
           fi
           
-          # Setup Homebrew PATH
+          # Setup Homebrew PATH for current shell
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
           export PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:$PATH"
           echo "PATH=$PATH" >> $GITHUB_ENV
           
-          # Verify Homebrew
-          brew --version
+          # Verify Homebrew is accessible
+          which brew && brew --version
           
-          # Install OroDC tap (as runner user with UID=1000)
+          # Install OroDC tap (with proper environment)
           echo "📦 Installing OroDC tap..."
-          su -c 'brew tap digitalspacestdio/docker-compose-oroplatform' runner
+          su -c 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && brew tap digitalspacestdio/docker-compose-oroplatform' runner
           
           # Copy current source to tap directory for testing
           TAP_DIR="/home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform"
           echo "📁 Copying source to: $TAP_DIR"
           cp -r "$GITHUB_WORKSPACE"/* "$TAP_DIR/"
           
-          # Install OroDC (as runner user with UID=1000)
+          # Install OroDC (with proper environment)
           echo "🔧 Installing OroDC..."
-          su -c 'brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform' runner
+          su -c 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform' runner
           
           # Verify installation
-          su -c '/home/linuxbrew/.linuxbrew/bin/orodc version' runner
+          su -c 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc version' runner
           echo "✅ OroDC installation completed"
           
       - name: Test ${{ matrix.application }} installation
@@ -361,21 +366,21 @@ jobs:
           # Verify Homebrew
           brew --version
           
-          # Install OroDC tap (as runner user with UID=1000)
+          # Install OroDC tap (with proper environment)
           echo "📦 Installing OroDC tap..."
-          su -c 'brew tap digitalspacestdio/docker-compose-oroplatform' runner
+          su -c 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && brew tap digitalspacestdio/docker-compose-oroplatform' runner
           
           # Copy current source to tap directory for testing
           TAP_DIR="/home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform"
           echo "📁 Copying source to: $TAP_DIR"
           cp -r "$GITHUB_WORKSPACE"/* "$TAP_DIR/"
           
-          # Install OroDC (as runner user with UID=1000)
+          # Install OroDC (with proper environment)
           echo "🔧 Installing OroDC..."
-          su -c 'brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform' runner
+          su -c 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform' runner
           
           # Verify installation
-          su -c '/home/linuxbrew/.linuxbrew/bin/orodc version' runner
+          su -c 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc version' runner
           echo "✅ OroDC installation completed [ARM64]"
           
       - name: Test ${{ matrix.application }} installation
