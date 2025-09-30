@@ -194,8 +194,9 @@ jobs:
             # Wait for services with timeout
             echo "⏳ Waiting for services to start (max 5 minutes)..."
             timeout 300 bash -c '
-              while ! docker ps --filter "name=${{ matrix.application }}-${{ github.run_id }}-${RANDOM_SUFFIX}-${TIMESTAMP}" --format "{{.Status}}" | grep -q "Up"; do
+              while [ $(docker ps --filter "name=${{ matrix.application }}-${{ github.run_id }}-${RANDOM_SUFFIX}-${TIMESTAMP}" --format "{{.Status}}" | grep -c -E "(Up|healthy)" ) -lt 6 ]; do
                 echo "Services starting... $(date)"
+                echo "Current status: $(docker ps --filter "name=${{ matrix.application }}-${{ github.run_id }}-${RANDOM_SUFFIX}-${TIMESTAMP}" --format "{{.Names}}: {{.Status}}" | head -3)"
                 sleep 10
               done
             ' || {
@@ -444,8 +445,9 @@ jobs:
             # Wait for services with timeout
             echo "⏳ Waiting for services to start (max 5 minutes)..."
             timeout 300 bash -c '
-              while ! docker ps --filter "name=${{ matrix.application }}-${{ github.run_id }}-${RANDOM_SUFFIX}-${TIMESTAMP}" --format "{{.Status}}" | grep -q "Up"; do
+              while [ $(docker ps --filter "name=${{ matrix.application }}-${{ github.run_id }}-${RANDOM_SUFFIX}-${TIMESTAMP}" --format "{{.Status}}" | grep -c -E "(Up|healthy)" ) -lt 6 ]; do
                 echo "Services starting... $(date)"
+                echo "Current status: $(docker ps --filter "name=${{ matrix.application }}-${{ github.run_id }}-${RANDOM_SUFFIX}-${TIMESTAMP}" --format "{{.Names}}: {{.Status}}" | head -3)"
                 sleep 10
               done
             ' || {
