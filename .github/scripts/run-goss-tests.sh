@@ -29,28 +29,17 @@ install_goss() {
 
 # Function to detect ports
 detect_ports() {
-    echo "🔍 Detecting service ports for ${UNIQUE_PROJECT_NAME}..."
+    echo "🔍 Detecting HTTP port for ${UNIQUE_PROJECT_NAME}..."
     
-    # HTTP Port (nginx)
+    # HTTP Port (nginx) - the only one we need for simple test
     HTTP_PORT=$(docker ps --filter "name=${UNIQUE_PROJECT_NAME}" --format "{{.Names}} {{.Ports}}" | grep nginx | grep -o '[0-9]*->80/tcp' | cut -d- -f1 | head -1)
     
-    # PostgreSQL Port
-    PG_PORT=$(docker ps --filter "name=${UNIQUE_PROJECT_NAME}" --format "{{.Names}} {{.Ports}}" | grep database | grep -o '[0-9]*->5432/tcp' | cut -d- -f1 | head -1)
-    
-    # Elasticsearch Port  
-    ES_PORT=$(docker ps --filter "name=${UNIQUE_PROJECT_NAME}" --format "{{.Names}} {{.Ports}}" | grep search | grep -o '[0-9]*->9200/tcp' | cut -d- -f1 | head -1)
-    
-    # RabbitMQ Port
-    RABBITMQ_PORT=$(docker ps --filter "name=${UNIQUE_PROJECT_NAME}" --format "{{.Names}} {{.Ports}}" | grep mq | grep -o '[0-9]*->15672/tcp' | cut -d- -f1 | head -1)
-    
-    echo "📋 Detected ports:"
-    echo "  HTTP: ${HTTP_PORT:-none}"
-    echo "  PostgreSQL: ${PG_PORT:-none}"  
-    echo "  Elasticsearch: ${ES_PORT:-none}"
-    echo "  RabbitMQ: ${RABBITMQ_PORT:-none}"
+    echo "📋 Detected HTTP port: ${HTTP_PORT:-none}"
     
     if [ -z "$HTTP_PORT" ]; then
         echo "❌ Could not detect HTTP port - this is critical for testing"
+        echo "📋 Available containers:"
+        docker ps --filter "name=${UNIQUE_PROJECT_NAME}" --format "{{.Names}} {{.Ports}}"
         return 1
     fi
 }
@@ -64,14 +53,11 @@ prepare_goss_file() {
     # Copy template and substitute variables
     cp "${GITHUB_WORKSPACE:-$(pwd)}/.github/tests/oro-installation.yaml" "$GOSS_FILE"
     
-    # Replace placeholders with actual values
+    # Replace HTTP_PORT with actual detected port
     sed -i "s/HTTP_PORT/${HTTP_PORT}/g" "$GOSS_FILE"
-    sed -i "s/PG_PORT/${PG_PORT}/g" "$GOSS_FILE" 
-    sed -i "s/ES_PORT/${ES_PORT}/g" "$GOSS_FILE"
-    sed -i "s/RABBITMQ_PORT/${RABBITMQ_PORT}/g" "$GOSS_FILE"
-    sed -i "s/PROJECT_NAME/${UNIQUE_PROJECT_NAME}/g" "$GOSS_FILE"
     
     echo "✅ Goss file prepared: $GOSS_FILE"
+    echo "🌐 Testing URL: http://localhost:$HTTP_PORT"
 }
 
 # Function to run Goss tests
