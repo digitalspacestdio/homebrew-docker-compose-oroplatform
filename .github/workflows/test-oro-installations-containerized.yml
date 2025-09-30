@@ -189,6 +189,11 @@ jobs:
             echo "🧹 Cleaning up unused Docker networks..."
             docker network prune -f 2>/dev/null || true
             
+            # Fix all permissions recursively for Composer and OroDC operations
+            echo "🔧 Setting proper permissions for installation..."
+            chown -R 1000:1000 "$TEST_DIR"
+            chmod -R 755 "$TEST_DIR"
+            
             # Install and start application (as runner user, not root)
             echo "⚙️  Installing ${{ matrix.application }}..."
             su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc install' runner
@@ -445,6 +450,11 @@ jobs:
             # Cleanup Docker networks to prevent address pool exhaustion
             echo "🧹 Cleaning up unused Docker networks..."
             docker network prune -f 2>/dev/null || true
+            
+            # Fix all permissions recursively for Composer and OroDC operations
+            echo "🔧 Setting proper permissions for installation..."
+            chown -R 1000:1000 "$TEST_DIR"
+            chmod -R 755 "$TEST_DIR"
             
             # Install and start application (as runner user, not root)
             echo "⚙️  Installing ${{ matrix.application }}..."
