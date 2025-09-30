@@ -207,7 +207,7 @@ jobs:
             # Health checks
             echo "🩺 Performing health checks..."
             echo "Container status:"
-            su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc ps' runner
+            docker ps --filter "name=${{ matrix.application }}-${{ github.run_id }}-${RANDOM_SUFFIX}-${TIMESTAMP}" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
             
             echo "PHP version:"
             su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc php --version' runner
@@ -249,7 +249,7 @@ jobs:
             else
               echo "⚠️  Could not detect HTTP port from OroDC"
               echo "📋 Available ports:"
-              su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc ps' runner || echo "No containers found"
+              docker ps --filter "name=${{ matrix.application }}-${{ github.run_id }}-${RANDOM_SUFFIX}-${TIMESTAMP}" --format "table {{.Names}}\t{{.Ports}}" || echo "No containers found"
             fi
             
             echo "✅ ${{ matrix.application }} test completed successfully!"
