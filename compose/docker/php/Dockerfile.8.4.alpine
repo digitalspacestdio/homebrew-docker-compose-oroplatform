@@ -8,6 +8,8 @@ FROM composer:${COMPOSER_VERSION} AS composer_app
 # Php base image - minimal, close to official php:fpm-alpine
 FROM php:${PHP_VERSION}-fpm-alpine${ALPINE_VERSION}
 
+# Set shell with pipefail option for better error handling
+SHELL ["/bin/ash", "-o", "pipefail", "-c"]
 ARG EXT_IMAP_VERSION=1.0.3
 ARG EXT_REDIS_VERSION=6.2.0
 ARG EXT_IGBINARY_VERSION=3.2.15
@@ -66,7 +68,7 @@ RUN set -eux; \
     wget \
   ; \
   \
-  wget -O redis.tar.gz "$REDIS_DOWNLOAD_URL"; \
+  wget --progress=dot:giga -O redis.tar.gz "$REDIS_DOWNLOAD_URL"; \
   mkdir -p /usr/src/redis; \
   tar -xzf redis.tar.gz -C /usr/src/redis --strip-components=1; \
   rm redis.tar.gz; \

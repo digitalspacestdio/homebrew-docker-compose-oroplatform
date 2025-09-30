@@ -599,6 +599,100 @@ echo "DC_ORO_MODE=ssh" >> .env.orodc
 - No SSH key management required
 - Works reliably in all containerized environments
 
+## Code Quality Tools
+
+### Linting and Validation
+Always validate code changes before committing:
+
+#### **1. Dockerfile Linting with Hadolint**
+```bash
+# Using Docker (recommended)
+docker run --rm -i hadolint/hadolint < compose/docker/php/Dockerfile.8.5.alpine
+
+# Install locally
+brew install hadolint
+hadolint compose/docker/php/Dockerfile.8.5.alpine
+```
+
+**Common Hadolint Rules:**
+- `DL3018`: Pin package versions in `apk add` 
+- `DL4006`: Set `SHELL -o pipefail` for pipes in RUN
+- `DL3047`: Use `wget --progress=dot:giga` for progress
+
+#### **2. GitHub Actions Validation**
+```bash
+# Install actionlint
+brew install actionlint
+
+# Validate workflow files
+actionlint .github/workflows/*.yml
+```
+
+#### **3. YAML Validation**
+```bash
+# Using yq (already in dependencies)
+yq eval '.github/workflows/test-oro-installations-containerized.yml' > /dev/null
+
+# Using yamllint
+pip install yamllint
+yamllint .github/workflows/
+```
+
+#### **4. Bash/Shell Script Validation**
+```bash
+# Install ShellCheck
+brew install shellcheck
+
+# Validate shell scripts
+shellcheck bin/orodc
+shellcheck .github/scripts/*.sh
+```
+
+#### **5. Automated Pre-commit Validation**
+Create `.pre-commit-config.yaml`:
+```yaml
+repos:
+  - repo: https://github.com/hadolint/hadolint
+    rev: v2.12.0
+    hooks:
+      - id: hadolint-docker
+  - repo: https://github.com/koalaman/shellcheck-precommit
+    rev: v0.9.0
+    hooks:
+      - id: shellcheck
+  - repo: https://github.com/adrienverge/yamllint.git
+    rev: v1.32.0
+    hooks:
+      - id: yamllint
+```
+
+**Installation:**
+```bash
+pip install pre-commit
+pre-commit install
+```
+
+### **Quality Guidelines:**
+- **Always lint Dockerfiles** before Docker image changes
+- **Validate YAML syntax** before workflow modifications  
+- **Check shell scripts** for common issues and security
+- **Run actionlint** before GitHub Actions changes
+- **Use consistent formatting** across all file types
+
+### **CI/CD Integration:**
+Add linting steps to workflows:
+```yaml
+- name: Lint Dockerfiles
+  run: |
+    docker run --rm -i hadolint/hadolint < compose/docker/php/Dockerfile.8.5.alpine
+    
+- name: Lint Shell Scripts
+  run: shellcheck bin/orodc .github/scripts/*.sh
+  
+- name: Validate YAML
+  run: yamllint .github/workflows/
+```
+
 ## Command Reference
 | Task | Command | Notes |
 |------|---------|-------|
