@@ -152,17 +152,18 @@ jobs:
           timeout_minutes: 15
           max_attempts: 3
           retry_wait_seconds: 30
-          command: |
-            echo "🚀 Testing ${{ matrix.application }} installation in isolated container..."
-            echo "🔄 Attempt ${{ github.run_attempt }} of 3 (retry logic active for port conflicts)"
+               command: |
+                 set -e
+                 echo "🚀 Testing ${{ matrix.application }} installation in isolated container..."
+                 echo "🔄 Attempt ${{ github.run_attempt }} of 3 (retry logic active for port conflicts)"
             
             # Setup PATH and run as runner user (UID=1000) for correct permissions
             export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
             
-            # Create unique test workspace with random port suffix to avoid conflicts
-            RANDOM_SUFFIX=$(( RANDOM % 1000 + 1000 ))  # Use 1000-1999 range for better uniqueness
-            TIMESTAMP=$(date +%s)
-            TEST_DIR="${{ github.workspace }}/${{ matrix.application }}-test-${{ github.run_id }}-${RANDOM_SUFFIX}-${TIMESTAMP}"
+            # Create unique test workspace with shorter names to avoid hostname issues
+            RANDOM_SUFFIX=$(( RANDOM % 900 + 100 ))  # Use 100-999 range for shorter names
+            RUN_SHORT=$(echo "${{ github.run_id }}" | tail -c 6)  # Last 5 digits of run_id
+            TEST_DIR="${{ github.workspace }}/${{ matrix.application }}-${RUN_SHORT}-${RANDOM_SUFFIX}"
             
             # Create directory with proper ownership
             mkdir -p "$TEST_DIR"
@@ -178,10 +179,10 @@ jobs:
             # Configure git for HTTPS
             git config --global url."https://github.com/".insteadOf git@github.com:
             
-            # Configure OroDC for containerized environment with random port to avoid conflicts
+            # Configure OroDC for containerized environment with shorter names
             echo "⚙️  Configuring OroDC for default mode with path sync..."
-            echo "DC_ORO_NAME=${{ matrix.application }}-${{ github.run_id }}-${RANDOM_SUFFIX}-${TIMESTAMP}" > .env.orodc
-            echo "DC_ORO_PORT_PREFIX=$(( 300 + ( ${{ github.run_id }} % 99 ) + ( RANDOM_SUFFIX % 10 ) ))" >> .env.orodc
+            echo "DC_ORO_NAME=${{ matrix.application }}-${RUN_SHORT}-${RANDOM_SUFFIX}" > .env.orodc
+            echo "DC_ORO_PORT_PREFIX=$(( 300 + ( ${RUN_SHORT} % 99 ) + ( RANDOM_SUFFIX % 10 ) ))" >> .env.orodc
             echo "DC_ORO_MODE=default" >> .env.orodc
             
             # Cleanup Docker networks to prevent address pool exhaustion
@@ -199,9 +200,9 @@ jobs:
             echo "⏳ Waiting for services to start (max 5 minutes)..."
             timeout 300 bash -c '
               set -e
-              while [ $(docker ps --filter "name=${{ matrix.application }}-${{ github.run_id }}-${RANDOM_SUFFIX}-${TIMESTAMP}" --format "{{.Status}}" | grep -c -E "(Up|healthy)" ) -lt 6 ]; do
+              while [ $(docker ps --filter "name=${{ matrix.application }}-${RUN_SHORT}-${RANDOM_SUFFIX}" --format "{{.Status}}" | grep -c -E "(Up|healthy)" ) -lt 6 ]; do
                 echo "Services starting... $(date)"
-                echo "Current status: $(docker ps --filter "name=${{ matrix.application }}-${{ github.run_id }}-${RANDOM_SUFFIX}-${TIMESTAMP}" --format "{{.Names}}: {{.Status}}" | head -3)"
+                echo "Current status: $(docker ps --filter "name=${{ matrix.application }}-${RUN_SHORT}-${RANDOM_SUFFIX}" --format "{{.Names}}: {{.Status}}" | head -3)"
                 sleep 10
               done
             ' || {
@@ -213,7 +214,7 @@ jobs:
             # Health checks
             echo "🩺 Performing health checks..."
             echo "Container status:"
-            docker ps --filter "name=${{ matrix.application }}-${{ github.run_id }}-${RANDOM_SUFFIX}-${TIMESTAMP}" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+            docker ps --filter "name=${{ matrix.application }}-${RUN_SHORT}-${RANDOM_SUFFIX}" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
             
             echo "PHP version:"
             su -c 'cd "'"$TEST_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc php --version' runner
@@ -255,7 +256,7 @@ jobs:
             else
               echo "⚠️  Could not detect HTTP port from OroDC"
               echo "📋 Available ports:"
-              docker ps --filter "name=${{ matrix.application }}-${{ github.run_id }}-${RANDOM_SUFFIX}-${TIMESTAMP}" --format "table {{.Names}}\t{{.Ports}}" || echo "No containers found"
+              docker ps --filter "name=${{ matrix.application }}-${RUN_SHORT}-${RANDOM_SUFFIX}" --format "table {{.Names}}\t{{.Ports}}" || echo "No containers found"
             fi
             
             echo "✅ ${{ matrix.application }} test completed successfully!"
@@ -412,9 +413,10 @@ jobs:
           timeout_minutes: 15
           max_attempts: 3
           retry_wait_seconds: 30
-          command: |
-            echo "🚀 Testing ${{ matrix.application }} installation in isolated container [ARM64]..."
-            echo "🔄 Attempt ${{ github.run_attempt }} of 3 (retry logic active for port conflicts)"
+               command: |
+                 set -e
+                 echo "🚀 Testing ${{ matrix.application }} installation in isolated container [ARM64]..."
+                 echo "🔄 Attempt ${{ github.run_attempt }} of 3 (retry logic active for port conflicts)"
             
             # Setup PATH
             export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
@@ -455,9 +457,9 @@ jobs:
             echo "⏳ Waiting for services to start (max 5 minutes)..."
             timeout 300 bash -c '
               set -e
-              while [ $(docker ps --filter "name=${{ matrix.application }}-${{ github.run_id }}-${RANDOM_SUFFIX}-${TIMESTAMP}" --format "{{.Status}}" | grep -c -E "(Up|healthy)" ) -lt 6 ]; do
+              while [ $(docker ps --filter "name=${{ matrix.application }}-${RUN_SHORT}-${RANDOM_SUFFIX}" --format "{{.Status}}" | grep -c -E "(Up|healthy)" ) -lt 6 ]; do
                 echo "Services starting... $(date)"
-                echo "Current status: $(docker ps --filter "name=${{ matrix.application }}-${{ github.run_id }}-${RANDOM_SUFFIX}-${TIMESTAMP}" --format "{{.Names}}: {{.Status}}" | head -3)"
+                echo "Current status: $(docker ps --filter "name=${{ matrix.application }}-${RUN_SHORT}-${RANDOM_SUFFIX}" --format "{{.Names}}: {{.Status}}" | head -3)"
                 sleep 10
               done
             ' || {
