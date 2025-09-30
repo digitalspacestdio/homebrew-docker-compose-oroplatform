@@ -136,6 +136,39 @@ git push  # ❌ This creates messy history!
 
 **Exception:** Only add to pushed branches if explicitly fixing issues in the SAME Pull Request discussion.
 
+### 🚨 **CRITICAL: When User Says "I Merged"**
+
+**⚡ IMMEDIATE ACTION REQUIRED:**
+When the user says **"я смерджил"** (I merged) or **"смерджил"** or **"merged"**, this means:
+
+1. **The current branch is now merged into main repository**
+2. **You MUST immediately create a NEW branch for any new work**
+3. **Do NOT continue working in the current branch**
+
+**✅ CORRECT workflow after merge:**
+```bash
+# 1. Sync with upstream (main repository)  
+git fetch --all
+git checkout master
+git pull main master    # Pull from upstream
+git push origin master  # Update your fork
+
+# 2. Create NEW branch for new work
+git checkout -b feature/next-improvements
+```
+
+**❌ WRONG: Continue working in merged branch**
+```bash
+# This pollutes merge history and creates confusion
+git commit -m "more changes"  # ❌ NEVER do this after merge!
+```
+
+**Why this rule exists:**
+- 🔄 **Clean History**: Each branch represents one complete feature/fix
+- 🛡️ **Avoid Conflicts**: Prevents merge pollution and history confusion
+- 📋 **Clear Tracking**: Each branch has clear purpose and lifecycle
+- 🚀 **Proper Flow**: Maintain proper git workflow discipline
+
 ### 📛 If you accidentally worked in master:
 
 1. **Create a branch from current state:**
