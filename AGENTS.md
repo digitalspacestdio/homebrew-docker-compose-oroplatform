@@ -301,6 +301,40 @@ orodc tests bin/behat --suite=OroUserBundle   # Behat tests
 
 **📋 For comprehensive local testing guidance:** See [LOCAL-TESTING.md](LOCAL-TESTING.md) for detailed testing methods, including quick commands, manual testing, and GitHub Actions locally with Act.
 
+## CI/CD Testing with Goss
+
+### Structured Workflow Steps
+The OroDC CI/CD pipeline is structured into clear, separate steps:
+
+1. **Install Homebrew and OroDC** - One-time setup with caching
+2. **Setup test environment** - Create unique project workspace  
+3. **Clone application** - Download Oro application code
+4. **Configure OroDC** - Set unique project names and ports
+5. **Install application** - Run `orodc install` 
+6. **Start services** - Run `orodc up -d` and wait for health
+7. **Run tests** - Execute comprehensive Goss verification tests
+
+### Goss Testing Framework
+**Goss** is used for comprehensive installation verification:
+
+```bash
+# Goss tests verify:
+# - Container health (6+ containers running)
+# - PHP version (8.3/8.4) 
+# - Database connectivity (PostgreSQL)
+# - HTTP server accessibility (nginx)
+# - Admin interface availability
+# - Service endpoint responses
+# - Port accessibility
+```
+
+**Benefits of Goss:**
+- ✅ **Structured tests**: YAML-based test definitions
+- ✅ **Multiple formats**: JUnit XML, Pretty output, JSON
+- ✅ **Comprehensive**: Tests containers, services, HTTP, commands
+- ✅ **Fast execution**: Parallel test execution  
+- ✅ **Clear results**: Pass/fail with detailed reporting
+
 ### Database
 ```bash
 orodc psql                         # PostgreSQL access
