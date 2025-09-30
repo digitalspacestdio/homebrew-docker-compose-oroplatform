@@ -44,17 +44,17 @@ jobs:
           - runner: [self-hosted, Linux, ARM64] 
             name: ARM64
             port_base: 400
-        include:
-          - application: oroplatform
+        application:
+          - name: oroplatform
             version: 6.1.4
             repo_url: https://github.com/oroinc/platform-application.git
-          - application: orocrm
+          - name: orocrm
             version: 6.1.4
             repo_url: https://github.com/oroinc/crm-application.git
-          - application: orocommerce
+          - name: orocommerce
             version: 6.1.4
             repo_url: https://github.com/oroinc/orocommerce-application.git
-          - application: marello
+          - name: marello
             version: 6.1.0
             repo_url: https://github.com/marellocommerce/marello-application.git
     
@@ -69,7 +69,7 @@ jobs:
         DC_ORO_MODE: default
     
     timeout-minutes: 90
-    name: Test ${{ matrix.application }} (${{ matrix.version }}) [${{ matrix.arch.name }}]
+    name: Test ${{ matrix.application.name }} (${{ matrix.application.version }}) [${{ matrix.arch.name }}]
     
     steps:
       - name: Checkout repository
@@ -175,14 +175,14 @@ jobs:
             ARCH_NAME="${{ matrix.arch.name }}"
             PORT_BASE="${{ matrix.arch.port_base }}"
             
-            echo "🚀 Testing ${{ matrix.application }} installation in isolated container [$ARCH_NAME]..."
+            echo "🚀 Testing ${{ matrix.application.name }} installation in isolated container [$ARCH_NAME]..."
             echo "🔄 Attempt ${{ github.run_attempt }} of 3 (retry logic active for port conflicts)"
             
             # Create unique test workspace with shorter names to avoid hostname issues
             RANDOM_SUFFIX=$(( RANDOM % 900 + 100 ))  # Use 100-999 range for shorter names
             RUN_SHORT=$(echo "${{ github.run_id }}" | tail -c 6)  # Last 5 digits of run_id
             TEST_BASE_DIR="${{ github.workspace }}/test-${RUN_SHORT}-${RANDOM_SUFFIX}"
-            PROJECT_DIR="${TEST_BASE_DIR}/${{ matrix.application }}"
+            PROJECT_DIR="${TEST_BASE_DIR}/${{ matrix.application.name }}"
             
             # Export variables so they persist across all operations
             export TEST_BASE_DIR
@@ -215,9 +215,9 @@ jobs:
             fi
             
             # Clone application into named subdirectory
-            echo "📥 Cloning ${{ matrix.application }} v${{ matrix.version }}..."
-            git clone --single-branch --branch ${{ matrix.version }} \
-              ${{ matrix.repo_url }} "$PROJECT_DIR"
+            echo "📥 Cloning ${{ matrix.application.name }} v${{ matrix.application.version }}..."
+            git clone --single-branch --branch ${{ matrix.application.version }} \
+              ${{ matrix.application.repo_url }} "$PROJECT_DIR"
               
             cd "$PROJECT_DIR"
               
@@ -227,7 +227,7 @@ jobs:
             # Configure OroDC for containerized environment
             echo "⚙️  Configuring OroDC for default mode with path sync..."
             # Configure unique project name to avoid port conflicts with other tests
-            UNIQUE_PROJECT_NAME="${{ matrix.application }}-${RUN_SHORT}-${RANDOM_SUFFIX}"
+            UNIQUE_PROJECT_NAME="${{ matrix.application.name }}-${RUN_SHORT}-${RANDOM_SUFFIX}"
             echo "DC_ORO_NAME=${UNIQUE_PROJECT_NAME}" > .env.orodc
             echo "DC_ORO_PORT_PREFIX=$(( ${PORT_BASE} + ( ${RUN_SHORT} % 99 ) + ( RANDOM_SUFFIX % 10 ) ))" >> .env.orodc
             echo "DC_ORO_MODE=default" >> .env.orodc
@@ -339,12 +339,12 @@ jobs:
               docker ps --format "table {{.Names}}\t{{.Ports}}"
             fi
             
-            echo "✅ ${{ matrix.application }} test completed successfully [$ARCH_NAME]!"
+            echo "✅ ${{ matrix.application.name }} test completed successfully [$ARCH_NAME]!"
           
       - name: Cleanup test environment
         if: always()
         run: |
-          echo "🧹 Cleaning up ${{ matrix.application }} test environment [${{ matrix.arch.name }}]..."
+          echo "🧹 Cleaning up ${{ matrix.application.name }} test environment [${{ matrix.arch.name }}]..."
           
           export PATH="/home/linuxbrew/.linuxbrew/bin:$PATH"
           
@@ -615,7 +615,7 @@ jobs:
           # Remove networks with build pattern
           docker network ls --filter "name=$BUILD_PATTERN" --format "{{.Name}}" | xargs -r docker network rm 2>/dev/null || true
           
-          echo "✅ Cleanup completed for ${{ matrix.application }} [ARM64]"
+          echo "✅ Cleanup completed for ${{ matrix.application.name }} [${{ matrix.arch.name }}]"
           echo "" >> $GITHUB_STEP_SUMMARY
           
           TEST_RESULT="${{ needs.test-installations.result }}"
