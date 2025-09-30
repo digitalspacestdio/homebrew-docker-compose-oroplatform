@@ -32,7 +32,7 @@ RUN apk add --no-cache \
     gmp \
     tidyhtml-libs \
     c-client \
-    oniguruma \
+    oniguruma
   ;
 
 ARG REDIS_VERSION="6.2.9"

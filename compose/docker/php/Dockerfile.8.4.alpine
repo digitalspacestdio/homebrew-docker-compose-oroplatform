@@ -10,7 +10,6 @@ FROM php:${PHP_VERSION}-fpm-alpine${ALPINE_VERSION}
 
 # Set shell with pipefail option for better error handling
 SHELL ["/bin/ash", "-o", "pipefail", "-c"]
-
 ARG EXT_IMAP_VERSION=1.0.3
 ARG EXT_REDIS_VERSION=6.2.0
 ARG EXT_IGBINARY_VERSION=3.2.15
