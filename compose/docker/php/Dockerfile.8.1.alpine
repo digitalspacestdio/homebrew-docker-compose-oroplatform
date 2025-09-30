@@ -118,7 +118,6 @@ RUN set -eux; \
     xsl \
     tidy \
     pcntl \
-    imap \
     sockets \
     bcmath \
     mbstring \
