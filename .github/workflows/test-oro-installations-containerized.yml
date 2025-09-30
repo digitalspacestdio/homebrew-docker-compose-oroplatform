@@ -265,8 +265,11 @@ jobs:
             fi
             
             # Install and start application (as runner user, not root)
-            echo "⚙️  Installing ${{ matrix.application }}..."
-            su -c 'cd "'"$PROJECT_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc install' runner
+            echo "⚙️  Installing ${{ matrix.application.name }} with fresh environment..."
+            # First purge any existing installation to ensure clean state
+            su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc purge' runner || true
+            # Then install fresh
+            su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc install' runner
             
             echo "🚀 Starting services..."  
             su -c 'cd "'"$PROJECT_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc up -d' runner
@@ -512,8 +515,11 @@ jobs:
             fi
             
             # Install and start application (as runner user, not root)
-            echo "⚙️  Installing ${{ matrix.application }}..."
-            su -c 'cd "'"$PROJECT_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc install' runner
+            echo "⚙️  Installing ${{ matrix.application.name }} with fresh environment..."
+            # First purge any existing installation to ensure clean state
+            su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc purge' runner || true
+            # Then install fresh
+            su -c 'cd "'"$PROJECT_DIR"'" && export DC_ORO_MODE=default && export DC_ORO_CONFIG_DIR="'"${TEST_BASE_DIR}/.orodc"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc install' runner
             
             echo "🚀 Starting services..."  
             su -c 'cd "'"$PROJECT_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc up -d' runner
