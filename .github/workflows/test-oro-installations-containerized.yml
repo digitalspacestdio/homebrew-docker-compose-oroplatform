@@ -57,10 +57,10 @@ jobs:
             version: 6.1.0
             repo_url: https://github.com/marellocommerce/marello-application.git
     
-    # Use containerized runner with Docker-in-Docker + Path Sync + Host Network
+    # Use containerized runner with Docker-in-Docker + Path Sync
     container:
       image: myoung34/github-runner:latest
-      options: --privileged --network host -v /var/run/docker.sock:/var/run/docker.sock -v ${{ github.workspace }}:${{ github.workspace }} -w ${{ github.workspace }}
+      options: --privileged -v /var/run/docker.sock:/var/run/docker.sock -v ${{ github.workspace }}:${{ github.workspace }} -w ${{ github.workspace }}
       env:
         HOMEBREW_NO_AUTO_UPDATE: 1
         HOMEBREW_NO_INSTALL_CLEANUP: 1
@@ -202,8 +202,8 @@ jobs:
             
             # Create directories with proper ownership
             mkdir -p "$TEST_BASE_DIR" "$PROJECT_DIR"
-            chown -R 1000:1000 "$TEST_BASE_DIR"
-            chmod -R 755 "$TEST_BASE_DIR"
+              chown -R 1000:1000 "$TEST_BASE_DIR"
+              chmod -R 755 "$TEST_BASE_DIR"
             
             echo "📥 Cloning ${{ matrix.application.name }} v${{ matrix.application.version }}..."
             git clone --single-branch --branch ${{ matrix.application.version }} \
@@ -233,8 +233,8 @@ jobs:
             echo "⚙️  Installing ${{ matrix.application.name }}..."
             
             # Fix all permissions recursively for Composer and OroDC operations
-            chown -R 1000:1000 "$PROJECT_DIR"
-            chmod -R 755 "$PROJECT_DIR"
+              chown -R 1000:1000 "$PROJECT_DIR"
+              chmod -R 755 "$PROJECT_DIR"
             
             # Purge any existing installation to ensure clean state
             su -c 'cd "'"$PROJECT_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc purge' runner || true

@@ -1,5 +1,5 @@
 # Goss test file for OroDC installation verification
-# Simple test - just check main page accessibility
+# Simple test - just check main page accessibility via direct nginx container connection
 
 # Test HTTP endpoints
 http:

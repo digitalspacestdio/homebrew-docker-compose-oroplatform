@@ -45,21 +45,44 @@ install_goss() {
     echo "✅ Goss installed: $(goss --version)"
 }
 
-# Function to detect ports
-detect_ports() {
-    echo "🔍 Detecting HTTP port for ${UNIQUE_PROJECT_NAME}..."
+# Function to detect nginx container and connect to its network
+detect_nginx_container() {
+    echo "🔍 Detecting nginx container for ${UNIQUE_PROJECT_NAME}..."
     
-    # HTTP Port (nginx) - the only one we need for simple test
-    HTTP_PORT=$(docker ps --filter "name=${UNIQUE_PROJECT_NAME}" --format "{{.Names}} {{.Ports}}" | grep nginx | grep -o '[0-9]*->80/tcp' | cut -d- -f1 | head -1)
+    # Get nginx container name
+    NGINX_CONTAINER=$(docker ps --filter "name=${UNIQUE_PROJECT_NAME}" --format "{{.Names}}" | grep nginx | head -1)
     
-    echo "📋 Detected HTTP port: ${HTTP_PORT:-none}"
-    
-    if [ -z "$HTTP_PORT" ]; then
-        echo "❌ Could not detect HTTP port - this is critical for testing"
+    if [ -z "$NGINX_CONTAINER" ]; then
+        echo "❌ Could not find nginx container"
         echo "📋 Available containers:"
-        docker ps --filter "name=${UNIQUE_PROJECT_NAME}" --format "{{.Names}} {{.Ports}}"
+        docker ps --filter "name=${UNIQUE_PROJECT_NAME}" --format "{{.Names}}"
         return 1
     fi
+    
+    echo "📋 Found nginx container: $NGINX_CONTAINER"
+    
+    # Get OroDC network name
+    ORODC_NETWORK=$(docker inspect "$NGINX_CONTAINER" --format '{{range $net, $config := .NetworkSettings.Networks}}{{$net}} {{end}}' | awk '{print $1}')
+    
+    if [ -z "$ORODC_NETWORK" ]; then
+        echo "❌ Could not detect OroDC network"
+        return 1
+    fi
+    
+    echo "📋 Found OroDC network: $ORODC_NETWORK"
+    
+    # Connect current container to OroDC network
+    echo "🔗 Connecting to OroDC network..."
+    CURRENT_CONTAINER=$(hostname)
+    docker network connect "$ORODC_NETWORK" "$CURRENT_CONTAINER" 2>/dev/null || {
+        echo "⚠️  Already connected to network or connection failed, continuing..."
+    }
+    
+    # We'll test nginx directly on port 80
+    NGINX_HOST="$NGINX_CONTAINER"
+    HTTP_PORT="80"
+    
+    echo "✅ Will test nginx directly: $NGINX_HOST:$HTTP_PORT"
 }
 
 # Function to prepare Goss test file
@@ -71,41 +94,41 @@ prepare_goss_file() {
     # Copy template and substitute variables
     cp "${GITHUB_WORKSPACE:-$(pwd)}/.github/tests/oro-installation.yaml" "$GOSS_FILE"
     
-    # Replace HTTP_PORT with actual detected port
-    sed -i "s/HTTP_PORT/${HTTP_PORT}/g" "$GOSS_FILE"
+    # Replace placeholder with nginx container name and port
+    sed -i "s/localhost:HTTP_PORT/${NGINX_HOST}:${HTTP_PORT}/g" "$GOSS_FILE"
     
     echo "✅ Goss file prepared: $GOSS_FILE"
-    echo "🌐 Testing URL: http://localhost:$HTTP_PORT"
+    echo "🌐 Testing URL: http://$NGINX_HOST:$HTTP_PORT"
 }
 
-# Function to wait for HTTP port to be ready
+# Function to wait for nginx container to be ready
 wait_for_http_port() {
-    echo "⏳ Waiting for HTTP service on port $HTTP_PORT to be ready..."
+    echo "⏳ Waiting for nginx container $NGINX_HOST:$HTTP_PORT to be ready..."
     
     local max_attempts=30
     local attempt=1
     
     while [ $attempt -le $max_attempts ]; do
-        echo "📡 Attempt $attempt/$max_attempts: Testing HTTP port $HTTP_PORT..."
+        echo "📡 Attempt $attempt/$max_attempts: Testing nginx at $NGINX_HOST:$HTTP_PORT..."
         
         # Test HTTP connectivity with curl
-        if curl -s -f -m 5 "http://localhost:$HTTP_PORT" >/dev/null 2>&1; then
-            echo "✅ HTTP service is ready on port $HTTP_PORT!"
+        if curl -s -f -m 5 "http://$NGINX_HOST:$HTTP_PORT" >/dev/null 2>&1; then
+            echo "✅ Nginx container is ready at $NGINX_HOST:$HTTP_PORT!"
             return 0
         fi
         
-        # Fallback: test TCP connection
-        if timeout 5 bash -c "</dev/tcp/localhost/$HTTP_PORT" >/dev/null 2>&1; then
-            echo "✅ HTTP port $HTTP_PORT is accepting connections!"
+        # Fallback: test TCP connection to nginx container
+        if timeout 5 bash -c "</dev/tcp/$NGINX_HOST/$HTTP_PORT" >/dev/null 2>&1; then
+            echo "✅ Nginx port $NGINX_HOST:$HTTP_PORT is accepting connections!"
             return 0
         fi
         
         if [ $attempt -eq $max_attempts ]; then
-            echo "❌ HTTP service failed to become ready after $max_attempts attempts"
+            echo "❌ Nginx container failed to become ready after $max_attempts attempts"
             return 1
         fi
         
-        echo "⏸️  HTTP not ready yet, waiting 10 seconds..."
+        echo "⏸️  Nginx not ready yet, waiting 10 seconds..."
         sleep 10
         attempt=$((attempt + 1))
     done
@@ -151,8 +174,8 @@ main() {
     # Step 1: Install Goss
     install_goss
     
-    # Step 2: Detect service ports
-    detect_ports
+    # Step 2: Detect nginx container and connect to network
+    detect_nginx_container
     
     # Step 3: Prepare Goss test file  
     prepare_goss_file
