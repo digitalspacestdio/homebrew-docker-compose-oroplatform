@@ -8,6 +8,7 @@ FROM composer:${COMPOSER_VERSION} AS composer_app
 # Php base image - minimal, close to official php:fpm-alpine
 FROM php:${PHP_VERSION}-fpm-alpine${ALPINE_VERSION}
 
+ARG EXT_IMAP_VERSION=1.0.3
 ARG EXT_REDIS_VERSION=6.2.0
 ARG EXT_IGBINARY_VERSION=3.2.15
 ARG EXT_MONGODB_VERSION=1.21.0
@@ -28,9 +29,11 @@ RUN apk add --no-cache \
     openldap \
     gmp \
     tidyhtml-libs \
-    c-client \
+    imap \
     oniguruma \
-  ;
+    git \
+    curl \
+    wget
 
 ARG REDIS_VERSION="6.2.9"
 ARG REDIS_DOWNLOAD_URL="http://download.redis.io/releases/redis-${REDIS_VERSION}.tar.gz"  
@@ -72,8 +75,13 @@ RUN set -eux; \
   \
   docker-php-source extract; \
   docker-php-ext-configure zip; \
-  docker-php-ext-configure imap --with-imap --with-imap-ssl; \
   docker-php-ext-configure gd --with-freetype --with-webp --with-jpeg; \
+  \
+  mkdir -p /usr/src/php/ext/imap; \
+  git clone --recursive --branch $EXT_IMAP_VERSION --depth 1 https://github.com/php/pecl-mail-imap.git /usr/src/php/ext/imap; \
+  docker-php-ext-configure imap --with-imap --with-imap-ssl; \
+  docker-php-ext-install -j$(printf "2\n$(nproc)" | sort -g | head -n1) imap; \
+  rm -rf /usr/src/php/ext/imap; \
   \
   mkdir -p /usr/src/php/ext/igbinary; \
   curl -fsSL https://github.com/igbinary/igbinary/archive/$EXT_IGBINARY_VERSION.tar.gz | tar xvz -C /usr/src/php/ext/igbinary --strip 1; \
