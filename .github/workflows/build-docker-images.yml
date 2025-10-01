@@ -48,6 +48,7 @@ jobs:
           context: compose/docker/php
           file: compose/docker/php/Dockerfile.${{ matrix.php }}.${{ matrix.variant }}
           platforms: linux/amd64
+          no-cache: true
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-amd64
           build-args: |
@@ -142,6 +143,7 @@ jobs:
           context: compose/docker/php
           file: compose/docker/php/Dockerfile.${{ matrix.php }}.${{ matrix.variant }}
           platforms: linux/amd64
+          no-cache: true
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-amd64
           build-args: |
@@ -236,6 +238,7 @@ jobs:
           context: compose/docker/php
           file: compose/docker/php/Dockerfile.${{ matrix.php }}.${{ matrix.variant }}
           platforms: linux/amd64
+          no-cache: true
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/orodc-php:8.5-rc-${{ matrix.variant }}-amd64
           build-args: |
@@ -336,6 +339,7 @@ jobs:
           context: compose/docker/php-node-symfony
           file: compose/docker/php-node-symfony/Dockerfile.${{ matrix.php }}.${{ matrix.variant }}
           platforms: linux/amd64
+          no-cache: true
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-${{ matrix.variant }}-amd64
           build-args: |
@@ -438,6 +442,7 @@ jobs:
           context: compose/docker/php-node-symfony
           file: compose/docker/php-node-symfony/Dockerfile.${{ matrix.php }}.${{ matrix.variant }}
           platforms: linux/amd64
+          no-cache: true
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-${{ matrix.variant }}-amd64
           build-args: |
@@ -540,6 +545,7 @@ jobs:
           context: compose/docker/php-node-symfony
           file: compose/docker/php-node-symfony/Dockerfile.${{ matrix.php }}.${{ matrix.variant }}
           platforms: linux/amd64
+          no-cache: true
           push: true
           tags: ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-${{ matrix.variant }}-amd64
           build-args: |

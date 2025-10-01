@@ -58,12 +58,43 @@ RUN apk add --no-cache \
     util-linux \
     patch \
   ;
-
-# Create developer user
-RUN addgroup -g $PHP_GID ${PHP_USER_GROUP} \
-    && adduser -u $PHP_UID -G ${PHP_USER_GROUP} -s /bin/sh -D ${PHP_USER_NAME} \
-    && rm -rf /var/www/*  \
-    && chown ${PHP_USER_NAME}:${PHP_USER_GROUP} /var/www
+# Create developer user with detailed logging
+RUN set -ex; \
+    echo "=== User Creation Debug Info ==="; \
+    echo "PHP_UID=${PHP_UID}"; \
+    echo "PHP_GID=${PHP_GID}"; \
+    echo "PHP_USER_NAME=${PHP_USER_NAME}"; \
+    echo "PHP_USER_GROUP=${PHP_USER_GROUP}"; \
+    echo "Current groups:"; getent group | head -5; \
+    echo "Current users:"; getent passwd | head -5; \
+    \
+    echo "Step 1: Check if group exists..."; \
+    if getent group "${PHP_USER_GROUP}" >/dev/null 2>&1; then \
+        echo "Group ${PHP_USER_GROUP} already exists, skipping creation"; \
+    else \
+        echo "Creating group ${PHP_USER_GROUP} with GID ${PHP_GID}"; \
+        addgroup -g "${PHP_GID}" "${PHP_USER_GROUP}"; \
+        echo "Group created successfully"; \
+    fi; \
+    \
+    echo "Step 2: Check if user exists..."; \
+    if getent passwd "${PHP_USER_NAME}" >/dev/null 2>&1; then \
+        echo "User ${PHP_USER_NAME} already exists, skipping creation"; \
+    else \
+        echo "Creating user ${PHP_USER_NAME} with UID ${PHP_UID}"; \
+        adduser -u "${PHP_UID}" -G "${PHP_USER_GROUP}" -s /bin/sh -D "${PHP_USER_NAME}"; \
+        echo "User created successfully"; \
+    fi; \
+    \
+    echo "Step 3: Setting up /var/www directory..."; \
+    rm -rf /var/www/* || echo "No files to remove in /var/www"; \
+    chown "${PHP_USER_NAME}:${PHP_USER_GROUP}" /var/www; \
+    echo "Directory ownership set successfully"; \
+    \
+    echo "=== User Creation Completed Successfully ==="; \
+    echo "Final verification:"; \
+    id "${PHP_USER_NAME}"; \
+    ls -la /var/www
 
 
 # Set up development PHP configuration and custom scripts
@@ -109,12 +140,43 @@ RUN echo http://dl-2.alpinelinux.org/alpine/edge/main >> /etc/apk/repositories; 
     htop \
     btop \
   ;
-
-# Create developer user
-RUN addgroup -g $PHP_GID ${PHP_USER_GROUP} \
-    && adduser -u $PHP_UID -G ${PHP_USER_GROUP} -s /bin/sh -D ${PHP_USER_NAME} \
-    && rm -rf /var/www/*  \
-    && chown ${PHP_USER_NAME}:${PHP_USER_GROUP} /var/www
+# Create developer user with detailed logging
+RUN set -ex; \
+    echo "=== User Creation Debug Info ==="; \
+    echo "PHP_UID=${PHP_UID}"; \
+    echo "PHP_GID=${PHP_GID}"; \
+    echo "PHP_USER_NAME=${PHP_USER_NAME}"; \
+    echo "PHP_USER_GROUP=${PHP_USER_GROUP}"; \
+    echo "Current groups:"; getent group | head -5; \
+    echo "Current users:"; getent passwd | head -5; \
+    \
+    echo "Step 1: Check if group exists..."; \
+    if getent group "${PHP_USER_GROUP}" >/dev/null 2>&1; then \
+        echo "Group ${PHP_USER_GROUP} already exists, skipping creation"; \
+    else \
+        echo "Creating group ${PHP_USER_GROUP} with GID ${PHP_GID}"; \
+        addgroup -g "${PHP_GID}" "${PHP_USER_GROUP}"; \
+        echo "Group created successfully"; \
+    fi; \
+    \
+    echo "Step 2: Check if user exists..."; \
+    if getent passwd "${PHP_USER_NAME}" >/dev/null 2>&1; then \
+        echo "User ${PHP_USER_NAME} already exists, skipping creation"; \
+    else \
+        echo "Creating user ${PHP_USER_NAME} with UID ${PHP_UID}"; \
+        adduser -u "${PHP_UID}" -G "${PHP_USER_GROUP}" -s /bin/sh -D "${PHP_USER_NAME}"; \
+        echo "User created successfully"; \
+    fi; \
+    \
+    echo "Step 3: Setting up /var/www directory..."; \
+    rm -rf /var/www/* || echo "No files to remove in /var/www"; \
+    chown "${PHP_USER_NAME}:${PHP_USER_GROUP}" /var/www; \
+    echo "Directory ownership set successfully"; \
+    \
+    echo "=== User Creation Completed Successfully ==="; \
+    echo "Final verification:"; \
+    id "${PHP_USER_NAME}"; \
+    ls -la /var/www
 
 RUN apk add --no-cache --sudo; \
   echo "${PHP_USER_NAME} ALL=(ALL) ALL" >> /etc/sudoers
