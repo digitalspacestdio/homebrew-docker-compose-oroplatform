@@ -237,7 +237,7 @@ jobs:
           file: compose/docker/php/Dockerfile.${{ matrix.php }}.${{ matrix.variant }}
           platforms: linux/amd64
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-amd64
+          tags: ghcr.io/${{ github.repository_owner }}/orodc-php:8.5-rc-${{ matrix.variant }}-amd64
           build-args: |
             PHP_VERSION=8.5-rc
             COMPOSER_VERSION=${{ matrix.composer }}
@@ -272,7 +272,7 @@ jobs:
           file: compose/docker/php/Dockerfile.${{ matrix.php }}.${{ matrix.variant }}
           platforms: linux/arm64
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-arm64
+          tags: ghcr.io/${{ github.repository_owner }}/orodc-php:8.5-rc-${{ matrix.variant }}-arm64
           build-args: |
             PHP_VERSION=8.5-rc
             COMPOSER_VERSION=${{ matrix.composer }}
@@ -296,12 +296,12 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-      - name: Create multi-arch manifest for PHP Base ${{ matrix.php }}-${{ matrix.variant }}
+      - name: Create multi-arch manifest for PHP Base 8.5-rc-${{ matrix.variant }}
         run: |
           docker buildx imagetools create \
-            --tag ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }} \
-            ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-amd64 \
-            ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-arm64
+            --tag ghcr.io/${{ github.repository_owner }}/orodc-php:8.5-rc-${{ matrix.variant }} \
+            ghcr.io/${{ github.repository_owner }}/orodc-php:8.5-rc-${{ matrix.variant }}-amd64 \
+            ghcr.io/${{ github.repository_owner }}/orodc-php:8.5-rc-${{ matrix.variant }}-arm64
 
   # ========================================
   # STAGE 2: FINAL PHP+NODE.JS IMAGES

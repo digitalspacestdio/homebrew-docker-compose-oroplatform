@@ -8,18 +8,6 @@ FROM php:${PHP_VERSION}-fpm-alpine${ALPINE_VERSION} AS app_php
 
 ARG STABILITY="stable"
 ENV STABILIT=${STABILITY}
-
-ARG PHP_UID=1000
-ENV PHP_UID=${PHP_UID}
-
-ARG PHP_GID=1000
-ENV PHP_GID=${PHP_GID}
-
-ARG PHP_USER_NAME=developer
-ENV PHP_USER_NAME=${PHP_USER_NAME}
-
-ARG PHP_USER_GROUP=developer
-ENV PHP_USER_GROUP=${PHP_USER_GROUP}
 ARG EXT_IMAP_VERSION=1.0.3
 ARG EXT_REDIS_VERSION=1d07c3a07efaa7cf9e9a9e9c7f31834f285e4436
 ARG EXT_IGBINARY_VERSION=c7fe8aad3d7894bb85f5a189eba60dec9203950d
@@ -161,12 +149,3 @@ RUN set -eux; \
   \
   apk del .build-deps
 
-
-RUN addgroup -g $PHP_GID ${PHP_USER_GROUP} \
-    && adduser -u $PHP_UID -G ${PHP_USER_GROUP} -s /bin/sh -D ${PHP_USER_NAME} \
-    && rm -rf /var/www/*  \
-    && chown ${PHP_USER_NAME}:${PHP_USER_GROUP} /var/www
-
-RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
-
-RUN mkdir -p /var/run/php

@@ -58,7 +58,7 @@ RUN apk add --no-cache \
     patch \
   ;
 
-# Create developer user (base image uses root)
+# Create developer user
 RUN addgroup -g $PHP_GID ${PHP_USER_GROUP} \
     && adduser -u $PHP_UID -G ${PHP_USER_GROUP} -s /bin/sh -D ${PHP_USER_NAME} \
     && rm -rf /var/www/*  \
@@ -107,6 +107,12 @@ RUN echo http://dl-2.alpinelinux.org/alpine/edge/main >> /etc/apk/repositories; 
     htop \
     btop \
   ;
+
+# Create developer user
+RUN addgroup -g $PHP_GID ${PHP_USER_GROUP} \
+    && adduser -u $PHP_UID -G ${PHP_USER_GROUP} -s /bin/sh -D ${PHP_USER_NAME} \
+    && rm -rf /var/www/*  \
+    && chown ${PHP_USER_NAME}:${PHP_USER_GROUP} /var/www
 
 RUN apk add --no-cache --sudo; \
   echo "${PHP_USER_NAME} ALL=(ALL) ALL" >> /etc/sudoers
