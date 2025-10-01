@@ -12,11 +12,6 @@ on:
         description: 'PHP versions to build (comma-separated: 7.4,8.1,8.2,8.3,8.4,8.5 or "all")'
         required: false
         default: 'all'
-    inputs:
-      php_versions:
-        description: 'PHP versions to build (comma-separated: 7.4,8.1,8.2,8.3,8.4,8.5 or "all")'
-        required: false
-        default: 'all'
       skip_tests:
         description: 'Skip test workflow trigger'
         type: boolean
@@ -39,7 +34,10 @@ jobs:
   # PHP 7.4 (Legacy)
   build-php-7-4:
     name: Build PHP 7.4 Base (${{ matrix.arch_name }})
-    runs-on: [self-hosted, Linux, ${{ matrix.arch }}]
+    runs-on:
+      - self-hosted
+      - Linux
+      - ${{ matrix.arch }}
     strategy:
       fail-fast: false
       max-parallel: 2
@@ -105,7 +103,10 @@ jobs:
   # PHP 8.x (Stable: 8.1, 8.2, 8.3, 8.4)
   build-php-8-x:
     name: Build PHP ${{ matrix.php }} Base (${{ matrix.arch_config.arch_name }})
-    runs-on: [self-hosted, Linux, ${{ matrix.arch_config.arch }}]
+    runs-on:
+      - self-hosted
+      - Linux
+      - ${{ matrix.arch_config.arch }}
     strategy:
       fail-fast: false
       max-parallel: 4
@@ -172,7 +173,10 @@ jobs:
   # PHP 8.5-rc (RC/Beta)
   build-php-8-5:
     name: Build PHP 8.5-rc Base (${{ matrix.arch_name }})
-    runs-on: [self-hosted, Linux, ${{ matrix.arch }}]
+    runs-on:
+      - self-hosted
+      - Linux
+      - ${{ matrix.arch }}
     strategy:
       fail-fast: false
       max-parallel: 2
@@ -304,7 +308,10 @@ jobs:
   build-php-node-7-4:
     name: Build PHP+Node 7.4 (${{ matrix.arch_name }})
     needs: [create-php-base-7-4-manifest]
-    runs-on: [self-hosted, Linux, ${{ matrix.arch }}]
+    runs-on:
+      - self-hosted
+      - Linux
+      - ${{ matrix.arch }}
     strategy:
       fail-fast: false
       max-parallel: 2
@@ -369,7 +376,10 @@ jobs:
   build-php-node-8-x:
     name: Build PHP+Node ${{ matrix.php }} (${{ matrix.arch_config.arch_name }})
     needs: [create-php-base-8-x-manifests]
-    runs-on: [self-hosted, Linux, ${{ matrix.arch_config.arch }}]
+    runs-on:
+      - self-hosted
+      - Linux
+      - ${{ matrix.arch_config.arch }}
     strategy:
       fail-fast: false
       max-parallel: 4
@@ -435,7 +445,10 @@ jobs:
   build-php-node-8-5:
     name: Build PHP+Node 8.5-rc (${{ matrix.arch_name }})
     needs: [create-php-base-8-5-manifest]
-    runs-on: [self-hosted, Linux, ${{ matrix.arch }}]
+    runs-on:
+      - self-hosted
+      - Linux
+      - ${{ matrix.arch }}
     strategy:
       fail-fast: false
       max-parallel: 2
