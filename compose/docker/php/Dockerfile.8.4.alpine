@@ -1,8 +1,6 @@
 ARG ALPINE_VERSION=3.21
 ARG PHP_VERSION=8.4
 ARG COMPOSER_VERSION=2
-# Composer image
-FROM composer:${COMPOSER_VERSION} AS composer_app
 
 FROM php:${PHP_VERSION}-fpm-alpine${ALPINE_VERSION} AS app_php
 
