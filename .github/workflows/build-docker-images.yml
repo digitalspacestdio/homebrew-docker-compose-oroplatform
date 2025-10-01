@@ -12,11 +12,6 @@ on:
         description: 'PHP versions to build (comma-separated: 7.4,8.1,8.2,8.3,8.4,8.5 or "all")'
         required: false
         default: 'all'
-    inputs:
-      php_versions:
-        description: 'PHP versions to build (comma-separated: 7.4,8.1,8.2,8.3,8.4,8.5 or "all")'
-        required: false
-        default: 'all'
       skip_tests:
         description: 'Skip test workflow trigger'
         type: boolean
@@ -251,7 +246,10 @@ jobs:
   create-php-base-7-4-manifest:
     name: Create PHP 7.4 Base Multi-arch Manifest
     needs: [build-php-7-4]
-    runs-on: [self-hosted, Linux, X64]
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
     steps:
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -269,7 +267,10 @@ jobs:
   create-php-base-8-x-manifests:
     name: Create PHP ${{ matrix.php }} Base Multi-arch Manifest
     needs: [build-php-8-x]
-    runs-on: [self-hosted, Linux, X64]
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
     strategy:
       matrix:
         php: ["8.1", "8.2", "8.3", "8.4"]
@@ -290,7 +291,10 @@ jobs:
   create-php-base-8-5-manifest:
     name: Create PHP 8.5-rc Base Multi-arch Manifest
     needs: [build-php-8-5]
-    runs-on: [self-hosted, Linux, X64]
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
     steps:
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -521,7 +525,10 @@ jobs:
   create-php-node-7-4-manifest:
     name: Create PHP+Node 7.4 Multi-arch Manifest
     needs: [build-php-node-7-4]
-    runs-on: [self-hosted, Linux, X64]
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
     steps:
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -539,7 +546,10 @@ jobs:
   create-php-node-8-x-manifests:
     name: Create PHP+Node ${{ matrix.php }} Multi-arch Manifest
     needs: [build-php-node-8-x]
-    runs-on: [self-hosted, Linux, X64]
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
     strategy:
       matrix:
         php: ["8.1", "8.2", "8.3", "8.4"]
@@ -560,7 +570,10 @@ jobs:
   create-php-node-8-5-manifest:
     name: Create PHP+Node 8.5-rc Multi-arch Manifest
     needs: [build-php-node-8-5]
-    runs-on: [self-hosted, Linux, X64]
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
     steps:
       - name: Log in to GHCR
         uses: docker/login-action@v3
