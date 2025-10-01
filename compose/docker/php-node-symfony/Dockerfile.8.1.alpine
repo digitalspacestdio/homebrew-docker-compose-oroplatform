@@ -9,6 +9,19 @@ FROM node:${NODE_VERSION}-alpine${ALPINE_VERSION} AS app_node
 # Use our base PHP image with all PHP modules pre-compiled
 FROM ghcr.io/digitalspacestdio/orodc-php:${PHP_VERSION}-alpine
 
+# Set up user environment variables (base image uses root)
+ARG PHP_UID=1000
+ENV PHP_UID=${PHP_UID}
+
+ARG PHP_GID=1000
+ENV PHP_GID=${PHP_GID}
+
+ARG PHP_USER_NAME=developer
+ENV PHP_USER_NAME=${PHP_USER_NAME}
+
+ARG PHP_USER_GROUP=developer
+ENV PHP_USER_GROUP=${PHP_USER_GROUP}
+
 
 # persistent / runtime deps
 RUN apk add --no-cache \
@@ -45,6 +58,12 @@ RUN apk add --no-cache \
     util-linux \
     patch \
   ;
+
+# Create developer user
+RUN addgroup -g $PHP_GID ${PHP_USER_GROUP} \
+    && adduser -u $PHP_UID -G ${PHP_USER_GROUP} -s /bin/sh -D ${PHP_USER_NAME} \
+    && rm -rf /var/www/*  \
+    && chown ${PHP_USER_NAME}:${PHP_USER_GROUP} /var/www
 
 
 # Set up development PHP configuration and custom scripts
@@ -90,6 +109,12 @@ RUN echo http://dl-2.alpinelinux.org/alpine/edge/main >> /etc/apk/repositories; 
     htop \
     btop \
   ;
+
+# Create developer user
+RUN addgroup -g $PHP_GID ${PHP_USER_GROUP} \
+    && adduser -u $PHP_UID -G ${PHP_USER_GROUP} -s /bin/sh -D ${PHP_USER_NAME} \
+    && rm -rf /var/www/*  \
+    && chown ${PHP_USER_NAME}:${PHP_USER_GROUP} /var/www
 
 RUN apk add --no-cache --sudo; \
   echo "${PHP_USER_NAME} ALL=(ALL) ALL" >> /etc/sudoers

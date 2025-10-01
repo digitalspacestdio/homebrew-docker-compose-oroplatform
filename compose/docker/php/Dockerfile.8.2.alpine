@@ -158,11 +158,4 @@ RUN set -eux; \
   \
   apk del .build-deps
 
-RUN addgroup -g $PHP_GID ${PHP_USER_GROUP} \
-    && adduser -u $PHP_UID -G ${PHP_USER_GROUP} -s /bin/sh -D ${PHP_USER_NAME} \
-    && rm -rf /var/www/*  \
-    && chown ${PHP_USER_NAME}:${PHP_USER_GROUP} /var/www
 
-RUN mv "$PHP_INI_DIR/php.ini-production" "$PHP_INI_DIR/php.ini"
-
-RUN mkdir -p /var/run/php
