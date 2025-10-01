@@ -63,9 +63,6 @@ apk add --no-cache \
 apk add --no-cache sudo
 echo "developer ALL=(ALL) ALL" >> /etc/sudoers
 
-# Install Python 2 for Node.js modules
-apk add --no-cache python2
-
 # Install and configure Zsh + Starship
 apk add --no-cache zsh
 
