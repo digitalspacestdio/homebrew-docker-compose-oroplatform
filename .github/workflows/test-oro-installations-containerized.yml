@@ -6,11 +6,21 @@ on:
     paths:
       - 'compose/**'
       - 'bin/**'
+      - '!compose/docker/**'  # Exclude docker files - they trigger via workflow_run
   pull_request:
     branches: [ main, master, develop ]
     paths:
       - 'compose/**'
       - 'bin/**'
+      - '!compose/docker/**'  # Exclude docker files - they trigger via workflow_run
+  
+  # Run after Docker images are successfully built
+  workflow_run:
+    workflows: ["Build & Publish PHP Base and PHP+Node.js multi-arch images to GHCR"]
+    types:
+      - completed
+    branches: [ master ]
+  
   schedule:
     # Run tests daily at 2 AM UTC
     - cron: '0 2 * * *'
@@ -32,6 +42,10 @@ env:
 jobs:
   # Test installations in isolated containers - Universal (X64 + ARM64)
   test-installations:
+    # Skip if triggered by workflow_run but build was not successful
+    if: |
+      github.event_name != 'workflow_run' || 
+      github.event.workflow_run.conclusion == 'success'
     runs-on: ${{ matrix.arch.runner }}
     strategy:
       fail-fast: false
