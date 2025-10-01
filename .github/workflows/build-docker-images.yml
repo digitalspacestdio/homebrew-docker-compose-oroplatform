@@ -34,28 +34,53 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      
+      # Login to Docker Hub (optional, increases rate limit from 100 to 200 pulls/6h)
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        continue-on-error: true
+      
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Build & Push PHP Base ${{ matrix.php }}-composer${{ matrix.composer }}-${{ matrix.variant }} (AMD64)
-        uses: docker/build-push-action@v5
+      
+      # Build with retry (handles Docker Hub rate limits)
+      - name: Build PHP Base ${{ matrix.php }}-${{ matrix.variant }} (AMD64)
+        uses: nick-invision/retry@v2
         with:
-          context: compose/docker/php
-          file: compose/docker/php/Dockerfile.${{ matrix.php }}.${{ matrix.variant }}
-          platforms: linux/amd64
-          no-cache: true
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-amd64
-          build-args: |
-            PHP_VERSION=${{ matrix.php }}
-            COMPOSER_VERSION=${{ matrix.composer }}
-          cache-from: type=gha,scope=php-base-${{ matrix.php }}-amd64
-          cache-to: type=gha,mode=max,scope=php-base-${{ matrix.php }}-amd64
+          timeout_minutes: 30
+          max_attempts: 3
+          retry_wait_seconds: 60
+          command: |
+            docker buildx build \
+              --file compose/docker/php/Dockerfile.${{ matrix.php }}.${{ matrix.variant }} \
+              --platform linux/amd64 \
+              --tag ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-amd64 \
+              --build-arg PHP_VERSION=${{ matrix.php }} \
+              --build-arg COMPOSER_VERSION=${{ matrix.composer }} \
+              --cache-from type=gha,scope=php-base-${{ matrix.php }}-amd64 \
+              --cache-to type=gha,mode=max,scope=php-base-${{ matrix.php }}-amd64 \
+              --load \
+              compose/docker/php
+      
+      # Push with retry (handles network errors)
+      - name: Push PHP Base ${{ matrix.php }}-${{ matrix.variant }} (AMD64)
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: |
+            docker push ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-amd64
 
   build-php-7-4-arm64:
     name: Build PHP 7.4 Base (ARM64)
@@ -78,20 +103,41 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Build & Push PHP Base ${{ matrix.php }}-composer${{ matrix.composer }}-${{ matrix.variant }} (ARM64)
-        uses: docker/build-push-action@v5
+      
+      # Login to Docker Hub (optional, increases rate limit from 100 to 200 pulls/6h)
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
         with:
-          context: compose/docker/php
-          file: compose/docker/php/Dockerfile.${{ matrix.php }}.${{ matrix.variant }}
-          platforms: linux/arm64
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-arm64
-          build-args: |
-            PHP_VERSION=${{ matrix.php }}
-            COMPOSER_VERSION=${{ matrix.composer }}
-          cache-from: type=gha,scope=php-base-${{ matrix.php }}-arm64
-          cache-to: type=gha,mode=max,scope=php-base-${{ matrix.php }}-arm64
-
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        continue-on-error: true
+      
+      # Build with retry (handles Docker Hub rate limits)
+      - name: Build PHP Base ${{ matrix.php }} (ARM64)
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          retry_wait_seconds: 60
+          command: |
+            docker buildx build \
+              --file compose/docker/php/Dockerfile.${{ matrix.php }}.${{ matrix.variant }} \
+              --platform linux/arm64 \
+              --tag ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-arm64 \
+              --cache-from type=gha,scope=php-base-${{ matrix.php }}-arm64 \
+              --cache-to type=gha,mode=max,scope=php-base-${{ matrix.php }}-arm64 \
+              --load \
+              compose/docker/php
+      
+      # Push with retry (handles network errors)
+      - name: Push PHP Base ${{ matrix.php }} (ARM64)
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: |
+            docker push ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-arm64
   create-php-7-4-manifest:
     name: Create PHP 7.4 Base multi-arch manifests
     needs: [build-php-7-4-amd64, build-php-7-4-arm64]
@@ -137,21 +183,41 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Build & Push PHP Base ${{ matrix.php }}-composer${{ matrix.composer }}-${{ matrix.variant }} (AMD64)
-        uses: docker/build-push-action@v5
+      
+      # Login to Docker Hub (optional, increases rate limit from 100 to 200 pulls/6h)
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
         with:
-          context: compose/docker/php
-          file: compose/docker/php/Dockerfile.${{ matrix.php }}.${{ matrix.variant }}
-          platforms: linux/amd64
-          no-cache: true
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-amd64
-          build-args: |
-            PHP_VERSION=${{ matrix.php }}
-            COMPOSER_VERSION=${{ matrix.composer }}
-          cache-from: type=gha,scope=php-base-${{ matrix.php }}-amd64
-          cache-to: type=gha,mode=max,scope=php-base-${{ matrix.php }}-amd64
-
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        continue-on-error: true
+      
+      # Build with retry (handles Docker Hub rate limits)
+      - name: Build PHP Base ${{ matrix.php }} (AMD64)
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          retry_wait_seconds: 60
+          command: |
+            docker buildx build \
+              --file compose/docker/php/Dockerfile.${{ matrix.php }}.${{ matrix.variant }} \
+              --platform linux/amd64 \
+              --tag ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-amd64 \
+              --cache-from type=gha,scope=php-base-${{ matrix.php }}-amd64 \
+              --cache-to type=gha,mode=max,scope=php-base-${{ matrix.php }}-amd64 \
+              --load \
+              compose/docker/php
+      
+      # Push with retry (handles network errors)
+      - name: Push PHP Base ${{ matrix.php }} (AMD64)
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: |
+            docker push ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-amd64
   build-php-8-x-arm64:
     name: Build PHP 8.x Base (ARM64)
     runs-on: [self-hosted, Linux, ARM64]
@@ -173,20 +239,41 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Build & Push PHP Base ${{ matrix.php }}-composer${{ matrix.composer }}-${{ matrix.variant }} (ARM64)
-        uses: docker/build-push-action@v5
+      
+      # Login to Docker Hub (optional, increases rate limit from 100 to 200 pulls/6h)
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
         with:
-          context: compose/docker/php
-          file: compose/docker/php/Dockerfile.${{ matrix.php }}.${{ matrix.variant }}
-          platforms: linux/arm64
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-arm64
-          build-args: |
-            PHP_VERSION=${{ matrix.php }}
-            COMPOSER_VERSION=${{ matrix.composer }}
-          cache-from: type=gha,scope=php-base-${{ matrix.php }}-arm64
-          cache-to: type=gha,mode=max,scope=php-base-${{ matrix.php }}-arm64
-
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        continue-on-error: true
+      
+      # Build with retry (handles Docker Hub rate limits)
+      - name: Build PHP Base ${{ matrix.php }} (ARM64)
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          retry_wait_seconds: 60
+          command: |
+            docker buildx build \
+              --file compose/docker/php/Dockerfile.${{ matrix.php }}.${{ matrix.variant }} \
+              --platform linux/arm64 \
+              --tag ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-arm64 \
+              --cache-from type=gha,scope=php-base-${{ matrix.php }}-arm64 \
+              --cache-to type=gha,mode=max,scope=php-base-${{ matrix.php }}-arm64 \
+              --load \
+              compose/docker/php
+      
+      # Push with retry (handles network errors)
+      - name: Push PHP Base ${{ matrix.php }} (ARM64)
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: |
+            docker push ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-${{ matrix.variant }}-arm64
   create-php-8-x-manifest:
     name: Create PHP 8.x Base multi-arch manifests
     needs: [build-php-8-x-amd64, build-php-8-x-arm64]
@@ -232,21 +319,41 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Build & Push PHP Base ${{ matrix.php }}-composer${{ matrix.composer }}-${{ matrix.variant }} (AMD64)
-        uses: docker/build-push-action@v5
+      
+      # Login to Docker Hub (optional, increases rate limit from 100 to 200 pulls/6h)
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
         with:
-          context: compose/docker/php
-          file: compose/docker/php/Dockerfile.${{ matrix.php }}.${{ matrix.variant }}
-          platforms: linux/amd64
-          no-cache: true
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/orodc-php:8.5-rc-${{ matrix.variant }}-amd64
-          build-args: |
-            PHP_VERSION=8.5-rc
-            COMPOSER_VERSION=${{ matrix.composer }}
-          cache-from: type=gha,scope=php-base-${{ matrix.php }}-amd64
-          cache-to: type=gha,mode=max,scope=php-base-${{ matrix.php }}-amd64
-
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        continue-on-error: true
+      
+      # Build with retry (handles Docker Hub rate limits)
+      - name: Build PHP Base ${{ matrix.php }} (AMD64)
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          retry_wait_seconds: 60
+          command: |
+            docker buildx build \
+              --file compose/docker/php/Dockerfile.${{ matrix.php }}.${{ matrix.variant }} \
+              --platform linux/amd64 \
+              --tag ghcr.io/${{ github.repository_owner }}/orodc-php:8.5-rc-${{ matrix.variant }}-amd64 \
+              --cache-from type=gha,scope=php-base-${{ matrix.php }}-amd64 \
+              --cache-to type=gha,mode=max,scope=php-base-${{ matrix.php }}-amd64 \
+              --load \
+              compose/docker/php
+      
+      # Push with retry (handles network errors)
+      - name: Push PHP Base ${{ matrix.php }} (AMD64)
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: |
+            docker push ghcr.io/${{ github.repository_owner }}/orodc-php:8.5-rc-${{ matrix.variant }}-amd64
   build-php-8-5-arm64:
     name: Build PHP 8.5 Base (ARM64)
     runs-on: [self-hosted, Linux, ARM64]
@@ -268,20 +375,41 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Build & Push PHP Base ${{ matrix.php }}-composer${{ matrix.composer }}-${{ matrix.variant }} (ARM64)
-        uses: docker/build-push-action@v5
+      
+      # Login to Docker Hub (optional, increases rate limit from 100 to 200 pulls/6h)
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
         with:
-          context: compose/docker/php
-          file: compose/docker/php/Dockerfile.${{ matrix.php }}.${{ matrix.variant }}
-          platforms: linux/arm64
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/orodc-php:8.5-rc-${{ matrix.variant }}-arm64
-          build-args: |
-            PHP_VERSION=8.5-rc
-            COMPOSER_VERSION=${{ matrix.composer }}
-          cache-from: type=gha,scope=php-base-${{ matrix.php }}-arm64
-          cache-to: type=gha,mode=max,scope=php-base-${{ matrix.php }}-arm64
-
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        continue-on-error: true
+      
+      # Build with retry (handles Docker Hub rate limits)
+      - name: Build PHP Base ${{ matrix.php }} (ARM64)
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          retry_wait_seconds: 60
+          command: |
+            docker buildx build \
+              --file compose/docker/php/Dockerfile.${{ matrix.php }}.${{ matrix.variant }} \
+              --platform linux/arm64 \
+              --tag ghcr.io/${{ github.repository_owner }}/orodc-php:8.5-rc-${{ matrix.variant }}-arm64 \
+              --cache-from type=gha,scope=php-base-${{ matrix.php }}-arm64 \
+              --cache-to type=gha,mode=max,scope=php-base-${{ matrix.php }}-arm64 \
+              --load \
+              compose/docker/php
+      
+      # Push with retry (handles network errors)
+      - name: Push PHP Base ${{ matrix.php }} (ARM64)
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: |
+            docker push ghcr.io/${{ github.repository_owner }}/orodc-php:8.5-rc-${{ matrix.variant }}-arm64
   create-php-8-5-manifest:
     name: Create PHP 8.5 Base multi-arch manifests
     needs: [build-php-8-5-amd64, build-php-8-5-arm64]
@@ -333,22 +461,41 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Build & Push PHP ${{ matrix.php }}-node${{ matrix.node }}-composer${{ matrix.composer }}-${{ matrix.variant }} (AMD64)
-        uses: docker/build-push-action@v5
+      
+      # Login to Docker Hub (optional, increases rate limit from 100 to 200 pulls/6h)
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
         with:
-          context: compose/docker/php-node-symfony
-          file: compose/docker/php-node-symfony/Dockerfile.${{ matrix.php }}.${{ matrix.variant }}
-          platforms: linux/amd64
-          no-cache: true
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-${{ matrix.variant }}-amd64
-          build-args: |
-            PHP_VERSION=${{ matrix.php }}
-            NODE_VERSION=${{ matrix.node }}
-            COMPOSER_VERSION=${{ matrix.composer }}
-          cache-from: type=gha,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-amd64
-          cache-to: type=gha,mode=max,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-amd64
-
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        continue-on-error: true
+      
+      # Build with retry (handles Docker Hub rate limits)
+      - name: Build PHP Final ${{ matrix.php }} (AMD64)
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          retry_wait_seconds: 60
+          command: |
+            docker buildx build \
+              --file compose/docker/php-node-symfony/Dockerfile.${{ matrix.php }}.${{ matrix.variant }} \
+              --platform linux/amd64 \
+              --tag ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-${{ matrix.variant }}-amd64 \
+              --cache-from type=gha,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-amd64 \
+              --cache-to type=gha,mode=max,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-amd64 \
+              --load \
+              compose/docker/php-node-symfony
+      
+      # Push with retry (handles network errors)
+      - name: Push PHP Final ${{ matrix.php }} (AMD64)
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: |
+            docker push ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-${{ matrix.variant }}-amd64
   build-php-node-7-4-arm64:
     name: Build PHP 7.4 + Node.js images (ARM64)
     needs: [create-php-7-4-manifest]
@@ -372,21 +519,41 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Build & Push PHP ${{ matrix.php }}-node${{ matrix.node }}-composer${{ matrix.composer }}-${{ matrix.variant }} (ARM64)
-        uses: docker/build-push-action@v5
+      
+      # Login to Docker Hub (optional, increases rate limit from 100 to 200 pulls/6h)
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
         with:
-          context: compose/docker/php-node-symfony
-          file: compose/docker/php-node-symfony/Dockerfile.${{ matrix.php }}.${{ matrix.variant }}
-          platforms: linux/arm64
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-${{ matrix.variant }}-arm64
-          build-args: |
-            PHP_VERSION=${{ matrix.php }}
-            NODE_VERSION=${{ matrix.node }}
-            COMPOSER_VERSION=${{ matrix.composer }}
-          cache-from: type=gha,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-arm64
-          cache-to: type=gha,mode=max,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-arm64
-
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        continue-on-error: true
+      
+      # Build with retry (handles Docker Hub rate limits)
+      - name: Build PHP Final ${{ matrix.php }} (ARM64)
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          retry_wait_seconds: 60
+          command: |
+            docker buildx build \
+              --file compose/docker/php-node-symfony/Dockerfile.${{ matrix.php }}.${{ matrix.variant }} \
+              --platform linux/arm64 \
+              --tag ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-${{ matrix.variant }}-arm64 \
+              --cache-from type=gha,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-arm64 \
+              --cache-to type=gha,mode=max,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-arm64 \
+              --load \
+              compose/docker/php-node-symfony
+      
+      # Push with retry (handles network errors)
+      - name: Push PHP Final ${{ matrix.php }} (ARM64)
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: |
+            docker push ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-${{ matrix.variant }}-arm64
   create-php-node-7-4-manifest:
     name: Create PHP 7.4 + Node.js multi-arch manifests
     needs: [build-php-node-7-4-amd64, build-php-node-7-4-arm64]
@@ -436,22 +603,41 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Build & Push PHP ${{ matrix.php }}-node${{ matrix.node }}-composer${{ matrix.composer }}-${{ matrix.variant }} (AMD64)
-        uses: docker/build-push-action@v5
+      
+      # Login to Docker Hub (optional, increases rate limit from 100 to 200 pulls/6h)
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
         with:
-          context: compose/docker/php-node-symfony
-          file: compose/docker/php-node-symfony/Dockerfile.${{ matrix.php }}.${{ matrix.variant }}
-          platforms: linux/amd64
-          no-cache: true
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-${{ matrix.variant }}-amd64
-          build-args: |
-            PHP_VERSION=${{ matrix.php }}
-            NODE_VERSION=${{ matrix.node }}
-            COMPOSER_VERSION=${{ matrix.composer }}
-          cache-from: type=gha,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-amd64
-          cache-to: type=gha,mode=max,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-amd64
-
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        continue-on-error: true
+      
+      # Build with retry (handles Docker Hub rate limits)
+      - name: Build PHP Final ${{ matrix.php }} (AMD64)
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          retry_wait_seconds: 60
+          command: |
+            docker buildx build \
+              --file compose/docker/php-node-symfony/Dockerfile.${{ matrix.php }}.${{ matrix.variant }} \
+              --platform linux/amd64 \
+              --tag ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-${{ matrix.variant }}-amd64 \
+              --cache-from type=gha,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-amd64 \
+              --cache-to type=gha,mode=max,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-amd64 \
+              --load \
+              compose/docker/php-node-symfony
+      
+      # Push with retry (handles network errors)
+      - name: Push PHP Final ${{ matrix.php }} (AMD64)
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: |
+            docker push ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-${{ matrix.variant }}-amd64
   build-php-node-8-x-arm64:
     name: Build PHP 8.x + Node.js images (ARM64)
     needs: [create-php-8-x-manifest]
@@ -475,21 +661,41 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Build & Push PHP ${{ matrix.php }}-node${{ matrix.node }}-composer${{ matrix.composer }}-${{ matrix.variant }} (ARM64)
-        uses: docker/build-push-action@v5
+      
+      # Login to Docker Hub (optional, increases rate limit from 100 to 200 pulls/6h)
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
         with:
-          context: compose/docker/php-node-symfony
-          file: compose/docker/php-node-symfony/Dockerfile.${{ matrix.php }}.${{ matrix.variant }}
-          platforms: linux/arm64
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-${{ matrix.variant }}-arm64
-          build-args: |
-            PHP_VERSION=${{ matrix.php }}
-            NODE_VERSION=${{ matrix.node }}
-            COMPOSER_VERSION=${{ matrix.composer }}
-          cache-from: type=gha,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-arm64
-          cache-to: type=gha,mode=max,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-arm64
-
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        continue-on-error: true
+      
+      # Build with retry (handles Docker Hub rate limits)
+      - name: Build PHP Final ${{ matrix.php }} (ARM64)
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          retry_wait_seconds: 60
+          command: |
+            docker buildx build \
+              --file compose/docker/php-node-symfony/Dockerfile.${{ matrix.php }}.${{ matrix.variant }} \
+              --platform linux/arm64 \
+              --tag ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-${{ matrix.variant }}-arm64 \
+              --cache-from type=gha,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-arm64 \
+              --cache-to type=gha,mode=max,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-arm64 \
+              --load \
+              compose/docker/php-node-symfony
+      
+      # Push with retry (handles network errors)
+      - name: Push PHP Final ${{ matrix.php }} (ARM64)
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: |
+            docker push ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-${{ matrix.variant }}-arm64
   create-php-node-8-x-manifest:
     name: Create PHP 8.x + Node.js multi-arch manifests
     needs: [build-php-node-8-x-amd64, build-php-node-8-x-arm64]
@@ -539,22 +745,41 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Build & Push PHP ${{ matrix.php }}-node${{ matrix.node }}-composer${{ matrix.composer }}-${{ matrix.variant }} (AMD64)
-        uses: docker/build-push-action@v5
+      
+      # Login to Docker Hub (optional, increases rate limit from 100 to 200 pulls/6h)
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
         with:
-          context: compose/docker/php-node-symfony
-          file: compose/docker/php-node-symfony/Dockerfile.${{ matrix.php }}.${{ matrix.variant }}
-          platforms: linux/amd64
-          no-cache: true
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-${{ matrix.variant }}-amd64
-          build-args: |
-            PHP_VERSION=8.5-rc
-            NODE_VERSION=${{ matrix.node }}
-            COMPOSER_VERSION=${{ matrix.composer }}
-          cache-from: type=gha,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-amd64
-          cache-to: type=gha,mode=max,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-amd64
-
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        continue-on-error: true
+      
+      # Build with retry (handles Docker Hub rate limits)
+      - name: Build PHP Final ${{ matrix.php }} (AMD64)
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          retry_wait_seconds: 60
+          command: |
+            docker buildx build \
+              --file compose/docker/php-node-symfony/Dockerfile.${{ matrix.php }}.${{ matrix.variant }} \
+              --platform linux/amd64 \
+              --tag ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-${{ matrix.variant }}-amd64 \
+              --cache-from type=gha,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-amd64 \
+              --cache-to type=gha,mode=max,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-amd64 \
+              --load \
+              compose/docker/php-node-symfony
+      
+      # Push with retry (handles network errors)
+      - name: Push PHP Final ${{ matrix.php }} (AMD64)
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: |
+            docker push ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-${{ matrix.variant }}-amd64
   build-php-node-8-5-arm64:
     name: Build PHP 8.5 + Node.js images (ARM64)
     needs: [create-php-8-5-manifest]
@@ -578,21 +803,41 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
-      - name: Build & Push PHP ${{ matrix.php }}-node${{ matrix.node }}-composer${{ matrix.composer }}-${{ matrix.variant }} (ARM64)
-        uses: docker/build-push-action@v5
+      
+      # Login to Docker Hub (optional, increases rate limit from 100 to 200 pulls/6h)
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
         with:
-          context: compose/docker/php-node-symfony
-          file: compose/docker/php-node-symfony/Dockerfile.${{ matrix.php }}.${{ matrix.variant }}
-          platforms: linux/arm64
-          push: true
-          tags: ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-${{ matrix.variant }}-arm64
-          build-args: |
-            PHP_VERSION=8.5-rc
-            NODE_VERSION=${{ matrix.node }}
-            COMPOSER_VERSION=${{ matrix.composer }}
-          cache-from: type=gha,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-arm64
-          cache-to: type=gha,mode=max,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-arm64
-
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+        continue-on-error: true
+      
+      # Build with retry (handles Docker Hub rate limits)
+      - name: Build PHP Final ${{ matrix.php }} (ARM64)
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          retry_wait_seconds: 60
+          command: |
+            docker buildx build \
+              --file compose/docker/php-node-symfony/Dockerfile.${{ matrix.php }}.${{ matrix.variant }} \
+              --platform linux/arm64 \
+              --tag ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-${{ matrix.variant }}-arm64 \
+              --cache-from type=gha,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-arm64 \
+              --cache-to type=gha,mode=max,scope=php-${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-arm64 \
+              --load \
+              compose/docker/php-node-symfony
+      
+      # Push with retry (handles network errors)
+      - name: Push PHP Final ${{ matrix.php }} (ARM64)
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: |
+            docker push ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-${{ matrix.node }}-${{ matrix.composer }}-${{ matrix.variant }}-arm64
   create-php-node-8-5-manifest:
     name: Create PHP 8.5 + Node.js multi-arch manifests
     needs: [build-php-node-8-5-amd64, build-php-node-8-5-arm64]
