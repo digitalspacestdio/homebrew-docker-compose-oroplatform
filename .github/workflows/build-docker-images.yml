@@ -7,6 +7,16 @@ on:
       - 'compose/docker/php/**'
       - 'compose/docker/php-node-symfony/**'
   workflow_dispatch:
+    inputs:
+      php_versions:
+        description: 'PHP versions to build (comma-separated: 7.4,8.1,8.2,8.3,8.4,8.5 or "all")'
+        required: false
+        default: 'all'
+      skip_tests:
+        description: 'Skip test workflow trigger'
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
