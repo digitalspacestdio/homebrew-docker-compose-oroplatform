@@ -139,3 +139,6 @@ RUN set -eux; \
   apk add --no-cache --virtual .app-phpexts-rundeps $runDeps; \
   \
   apk del .build-deps
+
+# Copy Composer from composer image
+COPY --from=composer_app /usr/bin/composer /usr/local/bin/composer

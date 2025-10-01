@@ -1,10 +1,13 @@
-ARG ALPINE_VERSION=3.19
+ARG ALPINE_VERSION=3.18
 ARG NODE_VERSION=18
 ARG PHP_VERSION=8.2
 ARG COMPOSER_VERSION=2
 
 # Nodejs image
 FROM node:${NODE_VERSION}-alpine${ALPINE_VERSION} AS app_node
+
+# Composer image
+FROM composer:${COMPOSER_VERSION} AS composer_app
 
 # Use our base PHP image with all PHP modules pre-compiled
 FROM ghcr.io/digitalspacestdio/orodc-php:${PHP_VERSION}-alpine
@@ -22,68 +25,17 @@ ENV PHP_USER_NAME=${PHP_USER_NAME}
 ARG PHP_USER_GROUP=developer
 ENV PHP_USER_GROUP=${PHP_USER_GROUP}
 
-
-# persistent / runtime deps
-RUN apk add --no-cache \
-    acl \
-    ca-certificates \
-    curl \
-    bash \
-    fcgi \
-    file \
-    gettext \
-    git \
-    nss-tools \
-    openssh \
-    msmtp-openrc \
-    msmtp \
-    jpegoptim \
-    pngquant \
-    optipng \
-    gifsicle \
-    libstdc++ \
-    libxext \
-    libxrender \
-    libxtst \
-    libxi \
-    freetype \
-    procps \
-    gcompat \
-    rsync \
-    libpq \
-    vim \
-    micro \
-    postgresql-client \
-    mysql-client \
-    util-linux \
-    patch \
-  ;
-
-# Create developer user
-RUN addgroup -g $PHP_GID ${PHP_USER_GROUP} \
-    && adduser -u $PHP_UID -G ${PHP_USER_GROUP} -s /bin/sh -D ${PHP_USER_NAME} \
-    && rm -rf /var/www/*  \
-    && chown ${PHP_USER_NAME}:${PHP_USER_GROUP} /var/www
-
-
-# Set up development PHP configuration and custom scripts
-RUN rm -f $PHP_INI_DIR/conf.d/app.prod.ini; \
-  mv "$PHP_INI_DIR/php.ini" "$PHP_INI_DIR/php.ini-production"; \
-  mv "$PHP_INI_DIR/php.ini-development" "$PHP_INI_DIR/php.ini"
-
-COPY app.ini $PHP_INI_DIR/conf.d/
-COPY app.opcache.ini $PHP_INI_DIR/conf.d/
-COPY app.msmtp.ini $PHP_INI_DIR/conf.d/
-COPY app.xdebug.ini $PHP_INI_DIR/conf.d/
+# Copy configuration files
+COPY app.ini /usr/local/etc/php/conf.d/
+COPY app.opcache.ini /usr/local/etc/php/conf.d/
+COPY app.msmtp.ini /usr/local/etc/php/conf.d/
+COPY app.xdebug.ini /usr/local/etc/php/conf.d/
 COPY php-fpm.conf /usr/local/etc/php-fpm.conf
 
-# Create /var/run/php if not exists and install custom scripts
-RUN mkdir -p /var/run/php
-
+# Copy scripts
 COPY --chmod=0755 docker-healthcheck.sh /usr/local/bin/docker-healthcheck
 COPY --chmod=0755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint
 COPY --chmod=0755 docker-sshd.sh /usr/local/bin/docker-sshd
-
 COPY --chmod=0755 docker-psql.sh /usr/local/bin/psql
 COPY --chmod=0755 docker-mysql.sh /usr/local/bin/mysql
 
@@ -93,63 +45,27 @@ ENTRYPOINT ["docker-entrypoint"]
 COPY --from=app_node /usr/local /usr/local
 COPY --from=app_node /opt /opt
 
- # smoke test
+# Smoke test for Node.js
 RUN node --version && npm --version && yarn --version
 
-# Install ofelia
+# Copy ofelia binary
 COPY --from=mcuadros/ofelia:latest /usr/bin/ofelia /usr/bin/ofelia
 
-# Composer and XDebug already configured in base image
+# Install composer
+# https://getcomposer.org/doc/03-cli.md#composer-allow-superuser
+ENV COMPOSER_ALLOW_SUPERUSER=1
+ENV PATH="${PATH}:/root/.composer/vendor/bin"
+COPY --from=composer_app /usr/bin/composer /usr/bin/composer
 
-# persistent / runtime deps
-RUN echo http://dl-2.alpinelinux.org/alpine/edge/main >> /etc/apk/repositories; \
-    echo http://dl-2.alpinelinux.org/alpine/edge/community >> /etc/apk/repositories; \
-    apk add --no-cache \
-    shadow \
-    htop \
-    btop \
-  ;
-
-# Create developer user
-RUN addgroup -g $PHP_GID ${PHP_USER_GROUP} \
-    && adduser -u $PHP_UID -G ${PHP_USER_GROUP} -s /bin/sh -D ${PHP_USER_NAME} \
-    && rm -rf /var/www/*  \
-    && chown ${PHP_USER_NAME}:${PHP_USER_GROUP} /var/www
-
-RUN apk add --no-cache --sudo; \
-  echo "${PHP_USER_NAME} ALL=(ALL) ALL" >> /etc/sudoers
-
-# Zsh + starship
-RUN set -eux && \
-  apk add --no-cache zsh && \
-  ARCH=$(uname -m) && \
-  case "$ARCH" in \
-    x86_64) ARCH="x86_64-unknown-linux-musl" ;; \
-    aarch64) ARCH="aarch64-unknown-linux-musl" ;; \
-    *) echo "Unsupported arch: $ARCH" && exit 1 ;; \
-  esac && \
-  mkdir -p /tmp/starship && cd /tmp/starship && \
-  wget -q "https://github.com/starship/starship/releases/latest/download/starship-${ARCH}.tar.gz" && \
-  tar -xzf "starship-${ARCH}.tar.gz" && \
-  install starship /usr/local/bin/starship && \
-  echo 'eval "$(starship init zsh)"' >> /root/.zshrc && \
-  rm -rf /tmp/starship
-
-COPY msmtprc /.msmtprc
-COPY zshrc "/.zshrc"
-
-RUN mkdir -p /etc/bash_completion.d && \
-  composer completion bash > /etc/bash_completion.d/composer; \
-  npm completion > /etc/bash_completion.d/npm; \
-  ln -s /usr/bin/pngquant /usr/local/bin/; \
-  ln -s /usr/bin/jpegoptim /usr/local/bin/;
-
+# Copy build script and run it (creates user and installs packages)
+COPY --chmod=0755 build8.2.sh /tmp/build8.2.sh
 ARG APP_DIR="/var/www"
 ENV APP_DIR=${APP_DIR}
+RUN /tmp/build8.2.sh && rm /tmp/build8.2.sh
 
-RUN mkdir -p ${APP_DIR}; \
-    chown ${PHP_USER_NAME}:${PHP_USER_GROUP} ${APP_DIR}; \
-    chown -R ${PHP_USER_NAME}:${PHP_USER_GROUP} ${PHP_INI_DIR};
+# Copy additional configuration files
+COPY msmtprc /.msmtprc
+COPY zshrc /.zshrc
 
 WORKDIR ${APP_DIR}
 USER ${PHP_USER_NAME}
