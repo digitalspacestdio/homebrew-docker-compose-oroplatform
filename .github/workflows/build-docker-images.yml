@@ -39,7 +39,6 @@ jobs:
       - ${{ matrix.arch }}
     strategy:
       fail-fast: false
-      max-parallel: 6
       matrix:
         include:
           # PHP 7.4
@@ -226,7 +225,6 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      max-parallel: 6
       matrix:
         include:
           # PHP 7.4 + Node 16, 18 + Composer 1, 2 (amd64)
