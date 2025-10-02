@@ -31,22 +31,105 @@ jobs:
   # STAGE 1: BASE PHP IMAGES
   # ========================================
   
-  # PHP 7.4 (Legacy)
-  build-php-7-4:
-    name: Build PHP 7.4 Base (${{ matrix.arch_name }})
+  build-php-base:
+    name: Build PHP ${{ matrix.config.version }} Base (${{ matrix.config.arch_name }})
     runs-on:
       - self-hosted
       - Linux
-      - ${{ matrix.arch }}
+      - ${{ matrix.config.arch }}
     strategy:
       fail-fast: false
-      max-parallel: 2
+      max-parallel: 6
       matrix:
-        include:
-          - arch: X64
+        config:
+          # PHP 7.4
+          - version: "7.4"
+            php_version: "7.4"
+            tag: "7.4"
+            dockerfile: "7.4"
+            arch: X64
             arch_name: amd64
             platform: linux/amd64
-          - arch: ARM64
+          - version: "7.4"
+            php_version: "7.4"
+            tag: "7.4"
+            dockerfile: "7.4"
+            arch: ARM64
+            arch_name: arm64
+            platform: linux/arm64
+          # PHP 8.1
+          - version: "8.1"
+            php_version: "8.1"
+            tag: "8.1"
+            dockerfile: "8.1"
+            arch: X64
+            arch_name: amd64
+            platform: linux/amd64
+          - version: "8.1"
+            php_version: "8.1"
+            tag: "8.1"
+            dockerfile: "8.1"
+            arch: ARM64
+            arch_name: arm64
+            platform: linux/arm64
+          # PHP 8.2
+          - version: "8.2"
+            php_version: "8.2"
+            tag: "8.2"
+            dockerfile: "8.2"
+            arch: X64
+            arch_name: amd64
+            platform: linux/amd64
+          - version: "8.2"
+            php_version: "8.2"
+            tag: "8.2"
+            dockerfile: "8.2"
+            arch: ARM64
+            arch_name: arm64
+            platform: linux/arm64
+          # PHP 8.3
+          - version: "8.3"
+            php_version: "8.3"
+            tag: "8.3"
+            dockerfile: "8.3"
+            arch: X64
+            arch_name: amd64
+            platform: linux/amd64
+          - version: "8.3"
+            php_version: "8.3"
+            tag: "8.3"
+            dockerfile: "8.3"
+            arch: ARM64
+            arch_name: arm64
+            platform: linux/arm64
+          # PHP 8.4
+          - version: "8.4"
+            php_version: "8.4"
+            tag: "8.4"
+            dockerfile: "8.4"
+            arch: X64
+            arch_name: amd64
+            platform: linux/amd64
+          - version: "8.4"
+            php_version: "8.4"
+            tag: "8.4"
+            dockerfile: "8.4"
+            arch: ARM64
+            arch_name: arm64
+            platform: linux/arm64
+          # PHP 8.5 (RC -> stable, tag without -rc)
+          - version: "8.5"
+            php_version: "8.5-rc"
+            tag: "8.5"
+            dockerfile: "8.5"
+            arch: X64
+            arch_name: amd64
+            platform: linux/amd64
+          - version: "8.5"
+            php_version: "8.5-rc"
+            tag: "8.5"
+            dockerfile: "8.5"
+            arch: ARM64
             arch_name: arm64
             platform: linux/arm64
     steps:
@@ -75,10 +158,10 @@ jobs:
       - name: Check if image needs rebuild
         id: check-rebuild
         run: |
-          IMAGE="ghcr.io/${{ github.repository_owner }}/orodc-php:7.4-alpine-${{ matrix.arch_name }}"
+          IMAGE="ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.config.tag }}-alpine-${{ matrix.config.arch_name }}"
           
           # Calculate hash of files affecting this version
-          HASH=$(cat compose/docker/php/Dockerfile.7.4.alpine | sha256sum | cut -d' ' -f1)
+          HASH=$(cat compose/docker/php/Dockerfile.${{ matrix.config.dockerfile }}.alpine | sha256sum | cut -d' ' -f1)
           echo "hash=${HASH}" >> $GITHUB_OUTPUT
           
           # Check if image exists with same hash
@@ -99,7 +182,7 @@ jobs:
           fi
       
       # Build with retry (handles Docker Hub rate limits)
-      - name: Build PHP 7.4 Base (${{ matrix.arch_name }})
+      - name: Build PHP ${{ matrix.config.version }} Base (${{ matrix.config.arch_name }})
         if: steps.check-rebuild.outputs.skip != 'true'
         uses: nick-invision/retry@v2
         with:
@@ -108,21 +191,21 @@ jobs:
           retry_wait_seconds: 60
           command: |
             docker buildx build \
-              --file compose/docker/php/Dockerfile.7.4.alpine \
-              --platform ${{ matrix.platform }} \
-              --tag ghcr.io/${{ github.repository_owner }}/orodc-php:7.4-alpine-${{ matrix.arch_name }} \
-              --build-arg PHP_VERSION=7.4 \
+              --file compose/docker/php/Dockerfile.${{ matrix.config.dockerfile }}.alpine \
+              --platform ${{ matrix.config.platform }} \
+              --tag ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.config.tag }}-alpine-${{ matrix.config.arch_name }} \
+              --build-arg PHP_VERSION=${{ matrix.config.php_version }} \
               --build-arg COMPOSER_VERSION=2 \
               --label "build.hash=${{ steps.check-rebuild.outputs.hash }}" \
               --label "build.date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
               --label "build.commit=${{ github.sha }}" \
-              --cache-from type=gha,scope=php-base-7.4-${{ matrix.arch }} \
-              --cache-to type=gha,mode=max,scope=php-base-7.4-${{ matrix.arch }} \
+              --cache-from type=gha,scope=php-base-${{ matrix.config.tag }}-${{ matrix.config.arch }} \
+              --cache-to type=gha,mode=max,scope=php-base-${{ matrix.config.tag }}-${{ matrix.config.arch }} \
               --load \
               compose/docker/php
       
       # Push with retry (handles network errors)
-      - name: Push PHP 7.4 Base (${{ matrix.arch_name }})
+      - name: Push PHP ${{ matrix.config.version }} Base (${{ matrix.config.arch_name }})
         if: steps.check-rebuild.outputs.skip != 'true'
         uses: nick-invision/retry@v2
         with:
@@ -130,267 +213,22 @@ jobs:
           max_attempts: 3
           retry_wait_seconds: 30
           command: |
-            docker push ghcr.io/${{ github.repository_owner }}/orodc-php:7.4-alpine-${{ matrix.arch_name }}
-
-  # PHP 8.x (Stable: 8.1, 8.2, 8.3, 8.4)
-  build-php-8-x:
-    name: Build PHP ${{ matrix.php }} Base (${{ matrix.arch_config.arch_name }})
-    runs-on:
-      - self-hosted
-      - Linux
-      - ${{ matrix.arch_config.arch }}
-    strategy:
-      fail-fast: false
-      max-parallel: 4
-      matrix:
-        php: ["8.1", "8.2", "8.3", "8.4"]
-        arch_config:
-          - arch: X64
-            arch_name: amd64
-            platform: linux/amd64
-          - arch: ARM64
-            arch_name: arm64
-            platform: linux/arm64
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      # Login to Docker Hub (optional, increases rate limit from 100 to 200 pulls/6h)
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-        continue-on-error: true
-      
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Set up Buildx
-        uses: docker/setup-buildx-action@v3
-      
-      # Check if image needs rebuild (reduces GHCR API calls)
-      - name: Check if image needs rebuild
-        id: check-rebuild
-        run: |
-          IMAGE="ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-alpine-${{ matrix.arch_config.arch_name }}"
-          
-          # Calculate hash of files affecting this version
-          HASH=$(cat compose/docker/php/Dockerfile.${{ matrix.php }}.alpine | sha256sum | cut -d' ' -f1)
-          echo "hash=${HASH}" >> $GITHUB_OUTPUT
-          
-          # Check if image exists with same hash
-          if docker pull --quiet ${IMAGE} 2>/dev/null; then
-            EXISTING_HASH=$(docker inspect ${IMAGE} --format '{{index .Config.Labels "build.hash"}}' 2>/dev/null || echo "")
-            
-            if [ "${EXISTING_HASH}" = "${HASH}" ]; then
-              echo "skip=true" >> $GITHUB_OUTPUT
-              echo "[SKIP] Image exists with matching hash: ${HASH}"
-              exit 0
-            else
-              echo "skip=false" >> $GITHUB_OUTPUT
-              echo "[BUILD] Hash changed: ${EXISTING_HASH:-none} -> ${HASH}"
-            fi
-          else
-            echo "skip=false" >> $GITHUB_OUTPUT
-            echo "[BUILD] Image not found in registry"
-          fi
-      
-      # Build with retry (handles Docker Hub rate limits)
-      - name: Build PHP ${{ matrix.php }} Base (${{ matrix.arch_config.arch_name }})
-        if: steps.check-rebuild.outputs.skip != 'true'
-        uses: nick-invision/retry@v2
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          retry_wait_seconds: 60
-          command: |
-            docker buildx build \
-              --file compose/docker/php/Dockerfile.${{ matrix.php }}.alpine \
-              --platform ${{ matrix.arch_config.platform }} \
-              --tag ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-alpine-${{ matrix.arch_config.arch_name }} \
-              --build-arg PHP_VERSION=${{ matrix.php }} \
-              --build-arg COMPOSER_VERSION=2 \
-              --label "build.hash=${{ steps.check-rebuild.outputs.hash }}" \
-              --label "build.date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
-              --label "build.commit=${{ github.sha }}" \
-              --cache-from type=gha,scope=php-base-${{ matrix.php }}-${{ matrix.arch_config.arch }} \
-              --cache-to type=gha,mode=max,scope=php-base-${{ matrix.php }}-${{ matrix.arch_config.arch }} \
-              --load \
-              compose/docker/php
-      
-      # Push with retry (handles network errors)
-      - name: Push PHP ${{ matrix.php }} Base (${{ matrix.arch_config.arch_name }})
-        if: steps.check-rebuild.outputs.skip != 'true'
-        uses: nick-invision/retry@v2
-        with:
-          timeout_minutes: 10
-          max_attempts: 3
-          retry_wait_seconds: 30
-          command: |
-            docker push ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-alpine-${{ matrix.arch_config.arch_name }}
-
-  # PHP 8.5-rc (RC/Beta)
-  build-php-8-5:
-    name: Build PHP 8.5-rc Base (${{ matrix.arch_name }})
-    runs-on:
-      - self-hosted
-      - Linux
-      - ${{ matrix.arch }}
-    strategy:
-      fail-fast: false
-      max-parallel: 2
-      matrix:
-        include:
-          - arch: X64
-            arch_name: amd64
-            platform: linux/amd64
-          - arch: ARM64
-            arch_name: arm64
-            platform: linux/arm64
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      # Login to Docker Hub (optional, increases rate limit from 100 to 200 pulls/6h)
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-        continue-on-error: true
-      
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Set up Buildx
-        uses: docker/setup-buildx-action@v3
-      
-      # Check if image needs rebuild (reduces GHCR API calls)
-      - name: Check if image needs rebuild
-        id: check-rebuild
-        run: |
-          IMAGE="ghcr.io/${{ github.repository_owner }}/orodc-php:8.5-rc-alpine-${{ matrix.arch_name }}"
-          
-          # Calculate hash of files affecting this version
-          HASH=$(cat compose/docker/php/Dockerfile.8.5.alpine | sha256sum | cut -d' ' -f1)
-          echo "hash=${HASH}" >> $GITHUB_OUTPUT
-          
-          # Check if image exists with same hash
-          if docker pull --quiet ${IMAGE} 2>/dev/null; then
-            EXISTING_HASH=$(docker inspect ${IMAGE} --format '{{index .Config.Labels "build.hash"}}' 2>/dev/null || echo "")
-            
-            if [ "${EXISTING_HASH}" = "${HASH}" ]; then
-              echo "skip=true" >> $GITHUB_OUTPUT
-              echo "[SKIP] Image exists with matching hash: ${HASH}"
-              exit 0
-            else
-              echo "skip=false" >> $GITHUB_OUTPUT
-              echo "[BUILD] Hash changed: ${EXISTING_HASH:-none} -> ${HASH}"
-            fi
-          else
-            echo "skip=false" >> $GITHUB_OUTPUT
-            echo "[BUILD] Image not found in registry"
-          fi
-      
-      # Build with retry (handles Docker Hub rate limits)
-      - name: Build PHP 8.5-rc Base (${{ matrix.arch_name }})
-        if: steps.check-rebuild.outputs.skip != 'true'
-        uses: nick-invision/retry@v2
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          retry_wait_seconds: 60
-          command: |
-            docker buildx build \
-              --file compose/docker/php/Dockerfile.8.5.alpine \
-              --platform ${{ matrix.platform }} \
-              --tag ghcr.io/${{ github.repository_owner }}/orodc-php:8.5-rc-alpine-${{ matrix.arch_name }} \
-              --build-arg PHP_VERSION=8.5-rc \
-              --build-arg COMPOSER_VERSION=2 \
-              --label "build.hash=${{ steps.check-rebuild.outputs.hash }}" \
-              --label "build.date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
-              --label "build.commit=${{ github.sha }}" \
-              --cache-from type=gha,scope=php-base-8.5-${{ matrix.arch }} \
-              --cache-to type=gha,mode=max,scope=php-base-8.5-${{ matrix.arch }} \
-              --load \
-              compose/docker/php
-      
-      # Push with retry (handles network errors)
-      - name: Push PHP 8.5-rc Base (${{ matrix.arch_name }})
-        if: steps.check-rebuild.outputs.skip != 'true'
-        uses: nick-invision/retry@v2
-        with:
-          timeout_minutes: 10
-          max_attempts: 3
-          retry_wait_seconds: 30
-          command: |
-            docker push ghcr.io/${{ github.repository_owner }}/orodc-php:8.5-rc-alpine-${{ matrix.arch_name }}
+            docker push ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.config.tag }}-alpine-${{ matrix.config.arch_name }}
 
   # ========================================
   # STAGE 2: CREATE MULTI-ARCH MANIFESTS
   # ========================================
   
-  create-php-base-7-4-manifest:
-    name: PHP 7.4 Base Manifest
-    needs: [build-php-7-4]
-    runs-on:
-      - self-hosted
-      - Linux
-      - X64
-    steps:
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Create and push manifest
-        run: |
-          docker buildx imagetools create -t ghcr.io/${{ github.repository_owner }}/orodc-php:7.4-alpine \
-            ghcr.io/${{ github.repository_owner }}/orodc-php:7.4-alpine-amd64 \
-            ghcr.io/${{ github.repository_owner }}/orodc-php:7.4-alpine-arm64
-
-  create-php-base-8-x-manifests:
-    name: PHP ${{ matrix.php }} Base Manifest
-    needs: [build-php-8-x]
+  create-php-base-manifests:
+    name: PHP ${{ matrix.version }} Base Manifest
+    needs: [build-php-base]
     runs-on:
       - self-hosted
       - Linux
       - X64
     strategy:
       matrix:
-        php: ["8.1", "8.2", "8.3", "8.4"]
-    steps:
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      
-      - name: Create and push manifest for PHP ${{ matrix.php }}
-        run: |
-          docker buildx imagetools create -t ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-alpine \
-            ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-alpine-amd64 \
-            ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-alpine-arm64
-
-  create-php-base-8-5-manifest:
-    name: PHP 8.5-rc Base Manifest
-    needs: [build-php-8-5]
-    runs-on:
-      - self-hosted
-      - Linux
-      - X64
+        version: ["7.4", "8.1", "8.2", "8.3", "8.4", "8.5"]
     steps:
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -401,9 +239,9 @@ jobs:
       
       - name: Create and push manifest
         run: |
-          docker buildx imagetools create -t ghcr.io/${{ github.repository_owner }}/orodc-php:8.5-rc-alpine \
-            ghcr.io/${{ github.repository_owner }}/orodc-php:8.5-rc-alpine-amd64 \
-            ghcr.io/${{ github.repository_owner }}/orodc-php:8.5-rc-alpine-arm64
+          docker buildx imagetools create -t ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.version }}-alpine \
+            ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.version }}-alpine-amd64 \
+            ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.version }}-alpine-arm64
 
   # ========================================
   # STAGE 3: FINAL PHP+NODE.JS IMAGES
@@ -412,7 +250,7 @@ jobs:
   # PHP+Node.js 7.4 (Legacy)
   build-php-node-7-4:
     name: Build PHP+Node 7.4 (${{ matrix.arch_name }})
-    needs: [create-php-base-7-4-manifest]
+    needs: [create-php-base-manifests]
     runs-on:
       - self-hosted
       - Linux
@@ -512,7 +350,7 @@ jobs:
   # PHP+Node.js 8.x (Stable: 8.1, 8.2, 8.3, 8.4)
   build-php-node-8-x:
     name: Build PHP+Node ${{ matrix.php }} (${{ matrix.arch_config.arch_name }})
-    needs: [create-php-base-8-x-manifests]
+    needs: [create-php-base-manifests]
     runs-on:
       - self-hosted
       - Linux
@@ -613,7 +451,7 @@ jobs:
   # PHP+Node.js 8.5-rc (RC/Beta)
   build-php-node-8-5:
     name: Build PHP+Node 8.5-rc (${{ matrix.arch_name }})
-    needs: [create-php-base-8-5-manifest]
+    needs: [create-php-base-manifests]
     runs-on:
       - self-hosted
       - Linux
