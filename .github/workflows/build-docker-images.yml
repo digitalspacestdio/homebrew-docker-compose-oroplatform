@@ -32,7 +32,7 @@ jobs:
   # ========================================
   
   build-php-base:
-    name: Build PHP ${{ matrix.config.version }} Base (${{ matrix.config.arch_name }})
+    name: PHP ${{ matrix.config.version }} (${{ matrix.config.arch_name }})
     runs-on:
       - self-hosted
       - Linux
@@ -220,7 +220,7 @@ jobs:
   # ========================================
   
   create-php-base-manifests:
-    name: PHP ${{ matrix.version }} Base Manifest
+    name: PHP ${{ matrix.version }} (Manifest)
     needs: [build-php-base]
     runs-on:
       - self-hosted
@@ -249,7 +249,7 @@ jobs:
   
   # PHP+Node.js 7.4 (Legacy)
   build-php-node-7-4:
-    name: Build PHP+Node 7.4 (${{ matrix.arch_name }})
+    name: PHP+Node 7.4 (${{ matrix.arch_name }})
     needs: [create-php-base-manifests]
     runs-on:
       - self-hosted
@@ -349,7 +349,7 @@ jobs:
 
   # PHP+Node.js 8.x (Stable: 8.1, 8.2, 8.3, 8.4)
   build-php-node-8-x:
-    name: Build PHP+Node ${{ matrix.php }} (${{ matrix.arch_config.arch_name }})
+    name: PHP+Node ${{ matrix.php }} (${{ matrix.arch_config.arch_name }})
     needs: [create-php-base-manifests]
     runs-on:
       - self-hosted
@@ -450,7 +450,7 @@ jobs:
 
   # PHP+Node.js 8.5-rc (RC/Beta)
   build-php-node-8-5:
-    name: Build PHP+Node 8.5-rc (${{ matrix.arch_name }})
+    name: PHP+Node 8.5 (${{ matrix.arch_name }})
     needs: [create-php-base-manifests]
     runs-on:
       - self-hosted
@@ -553,7 +553,7 @@ jobs:
   # ========================================
   
   create-php-node-7-4-manifest:
-    name: PHP+Node 7.4 Manifest
+    name: PHP+Node 7.4 (Manifest)
     needs: [build-php-node-7-4]
     runs-on:
       - self-hosted
@@ -574,7 +574,7 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:7.4-alpine-arm64
 
   create-php-node-8-x-manifests:
-    name: PHP+Node ${{ matrix.php }} Manifest
+    name: PHP+Node ${{ matrix.php }} (Manifest)
     needs: [build-php-node-8-x]
     runs-on:
       - self-hosted
@@ -598,7 +598,7 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-alpine-arm64
 
   create-php-node-8-5-manifest:
-    name: PHP+Node 8.5-rc Manifest
+    name: PHP+Node 8.5 (Manifest)
     needs: [build-php-node-8-5]
     runs-on:
       - self-hosted
