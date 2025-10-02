@@ -223,10 +223,7 @@ jobs:
   build-php-node:
     name: PHP-${{ matrix.php }}+NODE-${{ matrix.node }} (${{ matrix.arch_name }})
     needs: [create-php-base-manifests]
-    runs-on:
-      - self-hosted
-      - Linux
-      - ${{ matrix.arch }}
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       max-parallel: 6
@@ -478,6 +475,10 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      
+      # Set up QEMU for multi-arch builds (arm64 on amd64 host)
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
       
       - name: Set up Buildx
         uses: docker/setup-buildx-action@v3
