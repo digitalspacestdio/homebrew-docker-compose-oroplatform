@@ -135,8 +135,8 @@ jobs:
         run: |
           IMAGE="ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-alpine-${{ matrix.arch_name }}"
           
-          # Calculate hash of files affecting this version
-          HASH=$(cat compose/docker/php/Dockerfile.${{ matrix.php }}.alpine | sha256sum | cut -d' ' -f1)
+          # Calculate hash of build context (version-specific files only, exclude other versions)
+          HASH=$(find compose/docker/php -type f -name "Dockerfile.${{ matrix.php }}.alpine" -o -type f ! -name "Dockerfile.*.alpine" | sort | xargs cat 2>/dev/null | sha256sum | cut -d' ' -f1)
           echo "hash=${HASH}" >> $GITHUB_OUTPUT
           
           # Check if image exists with same hash
@@ -488,8 +488,8 @@ jobs:
         run: |
           IMAGE="ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-node${{ matrix.node }}-composer${{ matrix.composer }}-alpine-${{ matrix.arch_name }}"
           
-          # Calculate hash of files affecting this version
-          HASH=$(cat compose/docker/php-node-symfony/Dockerfile.${{ matrix.php }}.alpine compose/docker/php-node-symfony/build${{ matrix.php }}.sh 2>/dev/null | sha256sum | cut -d' ' -f1)
+          # Calculate hash of build context (version-specific + all common files, exclude other versions)
+          HASH=$(find compose/docker/php-node-symfony -type f \( -name "Dockerfile.${{ matrix.php }}.alpine" -o -name "build${{ matrix.php }}.sh" -o \( ! -name "Dockerfile.*.alpine" -a ! -name "build*.sh" \) \) | sort | xargs cat 2>/dev/null | sha256sum | cut -d' ' -f1)
           echo "hash=${HASH}" >> $GITHUB_OUTPUT
           
           # Check if image exists with same hash
