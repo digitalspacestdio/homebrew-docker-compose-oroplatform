@@ -221,7 +221,7 @@ jobs:
   # ========================================
   
   build-php-node:
-    name: PHP+Node ${{ matrix.php }} (${{ matrix.arch_name }})
+    name: PHP-${{ matrix.php }}+NODE-${{ matrix.node }} (${{ matrix.arch_name }})
     needs: [create-php-base-manifests]
     runs-on:
       - self-hosted
