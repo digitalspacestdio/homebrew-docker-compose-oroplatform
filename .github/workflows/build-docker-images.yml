@@ -188,7 +188,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          retry_wait_seconds: 60
+          retry_wait_seconds: 20
           command: |
             docker buildx build \
               --file compose/docker/php/Dockerfile.${{ matrix.config.dockerfile }}.alpine \
@@ -211,7 +211,7 @@ jobs:
         with:
           timeout_minutes: 10
           max_attempts: 3
-          retry_wait_seconds: 30
+          retry_wait_seconds: 20
           command: |
             docker push ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.config.tag }}-alpine-${{ matrix.config.arch_name }}
 
@@ -322,7 +322,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          retry_wait_seconds: 60
+          retry_wait_seconds: 20
           command: |
             docker buildx build \
               --file compose/docker/php-node-symfony/Dockerfile.7.4.alpine \
@@ -343,7 +343,7 @@ jobs:
         with:
           timeout_minutes: 10
           max_attempts: 3
-          retry_wait_seconds: 30
+          retry_wait_seconds: 20
           command: |
             docker push ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:7.4-alpine-${{ matrix.arch_name }}
 
@@ -423,7 +423,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          retry_wait_seconds: 60
+          retry_wait_seconds: 20
           command: |
             docker buildx build \
               --file compose/docker/php-node-symfony/Dockerfile.${{ matrix.php }}.alpine \
@@ -444,7 +444,7 @@ jobs:
         with:
           timeout_minutes: 10
           max_attempts: 3
-          retry_wait_seconds: 30
+          retry_wait_seconds: 20
           command: |
             docker push ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-alpine-${{ matrix.arch_config.arch_name }}
 
@@ -523,7 +523,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          retry_wait_seconds: 60
+          retry_wait_seconds: 20
           command: |
             docker buildx build \
               --file compose/docker/php-node-symfony/Dockerfile.8.5.alpine \
@@ -544,7 +544,7 @@ jobs:
         with:
           timeout_minutes: 10
           max_attempts: 3
-          retry_wait_seconds: 30
+          retry_wait_seconds: 20
           command: |
             docker push ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:8.5-alpine-${{ matrix.arch_name }}
 
