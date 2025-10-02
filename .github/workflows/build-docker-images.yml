@@ -32,103 +32,79 @@ jobs:
   # ========================================
   
   build-php-base:
-    name: PHP ${{ matrix.config.version }} (${{ matrix.config.arch_name }})
+    name: PHP-${{ matrix.php }} (${{ matrix.arch_name }})
     runs-on:
       - self-hosted
       - Linux
-      - ${{ matrix.config.arch }}
+      - ${{ matrix.arch }}
     strategy:
       fail-fast: false
       max-parallel: 6
       matrix:
-        config:
+        include:
           # PHP 7.4
-          - version: "7.4"
+          - php: "7.4"
             php_version: "7.4"
-            tag: "7.4"
-            dockerfile: "7.4"
             arch: X64
             arch_name: amd64
             platform: linux/amd64
-          - version: "7.4"
+          - php: "7.4"
             php_version: "7.4"
-            tag: "7.4"
-            dockerfile: "7.4"
             arch: ARM64
             arch_name: arm64
             platform: linux/arm64
           # PHP 8.1
-          - version: "8.1"
+          - php: "8.1"
             php_version: "8.1"
-            tag: "8.1"
-            dockerfile: "8.1"
             arch: X64
             arch_name: amd64
             platform: linux/amd64
-          - version: "8.1"
+          - php: "8.1"
             php_version: "8.1"
-            tag: "8.1"
-            dockerfile: "8.1"
             arch: ARM64
             arch_name: arm64
             platform: linux/arm64
           # PHP 8.2
-          - version: "8.2"
+          - php: "8.2"
             php_version: "8.2"
-            tag: "8.2"
-            dockerfile: "8.2"
             arch: X64
             arch_name: amd64
             platform: linux/amd64
-          - version: "8.2"
+          - php: "8.2"
             php_version: "8.2"
-            tag: "8.2"
-            dockerfile: "8.2"
             arch: ARM64
             arch_name: arm64
             platform: linux/arm64
           # PHP 8.3
-          - version: "8.3"
+          - php: "8.3"
             php_version: "8.3"
-            tag: "8.3"
-            dockerfile: "8.3"
             arch: X64
             arch_name: amd64
             platform: linux/amd64
-          - version: "8.3"
+          - php: "8.3"
             php_version: "8.3"
-            tag: "8.3"
-            dockerfile: "8.3"
             arch: ARM64
             arch_name: arm64
             platform: linux/arm64
           # PHP 8.4
-          - version: "8.4"
+          - php: "8.4"
             php_version: "8.4"
-            tag: "8.4"
-            dockerfile: "8.4"
             arch: X64
             arch_name: amd64
             platform: linux/amd64
-          - version: "8.4"
+          - php: "8.4"
             php_version: "8.4"
-            tag: "8.4"
-            dockerfile: "8.4"
             arch: ARM64
             arch_name: arm64
             platform: linux/arm64
           # PHP 8.5 (RC -> stable, tag without -rc)
-          - version: "8.5"
+          - php: "8.5"
             php_version: "8.5-rc"
-            tag: "8.5"
-            dockerfile: "8.5"
             arch: X64
             arch_name: amd64
             platform: linux/amd64
-          - version: "8.5"
+          - php: "8.5"
             php_version: "8.5-rc"
-            tag: "8.5"
-            dockerfile: "8.5"
             arch: ARM64
             arch_name: arm64
             platform: linux/arm64
@@ -158,10 +134,10 @@ jobs:
       - name: Check if image needs rebuild
         id: check-rebuild
         run: |
-          IMAGE="ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.config.tag }}-alpine-${{ matrix.config.arch_name }}"
+          IMAGE="ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-alpine-${{ matrix.arch_name }}"
           
           # Calculate hash of files affecting this version
-          HASH=$(cat compose/docker/php/Dockerfile.${{ matrix.config.dockerfile }}.alpine | sha256sum | cut -d' ' -f1)
+          HASH=$(cat compose/docker/php/Dockerfile.${{ matrix.php }}.alpine | sha256sum | cut -d' ' -f1)
           echo "hash=${HASH}" >> $GITHUB_OUTPUT
           
           # Check if image exists with same hash
@@ -182,7 +158,7 @@ jobs:
           fi
       
       # Build with retry (handles Docker Hub rate limits)
-      - name: Build PHP ${{ matrix.config.version }} Base (${{ matrix.config.arch_name }})
+      - name: Build PHP-${{ matrix.php }} (${{ matrix.arch_name }})
         if: steps.check-rebuild.outputs.skip != 'true'
         uses: nick-invision/retry@v2
         with:
@@ -191,21 +167,21 @@ jobs:
           retry_wait_seconds: 20
           command: |
             docker buildx build \
-              --file compose/docker/php/Dockerfile.${{ matrix.config.dockerfile }}.alpine \
-              --platform ${{ matrix.config.platform }} \
-              --tag ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.config.tag }}-alpine-${{ matrix.config.arch_name }} \
-              --build-arg PHP_VERSION=${{ matrix.config.php_version }} \
+              --file compose/docker/php/Dockerfile.${{ matrix.php }}.alpine \
+              --platform ${{ matrix.platform }} \
+              --tag ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-alpine-${{ matrix.arch_name }} \
+              --build-arg PHP_VERSION=${{ matrix.php_version }} \
               --build-arg COMPOSER_VERSION=2 \
               --label "build.hash=${{ steps.check-rebuild.outputs.hash }}" \
               --label "build.date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
               --label "build.commit=${{ github.sha }}" \
-              --cache-from type=gha,scope=php-base-${{ matrix.config.tag }}-${{ matrix.config.arch }} \
-              --cache-to type=gha,mode=max,scope=php-base-${{ matrix.config.tag }}-${{ matrix.config.arch }} \
+              --cache-from type=gha,scope=php-base-${{ matrix.php }}-${{ matrix.arch }} \
+              --cache-to type=gha,mode=max,scope=php-base-${{ matrix.php }}-${{ matrix.arch }} \
               --load \
               compose/docker/php
       
       # Push with retry (handles network errors)
-      - name: Push PHP ${{ matrix.config.version }} Base (${{ matrix.config.arch_name }})
+      - name: Push PHP-${{ matrix.php }} (${{ matrix.arch_name }})
         if: steps.check-rebuild.outputs.skip != 'true'
         uses: nick-invision/retry@v2
         with:
@@ -213,14 +189,14 @@ jobs:
           max_attempts: 3
           retry_wait_seconds: 20
           command: |
-            docker push ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.config.tag }}-alpine-${{ matrix.config.arch_name }}
+            docker push ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-alpine-${{ matrix.arch_name }}
 
   # ========================================
   # STAGE 2: CREATE MULTI-ARCH MANIFESTS
   # ========================================
   
   create-php-base-manifests:
-    name: PHP ${{ matrix.version }} (Manifest)
+    name: PHP-${{ matrix.version }} (Manifest)
     needs: [build-php-base]
     runs-on: ubuntu-latest
     strategy:
@@ -245,92 +221,242 @@ jobs:
   # ========================================
   
   build-php-node:
-    name: PHP+Node ${{ matrix.config.version }} (${{ matrix.config.arch_name }})
+    name: PHP+Node ${{ matrix.php }} (${{ matrix.arch_name }})
     needs: [create-php-base-manifests]
     runs-on:
       - self-hosted
       - Linux
-      - ${{ matrix.config.arch }}
+      - ${{ matrix.arch }}
     strategy:
       fail-fast: false
       max-parallel: 6
       matrix:
-        config:
-          # PHP+Node 7.4
-          - version: "7.4"
-            tag: "7.4"
-            dockerfile: "7.4"
+        include:
+          # PHP 7.4 + Node 16, 18 + Composer 1, 2 (amd64)
+          - php: "7.4"
+            node: "16"
+            composer: "1"
             arch: X64
             arch_name: amd64
             platform: linux/amd64
-          - version: "7.4"
-            tag: "7.4"
-            dockerfile: "7.4"
+          - php: "7.4"
+            node: "16"
+            composer: "2"
+            arch: X64
+            arch_name: amd64
+            platform: linux/amd64
+          - php: "7.4"
+            node: "18"
+            composer: "1"
+            arch: X64
+            arch_name: amd64
+            platform: linux/amd64
+          - php: "7.4"
+            node: "18"
+            composer: "2"
+            arch: X64
+            arch_name: amd64
+            platform: linux/amd64
+          # PHP 7.4 + Node 16, 18 + Composer 1, 2 (arm64)
+          - php: "7.4"
+            node: "16"
+            composer: "1"
             arch: ARM64
             arch_name: arm64
             platform: linux/arm64
-          # PHP+Node 8.1
-          - version: "8.1"
-            tag: "8.1"
-            dockerfile: "8.1"
-            arch: X64
-            arch_name: amd64
-            platform: linux/amd64
-          - version: "8.1"
-            tag: "8.1"
-            dockerfile: "8.1"
+          - php: "7.4"
+            node: "16"
+            composer: "2"
             arch: ARM64
             arch_name: arm64
             platform: linux/arm64
-          # PHP+Node 8.2
-          - version: "8.2"
-            tag: "8.2"
-            dockerfile: "8.2"
-            arch: X64
-            arch_name: amd64
-            platform: linux/amd64
-          - version: "8.2"
-            tag: "8.2"
-            dockerfile: "8.2"
+          - php: "7.4"
+            node: "18"
+            composer: "1"
             arch: ARM64
             arch_name: arm64
             platform: linux/arm64
-          # PHP+Node 8.3
-          - version: "8.3"
-            tag: "8.3"
-            dockerfile: "8.3"
-            arch: X64
-            arch_name: amd64
-            platform: linux/amd64
-          - version: "8.3"
-            tag: "8.3"
-            dockerfile: "8.3"
+          - php: "7.4"
+            node: "18"
+            composer: "2"
             arch: ARM64
             arch_name: arm64
             platform: linux/arm64
-          # PHP+Node 8.4
-          - version: "8.4"
-            tag: "8.4"
-            dockerfile: "8.4"
+          # PHP 8.1 + Node 18, 20, 22 + Composer 2 (amd64)
+          - php: "8.1"
+            node: "18"
+            composer: "2"
             arch: X64
             arch_name: amd64
             platform: linux/amd64
-          - version: "8.4"
-            tag: "8.4"
-            dockerfile: "8.4"
+          - php: "8.1"
+            node: "20"
+            composer: "2"
+            arch: X64
+            arch_name: amd64
+            platform: linux/amd64
+          - php: "8.1"
+            node: "22"
+            composer: "2"
+            arch: X64
+            arch_name: amd64
+            platform: linux/amd64
+          # PHP 8.1 + Node 18, 20, 22 + Composer 2 (arm64)
+          - php: "8.1"
+            node: "18"
+            composer: "2"
             arch: ARM64
             arch_name: arm64
             platform: linux/arm64
-          # PHP+Node 8.5
-          - version: "8.5"
-            tag: "8.5"
-            dockerfile: "8.5"
+          - php: "8.1"
+            node: "20"
+            composer: "2"
+            arch: ARM64
+            arch_name: arm64
+            platform: linux/arm64
+          - php: "8.1"
+            node: "22"
+            composer: "2"
+            arch: ARM64
+            arch_name: arm64
+            platform: linux/arm64
+          # PHP 8.2 + Node 18, 20, 22 + Composer 2 (amd64)
+          - php: "8.2"
+            node: "18"
+            composer: "2"
             arch: X64
             arch_name: amd64
             platform: linux/amd64
-          - version: "8.5"
-            tag: "8.5"
-            dockerfile: "8.5"
+          - php: "8.2"
+            node: "20"
+            composer: "2"
+            arch: X64
+            arch_name: amd64
+            platform: linux/amd64
+          - php: "8.2"
+            node: "22"
+            composer: "2"
+            arch: X64
+            arch_name: amd64
+            platform: linux/amd64
+          # PHP 8.2 + Node 18, 20, 22 + Composer 2 (arm64)
+          - php: "8.2"
+            node: "18"
+            composer: "2"
+            arch: ARM64
+            arch_name: arm64
+            platform: linux/arm64
+          - php: "8.2"
+            node: "20"
+            composer: "2"
+            arch: ARM64
+            arch_name: arm64
+            platform: linux/arm64
+          - php: "8.2"
+            node: "22"
+            composer: "2"
+            arch: ARM64
+            arch_name: arm64
+            platform: linux/arm64
+          # PHP 8.3 + Node 18, 20, 22 + Composer 2 (amd64)
+          - php: "8.3"
+            node: "18"
+            composer: "2"
+            arch: X64
+            arch_name: amd64
+            platform: linux/amd64
+          - php: "8.3"
+            node: "20"
+            composer: "2"
+            arch: X64
+            arch_name: amd64
+            platform: linux/amd64
+          - php: "8.3"
+            node: "22"
+            composer: "2"
+            arch: X64
+            arch_name: amd64
+            platform: linux/amd64
+          # PHP 8.3 + Node 18, 20, 22 + Composer 2 (arm64)
+          - php: "8.3"
+            node: "18"
+            composer: "2"
+            arch: ARM64
+            arch_name: arm64
+            platform: linux/arm64
+          - php: "8.3"
+            node: "20"
+            composer: "2"
+            arch: ARM64
+            arch_name: arm64
+            platform: linux/arm64
+          - php: "8.3"
+            node: "22"
+            composer: "2"
+            arch: ARM64
+            arch_name: arm64
+            platform: linux/arm64
+          # PHP 8.4 + Node 18, 20, 22 + Composer 2 (amd64)
+          - php: "8.4"
+            node: "18"
+            composer: "2"
+            arch: X64
+            arch_name: amd64
+            platform: linux/amd64
+          - php: "8.4"
+            node: "20"
+            composer: "2"
+            arch: X64
+            arch_name: amd64
+            platform: linux/amd64
+          - php: "8.4"
+            node: "22"
+            composer: "2"
+            arch: X64
+            arch_name: amd64
+            platform: linux/amd64
+          # PHP 8.4 + Node 18, 20, 22 + Composer 2 (arm64)
+          - php: "8.4"
+            node: "18"
+            composer: "2"
+            arch: ARM64
+            arch_name: arm64
+            platform: linux/arm64
+          - php: "8.4"
+            node: "20"
+            composer: "2"
+            arch: ARM64
+            arch_name: arm64
+            platform: linux/arm64
+          - php: "8.4"
+            node: "22"
+            composer: "2"
+            arch: ARM64
+            arch_name: arm64
+            platform: linux/arm64
+          # PHP 8.5 + Node 22, 24 + Composer 2 (amd64)
+          - php: "8.5"
+            node: "22"
+            composer: "2"
+            arch: X64
+            arch_name: amd64
+            platform: linux/amd64
+          - php: "8.5"
+            node: "24"
+            composer: "2"
+            arch: X64
+            arch_name: amd64
+            platform: linux/amd64
+          # PHP 8.5 + Node 22, 24 + Composer 2 (arm64)
+          - php: "8.5"
+            node: "22"
+            composer: "2"
+            arch: ARM64
+            arch_name: arm64
+            platform: linux/arm64
+          - php: "8.5"
+            node: "24"
+            composer: "2"
             arch: ARM64
             arch_name: arm64
             platform: linux/arm64
@@ -360,10 +486,10 @@ jobs:
       - name: Check if image needs rebuild
         id: check-rebuild
         run: |
-          IMAGE="ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.config.tag }}-alpine-${{ matrix.config.arch_name }}"
+          IMAGE="ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-node${{ matrix.node }}-composer${{ matrix.composer }}-alpine-${{ matrix.arch_name }}"
           
           # Calculate hash of files affecting this version
-          HASH=$(cat compose/docker/php-node-symfony/Dockerfile.${{ matrix.config.dockerfile }}.alpine compose/docker/php-node-symfony/build${{ matrix.config.dockerfile }}.sh 2>/dev/null | sha256sum | cut -d' ' -f1)
+          HASH=$(cat compose/docker/php-node-symfony/Dockerfile.${{ matrix.php }}.alpine compose/docker/php-node-symfony/build${{ matrix.php }}.sh 2>/dev/null | sha256sum | cut -d' ' -f1)
           echo "hash=${HASH}" >> $GITHUB_OUTPUT
           
           # Check if image exists with same hash
@@ -384,7 +510,7 @@ jobs:
           fi
       
       # Build with retry
-      - name: Build PHP+Node ${{ matrix.config.version }} (${{ matrix.config.arch_name }})
+      - name: PHP-${{ matrix.php }}+NODE-${{ matrix.node }} (${{ matrix.arch_name }})
         if: steps.check-rebuild.outputs.skip != 'true'
         uses: nick-invision/retry@v2
         with:
@@ -393,19 +519,21 @@ jobs:
           retry_wait_seconds: 20
           command: |
             docker buildx build \
-              --file compose/docker/php-node-symfony/Dockerfile.${{ matrix.config.dockerfile }}.alpine \
-              --platform ${{ matrix.config.platform }} \
-              --tag ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.config.tag }}-alpine-${{ matrix.config.arch_name }} \
+              --file compose/docker/php-node-symfony/Dockerfile.${{ matrix.php }}.alpine \
+              --platform ${{ matrix.platform }} \
+              --tag ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-node${{ matrix.node }}-composer${{ matrix.composer }}-alpine-${{ matrix.arch_name }} \
+              --build-arg NODE_VERSION=${{ matrix.node }} \
+              --build-arg COMPOSER_VERSION=${{ matrix.composer }} \
               --label "build.hash=${{ steps.check-rebuild.outputs.hash }}" \
               --label "build.date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
               --label "build.commit=${{ github.sha }}" \
-              --cache-from type=gha,scope=php-node-${{ matrix.config.tag }}-${{ matrix.config.arch }} \
-              --cache-to type=gha,mode=max,scope=php-node-${{ matrix.config.tag }}-${{ matrix.config.arch }} \
+              --cache-from type=gha,scope=php-node-${{ matrix.php }}-node${{ matrix.node }}-composer${{ matrix.composer }}-${{ matrix.arch }} \
+              --cache-to type=gha,mode=max,scope=php-node-${{ matrix.php }}-node${{ matrix.node }}-composer${{ matrix.composer }}-${{ matrix.arch }} \
               --load \
               compose/docker/php-node-symfony
       
       # Push with retry
-      - name: Push PHP+Node ${{ matrix.config.version }} (${{ matrix.config.arch_name }})
+      - name: Push PHP-${{ matrix.php }}+NODE-${{ matrix.node }} (${{ matrix.arch_name }})
         if: steps.check-rebuild.outputs.skip != 'true'
         uses: nick-invision/retry@v2
         with:
@@ -413,19 +541,79 @@ jobs:
           max_attempts: 3
           retry_wait_seconds: 20
           command: |
-            docker push ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.config.tag }}-alpine-${{ matrix.config.arch_name }}
+            docker push ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-node${{ matrix.node }}-composer${{ matrix.composer }}-alpine-${{ matrix.arch_name }}
 
   # ========================================
   # STAGE 4: CREATE FINAL MULTI-ARCH MANIFESTS
   # ========================================
   
   create-php-node-manifests:
-    name: PHP+Node ${{ matrix.version }} (Manifest)
+    name: PHP-${{ matrix.php }}+NODE-${{ matrix.node }} (Manifest)
     needs: [build-php-node]
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        version: ["7.4", "8.1", "8.2", "8.3", "8.4", "8.5"]
+        include:
+          # PHP 7.4 + Node 16, 18 + Composer 1, 2
+          - php: "7.4"
+            node: "16"
+            composer: "1"
+          - php: "7.4"
+            node: "16"
+            composer: "2"
+          - php: "7.4"
+            node: "18"
+            composer: "1"
+          - php: "7.4"
+            node: "18"
+            composer: "2"
+          # PHP 8.1 + Node 18, 20, 22 + Composer 2
+          - php: "8.1"
+            node: "18"
+            composer: "2"
+          - php: "8.1"
+            node: "20"
+            composer: "2"
+          - php: "8.1"
+            node: "22"
+            composer: "2"
+          # PHP 8.2 + Node 18, 20, 22 + Composer 2
+          - php: "8.2"
+            node: "18"
+            composer: "2"
+          - php: "8.2"
+            node: "20"
+            composer: "2"
+          - php: "8.2"
+            node: "22"
+            composer: "2"
+          # PHP 8.3 + Node 18, 20, 22 + Composer 2
+          - php: "8.3"
+            node: "18"
+            composer: "2"
+          - php: "8.3"
+            node: "20"
+            composer: "2"
+          - php: "8.3"
+            node: "22"
+            composer: "2"
+          # PHP 8.4 + Node 18, 20, 22 + Composer 2
+          - php: "8.4"
+            node: "18"
+            composer: "2"
+          - php: "8.4"
+            node: "20"
+            composer: "2"
+          - php: "8.4"
+            node: "22"
+            composer: "2"
+          # PHP 8.5 + Node 22, 24 + Composer 2
+          - php: "8.5"
+            node: "22"
+            composer: "2"
+          - php: "8.5"
+            node: "24"
+            composer: "2"
     steps:
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -436,6 +624,6 @@ jobs:
       
       - name: Create and push manifest
         run: |
-          docker buildx imagetools create -t ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.version }}-alpine \
-            ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.version }}-alpine-amd64 \
-            ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.version }}-alpine-arm64
+          docker buildx imagetools create -t ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-node${{ matrix.node }}-composer${{ matrix.composer }}-alpine \
+            ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-node${{ matrix.node }}-composer${{ matrix.composer }}-alpine-amd64 \
+            ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-node${{ matrix.node }}-composer${{ matrix.composer }}-alpine-arm64
