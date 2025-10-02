@@ -488,8 +488,8 @@ jobs:
         run: |
           IMAGE="ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-node${{ matrix.node }}-composer${{ matrix.composer }}-alpine-${{ matrix.arch_name }}"
           
-          # Calculate hash of build context (version-specific + all common files, exclude other versions)
-          HASH=$(find compose/docker/php-node-symfony -type f \( -name "Dockerfile.${{ matrix.php }}.alpine" -o -name "build${{ matrix.php }}.sh" -o \( ! -name "Dockerfile.*.alpine" -a ! -name "build*.sh" \) \) | sort | xargs cat 2>/dev/null | sha256sum | cut -d' ' -f1)
+          # Calculate hash of build context (version-specific folder + shared folder)
+          HASH=$(find compose/docker/php-node-symfony/${{ matrix.php }}/ compose/docker/php-node-symfony/shared/ -type f 2>/dev/null | sort | xargs cat 2>/dev/null | sha256sum | cut -d' ' -f1)
           echo "hash=${HASH}" >> $GITHUB_OUTPUT
           
           # Check if image exists with same hash
@@ -519,7 +519,7 @@ jobs:
           retry_wait_seconds: 20
           command: |
             docker buildx build \
-              --file compose/docker/php-node-symfony/Dockerfile.${{ matrix.php }}.alpine \
+              --file compose/docker/php-node-symfony/${{ matrix.php }}/Dockerfile \
               --platform ${{ matrix.platform }} \
               --tag ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-node${{ matrix.node }}-composer${{ matrix.composer }}-alpine-${{ matrix.arch_name }} \
               --build-arg NODE_VERSION=${{ matrix.node }} \

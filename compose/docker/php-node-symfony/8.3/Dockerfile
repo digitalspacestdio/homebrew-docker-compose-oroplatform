@@ -1,6 +1,6 @@
 ARG ALPINE_VERSION=3.18
 ARG NODE_VERSION=18
-ARG PHP_VERSION=8.2
+ARG PHP_VERSION=8.3
 ARG COMPOSER_VERSION=2
 
 # Nodejs image
@@ -25,19 +25,19 @@ ENV PHP_USER_NAME=${PHP_USER_NAME}
 ARG PHP_USER_GROUP=developer
 ENV PHP_USER_GROUP=${PHP_USER_GROUP}
 
-# Copy configuration files
-COPY app.ini /usr/local/etc/php/conf.d/
-COPY app.opcache.ini /usr/local/etc/php/conf.d/
-COPY app.msmtp.ini /usr/local/etc/php/conf.d/
-COPY app.xdebug.ini /usr/local/etc/php/conf.d/
-COPY php-fpm.conf /usr/local/etc/php-fpm.conf
+# Copy configuration files from shared
+COPY shared/app.ini /usr/local/etc/php/conf.d/
+COPY shared/app.opcache.ini /usr/local/etc/php/conf.d/
+COPY shared/app.msmtp.ini /usr/local/etc/php/conf.d/
+COPY shared/app.xdebug.ini /usr/local/etc/php/conf.d/
+COPY shared/php-fpm.conf /usr/local/etc/php-fpm.conf
 
-# Copy scripts
-COPY --chmod=0755 docker-healthcheck.sh /usr/local/bin/docker-healthcheck
-COPY --chmod=0755 docker-entrypoint.sh /usr/local/bin/docker-entrypoint
-COPY --chmod=0755 docker-sshd.sh /usr/local/bin/docker-sshd
-COPY --chmod=0755 docker-psql.sh /usr/local/bin/psql
-COPY --chmod=0755 docker-mysql.sh /usr/local/bin/mysql
+# Copy scripts from shared
+COPY --chmod=0755 shared/docker-healthcheck.sh /usr/local/bin/docker-healthcheck
+COPY --chmod=0755 shared/docker-entrypoint.sh /usr/local/bin/docker-entrypoint
+COPY --chmod=0755 shared/docker-sshd.sh /usr/local/bin/docker-sshd
+COPY --chmod=0755 shared/docker-psql.sh /usr/local/bin/psql
+COPY --chmod=0755 shared/docker-mysql.sh /usr/local/bin/mysql
 
 ENTRYPOINT ["docker-entrypoint"]
 
@@ -58,14 +58,14 @@ ENV PATH="${PATH}:/root/.composer/vendor/bin"
 COPY --from=composer_app /usr/bin/composer /usr/bin/composer
 
 # Copy build script and run it (creates user and installs packages)
-COPY --chmod=0755 build8.2.sh /tmp/build8.2.sh
+COPY --chmod=0755 8.3/build.sh /tmp/build.sh
 ARG APP_DIR="/var/www"
 ENV APP_DIR=${APP_DIR}
-RUN /tmp/build8.2.sh && rm /tmp/build8.2.sh
+RUN /tmp/build.sh && rm /tmp/build.sh
 
-# Copy additional configuration files
-COPY msmtprc /.msmtprc
-COPY zshrc /.zshrc
+# Copy additional configuration files from shared
+COPY shared/msmtprc /.msmtprc
+COPY shared/zshrc /.zshrc
 
 WORKDIR ${APP_DIR}
 USER ${PHP_USER_NAME}
