@@ -1,5 +1,19 @@
 name: Build & Publish PHP Base and PHP+Node.js multi-arch images to GHCR
 
+# DOCKER HUB CREDENTIALS SETUP:
+# This workflow uses 4 Docker Hub accounts to distribute rate limits (200 pulls/6h per account = 800 total)
+# 
+# Required GitHub Secrets (8 total):
+#   DOCKERHUB_USERNAME_1, DOCKERHUB_TOKEN_1  - for PHP 7.4, 8.4
+#   DOCKERHUB_USERNAME_2, DOCKERHUB_TOKEN_2  - for PHP 8.1, 8.5
+#   DOCKERHUB_USERNAME_3, DOCKERHUB_TOKEN_3  - for PHP 8.2
+#   DOCKERHUB_USERNAME_4, DOCKERHUB_TOKEN_4  - for PHP 8.3
+#
+# Setup via GitHub CLI:
+#   gh secret set DOCKERHUB_USERNAME_1 -b "username1"
+#   gh secret set DOCKERHUB_TOKEN_1 -b "token1"
+#   (repeat for all 4 accounts)
+
 on:
   push:
     branches: [ master ]
@@ -111,12 +125,28 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
+      # Select Docker Hub credentials based on PHP version (rotate between 4 accounts)
+      - name: Select Docker Hub credentials
+        id: docker-creds
+        run: |
+          case "${{ matrix.php }}" in
+            "7.4") KEY_NUM=1 ;;
+            "8.1") KEY_NUM=2 ;;
+            "8.2") KEY_NUM=3 ;;
+            "8.3") KEY_NUM=4 ;;
+            "8.4") KEY_NUM=1 ;;
+            "8.5") KEY_NUM=2 ;;
+            *) KEY_NUM=1 ;;
+          esac
+          echo "key_num=${KEY_NUM}" >> $GITHUB_OUTPUT
+          echo "[INFO] Using Docker Hub credentials set #${KEY_NUM} for PHP ${{ matrix.php }}"
+      
       # Login to Docker Hub (optional, increases rate limit from 100 to 200 pulls/6h)
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          username: ${{ secrets[format('DOCKERHUB_USERNAME_{0}', steps.docker-creds.outputs.key_num)] }}
+          password: ${{ secrets[format('DOCKERHUB_TOKEN_{0}', steps.docker-creds.outputs.key_num)] }}
         continue-on-error: true
       
       - name: Log in to GHCR
@@ -463,12 +493,28 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       
-      # Login to Docker Hub
+      # Select Docker Hub credentials based on PHP version (rotate between 4 accounts)
+      - name: Select Docker Hub credentials
+        id: docker-creds
+        run: |
+          case "${{ matrix.php }}" in
+            "7.4") KEY_NUM=1 ;;
+            "8.1") KEY_NUM=2 ;;
+            "8.2") KEY_NUM=3 ;;
+            "8.3") KEY_NUM=4 ;;
+            "8.4") KEY_NUM=1 ;;
+            "8.5") KEY_NUM=2 ;;
+            *) KEY_NUM=1 ;;
+          esac
+          echo "key_num=${KEY_NUM}" >> $GITHUB_OUTPUT
+          echo "[INFO] Using Docker Hub credentials set #${KEY_NUM} for PHP ${{ matrix.php }}"
+      
+      # Login to Docker Hub (optional, increases rate limit from 100 to 200 pulls/6h)
       - name: Log in to Docker Hub
         uses: docker/login-action@v3
         with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          username: ${{ secrets[format('DOCKERHUB_USERNAME_{0}', steps.docker-creds.outputs.key_num)] }}
+          password: ${{ secrets[format('DOCKERHUB_TOKEN_{0}', steps.docker-creds.outputs.key_num)] }}
         continue-on-error: true
       
       - name: Log in to GHCR
