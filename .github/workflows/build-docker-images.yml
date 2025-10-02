@@ -135,8 +135,8 @@ jobs:
         run: |
           IMAGE="ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-alpine-${{ matrix.arch_name }}"
           
-          # Calculate hash of files affecting this version
-          HASH=$(cat compose/docker/php/Dockerfile.${{ matrix.php }}.alpine | sha256sum | cut -d' ' -f1)
+          # Calculate hash of build context (version-specific files only, exclude other versions)
+          HASH=$(find compose/docker/php -type f -name "Dockerfile.${{ matrix.php }}.alpine" -o -type f ! -name "Dockerfile.*.alpine" | sort | xargs cat 2>/dev/null | sha256sum | cut -d' ' -f1)
           echo "hash=${HASH}" >> $GITHUB_OUTPUT
           
           # Check if image exists with same hash
@@ -225,6 +225,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      max-parallel: 2
       matrix:
         include:
           # PHP 7.4 + Node 16, 18 + Composer 1, 2 (amd64)
@@ -487,8 +488,8 @@ jobs:
         run: |
           IMAGE="ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-node${{ matrix.node }}-composer${{ matrix.composer }}-alpine-${{ matrix.arch_name }}"
           
-          # Calculate hash of files affecting this version
-          HASH=$(cat compose/docker/php-node-symfony/Dockerfile.${{ matrix.php }}.alpine compose/docker/php-node-symfony/build${{ matrix.php }}.sh 2>/dev/null | sha256sum | cut -d' ' -f1)
+          # Calculate hash of build context (version-specific folder + shared folder)
+          HASH=$(find compose/docker/php-node-symfony/${{ matrix.php }}/ compose/docker/php-node-symfony/shared/ -type f 2>/dev/null | sort | xargs cat 2>/dev/null | sha256sum | cut -d' ' -f1)
           echo "hash=${HASH}" >> $GITHUB_OUTPUT
           
           # Check if image exists with same hash
@@ -518,7 +519,7 @@ jobs:
           retry_wait_seconds: 20
           command: |
             docker buildx build \
-              --file compose/docker/php-node-symfony/Dockerfile.${{ matrix.php }}.alpine \
+              --file compose/docker/php-node-symfony/${{ matrix.php }}/Dockerfile \
               --platform ${{ matrix.platform }} \
               --tag ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-node${{ matrix.node }}-composer${{ matrix.composer }}-alpine-${{ matrix.arch_name }} \
               --build-arg NODE_VERSION=${{ matrix.node }} \
