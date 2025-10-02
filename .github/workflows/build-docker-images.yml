@@ -340,7 +340,7 @@ jobs:
   # ========================================
   
   create-php-base-7-4-manifest:
-    name: Create PHP 7.4 Base Multi-arch Manifest
+    name: PHP 7.4 Base Manifest
     needs: [build-php-7-4]
     runs-on:
       - self-hosted
@@ -361,7 +361,7 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/orodc-php:7.4-alpine-arm64
 
   create-php-base-8-x-manifests:
-    name: Create PHP ${{ matrix.php }} Base Multi-arch Manifest
+    name: PHP ${{ matrix.php }} Base Manifest
     needs: [build-php-8-x]
     runs-on:
       - self-hosted
@@ -385,7 +385,7 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-alpine-arm64
 
   create-php-base-8-5-manifest:
-    name: Create PHP 8.5-rc Base Multi-arch Manifest
+    name: PHP 8.5-rc Base Manifest
     needs: [build-php-8-5]
     runs-on:
       - self-hosted
@@ -715,7 +715,7 @@ jobs:
   # ========================================
   
   create-php-node-7-4-manifest:
-    name: Create PHP+Node 7.4 Multi-arch Manifest
+    name: PHP+Node 7.4 Manifest
     needs: [build-php-node-7-4]
     runs-on:
       - self-hosted
@@ -736,7 +736,7 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:7.4-alpine-arm64
 
   create-php-node-8-x-manifests:
-    name: Create PHP+Node ${{ matrix.php }} Multi-arch Manifest
+    name: PHP+Node ${{ matrix.php }} Manifest
     needs: [build-php-node-8-x]
     runs-on:
       - self-hosted
@@ -760,7 +760,7 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-alpine-arm64
 
   create-php-node-8-5-manifest:
-    name: Create PHP+Node 8.5-rc Multi-arch Manifest
+    name: PHP+Node 8.5-rc Manifest
     needs: [build-php-node-8-5]
     runs-on:
       - self-hosted
