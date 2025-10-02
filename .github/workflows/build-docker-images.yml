@@ -258,7 +258,6 @@ jobs:
       - ${{ matrix.arch }}
     strategy:
       fail-fast: false
-      max-parallel: 2
       matrix:
         include:
           # PHP 7.4 + Node 16, 18 + Composer 1, 2 (amd64)

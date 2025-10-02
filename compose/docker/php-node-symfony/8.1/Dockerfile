@@ -41,6 +41,9 @@ COPY --chmod=0755 shared/docker-mysql.sh /usr/local/bin/mysql
 
 ENTRYPOINT ["docker-entrypoint"]
 
+# Install runtime dependencies for Node.js BEFORE copying binaries (ARM64 compatibility)
+RUN apk add --no-cache libstdc++ gcompat
+
 # Copy nodejs binaries
 COPY --from=app_node /usr/local /usr/local
 COPY --from=app_node /opt /opt

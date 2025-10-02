@@ -1,4 +1,4 @@
-ARG ALPINE_VERSION=3.18
+ARG ALPINE_VERSION=3.21
 ARG NODE_VERSION=18
 ARG PHP_VERSION=8.5
 ARG COMPOSER_VERSION=2
@@ -40,6 +40,10 @@ COPY --chmod=0755 shared/docker-psql.sh /usr/local/bin/psql
 COPY --chmod=0755 shared/docker-mysql.sh /usr/local/bin/mysql
 
 ENTRYPOINT ["docker-entrypoint"]
+
+# Install/upgrade runtime dependencies for Node.js BEFORE copying binaries (ARM64 compatibility)
+# Using 'apk add' will upgrade if already installed from base image
+RUN apk add --no-cache libstdc++ gcompat
 
 # Copy nodejs binaries
 COPY --from=app_node /usr/local /usr/local
