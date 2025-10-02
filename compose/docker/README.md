@@ -311,19 +311,79 @@ docker build -f Dockerfile.8.3.alpine -t orodc-php-node-symfony:8.3-alpine .
 
 ## 🐛 Critical Build Nuances
 
-### 1. **Alpine Version Pinning**
+### 1. **Alpine Version Pinning & Node.js Compatibility**
 
-**Problem:** Different PHP versions require different Alpine versions.
+**Problem:** Different PHP versions require different Alpine versions, and Node.js base image MUST match the PHP Alpine version to avoid `libstdc++` incompatibility (especially on ARM64).
 
 **Solution:**
-- PHP 7.4: Alpine 3.16
-- PHP 8.1-8.4: Alpine 3.18
-- PHP 8.5-rc: Alpine 3.21
+- PHP 7.4: Alpine 3.15
+- PHP 8.1-8.2: Alpine 3.18
+- PHP 8.3-8.5: Alpine 3.21
+
+**CRITICAL:** The `php-node-symfony` Dockerfiles MUST use the SAME Alpine version as the base PHP image:
 
 ```dockerfile
-ARG ALPINE_VERSION=3.18
+# ✅ CORRECT - Alpine versions match
+# In Dockerfile.8.5.alpine (base PHP)
+ARG ALPINE_VERSION=3.21
 FROM php:${PHP_VERSION}-fpm-alpine${ALPINE_VERSION}
+
+# In php-node-symfony/8.5/Dockerfile (final image)
+ARG ALPINE_VERSION=3.21
+FROM node:${NODE_VERSION}-alpine${ALPINE_VERSION} AS app_node
+FROM ghcr.io/digitalspacestdio/orodc-php:${PHP_VERSION}-alpine
+
+# ❌ WRONG - Mismatched Alpine versions
+# Base uses 3.21, but Node stage uses 3.18
+# Causes: Error relocating /usr/local/bin/node: symbol not found
 ```
+
+**Why this matters:**
+- Node.js binaries are compiled against specific `libstdc++` versions
+- ARM64 is particularly sensitive to C++ ABI compatibility
+- Mismatched Alpine versions = incompatible `libstdc++` = Node.js crashes
+- **CRITICAL:** `libstdc++` and `gcompat` MUST be installed BEFORE copying Node.js binaries (see fix below)
+
+**Alpine Version Matrix:**
+
+| PHP Version | Alpine Version | Base Dockerfile | Node Dockerfile |
+|-------------|----------------|-----------------|-----------------|
+| 7.4         | 3.15           | `Dockerfile.7.4.alpine` | `php-node-symfony/7.4/Dockerfile` |
+| 8.1         | 3.18           | `Dockerfile.8.1.alpine` | `php-node-symfony/8.1/Dockerfile` |
+| 8.2         | 3.18           | `Dockerfile.8.2.alpine` | `php-node-symfony/8.2/Dockerfile` |
+| 8.3         | 3.21           | `Dockerfile.8.3.alpine` | `php-node-symfony/8.3/Dockerfile` |
+| 8.4         | 3.21           | `Dockerfile.8.4.alpine` | `php-node-symfony/8.4/Dockerfile` |
+| 8.5-rc      | 3.21           | `Dockerfile.8.5.alpine` | `php-node-symfony/8.5/Dockerfile` |
+
+**Dockerfile Build Order Fix (ARM64):**
+
+After splitting base and final images, Node.js ARM64 builds started failing with:
+```
+Error relocating /usr/local/bin/node: symbol not found
+```
+
+**Root Cause:** In the new architecture, Node.js binaries were copied BEFORE installing `libstdc++` and `gcompat`, causing the smoke test (`node --version`) to fail on ARM64.
+
+**Solution:** Install runtime dependencies BEFORE copying Node.js binaries:
+
+```dockerfile
+# ✅ CORRECT ORDER
+# 1. Install C++ runtime libraries FIRST
+RUN apk add --no-cache libstdc++ gcompat
+
+# 2. THEN copy Node.js binaries
+COPY --from=app_node /usr/local /usr/local
+COPY --from=app_node /opt /opt
+
+# 3. NOW smoke test will work
+RUN node --version && npm --version && yarn --version
+
+# ❌ WRONG ORDER (old broken version)
+# Copy Node.js first, then install libs later in build.sh
+# Smoke test fails because libstdc++ not available yet
+```
+
+This fix was applied to ALL PHP versions (7.4, 8.1, 8.2, 8.3, 8.4, 8.5).
 
 ### 2. **IMAP Extension Handling**
 

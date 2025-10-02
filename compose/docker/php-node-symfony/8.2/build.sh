@@ -21,14 +21,12 @@ apk add --no-cache \
     pngquant \
     optipng \
     gifsicle \
-    libstdc++ \
     libxext \
     libxrender \
     libxtst \
     libxi \
     freetype \
     procps \
-    gcompat \
     rsync \
     vim \
     micro \
