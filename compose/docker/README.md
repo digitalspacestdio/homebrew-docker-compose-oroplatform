@@ -441,44 +441,7 @@ adduser -u $PHP_UID -G ${PHP_USER_GROUP} -s /bin/sh -D ${PHP_USER_NAME}
 chown ${PHP_USER_NAME}:${PHP_USER_GROUP} /var/www
 ```
 
-### 6. **Docker Hub Rate Limits**
-
-**Problem:** `COPY --from=mcuadros/ofelia:latest` can hit Docker Hub rate limits (100 pulls/6h).
-
-**Solution:** CI workflow includes retry logic:
-```yaml
-- name: Build with Retry
-  uses: nick-invision/retry@v2
-  with:
-    max_attempts: 3
-    retry_wait_seconds: 60
-```
-
-**Alternative:** Pre-login to Docker Hub:
-```yaml
-- name: Log in to Docker Hub
-  uses: docker/login-action@v3
-  with:
-    username: ${{ secrets.DOCKERHUB_USERNAME }}
-    token: ${{ secrets.DOCKERHUB_TOKEN }}
-```
-
-### 7. **YAML Syntax for GitHub Actions**
-
-**Problem:** Inline arrays with expressions break YAML parsers:
-```yaml
-runs-on: [self-hosted, Linux, ${{ matrix.arch }}]  # ❌ INVALID
-```
-
-**Solution:** Use block-style arrays:
-```yaml
-runs-on:
-  - self-hosted
-  - Linux
-  - ${{ matrix.arch }}  # ✅ VALID
-```
-
-### 8. **Build Context and File Paths**
+### 6. **Build Context and File Paths**
 
 **Problem:** `COPY` commands require files in build context.
 
