@@ -602,7 +602,7 @@ load_env_safe() {
       value="${value#\'}"
 
       # Export the variable safely
-      eval "export $key=\"${value}\""
+      export "$key=$value"
     done < "$env_file"
   fi
 }
