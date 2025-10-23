@@ -3,7 +3,7 @@
 # Note: ca-certificates and nss-tools are pre-installed in base images
 # Uses wildcard pattern COPY .cr[t] to optionally copy .crt directory if present
 
-ARG BASE_IMAGE
+ARG BASE_IMAGE=ghcr.io/digitalspacestdio/orodc-php-node-symfony:8.4-node22-composer2-alpine
 FROM ${BASE_IMAGE}
 
 # Switch to root to install certificates if they exist
