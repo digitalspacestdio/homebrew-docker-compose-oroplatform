@@ -29,8 +29,8 @@ if [[ -f /.zshrc ]]; then
 fi
 
 if [[ $XDEBUG_MODE = "off" ]]; then
-	rm -f "${PHP_INI_DIR}/conf.d/docker-php-ext-xdebug.ini"
-	rm -f "${PHP_INI_DIR}/conf.d/app.xdebug.ini"
+	rm -f "${PHP_INI_DIR}/conf.d/docker-php-ext-xdebug.ini" 2>/dev/null || true
+	rm -f "${PHP_INI_DIR}/conf.d/app.xdebug.ini" 2>/dev/null || true
 fi
 
 chmod +x ${PHP_USER_HOME}/.profile
