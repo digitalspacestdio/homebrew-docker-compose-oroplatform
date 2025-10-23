@@ -2,7 +2,7 @@ services:
   test-fpm:
     container_name: "${DC_ORO_NAME:-unnamed}_test_fpm_${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}"
     hostname: test-fpm.${DC_ORO_NAME:-unnamed}.docker.local
-    image: ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}
+    image: ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.4}-node${DC_ORO_NODE_VERSION:-22}-composer${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}
     build:
       dockerfile: Dockerfile.${DC_ORO_PHP_VERSION:-8.4}.${DC_ORO_PHP_DIST:-alpine}
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony"
@@ -126,7 +126,7 @@ services:
   test-cli:
     container_name: "${DC_ORO_NAME:-unnamed}_test_cli_${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}"
     hostname: test-cli.${DC_ORO_NAME:-unnamed}.docker.local
-    image: ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}
+    image: ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.4}-node${DC_ORO_NODE_VERSION:-22}-composer${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}
     user: "${DC_ORO_USER_NAME:-developer}"
     volumes:
       - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
@@ -178,7 +178,7 @@ services:
   test-consumer:
     container_name: "${DC_ORO_NAME:-unnamed}_test_consumer_${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}"
     hostname: test-consumer.${DC_ORO_NAME:-unnamed}.docker.local
-    image: ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}
+    image: ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.4}-node${DC_ORO_NODE_VERSION:-22}-composer${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}
     build:
       dockerfile: Dockerfile.${DC_ORO_PHP_VERSION:-8.4}.${DC_ORO_PHP_DIST:-alpine}
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/php-node-symfony"
