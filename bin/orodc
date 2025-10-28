@@ -424,7 +424,7 @@ DOCKER_COMPOSE_BIN="$DOCKER_BIN compose"
 # DOCKER_COMPOSE_BIN_CMD is the main command that gets built up with compose files  
 # This variable is reused throughout the script and in the test merging logic
 DOCKER_COMPOSE_BIN_CMD="$DOCKER_COMPOSE_BIN"
-DOCKER_COMPOSE_VERSION=$($DOCKER_COMPOSE_BIN_CMD version | grep '[0-9]\+\.[0-9]\+\.[0-9]\+' -o | head -1 |awk -F. '{ print $1 }')
+DOCKER_COMPOSE_VERSION=$($DOCKER_COMPOSE_BIN_CMD version | grep -E '[0-9]+\.[0-9]+\.[0-9]+' -o | head -1 |awk -F. '{ print $1 }')
 ${RSYNC_BIN} -r "${DIR}/compose/" "${DC_ORO_CONFIG_DIR}/"
 
 # Setup certificates synchronization
@@ -1105,7 +1105,7 @@ execute_in_container() {
   # Collect external PHP files from command arguments
   for arg in "${cmd_args[@]}"; do
     if [[ $arg == *.php ]]; then
-      PHPFILE_PATH=$(echo $arg | grep -o '.\+\.php' | sed s~.\*=~~)
+      PHPFILE_PATH=$(echo $arg | grep -oE '.+\.php' | sed s~.\*=~~)
       PHPFILE_DIR=$(dirname "${PHPFILE_PATH}")
       
       # Check if file is outside project directory
@@ -1231,15 +1231,15 @@ if echo "$first_non_flag_arg" | grep -i 'import' | grep -i 'db\|database' > /dev
 
   DB_DUMP_BASENAME=$(echo "${DB_DUMP##*/}")
   if [[ $DC_ORO_DATABASE_SCHEMA == "pdo_pgsql" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgres" ]];then
-    DB_IMPORT_CMD="sed -e 's/OWNER TO [a-zA-Z0-9_]\+/OWNER TO '\$DC_ORO_DATABASE_USER'/g' | sed -e '/SET transaction_timeout = 0;/d' | sed -E '/^\\\\restrict|^\\\\unrestrict/d' | PGPASSWORD=\$DC_ORO_DATABASE_PASSWORD psql --set ON_ERROR_STOP=on -h \$DC_ORO_DATABASE_HOST -p \$DC_ORO_DATABASE_PORT -U \$DC_ORO_DATABASE_USER -d \$DC_ORO_DATABASE_DBNAME -1 >/dev/null"
+    DB_IMPORT_CMD="sed -E 's/OWNER TO [a-zA-Z0-9_]+/OWNER TO '\$DC_ORO_DATABASE_USER'/g' | sed -e '/SET transaction_timeout = 0;/d' | sed -E '/^\\\\restrict|^\\\\unrestrict/d' | PGPASSWORD=\$DC_ORO_DATABASE_PASSWORD psql --set ON_ERROR_STOP=on -h \$DC_ORO_DATABASE_HOST -p \$DC_ORO_DATABASE_PORT -U \$DC_ORO_DATABASE_USER -d \$DC_ORO_DATABASE_DBNAME -1 >/dev/null"
   elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "pdo_mysql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]];then
     DB_IMPORT_CMD="sed -e 's/DEFINER[ ]*=[ ]*[^*]*\*/DEFINER=CURRENT_USER \*/' | MYSQL_PWD=\$DC_ORO_DATABASE_PASSWORD mysql -h\$DC_ORO_DATABASE_HOST -P\$DC_ORO_DATABASE_PORT -u\$DC_ORO_DATABASE_USER \$DC_ORO_DATABASE_DBNAME"
   fi
 
   if echo ${DB_DUMP_BASENAME} | grep -i 'sql\.gz$' > /dev/null; then
-    DB_IMPORT_CMD="zcat ${DB_DUMP_BASENAME} | sed -E 's/^\s*CREATE\s+FUNCTION/CREATE OR REPLACE FUNCTION/I' | ${DB_IMPORT_CMD}"
+    DB_IMPORT_CMD="zcat ${DB_DUMP_BASENAME} | sed -E 's/^[[:space:]]*[Cc][Rr][Ee][Aa][Tt][Ee][[:space:]]+[Ff][Uu][Nn][Cc][Tt][Ii][Oo][Nn]/CREATE OR REPLACE FUNCTION/g' | ${DB_IMPORT_CMD}"
   else
-    DB_IMPORT_CMD="cat /${DB_DUMP_BASENAME} | sed -E 's/^\s*CREATE\s+FUNCTION/CREATE OR REPLACE FUNCTION/I' | ${DB_IMPORT_CMD}"
+    DB_IMPORT_CMD="cat /${DB_DUMP_BASENAME} | sed -E 's/^[[:space:]]*[Cc][Rr][Ee][Aa][Tt][Ee][[:space:]]+[Ff][Uu][Nn][Cc][Tt][Ii][Oo][Nn]/CREATE OR REPLACE FUNCTION/g' | ${DB_IMPORT_CMD}"
   fi
 
   >&2 echo "/* Starting import of the database dump... */"
@@ -1679,7 +1679,7 @@ EOF
             for i in {1..10}; do
               if ${TEST_COMPOSE_CMD} exec -T test-cli bash -c "ps aux | grep 'oro:message-queue:consume' | grep -v grep >/dev/null 2>&1"; then
                 echo "Consumer processes found, stopping them..."
-                ${TEST_COMPOSE_CMD} exec -T test-cli bash -c "ps aux | grep 'oro:message-queue:consume' | grep -v grep | awk '{print \$2}' | xargs -r kill -9" 2>/dev/null || true
+                ${TEST_COMPOSE_CMD} exec -T test-cli bash -c "pids=\$(ps aux | grep 'oro:message-queue:consume' | grep -v grep | awk '{print \$2}'); [ -n \"\$pids\" ] && echo \$pids | xargs kill -9" 2>/dev/null || true
                 break
               fi
               echo "Waiting for consumer processes to start... ($i/10)"
@@ -1814,19 +1814,19 @@ EOF
       
     "consumer-stop")
       echo "Stopping test consumer (SIGSTOP)..."
-      ${TEST_COMPOSE_CMD} exec test-cli bash -c "pgrep -f 'oro:message-queue:consume' | xargs -r kill -STOP" 2>/dev/null || echo "Consumer process not found or already stopped"
+      ${TEST_COMPOSE_CMD} exec test-cli bash -c "pids=\$(pgrep -f 'oro:message-queue:consume'); [ -n \"\$pids\" ] && echo \$pids | xargs kill -STOP" 2>/dev/null || echo "Consumer process not found or already stopped"
       exit 0
       ;;
       
     "consumer-start")
       echo "Starting test consumer (SIGCONT)..."
-      ${TEST_COMPOSE_CMD} exec test-cli bash -c "pgrep -f 'oro:message-queue:consume' | xargs -r kill -CONT" 2>/dev/null || echo "Consumer process not found"
+      ${TEST_COMPOSE_CMD} exec test-cli bash -c "pids=\$(pgrep -f 'oro:message-queue:consume'); [ -n \"\$pids\" ] && echo \$pids | xargs kill -CONT" 2>/dev/null || echo "Consumer process not found"
       exit 0
       ;;
       
     "consumer-kill")
       echo "Killing test consumer (SIGKILL)..."
-      ${TEST_COMPOSE_CMD} exec test-cli bash -c "pgrep -f 'oro:message-queue:consume' | xargs -r kill -9" 2>/dev/null || echo "Consumer process not found"
+      ${TEST_COMPOSE_CMD} exec test-cli bash -c "pids=\$(pgrep -f 'oro:message-queue:consume'); [ -n \"\$pids\" ] && echo \$pids | xargs kill -9" 2>/dev/null || echo "Consumer process not found"
       exit 0
       ;;
       
