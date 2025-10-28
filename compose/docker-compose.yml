@@ -416,6 +416,7 @@ services:
       - "traefik.http.middlewares.cors-${DC_ORO_NAME:-unnamed}.headers.accessControlAllowMethods=PUT,GET,POST,HEAD,PATCH,DELETE"
       - "traefik.http.middlewares.cors-${DC_ORO_NAME:-unnamed}.headers.accessControlAllowOriginList=*"
       - "traefik.http.middlewares.resp-headers-${DC_ORO_NAME:-unnamed}.headers.customResponseHeaders.X-Project-Name=${DC_ORO_NAME:-unnamed}"
+      - "traefik.http.middlewares.resp-headers-${DC_ORO_NAME:-unnamed}.headers.customResponseHeaders.X-Website-Code-Traefik=from-traefik"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}.entrypoints=default"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}.middlewares=compress-${DC_ORO_NAME:-unnamed},cors-${DC_ORO_NAME:-unnamed},resp-headers-${DC_ORO_NAME:-unnamed}"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}.rule=Host(`${DC_ORO_NAME:-unnamed}.docker.local`)"
