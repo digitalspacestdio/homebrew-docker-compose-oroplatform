@@ -762,6 +762,34 @@ load_env_safe "$DC_ORO_APPDIR/.env-app"
 load_env_safe "$DC_ORO_APPDIR/.env-app.local"
 load_env_safe "$DC_ORO_APPDIR/.env.orodc"
 
+# Build complete Traefik routing rule
+build_traefik_rule() {
+  # Start with main host
+  local traefik_rule="Host(\`${DC_ORO_NAME:-unnamed}.docker.local\`)"
+  
+  # Process DC_ORO_EXTRA_HOSTS - convert comma-separated hosts to Traefik rule format
+  if [[ -n "${DC_ORO_EXTRA_HOSTS:-}" ]]; then
+    # Split by comma and create Host() rules
+    IFS=',' read -ra HOSTS <<< "$DC_ORO_EXTRA_HOSTS"
+    for host in "${HOSTS[@]}"; do
+      # Trim whitespace
+      host=$(echo "$host" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+      if [[ -n "$host" ]]; then
+        # Auto-append .docker.local if host is a single word (no dots)
+        if [[ "$host" != *.* ]]; then
+          host="$host.docker.local"
+        fi
+        traefik_rule="$traefik_rule || Host(\`$host\`)"
+      fi
+    done
+  fi
+  
+  export DC_ORO_TRAEFIK_RULE="$traefik_rule"
+}
+
+# Build the complete Traefik rule
+build_traefik_rule
+
 parse_dsn_uri "$ORO_DB_URL" "database" "DC_ORO"
 export DC_ORO_DATABASE_USER=${DC_ORO_DATABASE_USER:-app}
 export DC_ORO_DATABASE_PASSWORD=${DC_ORO_DATABASE_PASSWORD:-app}

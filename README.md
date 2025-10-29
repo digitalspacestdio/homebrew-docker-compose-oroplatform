@@ -29,6 +29,7 @@
   - [Running Tests](#running-tests)
   - [Available Test Commands](#available-test-commands)
 - [🔧 Development Commands](#-development-commands)
+- [🌐 Multiple Hosts Configuration](#-multiple-hosts-configuration)
 - [⚙️ Environment Variables](#️-environment-variables)
 - [🐳 Custom Docker Images](#-custom-docker-images)
 - [🐛 XDEBUG Configuration](#-xdebug-configuration)
@@ -323,6 +324,114 @@ orodc --profile=consumer bin/console oro:message-queue:consume
 orodc --profile=consumer platformupdate
 ```
 
+## 🌐 Multiple Hosts Configuration
+
+OroDC supports multiple hostnames for your application, perfect for multisite setups, API endpoints, or different access points.
+
+### 🚀 Quick Examples
+
+```bash
+# Single additional host
+export DC_ORO_EXTRA_HOSTS="api"
+orodc up -d
+# Access: myproject.docker.local + api.docker.local
+
+# Multiple hosts (comma-separated)
+export DC_ORO_EXTRA_HOSTS="api,admin,shop"
+orodc up -d
+# Access: myproject.docker.local + api.docker.local + admin.docker.local + shop.docker.local
+
+# Mixed short and full hostnames
+export DC_ORO_EXTRA_HOSTS="api,admin.myproject.local,external.example.com"
+orodc up -d
+# Access: myproject.docker.local + api.docker.local + admin.myproject.local + external.example.com
+```
+
+### 🎯 Smart Hostname Processing
+
+OroDC automatically processes hostnames for maximum convenience:
+
+- **Short names** (single words) → automatically get `.docker.local` suffix
+- **Full hostnames** (with dots) → used as-is
+- **Whitespace** → automatically trimmed
+- **Empty entries** → automatically ignored
+
+### 📝 Configuration Methods
+
+#### Method 1: Environment Variable
+```bash
+export DC_ORO_EXTRA_HOSTS="api,admin,shop"
+orodc up -d
+```
+
+#### Method 2: .env.orodc File
+```bash
+echo 'DC_ORO_EXTRA_HOSTS=api,admin,shop' >> .env.orodc
+orodc up -d
+```
+
+#### Method 3: Project-specific Configuration
+```bash
+# In your project directory
+echo 'DC_ORO_EXTRA_HOSTS=api,admin,shop.local' > .env.orodc
+orodc up -d
+```
+
+### 🌟 Use Cases
+
+#### API & Admin Separation
+```bash
+# Separate API and admin interfaces
+DC_ORO_EXTRA_HOSTS="api,admin"
+# Access:
+# - Main site: myproject.docker.local
+# - API: api.docker.local  
+# - Admin: admin.docker.local
+```
+
+#### Multisite E-commerce
+```bash
+# Multiple storefronts
+DC_ORO_EXTRA_HOSTS="shop1,shop2,wholesale"
+# Access:
+# - Main: myproject.docker.local
+# - Shop 1: shop1.docker.local
+# - Shop 2: shop2.docker.local  
+# - Wholesale: wholesale.docker.local
+```
+
+#### Development & Staging
+```bash
+# Different environments on same instance
+DC_ORO_EXTRA_HOSTS="dev,staging,demo"
+# Access:
+# - Production-like: myproject.docker.local
+# - Development: dev.docker.local
+# - Staging: staging.docker.local
+# - Demo: demo.docker.local
+```
+
+### 🔧 Technical Details
+
+- **Traefik Integration**: Automatically generates `Host()` rules for all hostnames
+- **Load Balancing**: All hosts point to the same application instance
+- **SSL/TLS**: Works with existing SSL certificate configuration
+- **Performance**: No performance impact - handled at routing level
+
+### 🆘 Troubleshooting
+
+```bash
+# Check generated Traefik rule
+echo $DC_ORO_TRAEFIK_RULE
+
+# Debug hostname processing
+DEBUG=1 orodc up -d
+
+# Reset configuration
+unset DC_ORO_EXTRA_HOSTS
+orodc down && orodc up -d
+```
+
 ## ⚙️ Environment Variables
 
 ### 🔧 Complete Environment Variables Reference
@@ -332,6 +441,9 @@ orodc --profile=consumer platformupdate
 # Project identity
 DC_ORO_NAME=unnamed                # Project name (default: unnamed)
 DC_ORO_PORT_PREFIX=302             # Port prefix (302 → 30280, 30243, etc.)
+
+# Multiple hosts configuration
+DC_ORO_EXTRA_HOSTS=api,admin,shop  # Additional hostnames (comma-separated)
 
 # Application directory
 DC_ORO_APPDIR=/var/www             # Application directory in container

@@ -419,7 +419,7 @@ services:
       - "traefik.http.middlewares.resp-headers-${DC_ORO_NAME:-unnamed}.headers.customResponseHeaders.X-Website-Code-Traefik=from-traefik"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}.entrypoints=default"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}.middlewares=compress-${DC_ORO_NAME:-unnamed},cors-${DC_ORO_NAME:-unnamed},resp-headers-${DC_ORO_NAME:-unnamed}"
-      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}.rule=Host(`${DC_ORO_NAME:-unnamed}.docker.local`)"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}.rule=${DC_ORO_TRAEFIK_RULE}"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}.service=${DC_ORO_NAME:-unnamed}"
       - "traefik.http.services.${DC_ORO_NAME:-unnamed}.loadbalancer.server.port=80"
       - "traefik.http.services.${DC_ORO_NAME:-unnamed}.loadbalancer.server.scheme=http"
