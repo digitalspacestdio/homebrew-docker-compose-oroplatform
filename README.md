@@ -30,6 +30,7 @@
   - [Available Test Commands](#available-test-commands)
 - [🔧 Development Commands](#-development-commands)
 - [🌐 Multiple Hosts Configuration](#-multiple-hosts-configuration)
+- [🌐 Dynamic Multisite Support via URL Paths](#-dynamic-multisite-support-via-url-paths)
 - [⚙️ Environment Variables](#️-environment-variables)
 - [🐳 Custom Docker Images](#-custom-docker-images)
 - [🐛 XDEBUG Configuration](#-xdebug-configuration)
@@ -431,6 +432,99 @@ DEBUG=1 orodc up -d
 unset DC_ORO_EXTRA_HOSTS
 orodc down && orodc up -d
 ```
+
+## 🌐 Dynamic Multisite Support via URL Paths
+
+OroDC automatically extracts website identification from URL paths and passes them to your OroPlatform application via FastCGI parameters. This enables **dynamic multisite routing** without explicit configuration.
+
+### 🎯 How It Works
+
+The nginx configuration automatically extracts the first URL segment and exposes it to PHP:
+
+| URL | `$_SERVER['WEBSITE_CODE']` | `$_SERVER['WEBSITE_PATH']` |
+|-----|---------------------------|---------------------------|
+| `/tech-group/admin` | `"tech-group"` | `"/tech-group"` |
+| `/store-eu/products` | `"store-eu"` | `"/store-eu"` |
+| `/api/v1/users` | `"api"` | `"/api"` |
+| `/products` | `"products"` | `"/products"` |
+| `/` | `""` (empty string) | `"/"` |
+
+### 📋 FastCGI Parameters
+
+OroDC passes two environment variables to your PHP application:
+
+- **`WEBSITE_CODE`**: First URL segment (e.g., `"tech-group"`, `"api"`) or empty string
+- **`WEBSITE_PATH`**: First URL segment with leading slash (e.g., `"/tech-group"`, `"/api"`) or `"/"`
+
+### 🔧 PHP Usage Example
+
+Access these parameters in your OroPlatform application:
+
+```php
+// In your PHP code (Symfony controller, service, etc.)
+$websiteCode = $_SERVER['WEBSITE_CODE'] ?? '';  // "tech-group"
+$websitePath = $_SERVER['WEBSITE_PATH'] ?? '/';  // "/tech-group"
+
+// Use for dynamic routing, configuration, or multisite logic
+if ($websiteCode === 'api') {
+    // API-specific logic
+} elseif ($websiteCode === 'admin') {
+    // Admin-specific logic
+}
+```
+
+### 🐛 Debug Headers
+
+For troubleshooting, OroDC adds debug headers to HTTP responses:
+
+```bash
+curl -I http://localhost:30280/tech-group/admin
+
+# Response headers include:
+# X-Website-Code: tech-group
+# X-Website-Path: /tech-group
+# X-Debug-URI: /index.php
+# X-Debug-Request-URI: /tech-group/admin
+# X-Debug-Host: localhost:30280
+```
+
+### 💡 Use Cases
+
+#### Multi-Store E-commerce
+```
+/store-us/products  → WEBSITE_CODE="store-us"
+/store-eu/products  → WEBSITE_CODE="store-eu"
+/wholesale/catalog  → WEBSITE_CODE="wholesale"
+```
+
+#### API & Admin Separation
+```
+/api/v1/users    → WEBSITE_CODE="api"
+/admin/dashboard → WEBSITE_CODE="admin"
+/app/products    → WEBSITE_CODE="app"
+```
+
+#### Geographic Segmentation
+```
+/us/checkout    → WEBSITE_CODE="us"
+/uk/checkout    → WEBSITE_CODE="uk"
+/de/checkout    → WEBSITE_CODE="de"
+```
+
+### 🔍 URL Pattern Matching
+
+The regex pattern `^/([a-z0-9_-]+)(?:/|$)` matches:
+- ✅ Lowercase letters: `a-z`
+- ✅ Numbers: `0-9`
+- ✅ Underscores: `_`
+- ✅ Hyphens: `-`
+
+**Examples:**
+- ✅ `/tech-group` → matches
+- ✅ `/store_eu` → matches
+- ✅ `/api-v2` → matches
+- ❌ `/TechGroup` → no match (uppercase)
+- ❌ `/tech.group` → no match (dot)
 
 ## ⚙️ Environment Variables
 
