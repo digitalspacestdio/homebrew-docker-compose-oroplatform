@@ -531,6 +531,21 @@ The regex pattern `^/([a-z0-9_-]+)(?:/|$)` matches:
 - ❌ `/TechGroup` → no match (uppercase)
 - ❌ `/tech.group` → no match (dot)
 
+### 🔄 Automatic Trailing Slash Redirect
+
+OroDC automatically redirects single-segment URLs without trailing slash to ensure proper relative path resolution:
+
+**Automatic redirects (301 Permanent):**
+- `/tech-group` → `/tech-group/`
+- `/store-eu` → `/store-eu/`
+- `/api` → `/api/`
+
+**Why this is important:**
+- ✅ Ensures proper relative path resolution for CSS, JS, and images
+- ✅ Prevents "double loading" issues with relative URLs
+- ✅ Standard practice for subfolder-based multisite setups
+- ✅ Query strings are preserved: `/tech-group?param=value` → `/tech-group/?param=value`
+
 ## ⚙️ Environment Variables
 
 ### 🔧 Complete Environment Variables Reference
