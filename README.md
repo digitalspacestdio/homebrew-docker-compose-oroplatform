@@ -451,10 +451,11 @@ The nginx configuration automatically extracts the first URL segment and exposes
 
 ### 📋 FastCGI Parameters
 
-OroDC passes two environment variables to your PHP application:
+OroDC passes multiple environment variables to your PHP application:
 
 - **`WEBSITE_CODE`**: First URL segment (e.g., `"tech-group"`, `"api"`) or empty string
 - **`WEBSITE_PATH`**: First URL segment with leading slash (e.g., `"/tech-group"`, `"/api"`) or `"/"`
+- **`SCRIPT_NAME`**: Includes website path for proper routing (e.g., `"/eu-de/index.php"`, `"/index.php"`)
 
 ### 🔧 PHP Usage Example
 
@@ -462,8 +463,9 @@ Access these parameters in your OroPlatform application:
 
 ```php
 // In your PHP code (Symfony controller, service, etc.)
-$websiteCode = $_SERVER['WEBSITE_CODE'] ?? '';  // "tech-group"
-$websitePath = $_SERVER['WEBSITE_PATH'] ?? '/';  // "/tech-group"
+$websiteCode = $_SERVER['WEBSITE_CODE'] ?? '';     // "tech-group"
+$websitePath = $_SERVER['WEBSITE_PATH'] ?? '/';    // "/tech-group"
+$scriptName  = $_SERVER['SCRIPT_NAME'] ?? '';       // "/tech-group/index.php"
 
 // Use for dynamic routing, configuration, or multisite logic
 if ($websiteCode === 'api') {
@@ -471,6 +473,9 @@ if ($websiteCode === 'api') {
 } elseif ($websiteCode === 'admin') {
     // Admin-specific logic
 }
+
+// OroCommerce uses SCRIPT_NAME for subfolder detection
+// No additional configuration needed - it works automatically!
 ```
 
 ### 🐛 Debug Headers
