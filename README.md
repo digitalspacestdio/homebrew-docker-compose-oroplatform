@@ -435,7 +435,32 @@ orodc down && orodc up -d
 
 ## 🌐 Dynamic Multisite Support via URL Paths
 
-OroDC automatically extracts website identification from URL paths and passes them to your OroPlatform application via FastCGI parameters. This enables **dynamic multisite routing** without explicit configuration.
+OroDC supports **optional** dynamic multisite routing that extracts website identification from URL paths and passes them to your OroPlatform application via FastCGI parameters. This feature is **disabled by default** and can be enabled when needed.
+
+### 🔧 Enable/Disable Multisite Path Support
+
+```bash
+# Enable multisite path functionality (disabled by default)
+echo "DC_NGINX_MULTISITE_PATH_ENABLE=1" >> .env.orodc
+orodc down && orodc up -d
+
+# Disable multisite path functionality (default behavior)
+echo "DC_NGINX_MULTISITE_PATH_ENABLE=0" >> .env.orodc
+# or simply remove the variable
+orodc down && orodc up -d
+```
+
+**Default Behavior (DC_NGINX_MULTISITE_PATH_ENABLE=0):**
+- All URLs are handled normally without path extraction
+- No automatic redirects for single-segment URLs
+- Standard OroPlatform routing behavior
+- Better performance for single-site installations
+
+**Multisite Enabled (DC_NGINX_MULTISITE_PATH_ENABLE=1):**
+- Automatic website code extraction from URL paths
+- FastCGI parameters passed to PHP application
+- Automatic trailing slash redirects for proper relative paths
+- Perfect for multi-store or multi-tenant setups
 
 ### 🎯 How It Works
 
@@ -558,6 +583,9 @@ DC_ORO_PORT_PREFIX=302             # Port prefix (302 → 30280, 30243, etc.)
 
 # Multiple hosts configuration
 DC_ORO_EXTRA_HOSTS=api,admin,shop  # Additional hostnames (comma-separated)
+
+# Multisite path support
+DC_NGINX_MULTISITE_PATH_ENABLE=1   # Enable multisite URL path extraction (default: 0)
 
 # Application directory
 DC_ORO_APPDIR=/var/www             # Application directory in container
