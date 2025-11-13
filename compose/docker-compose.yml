@@ -407,6 +407,7 @@ services:
     environment:
       - 'APP_DIR=${DC_ORO_APPDIR:-/var/www}'
       - 'DC_ORO_APPDIR=${DC_ORO_APPDIR:-/var/www}'
+      - 'DC_NGINX_MULTISITE_PATH_ENABLE=${DC_NGINX_MULTISITE_PATH_ENABLE:-0}'
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=dc_shared_net"
