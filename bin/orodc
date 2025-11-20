@@ -1272,7 +1272,15 @@ if echo "$first_non_flag_arg" | grep -i 'import' | grep -i 'db\|database' > /dev
 
   >&2 echo "/* Starting import of the database dump... */"
   >&2 echo "/* From: $DB_DUMP */"
+  >&2 echo "/* File size: $(du -h "$DB_DUMP" | cut -f1) */"
+  >&2 echo "/* Database schema: $DC_ORO_DATABASE_SCHEMA */"
+  >&2 echo "/* Database host: $DC_ORO_DATABASE_HOST:$DC_ORO_DATABASE_PORT */"
+  >&2 echo "/* Database name: $DC_ORO_DATABASE_DBNAME */"
+  >&2 echo "/* Database user: $DC_ORO_DATABASE_USER */"
+  >&2 echo "/* Import command: $DB_IMPORT_CMD */"
+  >&2 echo "/* Docker command: ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} run -i --rm -v \"${DB_DUMP}:/${DB_DUMP_BASENAME}\" database-cli bash -c \"$DB_IMPORT_CMD\" */"
 
+  set -x
   exec ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} run -i --rm -v "${DB_DUMP}:/${DB_DUMP_BASENAME}" database-cli bash -c "$DB_IMPORT_CMD"
   exit 0
 fi
