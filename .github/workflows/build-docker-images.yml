@@ -110,14 +110,14 @@ jobs:
             arch: ARM64
             arch_name: arm64
             platform: linux/arm64
-          # PHP 8.5 (RC -> stable, tag without -rc)
+          # PHP 8.5 (stable)
           - php: "8.5"
-            php_version: "8.5-rc"
+            php_version: "8.5"
             arch: X64
             arch_name: amd64
             platform: linux/amd64
           - php: "8.5"
-            php_version: "8.5-rc"
+            php_version: "8.5"
             arch: ARM64
             arch_name: arm64
             platform: linux/arm64
