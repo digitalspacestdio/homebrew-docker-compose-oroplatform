@@ -12,7 +12,7 @@ compose/docker/
 │   ├── Dockerfile.8.2.alpine     # PHP 8.2 base
 │   ├── Dockerfile.8.3.alpine     # PHP 8.3 base
 │   ├── Dockerfile.8.4.alpine     # PHP 8.4 base
-│   └── Dockerfile.8.5.alpine     # PHP 8.5-rc base
+│   └── Dockerfile.8.5.alpine     # PHP 8.5 base
 │
 ├── php-node-symfony/             # Final images (PHP + Node.js + tools)
 │   ├── Dockerfile.7.4.alpine     # PHP 7.4 + Node.js 18
@@ -20,7 +20,7 @@ compose/docker/
 │   ├── Dockerfile.8.2.alpine     # PHP 8.2 + Node.js 18
 │   ├── Dockerfile.8.3.alpine     # PHP 8.3 + Node.js 18
 │   ├── Dockerfile.8.4.alpine     # PHP 8.4 + Node.js 20
-│   ├── Dockerfile.8.5.alpine     # PHP 8.5-rc + Node.js 22
+│   ├── Dockerfile.8.5.alpine     # PHP 8.5 + Node.js 22
 │   ├── build7.4.sh               # Build scripts (one per PHP version)
 │   ├── build8.*.sh               # Consolidate RUN commands for layer optimization
 │   ├── app.ini                   # PHP configuration
@@ -86,7 +86,7 @@ compose/docker/
 
 **Extension Version Management:**
 - PHP 7.4, 8.1-8.4: Use stable release versions
-- PHP 8.5-rc: Use git commit hashes (for RC/beta compatibility)
+- PHP 8.5: Use git commit hashes (for stable compatibility)
 
 **Key Build Arguments:**
 ```dockerfile
@@ -134,7 +134,7 @@ COPY --from=app_node /opt /opt
 ```
 - PHP 7.4, 8.1-8.3: Node.js 18
 - PHP 8.4: Node.js 20
-- PHP 8.5-rc: Node.js 22
+- PHP 8.5: Node.js 22
 
 #### 2. **Composer** (copied from `composer:2`)
 ```dockerfile
@@ -353,7 +353,7 @@ FROM ghcr.io/digitalspacestdio/orodc-php:${PHP_VERSION}-alpine
 | 8.2         | 3.18           | `Dockerfile.8.2.alpine` | `php-node-symfony/8.2/Dockerfile` |
 | 8.3         | 3.21           | `Dockerfile.8.3.alpine` | `php-node-symfony/8.3/Dockerfile` |
 | 8.4         | 3.21           | `Dockerfile.8.4.alpine` | `php-node-symfony/8.4/Dockerfile` |
-| 8.5-rc      | 3.21           | `Dockerfile.8.5.alpine` | `php-node-symfony/8.5/Dockerfile` |
+| 8.5         | 3.21           | `Dockerfile.8.5.alpine` | `php-node-symfony/8.5/Dockerfile` |
 
 **Dockerfile Build Order Fix (ARM64):**
 
