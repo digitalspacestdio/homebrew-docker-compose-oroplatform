@@ -351,7 +351,10 @@ DC_PROXY_SOCKS5_PORT=1080           # SOCKS5 port
 compose/docker/proxy/
 ├── Dockerfile                 # Multi-stage build
 ├── traefik.yml                # Traefik v3 static config
-├── generate-certs.sh          # Certificate generation logic
+├── localCA.cnf                # OpenSSL CA configuration
+├── local-ca-init.sh           # Initialize CA structure
+├── local-ca-crtgen.sh         # Generate domain certificates
+├── generate-certs.sh          # Main certificate wrapper
 └── s6-rc.d/                   # s6-overlay service definitions
     ├── init-certs/            # One-shot: Generate certificates on first start
     │   ├── type               # "oneshot"
@@ -366,6 +369,19 @@ compose/docker/proxy/
         ├── run                # Start socks5
         └── dependencies.d/
             └── traefik        # Wait for Traefik
+
+# Inside container after build:
+/certs/                        # Volume mount point
+  ├── localCA.cnf             # OpenSSL config (copied at runtime)
+  └── localCA/                # CA structure (created by local-ca-init.sh)
+      ├── certs/              # Issued certificates
+      ├── newcerts/           # Certificate copies (by serial)
+      ├── crl/                # Certificate revocation lists
+      ├── private/            # Private keys
+      ├── root_ca.crt         # Root CA certificate
+      ├── serial              # Next serial number
+      ├── index.txt           # Certificate database
+      └── index.txt.attr      # Database attributes
 ```
 
 ### DNS Sync Service (External, runs on host)
@@ -391,45 +407,259 @@ bin/
 - Updates /etc/hosts atomically
 - Manages entries between markers
 
-### Certificate Generation Script
+### Certificate Generation Scripts (Based on digitalspace-local-ca approach)
+
+Inspired by [digitalspace-local-ca](https://github.com/digitalspacestdio/homebrew-ngdev/blob/main/Formula/digitalspace-local-ca.rb), we implement a proper CA structure with separate initialization and certificate generation scripts.
+
+**Script Structure:**
+```
+compose/docker/proxy/
+├── local-ca-init.sh         # Initialize CA structure (run once)
+├── local-ca-crtgen.sh       # Generate domain certificates
+├── localCA.cnf              # OpenSSL CA configuration
+└── generate-certs.sh        # Wrapper that calls init + crtgen
+```
+
+#### Script 1: local-ca-init.sh
+
+Initializes the CA directory structure and generates root CA certificate.
 
 ```bash
 #!/bin/bash
-# generate-certs.sh
+# local-ca-init.sh
+set -e
 
 CERT_DIR="/certs"
-CA_CERT="$CERT_DIR/ca.crt"
-CA_KEY="$CERT_DIR/ca.key"
-DOMAIN="docker.local"
+CA_DIR="$CERT_DIR/localCA"
 
-if [[ -f "$CA_CERT" ]]; then
-    echo "Certificates already exist, skipping generation"
+export OPENSSL_CONF="$CERT_DIR/localCA.cnf"
+
+echo "[INFO] Initializing Local CA structure..."
+
+# Create CA directory structure
+mkdir -p "$CA_DIR/certs"
+mkdir -p "$CA_DIR/newcerts"
+mkdir -p "$CA_DIR/crl"
+mkdir -p "$CA_DIR/private"
+
+# Initialize CA database files
+echo "01" > "$CA_DIR/serial"
+echo "unique_subject = no" > "$CA_DIR/index.txt.attr"
+echo -n "" > "$CA_DIR/index.txt"
+
+# Generate Root CA certificate (10 years validity)
+openssl req -x509 -sha256 -newkey rsa:2048 -nodes -days 3650 \
+    -keyout "$CA_DIR/private/cakey.pem" \
+    -out "$CA_DIR/root_ca.crt" \
+    -subj "/C=US/ST=Local/L=Local/O=OroDC/OU=Development/CN=OroDC Local CA/emailAddress=root@localhost"
+
+chmod 600 "$CA_DIR/private/cakey.pem"
+
+echo "[INFO] Root CA certificate generated:"
+echo "  Certificate: $CA_DIR/root_ca.crt"
+echo "  Private Key: $CA_DIR/private/cakey.pem"
+```
+
+#### Script 2: local-ca-crtgen.sh
+
+Generates wildcard certificates for specified domains using the CA.
+
+```bash
+#!/bin/bash
+# local-ca-crtgen.sh
+set -e
+
+if [[ -z $1 ]]; then
+    echo "Usage: $0 <domain>"
+    echo "Example: $0 docker.local"
+    exit 1
+fi
+
+CERT_DIR="/certs"
+CA_DIR="$CERT_DIR/localCA"
+DOMAIN="$1"
+
+# Sanitize domain name
+DOMAIN_SAFE=$(echo "$DOMAIN" | sed -e 's/[^A-Za-z0-9._-]/_/g')
+
+if [[ "$DOMAIN_SAFE" != "$DOMAIN" ]]; then
+    echo "[ERROR] Invalid domain name: $DOMAIN"
+    exit 1
+fi
+
+echo "[INFO] Generating certificate for *.${DOMAIN}..."
+
+# Create domain-specific OpenSSL config
+cat > "$CA_DIR/${DOMAIN}.cnf" <<EOM
+[ req ]
+prompt = no
+distinguished_name = server_distinguished_name
+req_extensions = v3_req
+
+[ server_distinguished_name ]
+commonName = *.${DOMAIN}
+stateOrProvinceName = Local
+countryName = US
+emailAddress = root@${DOMAIN}
+organizationName = OroDC
+organizationalUnitName = Development
+
+[ v3_req ]
+basicConstraints = CA:FALSE
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+subjectAltName = @alt_names
+
+[ alt_names ]
+DNS.0 = *.${DOMAIN}
+DNS.1 = ${DOMAIN}
+EOM
+
+# Generate private key and certificate request
+export OPENSSL_CONF="$CA_DIR/${DOMAIN}.cnf"
+openssl req -newkey rsa:2048 \
+    -keyout "$CA_DIR/private/${DOMAIN}_key.pem" \
+    -keyform PEM \
+    -out "$CA_DIR/${DOMAIN}_req.pem" \
+    -outform PEM \
+    -nodes
+
+# Extract clean key (without extra headers)
+openssl rsa < "$CA_DIR/private/${DOMAIN}_key.pem" > "$CA_DIR/private/${DOMAIN}.key"
+chmod 600 "$CA_DIR/private/${DOMAIN}.key"
+
+# Sign certificate with CA
+export OPENSSL_CONF="$CERT_DIR/localCA.cnf"
+openssl ca -batch \
+    -in "$CA_DIR/${DOMAIN}_req.pem" \
+    -out "$CA_DIR/certs/${DOMAIN}.crt"
+
+# Cleanup temporary files
+rm -f "$CA_DIR/${DOMAIN}_req.pem"
+rm -f "$CA_DIR/private/${DOMAIN}_key.pem"
+
+echo "[INFO] Certificate generated successfully:"
+echo "  Certificate: $CA_DIR/certs/${DOMAIN}.crt"
+echo "  Private Key: $CA_DIR/private/${DOMAIN}.key"
+
+# Create symlinks in /certs root for Traefik compatibility
+ln -sf "$CA_DIR/root_ca.crt" "$CERT_DIR/ca.crt"
+ln -sf "$CA_DIR/private/cakey.pem" "$CERT_DIR/ca.key"
+ln -sf "$CA_DIR/certs/${DOMAIN}.crt" "$CERT_DIR/${DOMAIN}.crt"
+ln -sf "$CA_DIR/private/${DOMAIN}.key" "$CERT_DIR/${DOMAIN}.key"
+```
+
+#### Script 3: localCA.cnf
+
+OpenSSL configuration for CA operations.
+
+```ini
+# localCA.cnf - OpenSSL CA configuration for OroDC
+
+[ ca ]
+default_ca = local_ca
+
+[ local_ca ]
+dir             = /certs/localCA
+certs           = $dir/certs
+crl_dir         = $dir/crl
+database        = $dir/index.txt
+new_certs_dir   = $dir/newcerts
+certificate     = $dir/root_ca.crt
+crlnumber       = $dir/crlnumber
+private_key     = $dir/private/cakey.pem
+serial          = $dir/serial
+
+default_crl_days = 365
+default_days     = 398
+default_md       = sha256
+
+policy            = local_ca_policy
+x509_extensions   = local_ca_extensions
+copy_extensions   = copy
+
+[ local_ca_policy ]
+commonName             = supplied
+stateOrProvinceName    = supplied
+countryName            = supplied
+emailAddress           = supplied
+organizationName       = supplied
+organizationalUnitName = supplied
+
+[ local_ca_extensions ]
+basicConstraints = CA:false
+keyUsage = nonRepudiation, digitalSignature, keyEncipherment
+
+[ req ]
+default_bits    = 2048
+default_keyfile = /certs/localCA/private/cakey.pem
+default_md      = sha256
+prompt          = no
+distinguished_name = root_ca_distinguished_name
+x509_extensions    = root_ca_extensions
+
+[ root_ca_distinguished_name ]
+commonName             = OroDC Local CA
+stateOrProvinceName    = Local
+countryName            = US
+emailAddress           = root@localhost
+organizationName       = OroDC
+organizationalUnitName = Development
+
+[ root_ca_extensions ]
+basicConstraints = CA:true
+keyUsage = keyCertSign, cRLSign
+```
+
+#### Script 4: generate-certs.sh
+
+Main wrapper script called by s6-overlay to ensure certificates exist.
+
+```bash
+#!/bin/bash
+# generate-certs.sh - Main entrypoint for certificate generation
+set -e
+
+CERT_DIR="/certs"
+CA_DIR="$CERT_DIR/localCA"
+DOMAIN="${CERT_DOMAIN:-docker.local}"
+
+echo "[INFO] Certificate Generation for OroDC Proxy"
+echo "[INFO] Domain: ${DOMAIN}"
+
+# Check if CA already exists
+if [[ -f "$CA_DIR/root_ca.crt" ]] && [[ -f "$CERT_DIR/${DOMAIN}.crt" ]]; then
+    echo "[INFO] Certificates already exist, skipping generation"
     exit 0
 fi
 
-# Generate CA
-openssl req -x509 -nodes -new -sha256 -days 3650 -newkey rsa:2048 \
-    -keyout "$CA_KEY" -out "$CA_CERT" \
-    -subj "/C=US/CN=OroDC-Local-CA"
+# Copy OpenSSL config to certs directory
+cp /usr/local/etc/localCA.cnf "$CERT_DIR/localCA.cnf"
 
-# Generate wildcard certificate
-openssl req -new -nodes -newkey rsa:2048 \
-    -keyout "$CERT_DIR/$DOMAIN.key" \
-    -out "$CERT_DIR/$DOMAIN.csr" \
-    -subj "/C=US/CN=*.$DOMAIN"
+# Initialize CA if not exists
+if [[ ! -f "$CA_DIR/root_ca.crt" ]]; then
+    echo "[INFO] Initializing Certificate Authority..."
+    /usr/local/bin/local-ca-init.sh
+fi
 
-# Sign with CA
-openssl x509 -req -sha256 -days 365 \
-    -in "$CERT_DIR/$DOMAIN.csr" \
-    -CA "$CA_CERT" -CAkey "$CA_KEY" -CAcreateserial \
-    -out "$CERT_DIR/$DOMAIN.crt" \
-    -extfile <(echo "subjectAltName=DNS:*.$DOMAIN,DNS:$DOMAIN")
+# Generate domain certificate if not exists
+if [[ ! -f "$CERT_DIR/${DOMAIN}.crt" ]]; then
+    echo "[INFO] Generating certificate for *.${DOMAIN}..."
+    /usr/local/bin/local-ca-crtgen.sh "${DOMAIN}"
+fi
 
-# Cleanup
-rm "$CERT_DIR/$DOMAIN.csr"
-
-echo "Certificates generated successfully"
+echo "[INFO] Certificate setup complete"
+echo "[INFO] Root CA: $CERT_DIR/ca.crt"
+echo "[INFO] Domain cert: $CERT_DIR/${DOMAIN}.crt"
+echo "[INFO] Domain key: $CERT_DIR/${DOMAIN}.key"
 ```
+
+**Benefits of this approach:**
+- ✅ **Proper CA structure**: Industry-standard CA directory layout
+- ✅ **Certificate tracking**: index.txt tracks all issued certificates
+- ✅ **Reusable CA**: Can generate multiple domain certificates from same CA
+- ✅ **Standard OpenSSL**: Uses well-documented OpenSSL CA features
+- ✅ **Auditable**: Serial numbers and database for certificate management
+- ✅ **Extensible**: Easy to add new domains or regenerate certificates
 
 ### Traefik v3 Configuration
 
@@ -668,13 +898,18 @@ COPY --from=socks5-binary /socks5 /usr/local/bin/socks5
 RUN chmod +x /usr/local/bin/socks5
 
 # Create directories
-RUN mkdir -p /certs /etc/traefik
+RUN mkdir -p /certs /etc/traefik /usr/local/etc
 
-# Copy configuration files and s6 service definitions
-COPY traefik.yml /etc/traefik/traefik.yml
+# Copy CA configuration and certificate generation scripts
+COPY localCA.cnf /usr/local/etc/localCA.cnf
+COPY local-ca-init.sh /usr/local/bin/local-ca-init.sh
+COPY local-ca-crtgen.sh /usr/local/bin/local-ca-crtgen.sh
 COPY generate-certs.sh /usr/local/bin/generate-certs.sh
+RUN chmod +x /usr/local/bin/*.sh
+
+# Copy Traefik configuration and s6 service definitions
+COPY traefik.yml /etc/traefik/traefik.yml
 COPY s6-rc.d/ /etc/s6-overlay/s6-rc.d/
-RUN chmod +x /usr/local/bin/generate-certs.sh
 
 # Expose ports
 EXPOSE 80 443

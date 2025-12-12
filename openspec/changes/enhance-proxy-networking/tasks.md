@@ -27,7 +27,15 @@ Tasks are organized in phases to enable incremental delivery and testing. Tasks 
   - Copy pre-built `/socks5` binary from stage 1
   - Install Alpine packages: `ca-certificates`, `bash`, `openssl`, `xz`
   - Set up directory structure: `/certs`, `/etc/traefik`, `/etc/s6-overlay/s6-rc.d/`
-  - Copy s6 service definitions
+  - Copy certificate generation scripts to `/usr/local/bin/`:
+    - `local-ca-init.sh`
+    - `local-ca-crtgen.sh`
+    - `generate-certs.sh`
+  - Copy OpenSSL CA config to `/usr/local/etc/`:
+    - `localCA.cnf`
+  - Copy traefik.yml to `/etc/traefik/`
+  - Copy s6 service definitions to `/etc/s6-overlay/s6-rc.d/`
+  - Make all scripts executable (chmod +x)
 - Keep image minimal - all components as static binaries
 
 **Validation:**
@@ -44,26 +52,50 @@ Tasks are organized in phases to enable incremental delivery and testing. Tasks 
 
 ---
 
-### Task 1.2: Certificate Generation Script ✓ FOUNDATIONAL
+### Task 1.2: Certificate Generation Scripts (Based on digitalspace-local-ca) ✓ FOUNDATIONAL
 
-**Description:** Implement certificate generation logic
+**Description:** Implement proper CA structure with separate initialization and certificate generation scripts
 
 **Work Items:**
-- Create `compose/docker/proxy/generate-certs.sh`
-- Check if certificates already exist in `/certs` volume
-- Generate Root CA: 10-year validity, RSA 2048, CN=OroDC-Local-CA
-- Generate wildcard cert: 1-year validity, CN=*.docker.local
-- Sign wildcard cert with Root CA
-- Set appropriate permissions (600 for private keys)
-- Add subjectAltName for both *.docker.local and docker.local
-- Log generation steps clearly
+- Create `compose/docker/proxy/localCA.cnf` - OpenSSL CA configuration:
+  - CA directory structure definition: `/certs/localCA/{certs,newcerts,crl,private}`
+  - CA policy for certificate signing
+  - Extensions for CA and server certificates
+  - Distinguished name templates
+  - Serial and index.txt database configuration
+- Create `compose/docker/proxy/local-ca-init.sh` - CA initialization:
+  - Create directory structure: `localCA/{certs,newcerts,crl,private}`
+  - Initialize CA database files: `serial`, `index.txt`, `index.txt.attr`
+  - Generate Root CA certificate: 10-year validity, RSA 2048
+  - Set proper permissions (600 for private keys)
+  - Use OPENSSL_CONF environment variable
+- Create `compose/docker/proxy/local-ca-crtgen.sh` - Domain certificate generation:
+  - Accept domain name as parameter
+  - Sanitize domain name (alphanumeric, dots, hyphens only)
+  - Create domain-specific OpenSSL config with SAN
+  - Generate private key and CSR
+  - Sign CSR with Root CA using `openssl ca`
+  - Clean up temporary files
+  - Create symlinks in `/certs` root for Traefik compatibility
+  - Log all generation steps
+- Create `compose/docker/proxy/generate-certs.sh` - Main wrapper:
+  - Check if certificates already exist
+  - Copy localCA.cnf to `/certs` directory
+  - Call `local-ca-init.sh` if CA doesn't exist
+  - Call `local-ca-crtgen.sh docker.local` if domain cert doesn't exist
+  - Support `CERT_DOMAIN` environment variable (default: docker.local)
+  - Exit early if certificates exist (idempotent)
 
 **Validation:**
-- Script generates valid certificates when /certs is empty
-- Script skips generation when certificates exist
-- `openssl x509 -in /certs/ca.crt -text -noout` shows correct issuer
-- `openssl x509 -in /certs/docker.local.crt -text -noout` shows SAN
+- All scripts are executable and use `#!/bin/bash` shebang
+- CA initialization creates proper directory structure
+- `ls -la /certs/localCA/` shows: certs/, newcerts/, crl/, private/, serial, index.txt
+- Root CA generated: `openssl x509 -in /certs/localCA/root_ca.crt -text -noout` shows CA:true
+- Domain cert generated: `openssl x509 -in /certs/docker.local.crt -text -noout` shows SAN
+- Symlinks created: `/certs/ca.crt -> localCA/root_ca.crt`
 - Private keys have 600 permissions
+- Scripts are idempotent (skip if certs exist)
+- Can generate multiple domains: `local-ca-crtgen.sh example.docker.local`
 
 **Dependencies:** Task 1.1
 

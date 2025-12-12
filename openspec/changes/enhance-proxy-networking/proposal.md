@@ -46,13 +46,18 @@ External bash script service:
 - Automatically updates /etc/hosts
 - Runs as systemd/launchd service
 
-### 2. Certificate Generation
+### 2. Certificate Generation (Based on digitalspace-local-ca approach)
 
-On first start:
-- Generate root CA certificate + key
-- Store in named volume `proxy_certs`
+On first start, using industry-standard CA structure:
+- Initialize proper CA directory structure (certs, newcerts, crl, private)
+- Generate root CA certificate + key (10-year validity)
+- Create CA database (index.txt, serial) for certificate tracking
+- Generate wildcard certificate for *.docker.local using CA signing
+- Store in named volume `proxy_certs` with proper CA hierarchy
 - Configure Traefik to use generated certificates
-- Auto-generate certificates for *.docker.local wildcard
+- Supports generating additional domain certificates as needed
+
+Inspired by [digitalspace-local-ca](https://github.com/digitalspacestdio/homebrew-ngdev/blob/main/Formula/digitalspace-local-ca.rb) for proper CA management.
 
 ### 3. DNS Resolution Options
 
@@ -88,7 +93,10 @@ On first start:
 - `compose/docker-compose-proxy.yml` - Enhanced service definition
 - `bin/orodc` - New commands: `export-proxy-cert`, `proxy-dns-setup`
 - `compose/docker/proxy/` - New Dockerfile for multi-service proxy
-- `compose/docker/proxy/entrypoint.sh` - Certificate generation logic
+- `compose/docker/proxy/local-ca-init.sh` - CA initialization script
+- `compose/docker/proxy/local-ca-crtgen.sh` - Domain certificate generation script
+- `compose/docker/proxy/generate-certs.sh` - Main certificate wrapper script
+- `compose/docker/proxy/localCA.cnf` - OpenSSL CA configuration
 - `README.md` - Documentation updates
 
 ## Open Questions

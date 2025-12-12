@@ -28,12 +28,17 @@ Instead of running a DNS server, we use a simple **bash script** that watches Do
 - ✅ **Multi-arch** - Supports amd64 and arm64 architectures
 - ✅ **Static binaries** - All components as standalone executables
 
-### Certificate Management
-- ✅ Auto-generate self-signed CA on first start
-- ✅ Wildcard certificate for *.docker.local
-- ✅ Persistent certificate storage
+### Certificate Management (Inspired by digitalspace-local-ca)
+- ✅ **Proper CA structure** - Industry-standard directory layout (certs, newcerts, crl, private)
+- ✅ **CA database** - Certificate tracking with index.txt and serial numbers
+- ✅ **Separate scripts** - local-ca-init.sh (CA setup) + local-ca-crtgen.sh (domain certs)
+- ✅ Auto-generate self-signed Root CA on first start (10-year validity)
+- ✅ Wildcard certificate for *.docker.local with SAN
+- ✅ Extensible - Can generate additional domain certificates as needed
+- ✅ Persistent certificate storage in named volume
 - ✅ `orodc export-proxy-cert` command for system import
 - ✅ HTTPS on port 8443 (HTTP on 8880 stays for backward compat)
+- ✅ Based on [digitalspace-local-ca](https://github.com/digitalspacestdio/homebrew-ngdev/blob/main/Formula/digitalspace-local-ca.rb) approach
 
 ### DNS Resolution
 - ✅ **Auto /etc/hosts sync** - Primary solution (simple, reliable, no DNS server)
@@ -139,7 +144,10 @@ DC_PROXY_SOCKS5_PASS=            # Optional auth password
 **New Files:**
 - `compose/docker/proxy/Dockerfile` - Multi-stage: serjs/go-socks5-proxy + Alpine + Traefik v3 + s6-overlay
 - `compose/docker/proxy/traefik.yml` - Traefik v3 config with TLS
-- `compose/docker/proxy/generate-certs.sh` - SSL certificate generation
+- `compose/docker/proxy/localCA.cnf` - OpenSSL CA configuration (NEW)
+- `compose/docker/proxy/local-ca-init.sh` - Initialize CA structure (NEW)
+- `compose/docker/proxy/local-ca-crtgen.sh` - Generate domain certificates (NEW)
+- `compose/docker/proxy/generate-certs.sh` - Main certificate wrapper
 - `compose/docker/proxy/s6-rc.d/` - s6-overlay service definitions:
   - `init-certs/` - Oneshot certificate generation
   - `traefik/` - Longrun Traefik service
