@@ -16,58 +16,67 @@ log() {
     echo "[$(date +'%Y-%m-%d %H:%M:%S')] [DNS-SYNC] $*"
 }
 
+# Extract hostnames from Traefik rule
+extract_hosts_from_rule() {
+    local rule="$1"
+    # Extract all Host(`hostname`) patterns from Traefik rule
+    echo "$rule" | grep -oE 'Host\(`[^`]+`\)' | sed -E 's/Host\(`([^`]+)`\)/\1/g'
+}
+
 # Update /etc/hosts with container DNS names
 update_hosts() {
     log "Updating /etc/hosts inside container..."
     
-    # Get all running containers with the label
     local entries=""
     
-    # Query Docker API via Unix socket using curl
-    local containers
-    containers=$(curl -s --unix-socket "$DOCKER_SOCK" \
-        "http://localhost/containers/json?filters=%7B%22label%22%3A%5B%22${LABEL_NAME}%22%5D%7D" || echo "[]")
-    
-    # Parse JSON and extract hostnames and container names
-    echo "$containers" | grep -o '"Labels":{[^}]*}' | while read -r labels_block; do
-        # Extract hostname from label
-        hostname=$(echo "$labels_block" | grep -o "\"${LABEL_NAME}\":\"[^\"]*\"" | cut -d'"' -f4 || echo "")
-        
-        if [[ -n "$hostname" ]]; then
-            # Get container name from same container
-            container_name=$(echo "$containers" | grep -B20 "$hostname" | grep -o '"Name":"[^"]*"' | head -1 | cut -d'"' -f4 | sed 's/^\///' || echo "")
-            
-            if [[ -n "$container_name" ]]; then
-                # Map hostname to Docker container DNS name
-                entries+="${container_name} ${hostname}"$'\n'
-                log "Mapping: ${hostname} -> ${container_name}"
-            fi
-        fi
-    done
-    
-    # Alternative simpler approach using docker CLI if available
+    # Use docker CLI if available
     if command -v docker >/dev/null 2>&1; then
+        # Get all running containers with Traefik enabled
         while IFS= read -r container_id; do
             if [[ -z "$container_id" ]]; then
                 continue
             fi
             
-            # Get hostname and container name
-            hostname=$(docker inspect -f "{{index .Config.Labels \"$LABEL_NAME\"}}" "$container_id" 2>/dev/null || echo "")
             container_name=$(docker inspect -f "{{.Name}}" "$container_id" 2>/dev/null | sed 's/^\///' || echo "")
             
-            if [[ -n "$hostname" ]] && [[ -n "$container_name" ]]; then
+            if [[ -z "$container_name" ]]; then
+                continue
+            fi
+            
+            # Method 1: Check custom orodc.dns.hostname label
+            custom_hostname=$(docker inspect -f "{{index .Config.Labels \"$LABEL_NAME\"}}" "$container_id" 2>/dev/null || echo "")
+            
+            if [[ -n "$custom_hostname" ]]; then
                 # Support multiple hostnames (comma-separated)
-                IFS=',' read -ra HOSTNAMES <<< "$hostname"
+                IFS=',' read -ra HOSTNAMES <<< "$custom_hostname"
                 for h in "${HOSTNAMES[@]}"; do
                     h=$(echo "$h" | xargs)  # Trim
                     if [[ -n "$h" ]]; then
                         entries+="${container_name} ${h}"$'\n'
-                        log "Mapping: ${h} -> ${container_name}"
+                        log "Mapping (custom): ${h} -> ${container_name}"
                     fi
                 done
             fi
-        done < <(docker ps --filter "label=$LABEL_NAME" --format "{{.ID}}" 2>/dev/null || echo "")
+            
+            # Method 2: Extract from Traefik router rules
+            # Get all traefik.http.routers.*.rule labels
+            all_labels=$(docker inspect -f '{{range $k, $v := .Config.Labels}}{{$k}}={{$v}}{{"\n"}}{{end}}' "$container_id" 2>/dev/null || echo "")
+            
+            while IFS= read -r label_line; do
+                if [[ "$label_line" =~ traefik\.http\.routers\..*\.rule=(.+)$ ]]; then
+                    rule_value="${BASH_REMATCH[1]}"
+                    
+                    # Extract all Host() entries from the rule
+                    while IFS= read -r hostname; do
+                        if [[ -n "$hostname" ]]; then
+                            entries+="${container_name} ${hostname}"$'\n'
+                            log "Mapping (traefik): ${hostname} -> ${container_name}"
+                        fi
+                    done < <(extract_hosts_from_rule "$rule_value")
+                fi
+            done <<< "$all_labels"
+            
+        done < <(docker ps --filter "label=traefik.enable=true" --format "{{.ID}}" 2>/dev/null || echo "")
     fi
     
     # Update /etc/hosts

@@ -11,7 +11,8 @@ RUN apk add --no-cache \
     openssl \
     curl \
     tzdata \
-    xz
+    xz \
+    docker-cli
 
 # Set architecture variables for multi-arch support
 ARG TARGETARCH

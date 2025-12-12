@@ -78,4 +78,3 @@ networks:
   dc_shared_net:
     name: dc_shared_net
     external: true
-
