@@ -513,19 +513,32 @@ DC_ORO_COMPOSER_AUTH=""            # Composer authentication JSON
 DC_ORO_WEBSOCKET_SERVER_DSN=//0.0.0.0:8080
 
 # WebSocket frontend settings (public URL for browser connections)
-DC_ORO_WEBSOCKET_FRONTEND_DSN=//*//ws
+DC_ORO_WEBSOCKET_FRONTEND_DSN=//${DC_ORO_NAME}.docker.local/ws
 
 # WebSocket backend settings (internal container communication)
 DC_ORO_WEBSOCKET_BACKEND_DSN=tcp://websocket:8080
 ```
 
 **Notes:**
-- `WEBSOCKET_SERVER_DSN`: Internal address where WebSocket server binds
-- `WEBSOCKET_FRONTEND_DSN`: Public URL path for browser WebSocket connections (no port = auto-detect HTTP/HTTPS)
+- `WEBSOCKET_SERVER_DSN`: Internal address where WebSocket server binds (port 8080)
+- `WEBSOCKET_FRONTEND_DSN`: Public URL for browser WebSocket connections (uses project domain, auto-detects HTTP/HTTPS)
 - `WEBSOCKET_BACKEND_DSN`: TCP address for PHP backend to connect to WebSocket server
-- Frontend DSN uses `//*//ws` format (no port specified) to work with both HTTP:80 and HTTPS:443
+- Frontend DSN format: `//hostname/path` - no port means browser auto-detects (80 for HTTP, 443 for HTTPS)
+- Default uses `${DC_ORO_NAME}.docker.local/ws` - customize for production domains
 - All containers (fpm, cli, consumer, websocket) are configured with these variables
-- Nginx and Traefik automatically proxy `/ws` path to WebSocket server
+- Nginx and Traefik automatically proxy `/ws` path to WebSocket server on port 8080
+
+**Examples:**
+```bash
+# Local development (default)
+DC_ORO_WEBSOCKET_FRONTEND_DSN=//myproject.docker.local/ws
+
+# Production with custom domain
+DC_ORO_WEBSOCKET_FRONTEND_DSN=//example.com/ws
+
+# Subdomain
+DC_ORO_WEBSOCKET_FRONTEND_DSN=//app.example.com/ws
+```
 
 ### 📁 Sync Modes
 
