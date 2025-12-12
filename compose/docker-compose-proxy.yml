@@ -62,20 +62,6 @@ services:
       traefik.http.routers.traefik-api-host-https.service: "api@internal"
       traefik.http.routers.traefik-api-host-https.tls: "true"
       
-      # Nginx access via proxy.docker.local (for CA certificate download page)
-      # Higher priority than dashboard routes to serve HTML page first
-      traefik.http.routers.proxy-nginx.rule: 'Host(`proxy.docker.local`)'
-      traefik.http.routers.proxy-nginx.priority: 10000
-      traefik.http.routers.proxy-nginx.entrypoints: "http"
-      traefik.http.routers.proxy-nginx.service: "proxy-nginx"
-      traefik.http.services.proxy-nginx.loadbalancer.server.port: 8080
-      
-      traefik.http.routers.proxy-nginx-https.rule: 'Host(`proxy.docker.local`)'
-      traefik.http.routers.proxy-nginx-https.priority: 10000
-      traefik.http.routers.proxy-nginx-https.entrypoints: "https"
-      traefik.http.routers.proxy-nginx-https.service: "proxy-nginx"
-      traefik.http.routers.proxy-nginx-https.tls: "true"
-      
       # DNS sync (auto-updates /etc/hosts inside proxy container)
       orodc.dns.hostname: 'proxy.docker.local'
     healthcheck:

@@ -16,12 +16,9 @@ entryPoints:
   
   https:
     address: ":443"
-
-# TLS Configuration
-tls:
-  certificates:
-    - certFile: /certs/docker.local.crt
-      keyFile: /certs/docker.local.key
+    http:
+      tls:
+        certResolver: default
 
 # API and Dashboard
 api:
@@ -38,6 +35,10 @@ providers:
     endpoint: "unix:///var/run/docker.sock"
     exposedByDefault: false
     network: "dc_shared_net"
+  
+  file:
+    filename: /etc/traefik/dynamic.yml
+    watch: true
 
 # Logging
 log:
