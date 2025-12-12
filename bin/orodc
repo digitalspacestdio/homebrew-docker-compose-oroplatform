@@ -1619,7 +1619,15 @@ if [[ "$first_non_flag_arg" == "install-proxy" ]]; then
     exit 1
   fi
   
-  msg_info "Starting Traefik proxy container..."
+  # Set log level based on DEBUG environment variable
+  if [[ "${DEBUG:-}" == "1" ]]; then
+    export TRAEFIK_LOG_LEVEL="DEBUG"
+    msg_info "Starting Traefik proxy container (DEBUG mode)..."
+  else
+    export TRAEFIK_LOG_LEVEL="WARNING"
+    msg_info "Starting Traefik proxy container..."
+  fi
+  
   ${DOCKER_COMPOSE_BIN} -f "$PROXY_COMPOSE_FILE" up -d || {
     msg_error "Failed to start Traefik proxy"
     exit 1

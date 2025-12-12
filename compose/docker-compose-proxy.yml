@@ -5,7 +5,7 @@ services:
     container_name: traefik_docker_local
     command:
         - "--ping=true"
-        - "--log.level=DEBUG"
+        - "--log.level=${TRAEFIK_LOG_LEVEL:-WARNING}"
         - "--api=true"
         - "--api.dashboard=true"
         - "--providers.docker=true"

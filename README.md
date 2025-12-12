@@ -620,13 +620,18 @@ OroDC includes a built-in command to install Traefik reverse proxy inside Docker
 **Install Traefik Proxy:**
 
 ```bash
+# Install with default log level (WARNING)
 orodc install-proxy
+
+# Install with DEBUG logging
+DEBUG=1 orodc install-proxy
 ```
 
 This command will:
 1. Create `dc_shared_net` Docker network (if not exists)
 2. Start Traefik container (`traefik_docker_local`) on port 8880
 3. Automatically route all `*.docker.local` domains to OroDC containers
+4. Set log level to DEBUG if `DEBUG=1`, otherwise WARNING
 
 **Features:**
 - **Dashboard**: <http://localhost:8880/traefik/dashboard/>
