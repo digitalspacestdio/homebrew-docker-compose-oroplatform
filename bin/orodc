@@ -482,6 +482,96 @@ if [[ "$temp_first_non_flag_arg" == "proxy" ]]; then
         }
       fi
       
+      # Configure Traefik bind address if not set
+      if [[ -z "${TRAEFIK_BIND_ADDRESS:-}" ]]; then
+        msg_info ""
+        msg_info "Proxy Network Configuration"
+        msg_info "============================"
+        msg_info ""
+        
+        # Auto-detect environment and suggest default
+        IS_WSL=false
+        IS_LIMA=false
+        DETECTED_ENV=""
+        
+        # Check WSL
+        if grep -qi microsoft /proc/version 2>/dev/null || grep -qi wsl /proc/version 2>/dev/null; then
+          IS_WSL=true
+          DETECTED_ENV="Windows WSL2"
+        fi
+        
+        # Check Lima VM
+        if [[ -d "/lima" ]] || [[ -n "${LIMA_INSTANCE:-}" ]]; then
+          IS_LIMA=true
+          DETECTED_ENV="Lima VM"
+        fi
+        
+        # Determine default based on environment
+        if [[ "$IS_WSL" == "true" ]] || [[ "$IS_LIMA" == "true" ]]; then
+          # WSL or Lima VM - need to bind to all interfaces for host access
+          SUGGESTED_BIND="0.0.0.0"
+          SUGGESTED_REASON="VM/WSL detected - bind to all interfaces for host access"
+        else
+          # Native Docker (macOS or Linux) or unknown - bind to localhost only
+          SUGGESTED_BIND="127.0.0.1"
+          SUGGESTED_REASON="Native Docker - bind to localhost only (secure)"
+        fi
+        
+        msg_info "Choose proxy bind address (affects HTTP, HTTPS, SOCKS5):"
+        msg_info ""
+        msg_info "  1) 127.0.0.1 (localhost only)"
+        msg_info "     - Most secure: Only accessible from this machine"
+        msg_info "     - Use for: Native Docker on macOS/Linux"
+        msg_info ""
+        msg_info "  2) 0.0.0.0 (all interfaces)"
+        msg_info "     - Allows access from: VM host + network"
+        msg_info "     - Use for: WSL2, Lima VM, remote access"
+        msg_info ""
+        
+        if [[ -n "$DETECTED_ENV" ]]; then
+          msg_info "Detected: ${DETECTED_ENV}"
+          msg_info "Suggested: ${SUGGESTED_BIND} (${SUGGESTED_REASON})"
+        else
+          msg_info "Could not detect environment"
+          msg_info "Suggested: ${SUGGESTED_BIND} (safe default)"
+        fi
+        
+        msg_info ""
+        
+        # Interactive prompt
+        read -p "Enter choice [1-2] or custom IP (press Enter for suggested: ${SUGGESTED_BIND}): " BIND_CHOICE
+        
+        case "$BIND_CHOICE" in
+          1)
+            export TRAEFIK_BIND_ADDRESS="127.0.0.1"
+            msg_ok "Using 127.0.0.1 (localhost only)"
+            ;;
+          2)
+            export TRAEFIK_BIND_ADDRESS="0.0.0.0"
+            msg_ok "Using 0.0.0.0 (all interfaces)"
+            msg_warning "Make sure your firewall is properly configured!"
+            ;;
+          "")
+            export TRAEFIK_BIND_ADDRESS="$SUGGESTED_BIND"
+            msg_ok "Using suggested: ${SUGGESTED_BIND}"
+            ;;
+          *)
+            # Custom IP address
+            export TRAEFIK_BIND_ADDRESS="$BIND_CHOICE"
+            msg_ok "Using custom bind address: ${BIND_CHOICE}"
+            ;;
+        esac
+        
+        msg_info ""
+        msg_info "To skip this prompt next time, set:"
+        msg_info "  export TRAEFIK_BIND_ADDRESS=${TRAEFIK_BIND_ADDRESS}"
+        msg_info "Or add to .env.orodc:"
+        msg_info "  echo 'TRAEFIK_BIND_ADDRESS=${TRAEFIK_BIND_ADDRESS}' >> .env.orodc"
+        msg_info ""
+      else
+        msg_info "Using bind address: ${TRAEFIK_BIND_ADDRESS} (from environment)"
+      fi
+      
       # Set log level based on DEBUG environment variable
       if [[ "${DEBUG:-}" == "1" ]]; then
         export TRAEFIK_LOG_LEVEL="DEBUG"
@@ -499,10 +589,11 @@ if [[ "$temp_first_non_flag_arg" == "proxy" ]]; then
       if [[ "$*" == *"-d"* ]]; then
         msg_ok "Traefik proxy started!"
         msg_info ""
-        msg_info "Dashboard: http://localhost:8880/traefik/dashboard/"
-        msg_info "Proxy HTTP:  http://localhost:8880"
-        msg_info "Proxy HTTPS: https://localhost:8443"
-        msg_info "SOCKS5:      127.0.0.1:1080"
+        msg_info "Bind address: ${TRAEFIK_BIND_ADDRESS:-127.0.0.1}"
+        msg_info "Dashboard:    http://${TRAEFIK_BIND_ADDRESS:-127.0.0.1}:8880/traefik/dashboard/"
+        msg_info "Proxy HTTP:   http://${TRAEFIK_BIND_ADDRESS:-127.0.0.1}:8880"
+        msg_info "Proxy HTTPS:  https://${TRAEFIK_BIND_ADDRESS:-127.0.0.1}:8443"
+        msg_info "SOCKS5:       ${TRAEFIK_BIND_ADDRESS:-127.0.0.1}:1080"
         msg_info ""
         msg_warning "To enable HTTPS for *.docker.local domains, install CA certificate:"
         msg_info "  orodc proxy install-certs"
