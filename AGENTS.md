@@ -4,6 +4,42 @@ This document contains guidelines for AI agents working with the homebrew-docker
 
 ---
 
+# 🔴 **CRITICAL: NEW TASK = NEW BRANCH!**
+
+## ⚡ **MANDATORY RULE: ALWAYS CREATE NEW BRANCH FOR NEW TASK!**
+
+**🚨 BEFORE STARTING ANY NEW TASK:**
+```bash
+# ✅ MANDATORY WORKFLOW FOR EVERY NEW TASK:
+git fetch --all
+git checkout master
+git pull main master
+git push origin master
+git checkout -b fix/descriptive-task-name
+```
+
+**🔥 THIS RULE APPLIES TO:**
+- ✅ New features
+- ✅ Bug fixes
+- ✅ Configuration changes
+- ✅ Documentation updates
+- ✅ ANY code modifications
+
+**⛔ NEVER:**
+- ❌ Start working without creating a branch
+- ❌ Continue in old branch when starting new task
+- ❌ Make changes directly in master
+- ❌ Assume you're in the right branch
+
+**💡 WHY THIS IS CRITICAL:**
+- Prevents mixing unrelated changes
+- Allows independent code review per task
+- Enables parallel work on multiple features
+- Maintains clean git history
+- Prevents broken Pull Requests
+
+---
+
 # 🚨 **CRITICAL: PRE-PUSH MANDATORY SYNC!**
 
 ## ⚡ **BEFORE ANY BRANCH CREATION - MANDATORY STEPS:**

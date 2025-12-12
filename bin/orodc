@@ -2,6 +2,9 @@
 set -e
 if [ "$DEBUG" ]; then set -x; fi
 
+# Restore cursor visibility on exit
+trap 'tput cnorm 2>/dev/null || true' EXIT
+
 # Setup logging only when OroDC is used as PHP binary
 setup_php_logging() {
   mkdir -p /tmp/.orodc
@@ -1919,7 +1922,8 @@ if [[ "$first_non_flag_arg" == "down" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/compose.
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/compose.yml"
   # Combine all arguments into a single string for proper execution
   full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${args[*]} ${right_flags[*]} ${right_options[*]}"
-  exec bash -c "$full_cmd"
+  bash -c "$full_cmd"
+  exit $?
 fi
 
 # Handle docker compose commands with all variables set
@@ -1933,7 +1937,8 @@ if [[ "$is_docker_compose_cmd" == "true" ]]; then
   docker_cmd="${args[0]}"
   docker_services="${args[*]:1}"
   full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${docker_cmd} ${right_flags[*]} ${right_options[*]} ${docker_services}"
-  DC_ORO_NAME="$DC_ORO_NAME" exec bash -c "$full_cmd"
+  DC_ORO_NAME="$DC_ORO_NAME" bash -c "$full_cmd"
+  exit $?
 fi
 
 # Handle bash commands by running them in CLI container
@@ -1956,7 +1961,8 @@ if [[ "$first_non_flag_arg" == "bash" ]]; then
     full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} run --rm cli bash ${right_flags[*]} ${right_options[*]}"
   fi
   
-  DC_ORO_NAME="$DC_ORO_NAME" exec bash -c "$full_cmd"
+  DC_ORO_NAME="$DC_ORO_NAME" bash -c "$full_cmd"
+  exit $?
 fi
 
 # Generate config file only if it doesn't exist or if it's a management command (up, down, purge, etc.)
@@ -1967,4 +1973,5 @@ fi
 full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${args[*]} ${right_flags[*]} ${right_options[*]}"
 
 
-DC_ORO_NAME="$DC_ORO_NAME" exec bash -c "$full_cmd"
+DC_ORO_NAME="$DC_ORO_NAME" bash -c "$full_cmd"
+exit $?
