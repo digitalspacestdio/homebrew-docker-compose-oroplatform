@@ -23,6 +23,12 @@
 - [🗄️ Smart Database Integration](#️-smart-database-integration)
 - [💻 Supported Systems](#-supported-systems)
 - [📦 Installation](#-installation)
+- [🌐 Infrastructure Setup (Traefik + Dnsmasq + SSL)](#-infrastructure-setup-traefik--dnsmasq--ssl)
+  - [Prerequisites](#prerequisites)
+  - [Platform-Specific Configuration](#platform-specific-configuration)
+  - [SSL Certificate Setup](#ssl-certificate-setup)
+  - [Verification](#verification)
+  - [Troubleshooting Infrastructure](#troubleshooting-infrastructure)
 - [📖 Usage](#-usage)
 - [🧪 Testing](#-testing)
   - [Test Environment Setup](#test-environment-setup)
@@ -69,6 +75,11 @@ curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://localhost:30280
 
 # Open your application
 open http://localhost:30280/
+
+# 🌐 Optional: Install Traefik + Dnsmasq for domain-based access
+# See "Infrastructure Setup" section for *.docker.local domains with SSL
+# brew tap digitalspacestdio/ngdev
+# brew install digitalspace-traefik digitalspace-dnsmasq digitalspace-local-ca
 
 # 🎯 Smart PHP Commands & Database Access
 orodc help                         # Get full documentation
@@ -156,6 +167,231 @@ brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplat
 # Verify installation
 orodc help
 ```
+
+## 🌐 Infrastructure Setup (Traefik + Dnsmasq + SSL)
+
+OroDC uses **Traefik** as a reverse proxy and **Dnsmasq** for local DNS resolution, allowing you to access projects via `*.docker.local` domains with automatic SSL certificates.
+
+### Prerequisites
+
+You need to install Traefik and Dnsmasq from [homebrew-ngdev](https://github.com/digitalspacestdio/homebrew-ngdev):
+
+```bash
+# Add ngdev tap
+brew tap digitalspacestdio/ngdev
+
+# Install required infrastructure
+brew install digitalspace-traefik digitalspace-dnsmasq digitalspace-local-ca
+
+# Install allutils (helper scripts)
+brew install digitalspace-allutils
+```
+
+### Platform-Specific Configuration
+
+#### 🐧 Linux / WSL2 (Native Docker)
+
+On Linux and WSL2 **without** Docker Desktop, Traefik runs natively on the host and connects directly to Docker containers.
+
+**1. Enable Docker provider in Traefik:**
+
+```bash
+# Copy Traefik config
+cp $(brew --prefix)/etc/traefik/traefik.toml $(brew --prefix)/etc/traefik/traefik.override.toml
+
+# Edit traefik.override.toml and uncomment Docker provider section:
+# [providers.docker]
+#   endpoint = "unix:///var/run/docker.sock"
+#   exposedByDefault = false
+```
+
+**2. Start services:**
+
+```bash
+# Start Dnsmasq
+digitalspace-dnsmasq-start
+
+# Start Traefik (will use traefik.override.toml if exists)
+digitalspace-traefik-start
+
+# Verify services are running
+digitalspace-supctl status
+```
+
+**Architecture:** `Browser → Traefik (host) → Nginx (container)`
+
+#### 🍎 macOS / 🪟 WSL2 + Docker Desktop
+
+On macOS and WSL2 **with** Docker Desktop, Docker runs in a VM, so you need a **two-stage Traefik setup**:
+- **Traefik (host)** - receives requests from browser
+- **Traefik (docker)** - runs inside Docker, routes to containers
+
+**1. Install Traefik (host):**
+
+```bash
+# Install and start host Traefik
+brew install digitalspace-traefik
+digitalspace-dnsmasq-start
+digitalspace-traefik-start
+```
+
+**2. Enable Docker proxy config:**
+
+```bash
+# Create Traefik config for Docker proxy
+digitalspace-traefik-enable-docker-proxy
+```
+
+This creates a configuration that proxies `*.docker.local` requests from host Traefik to Docker Traefik.
+
+**3. Start Traefik inside Docker:**
+
+Create `docker-compose.yml` for Traefik in Docker:
+
+```yaml
+# ~/traefik-docker/docker-compose.yml
+services:
+  traefik_docker_local:
+    hostname: traefik.docker.local
+    image: traefik:v2.11
+    container_name: traefik_docker_local
+    command:
+        - "--ping=true"
+        - "--log.level=DEBUG"
+        - "--api=true"
+        - "--api.dashboard=true"
+        - "--providers.docker=true"
+        - "--providers.docker.exposedbydefault=false"
+        - "--entrypoints.default.address=:80"
+        - "--entrypoints.default.forwardedheaders.trustedips=0.0.0.0/0"
+        - "--entryPoints.default.forwardedHeaders.insecure"
+    restart: always
+    ports:
+      - "${TRAEFIK_BIND_ADDRESS:-0.0.0.0}:${TRAEFIK_BIND_PORT:-8880}:80"
+    networks:
+      - "dc_shared_net"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    labels:
+      traefik.enable: 'true'
+      traefik.http.routers.traefik-api.rule: 'PathPrefix(`/traefik/dashboard`) || (PathPrefix(`/api`) && HeadersRegexp(`referer`, `/traefik/dashboard`))'
+      traefik.http.routers.traefik-api.priority: 9000
+      traefik.http.routers.traefik-api.entrypoints: "default"
+      traefik.http.routers.traefik-api.service: "api@internal"
+      traefik.http.routers.traefik-api.middlewares: "traefik-api-stripprefix"
+      traefik.http.middlewares.traefik-api-stripprefix.stripprefix.prefixes: "/traefik"
+    healthcheck:
+      test: traefik healthcheck --ping
+      start_period: 5s
+      interval: 5s
+      retries: 30
+
+networks:
+  dc_shared_net:
+    name: dc_shared_net
+    external: true
+```
+
+**Start Docker Traefik:**
+
+```bash
+mkdir -p ~/traefik-docker
+cd ~/traefik-docker
+# Create docker-compose.yml (content above)
+docker network create dc_shared_net 2>/dev/null || true
+docker-compose up -d
+```
+
+**Architecture:** `Browser → Traefik (host) → Traefik (docker) → Nginx (container)`
+
+### SSL Certificate Setup
+
+Install the self-signed root certificate to avoid browser security warnings:
+
+#### macOS
+
+```bash
+sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain \
+  $(brew --prefix)/etc/openssl/localCA/root_ca.crt
+```
+
+#### Linux (Debian/Ubuntu/WSL2)
+
+```bash
+# Install certificate
+sudo mkdir -p /usr/local/share/ca-certificates/extra
+sudo cp $(brew --prefix)/etc/openssl/localCA/root_ca.crt /usr/local/share/ca-certificates/extra/
+sudo update-ca-certificates
+
+# For Chrome/Chromium (NSS database)
+sudo apt install libnss3-tools
+mkdir -p $HOME/.pki/nssdb
+certutil -d $HOME/.pki/nssdb -N
+certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "Local Development" \
+  -i $(brew --prefix)/etc/openssl/localCA/root_ca.crt
+```
+
+#### Linux (Fedora/RHEL/WSL2)
+
+```bash
+# Convert to PEM
+openssl x509 -in $(brew --prefix)/etc/openssl/localCA/root_ca.crt \
+  -out /tmp/root_ca.pem -outform PEM
+
+# Install certificate
+sudo mv /tmp/root_ca.pem /etc/pki/ca-trust/source/anchors/
+sudo update-ca-trust
+```
+
+### Verification
+
+After setup, verify infrastructure is working:
+
+```bash
+# Check services status
+digitalspace-supctl status
+
+# Should show:
+# - traefik: RUNNING
+# - dnsmasq: RUNNING
+
+# Test DNS resolution
+nslookup test.docker.local
+# Should resolve to 127.0.0.1
+
+# Test Traefik
+curl -I http://localhost:8880
+# Should return Traefik response
+```
+
+### Troubleshooting Infrastructure
+
+**DNS not resolving:**
+```bash
+# Restart Dnsmasq
+digitalspace-dnsmasq-restart
+
+# Check DNS server
+scutil --dns | grep nameserver  # macOS
+cat /etc/resolv.conf            # Linux
+```
+
+**Traefik not routing:**
+```bash
+# Check Traefik logs
+tail -f $(brew --prefix)/var/log/traefik.log
+
+# Restart Traefik
+digitalspace-traefik-restart
+
+# On macOS/Docker Desktop - check Docker Traefik
+docker logs traefik_docker_local
+```
+
+**Certificate warnings:**
+- Re-run certificate installation steps
+- Restart your browser completely
+- Clear browser SSL cache
 
 ## 📖 Usage
 
@@ -328,6 +564,8 @@ orodc --profile=consumer platformupdate
 ## 🌐 Multiple Hosts Configuration
 
 OroDC supports multiple hostnames for your application, perfect for multisite setups, API endpoints, or different access points.
+
+> **⚠️ Prerequisites:** Custom domains (like `*.docker.local`) require [Traefik + Dnsmasq infrastructure](#-infrastructure-setup-traefik--dnsmasq--ssl) to be installed and running. Without it, you can only access via `localhost` with port numbers.
 
 ### 🚀 Quick Examples
 
