@@ -159,7 +159,6 @@ services:
   consumer:
     container_name: "${DC_ORO_NAME:-unnamed}_consumer_${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}"
     hostname: consumer.${DC_ORO_NAME:-unnamed}.docker.local
-    profiles: ["consumer"]
     build:
       dockerfile: Dockerfile.project
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/project-php-node-symfony"
@@ -235,7 +234,6 @@ services:
   websocket:
     container_name: "${DC_ORO_NAME:-unnamed}_websocket_${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}"
     hostname: websocket.${DC_ORO_NAME:-unnamed}.docker.local
-    profiles: ["websocket"]
     build:
       dockerfile: Dockerfile.project
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/project-php-node-symfony"
@@ -257,6 +255,18 @@ services:
       - "home-root:/root"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     restart: always
+    networks:
+      - default
+      - dc_shared_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=dc_shared_net"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws.entrypoints=default"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws.rule=${DC_ORO_TRAEFIK_RULE} && (PathPrefix(`/ws`) || HeadersRegexp(`Upgrade`, `(?i)websocket`))"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws.service=${DC_ORO_NAME:-unnamed}-ws"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws.priority=100"
+      - "traefik.http.services.${DC_ORO_NAME:-unnamed}-ws.loadbalancer.server.port=8080"
+      - "traefik.http.services.${DC_ORO_NAME:-unnamed}-ws.loadbalancer.server.scheme=http"
     environment:
       - 'DC_ORO_DATABASE_HOST=${DC_ORO_DATABASE_HOST:-database}'
       - 'DC_ORO_DATABASE_PORT=${DC_ORO_DATABASE_PORT:-5432}'
@@ -407,7 +417,6 @@ services:
     environment:
       - 'APP_DIR=${DC_ORO_APPDIR:-/var/www}'
       - 'DC_ORO_APPDIR=${DC_ORO_APPDIR:-/var/www}'
-      - 'DC_NGINX_MULTISITE_PATH_ENABLE=${DC_NGINX_MULTISITE_PATH_ENABLE:-0}'
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=dc_shared_net"
