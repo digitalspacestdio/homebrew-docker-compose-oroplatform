@@ -302,6 +302,126 @@ if [[ -z "$temp_first_non_flag_arg" && $# -gt 0 ]]; then
   temp_first_non_flag_arg="php"
 fi
 
+# Handle proxy commands early - they don't require project initialization
+if [[ "$temp_first_non_flag_arg" == "install-proxy" ]] || [[ "$temp_first_non_flag_arg" == "export-proxy-cert" ]]; then
+  # Initialize minimal dependencies for proxy commands
+  DOCKER_BIN=$(resolve_bin "docker" "Docker is required. Install from https://docs.docker.com/get-docker/")
+  DOCKER_COMPOSE_BIN="$DOCKER_BIN compose"
+  
+  # Get OroDC install directory
+  SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  if [[ -d "$SCRIPT_DIR/../compose" ]]; then
+    DC_ORO_COMPOSE_DIR="$SCRIPT_DIR/../compose"
+  else
+    DC_ORO_COMPOSE_DIR="/home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform/compose"
+  fi
+  
+  # Handle install-proxy command
+  if [[ "$temp_first_non_flag_arg" == "install-proxy" ]]; then
+    msg_info "Installing Traefik reverse proxy in Docker..."
+    
+    # Create shared network if it doesn't exist
+    if ! ${DOCKER_BIN} network inspect dc_shared_net >/dev/null 2>&1; then
+      msg_info "Creating dc_shared_net network..."
+      ${DOCKER_BIN} network create dc_shared_net || {
+        msg_error "Failed to create dc_shared_net network"
+        exit 1
+      }
+    fi
+    
+    # Check if Traefik container is already running
+    if ${DOCKER_BIN} ps --filter "name=proxy" --format "{{.Names}}" | grep -q "^proxy$"; then
+      msg_info "Traefik proxy is already running"
+      ${DOCKER_BIN} ps --filter "name=proxy" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+      exit 0
+    fi
+    
+    # Use docker-compose-proxy.yml to start Traefik
+    PROXY_COMPOSE_FILE="${DC_ORO_COMPOSE_DIR}/docker-compose-proxy.yml"
+    
+    if [[ ! -f "$PROXY_COMPOSE_FILE" ]]; then
+      msg_error "Proxy compose file not found: $PROXY_COMPOSE_FILE"
+      exit 1
+    fi
+    
+    # Set log level based on DEBUG environment variable
+    if [[ "${DEBUG:-}" == "1" ]]; then
+      export TRAEFIK_LOG_LEVEL="DEBUG"
+      msg_info "Starting Traefik proxy container (DEBUG mode)..."
+    else
+      export TRAEFIK_LOG_LEVEL="WARNING"
+      msg_info "Starting Traefik proxy container..."
+    fi
+    
+    ${DOCKER_COMPOSE_BIN} -f "$PROXY_COMPOSE_FILE" up -d || {
+      msg_error "Failed to start Traefik proxy"
+      exit 1
+    }
+    
+    msg_info "Traefik proxy installed successfully!"
+    msg_info "Dashboard: http://localhost:8880/traefik/dashboard/"
+    msg_info "Proxy HTTP:  http://localhost:8880"
+    msg_info "Proxy HTTPS: https://localhost:8443"
+    msg_info "SOCKS5:      127.0.0.1:1080"
+    msg_info ""
+    msg_info "All OroDC projects with *.docker.local domains will be automatically routed through this proxy."
+    msg_info ""
+    msg_info "Via SOCKS5 proxy (configure in browser):"
+    msg_info "  http://proxy.docker.local/traefik/dashboard/"
+    msg_info "  http://oroplatform.docker.local/"
+    msg_info ""
+    msg_info "To stop proxy: docker compose -f ${PROXY_COMPOSE_FILE} down"
+    msg_info "To view logs: docker logs proxy"
+    
+    exit 0
+  fi
+  
+  # Handle export-proxy-cert command
+  if [[ "$temp_first_non_flag_arg" == "export-proxy-cert" ]]; then
+    msg_info "Exporting OroDC Proxy CA Certificate..."
+    
+    # Check if proxy container is running
+    if ! ${DOCKER_BIN} ps --filter "name=proxy" --format "{{.Names}}" | grep -q "^proxy$"; then
+      msg_error "Traefik proxy is not running. Start it first with: orodc install-proxy"
+      exit 1
+    fi
+    
+    # Export certificate to user's home directory
+    CERT_OUTPUT_PATH="${HOME}/orodc-proxy-ca.crt"
+    
+    if ${DOCKER_BIN} cp proxy:/certs/ca.crt "${CERT_OUTPUT_PATH}" 2>/dev/null; then
+      msg_info "CA certificate exported successfully!"
+      msg_info "Certificate location: ${CERT_OUTPUT_PATH}"
+      msg_info ""
+      msg_info "To trust this certificate, follow instructions for your OS:"
+      msg_info ""
+      msg_info "macOS:"
+      msg_info "  sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ${CERT_OUTPUT_PATH}"
+      msg_info ""
+      msg_info "Linux (Debian/Ubuntu):"
+      msg_info "  sudo cp ${CERT_OUTPUT_PATH} /usr/local/share/ca-certificates/orodc-proxy-ca.crt"
+      msg_info "  sudo update-ca-certificates"
+      msg_info ""
+      msg_info "Linux (RHEL/CentOS/Fedora):"
+      msg_info "  sudo cp ${CERT_OUTPUT_PATH} /etc/pki/ca-trust/source/anchors/orodc-proxy-ca.crt"
+      msg_info "  sudo update-ca-trust"
+      msg_info ""
+      msg_info "Windows:"
+      msg_info "  1. Open ${CERT_OUTPUT_PATH} in Notepad"
+      msg_info "  2. Copy the contents to Windows (if using WSL)"
+      msg_info "  3. Save as .crt file on Windows"
+      msg_info "  4. Double-click and install to 'Trusted Root Certification Authorities'"
+      msg_info ""
+      msg_info "For browser-specific import (Firefox, etc.), see documentation."
+    else
+      msg_error "Failed to export certificate. Is the proxy container running?"
+      exit 1
+    fi
+    
+    exit 0
+  fi
+fi
+
 # Check if we need argument parsing
 # Parse for docker compose commands OR commands with docker compose flags
 has_docker_compose_flags=false
@@ -1591,104 +1711,6 @@ elif echo ${args[0]} | grep -i '^install$' > /dev/null; then
   exit 0
 fi
 
-# Handle install-proxy command - installs Traefik reverse proxy in Docker
-if [[ "$first_non_flag_arg" == "install-proxy" ]]; then
-  msg_info "Installing Traefik reverse proxy in Docker..."
-  
-  # Create shared network if it doesn't exist
-  if ! ${DOCKER_BIN} network inspect dc_shared_net >/dev/null 2>&1; then
-    msg_info "Creating dc_shared_net network..."
-    ${DOCKER_BIN} network create dc_shared_net || {
-      msg_error "Failed to create dc_shared_net network"
-      exit 1
-    }
-  fi
-  
-  # Check if Traefik container is already running
-  if ${DOCKER_BIN} ps --filter "name=traefik_docker_local" --format "{{.Names}}" | grep -q "traefik_docker_local"; then
-    msg_info "Traefik proxy is already running"
-    ${DOCKER_BIN} ps --filter "name=traefik_docker_local" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-    exit 0
-  fi
-  
-  # Use docker-compose-proxy.yml to start Traefik
-  PROXY_COMPOSE_FILE="${DC_ORO_COMPOSE_DIR}/docker-compose-proxy.yml"
-  
-  if [[ ! -f "$PROXY_COMPOSE_FILE" ]]; then
-    msg_error "Proxy compose file not found: $PROXY_COMPOSE_FILE"
-    exit 1
-  fi
-  
-  # Set log level based on DEBUG environment variable
-  if [[ "${DEBUG:-}" == "1" ]]; then
-    export TRAEFIK_LOG_LEVEL="DEBUG"
-    msg_info "Starting Traefik proxy container (DEBUG mode)..."
-  else
-    export TRAEFIK_LOG_LEVEL="WARNING"
-    msg_info "Starting Traefik proxy container..."
-  fi
-  
-  ${DOCKER_COMPOSE_BIN} -f "$PROXY_COMPOSE_FILE" up -d || {
-    msg_error "Failed to start Traefik proxy"
-    exit 1
-  }
-  
-  msg_info "Traefik proxy installed successfully!"
-  msg_info "Dashboard: http://localhost:8880/traefik/dashboard/"
-  msg_info "Proxy endpoint: http://localhost:8880"
-  msg_info ""
-  msg_info "All OroDC projects with *.docker.local domains will be automatically routed through this proxy."
-  msg_info ""
-  msg_info "To stop proxy: docker-compose -f ${PROXY_COMPOSE_FILE} down"
-  msg_info "To view logs: docker logs traefik_docker_local"
-  
-  exit 0
-fi
-
-# Handle export-proxy-cert command - exports CA certificate from proxy container
-if [[ "$first_non_flag_arg" == "export-proxy-cert" ]]; then
-  msg_info "Exporting OroDC Proxy CA Certificate..."
-  
-  # Check if proxy container is running
-  if ! ${DOCKER_BIN} ps --filter "name=traefik_docker_local" --format "{{.Names}}" | grep -q "traefik_docker_local"; then
-    msg_error "Traefik proxy is not running. Start it first with: orodc install-proxy"
-    exit 1
-  fi
-  
-  # Export certificate to user's home directory
-  CERT_OUTPUT_PATH="${HOME}/orodc-proxy-ca.crt"
-  
-  if ${DOCKER_BIN} cp traefik_docker_local:/certs/ca.crt "${CERT_OUTPUT_PATH}" 2>/dev/null; then
-    msg_info "CA certificate exported successfully!"
-    msg_info "Certificate location: ${CERT_OUTPUT_PATH}"
-    msg_info ""
-    msg_info "To trust this certificate, follow instructions for your OS:"
-    msg_info ""
-    msg_info "macOS:"
-    msg_info "  sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ${CERT_OUTPUT_PATH}"
-    msg_info ""
-    msg_info "Linux (Debian/Ubuntu):"
-    msg_info "  sudo cp ${CERT_OUTPUT_PATH} /usr/local/share/ca-certificates/orodc-proxy-ca.crt"
-    msg_info "  sudo update-ca-certificates"
-    msg_info ""
-    msg_info "Linux (RHEL/CentOS/Fedora):"
-    msg_info "  sudo cp ${CERT_OUTPUT_PATH} /etc/pki/ca-trust/source/anchors/orodc-proxy-ca.crt"
-    msg_info "  sudo update-ca-trust"
-    msg_info ""
-    msg_info "Windows:"
-    msg_info "  1. Open ${CERT_OUTPUT_PATH} in Notepad"
-    msg_info "  2. Copy the contents to Windows (if using WSL)"
-    msg_info "  3. Save as .crt file on Windows"
-    msg_info "  4. Double-click and install to 'Trusted Root Certification Authorities'"
-    msg_info ""
-    msg_info "For browser-specific import (Firefox, etc.), see documentation."
-  else
-    msg_error "Failed to export certificate. Is the proxy container running?"
-    exit 1
-  fi
-  
-  exit 0
-fi
 
 # Handle tests commands - unified entry point
 if [[ "$first_non_flag_arg" == "tests" ]]; then
