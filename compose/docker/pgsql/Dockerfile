@@ -4,8 +4,8 @@ FROM postgres:${PG_VERSION}
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-# Install pgpool2 if available for this PostgreSQL version
-# The script automatically detects the major version and installs the appropriate package
+# Install PostgreSQL extensions if available for this version
+# The script automatically detects the major version and installs the appropriate packages
 # hadolint ignore=DL3008
 RUN set -eux; \
     apt-get update -yqq; \
@@ -19,6 +19,14 @@ RUN set -eux; \
         echo "postgresql-${PG_MAJOR}-pgpool2 installed successfully"; \
     else \
         echo "postgresql-${PG_MAJOR}-pgpool2 not available in repository, skipping..."; \
+    fi; \
+    # Try to install pg_repack for this version
+    if apt-cache show "postgresql-${PG_MAJOR}-repack" >/dev/null 2>&1; then \
+        echo "Installing postgresql-${PG_MAJOR}-repack..."; \
+        apt-get install -yqq --no-install-recommends "postgresql-${PG_MAJOR}-repack"; \
+        echo "postgresql-${PG_MAJOR}-repack installed successfully"; \
+    else \
+        echo "postgresql-${PG_MAJOR}-repack not available in repository, skipping..."; \
     fi; \
     # Clean up
     apt-get clean; \
