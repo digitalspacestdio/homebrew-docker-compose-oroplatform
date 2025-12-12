@@ -343,6 +343,63 @@ sudo mv /tmp/root_ca.pem /etc/pki/ca-trust/source/anchors/
 sudo update-ca-trust
 ```
 
+#### Windows (Host OS for WSL2)
+
+For browsers on Windows host to trust the certificate, you need to install it into Windows certificate store:
+
+**Option 1: Using Windows Explorer (GUI)**
+
+```bash
+# From WSL2: Copy certificate to Windows accessible location
+cp /home/linuxbrew/.linuxbrew/etc/openssl/localCA/root_ca.crt /mnt/c/Users/$USER/Downloads/
+```
+
+Then on Windows:
+1. Open File Explorer → `C:\Users\YourUsername\Downloads\`
+2. Right-click `root_ca.crt` → **Install Certificate**
+3. Select **Local Machine** (requires Administrator) → **Next**
+4. Select **Place all certificates in the following store** → **Browse**
+5. Choose **Trusted Root Certification Authorities** → **OK**
+6. Click **Next** → **Finish**
+7. Accept the security warning
+8. **Restart all browsers** for changes to take effect
+
+**Option 2: Using PowerShell (Administrator)**
+
+```bash
+# From WSL2: Copy certificate to Windows temp
+cp /home/linuxbrew/.linuxbrew/etc/openssl/localCA/root_ca.crt /mnt/c/Temp/root_ca.crt
+```
+
+Then open **PowerShell as Administrator** on Windows:
+
+```powershell
+# Import certificate to Trusted Root store
+Import-Certificate -FilePath "C:\Temp\root_ca.crt" -CertStoreLocation Cert:\LocalMachine\Root
+
+# Verify installation
+Get-ChildItem -Path Cert:\LocalMachine\Root | Where-Object {$_.Subject -like "*Local Development*"}
+```
+
+**Option 3: Using certutil (Command Prompt as Administrator)**
+
+```bash
+# From WSL2: Copy certificate
+cp /home/linuxbrew/.linuxbrew/etc/openssl/localCA/root_ca.crt /mnt/c/Temp/root_ca.crt
+```
+
+Then open **Command Prompt as Administrator** on Windows:
+
+```cmd
+certutil -addstore -f "ROOT" C:\Temp\root_ca.crt
+```
+
+**Important Notes:**
+- You must install on **Windows Host** for Windows browsers (Chrome, Edge, Firefox on Windows)
+- WSL2 certificate installation (Linux steps above) only affects browsers **inside** WSL2
+- After installation, **restart all browsers** completely
+- You may need to clear browser SSL cache
+
 ### Verification
 
 After setup, verify infrastructure is working:
