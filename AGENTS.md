@@ -4,6 +4,38 @@ This document contains guidelines for AI agents working with the homebrew-docker
 
 ---
 
+# 🔴🔴🔴 **CRITICAL: "NEW BRANCH" ALWAYS MEANS FROM UPSTREAM!**
+
+## ⚡ **WHEN USER SAYS "CREATE NEW BRANCH" OR "NEW BRANCH":**
+
+**THIS ALWAYS MEANS:**
+- ✅ Sync with upstream (main repository) FIRST
+- ✅ Create branch from LATEST upstream master
+- ✅ NEVER continue existing work
+- ✅ NEVER assume current branch is correct
+
+**MANDATORY WORKFLOW:**
+```bash
+# ✅ ALWAYS DO THIS WHEN USER SAYS "NEW BRANCH":
+git fetch --all
+git checkout master
+git pull main master
+git push origin master
+git checkout -b feature/new-task-name
+```
+
+**⛔ NEVER:**
+- ❌ Continue working in current branch when user says "new branch"
+- ❌ Create branch without syncing upstream first
+- ❌ Assume user wants to continue existing work
+
+**💡 USER EXPECTATION:**
+- "New branch" = fresh start from upstream
+- "New branch" = abandon current work context
+- "New branch" = sync with latest changes first
+
+---
+
 # 🔴 **CRITICAL: NEW TASK = NEW BRANCH!**
 
 ## ⚡ **MANDATORY RULE: ALWAYS CREATE NEW BRANCH FOR NEW TASK!**
