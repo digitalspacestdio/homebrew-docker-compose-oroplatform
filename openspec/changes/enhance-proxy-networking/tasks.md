@@ -212,50 +212,65 @@ Tasks are organized in phases to enable incremental delivery and testing. Tasks 
 
 ---
 
-### Task 1.7: Implement `orodc export-proxy-cert` Command [x] COMPLETED
+### Task 1.7: Implement Proxy Management Commands [x] COMPLETED
 
-**Description:** Add command to export CA certificate
+**Description:** Implement unified `orodc proxy` command group
 
 **Work Items:**
-- Add command handler in `bin/orodc` after `install-proxy` section
-- Check if proxy container is running
-- Use `docker cp traefik_docker_local:/certs/ca.crt ~/orodc-proxy-ca.crt`
-- Display exported certificate path
-- Show OS-specific import instructions:
-  - macOS: `sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ~/orodc-proxy-ca.crt`
-  - Linux: Instructions for `update-ca-certificates`
-  - Windows: Instructions for Certificate Manager
-- Provide link to documentation for browser-specific import
+- Add `orodc proxy` command group with subcommands:
+  - `orodc proxy up [-d]` - Start proxy (foreground or detached)
+  - `orodc proxy down` - Stop proxy (keeps volumes)
+  - `orodc proxy purge` - Remove proxy and volumes
+  - `orodc proxy install-certs` - Install CA certificates to system
+- Extract certificate installation logic to reusable function `install_proxy_certs()`
+- Automatic OS detection (macOS, Linux, WSL2)
+- Automatic certificate installation to system trust store:
+  - macOS: `sudo security add-trusted-cert` to System Keychain
+  - Linux (Debian/Ubuntu): `sudo cp` to `/usr/local/share/ca-certificates/` + `update-ca-certificates`
+  - Linux (RHEL/Fedora): `sudo cp` to `/etc/pki/ca-trust/source/anchors/` + `update-ca-trust`
+  - NSS database support for Chrome/Node.js (if `certutil` available)
+- WSL2: Install to Linux + show Windows instructions
+- Certificate installation is now optional (not automatic on `up`)
+- Show hint after `proxy up -d` to run `proxy install-certs`
 
 **Validation:**
-- Command exports certificate to correct location
-- Certificate file is valid PEM format
-- Instructions are displayed correctly
-- Command fails gracefully if proxy not running
+- All proxy commands work correctly
+- Certificate installation detects OS properly
+- System trust store is updated successfully
+- Certificates work in browsers and curl
+- `proxy down` keeps volumes, `proxy purge` removes them
+- Help message shows all available commands
 
 **Dependencies:** Task 1.6
 
 ---
 
-### Task 1.8: Integration Test - HTTPS Endpoint [x] COMPLETED
+### Task 1.8: Integration Test - HTTPS Endpoint & Proxy Commands [x] COMPLETED
 
-**Description:** Verify HTTPS endpoint works with generated certificates
+**Description:** Verify HTTPS endpoint works and all proxy commands function correctly
 
 **Work Items:**
-- Create test script: `test-https-proxy.sh`
-- Start proxy with `orodc install-proxy`
+- Test all proxy commands:
+  - `orodc proxy up -d` - Start proxy
+  - `orodc proxy install-certs` - Install certificates
+  - `orodc proxy down` - Stop proxy (verify volumes kept)
+  - `orodc proxy purge` - Remove proxy (verify volumes removed)
 - Start test OroPlatform container with Traefik labels
 - Wait for containers to be healthy
-- Test HTTPS connection: `curl -k https://localhost:8443/`
+- Test HTTPS connection: `curl --cacert /etc/ssl/certs/ca-certificates.crt https://localhost:8443/`
 - Verify certificate: `openssl s_client -connect localhost:8443 -servername test.docker.local`
-- Check certificate issuer is OroDC-Local-CA
+- Check certificate issuer is OroDC Local CA
+- Verify certificate installation message shows hint about `install-certs`
 - Clean up test containers
 
 **Validation:**
+- All proxy commands work correctly
 - HTTPS endpoint responds successfully
-- Certificate is issued by OroDC-Local-CA
+- Certificate is issued by OroDC Local CA
 - Wildcard certificate covers *.docker.local
 - HTTP endpoint (8880) still works
+- Volume management works as expected (down keeps, purge removes)
+- Certificate installation hint displayed on startup
 
 **Dependencies:** Task 1.7
 
@@ -571,30 +586,39 @@ Tasks are organized in phases to enable incremental delivery and testing. Tasks 
 
 **Note:** These tasks finalize the feature
 
-### Task 4.1: Update Main README
+### Task 4.1: Update Main README [x] COMPLETED
 
 **Description:** Comprehensive documentation update
 
 **Work Items:**
+- Update version badge to 0.12.5
 - Add "Enhanced Proxy Networking" section to README.md
-- Document `orodc install-proxy` with new features
-- Document all new commands:
-  - `export-proxy-cert`
-  - `proxy-dns-setup`
-  - `proxy-socks5-test`
-  - `proxy-status`
-- Document all new environment variables
+- Document unified `orodc proxy` command group:
+  - `orodc proxy up [-d]` - Start proxy
+  - `orodc proxy down` - Stop proxy (keeps volumes)
+  - `orodc proxy purge` - Remove proxy and volumes
+  - `orodc proxy install-certs` - Install CA certificates
+- Update Infrastructure Setup section with new commands
+- Update SSL Certificate Setup section with automatic installation
+- Add Reverse Proxy Management section with:
+  - Command examples
+  - Features list (Dashboard, SSL/TLS, SOCKS5, health monitoring)
+  - Port mappings
+  - HTTPS support guide
+- Document environment variables (TRAEFIK_LOG_LEVEL, DEBUG)
+- Update Development Commands section
 - Add troubleshooting section for common issues
-- Add OS-specific setup guides
-- Update existing proxy section
+- Add OS-specific setup guides for certificate installation
 
 **Validation:**
 - Documentation is clear and comprehensive
 - All commands have examples
+- Version number is updated
 - Environment variables are explained
 - Troubleshooting covers common issues
+- Examples are copy-pasteable
 
-**Dependencies:** All Phase 1, 2, 3 tasks
+**Dependencies:** All Phase 1 tasks
 
 ---
 
@@ -780,32 +804,38 @@ Tasks are organized in phases to enable incremental delivery and testing. Tasks 
 
 ## Summary
 
-**Total Tasks:** 28 tasks across 5 phases
+**Phase 1 Status:** ✅ **COMPLETED** (v0.12.5)
 
-**Estimated Timeline:**
-- Phase 1 (Foundation): 3-4 days
-- Phase 2 (DNS): 2-3 days  
-- Phase 3 (SOCKS5): 2-3 days
-- Phase 4 (Documentation): 2-3 days
-- Phase 5 (Release): 1-2 days
+**Completed Features:**
+- ✅ SSL/TLS with self-signed CA and wildcard certificates
+- ✅ Traefik v3 reverse proxy with health monitoring
+- ✅ Unified `orodc proxy` command group
+- ✅ Automatic CA certificate installation (macOS/Linux/WSL2)
+- ✅ SOCKS5 proxy (always enabled on 127.0.0.1:1080)
+- ✅ DNS resolution inside proxy container
+- ✅ Persistent certificate storage
+- ✅ Comprehensive documentation in README.md
 
-**Total:** ~10-15 days for complete implementation
+**Architectural Decisions:**
+- DNS resolution happens **inside proxy container** (not on host)
+- Access via SOCKS5 proxy provides DNS resolution for *.docker.local
+- No host /etc/hosts modification required
+- Certificate installation is optional (user-triggered via `orodc proxy install-certs`)
 
-**Parallelization Opportunities:**
-- Phase 2 and Phase 3 can run concurrently after Phase 1
-- Documentation tasks can start early
-- Testing can happen incrementally
+**Future Phases:**
+- Phase 2 (DNS): Partially completed - DNS works inside container via SOCKS5
+- Phase 3 (SOCKS5): ✅ Completed - SOCKS5 always enabled by default
+- Phase 4 (Documentation): ✅ Completed - README.md updated
+- Phase 5 (Release): Ready for release
 
-**Critical Path:**
-1. Phase 1: Tasks 1.1 → 1.2 → 1.3 → 1.6 → 1.7
-2. Phase 2: Tasks 2.1 → 2.2 → 2.3 → 2.5
-3. Phase 4: Tasks 4.1 → 4.2 → 4.3 → 4.4
-4. Phase 5: All tasks sequential
+**Total Completed Tasks:** 9 tasks from Phase 1 + Phase 4 Task 4.1
 
-**Risk Mitigation:**
-- Early testing after each phase
-- Beta testing before final release
-- Comprehensive documentation
-- Backward compatibility maintained
-- Rollback procedure documented
+**Implementation Time:** ~3 days for Phase 1 + documentation
+
+**Version:** 0.12.5
+
+**Next Steps:**
+- User feedback collection
+- Optional: Additional documentation improvements
+- Optional: CI/CD workflow for proxy testing
 

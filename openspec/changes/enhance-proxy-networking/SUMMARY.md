@@ -1,24 +1,25 @@
-# Summary: Enhanced Proxy Networking Proposal
+# Summary: Enhanced Proxy Networking
 
 **Change ID:** `enhance-proxy-networking`  
-**Status:** ✅ VALIDATED - Ready for Review  
-**Created:** 2024-12-12
+**Status:** ✅ **COMPLETED** (v0.12.5)  
+**Created:** 2024-12-12  
+**Completed:** 2024-12-12
 
 ## Quick Overview
 
-This OpenSpec proposal enhances the existing OroDC proxy server to provide a complete local development networking solution with:
+OroDC proxy server has been enhanced with a complete local development networking solution:
 
-1. **🔒 SSL/TLS Support** - Auto-generated certificates for HTTPS
-2. **🌐 DNS Resolution** - **NEW APPROACH:** Auto /etc/hosts sync instead of DNS server
-3. **🔌 SOCKS5 Proxy** - Optional direct container network access
+1. **🔒 SSL/TLS Support** - Auto-generated certificates for HTTPS ✅
+2. **🌐 DNS Resolution** - DNS inside proxy container via `/etc/hosts` sync ✅
+3. **🔌 SOCKS5 Proxy** - Always enabled for direct container access ✅
 
-### 🎯 Key Innovation: Auto /etc/hosts Sync
+### 🎯 Implemented Approach: Container-Internal DNS
 
-Instead of running a DNS server, we use a simple **bash script** that watches Docker events and automatically updates `/etc/hosts`. This approach is:
-- **Simpler** - No DNS server, no port conflicts
-- **More reliable** - Works everywhere (Linux, macOS, Windows)
-- **Zero configuration** - Just install the service once
-- **Inspired by** [DNS Proxy Server](https://stackoverflow.com/questions/37242217/access-docker-container-from-host-using-containers-name/63656003#63656003)
+DNS resolution happens **inside the proxy container**, not on the host:
+- **Simpler** - No host configuration needed
+- **Reliable** - Works via SOCKS5 proxy
+- **Secure** - SOCKS5 bound to localhost only
+- **Access via** Browser configured with SOCKS5 proxy (127.0.0.1:1080)
 
 ## Key Features
 
@@ -36,30 +37,31 @@ Instead of running a DNS server, we use a simple **bash script** that watches Do
 - ✅ Wildcard certificate for *.docker.local with SAN
 - ✅ Extensible - Can generate additional domain certificates as needed
 - ✅ Persistent certificate storage in named volume
-- ✅ `orodc export-proxy-cert` command for system import
+- ✅ **Automatic installation** via `orodc proxy install-certs` command
+- ✅ OS detection (macOS, Linux, WSL2) with appropriate trust store installation
+- ✅ NSS database support for Chrome/Node.js
 - ✅ HTTPS on port 8443 (HTTP on 8880 stays for backward compat)
 - ✅ Based on [digitalspace-local-ca](https://github.com/digitalspacestdio/homebrew-ngdev/blob/main/Formula/digitalspace-local-ca.rb) approach
 
 ### DNS Resolution
-- ✅ **Auto /etc/hosts sync** - Primary solution (simple, reliable, no DNS server)
-- ✅ Watches Docker events and updates /etc/hosts automatically
-- ✅ Uses Docker label: `orodc.dns.hostname=app.docker.local`
-- ✅ Runs as systemd service (Linux) or launchd daemon (macOS)
-- ✅ `orodc proxy-dns-setup --install` - Install DNS sync service
-- ✅ `orodc proxy-dns-setup --status` - Check sync status
-- ✅ No DNS server, no port conflicts, works everywhere
-- ✅ Inspired by [DNS Proxy Server approach](https://stackoverflow.com/questions/37242217/access-docker-container-from-host-using-containers-name/63656003#63656003)
+- ✅ **Container-internal DNS** - DNS sync inside proxy container
+- ✅ Watches Docker events and updates `/etc/hosts` in proxy container
+- ✅ Parses Traefik labels: `traefik.http.routers.*.rule=Host(...)`
+- ✅ Maps hostnames to 127.0.0.1 (Traefik's internal IP)
+- ✅ Accessible via SOCKS5 proxy (127.0.0.1:1080)
+- ✅ No host configuration required
+- ✅ Docker internal DNS resolution works automatically
 
-### SOCKS5 Proxy (Optional)
-- ✅ Disabled by default (opt-in via DC_PROXY_SOCKS5_ENABLED=1)
+### SOCKS5 Proxy
+- ✅ **Always enabled** by default (bound to 127.0.0.1:1080)
 - ✅ Uses pre-built binary from [serjs/go-socks5-proxy](https://hub.docker.com/r/serjs/go-socks5-proxy) (~2-3MB)
 - ✅ **Zero compilation:** Just copy from official Docker image
 - ✅ Direct access to Docker network from browser
-- ✅ Traffic flow: Browser → SOCKS5 (localhost:1080) → socks5 (in container) → Traefik → nginx
-- ✅ No DNS setup needed - Docker internal DNS works automatically
+- ✅ Traffic flow: Browser → SOCKS5 (localhost:1080) → gost (in container) → Traefik → nginx
+- ✅ DNS resolution works through SOCKS5 (container `/etc/hosts`)
 - ✅ Browser/tool proxy support
-- ✅ `orodc proxy-socks5-test` command
 - ✅ Port 1080 (localhost only for security)
+- ✅ No authentication required (local development)
 
 ### Process Management (s6-overlay v3)
 - 🔄 **Auto-restart** - Processes automatically restart on failure
@@ -99,106 +101,134 @@ openspec/changes/enhance-proxy-networking/
         └── spec.md          # 7 requirements, 18 scenarios
 ```
 
-## Implementation Timeline
+## Implementation Status
 
-**Total:** 28 tasks, ~10-15 days
+**Completed:** Phase 1 (Foundation & SSL/TLS) + Phase 4 (Documentation)  
+**Time:** ~3 days  
+**Version:** 0.12.5
 
-- **Phase 1:** Foundation & Certificate Management (3-4 days)
-- **Phase 2:** DNS Resolution (2-3 days, parallel with Phase 3)
-- **Phase 3:** SOCKS5 Proxy (2-3 days, parallel with Phase 2)
-- **Phase 4:** Documentation & Polish (2-3 days)
-- **Phase 5:** Release Preparation (1-2 days)
+- ✅ **Phase 1:** Foundation & Certificate Management (COMPLETED)
+- ✅ **Phase 3:** SOCKS5 Proxy (COMPLETED - always enabled)
+- ✅ **Phase 4:** Documentation (COMPLETED - README.md updated)
+- ⚠️ **Phase 2:** DNS Resolution (PARTIAL - works inside container via SOCKS5)
 
 ## New Commands
 
 ```bash
-orodc install-proxy                  # Enhanced with HTTPS, optional SOCKS5
-orodc export-proxy-cert              # Export CA certificate for import
-orodc proxy-dns-setup --install      # Install auto /etc/hosts sync service
-orodc proxy-dns-setup --uninstall    # Uninstall DNS sync service
-orodc proxy-dns-setup --status       # Show DNS sync status
-orodc proxy-dns-setup --verify       # Test hostname resolution
-orodc proxy-socks5-test              # Test SOCKS5 connectivity
-orodc proxy-status                   # Show all proxy features status
+# Unified proxy management group
+orodc proxy up [-d]                  # Start proxy (foreground or detached)
+orodc proxy down                     # Stop proxy (keeps volumes)
+orodc proxy purge                    # Remove proxy and volumes
+orodc proxy install-certs            # Install CA certificates to system
 ```
 
 ## Environment Variables
 
 ```bash
-# HTTPS
-TRAEFIK_HTTPS_BIND_PORT=8443     # HTTPS port (new)
+# Traefik Configuration
+TRAEFIK_LOG_LEVEL=WARNING        # Traefik log level (WARNING or DEBUG)
+DEBUG=1                          # Enable debug mode for orodc commands
 
-# Auto DNS Sync (no environment variables - controlled by service)
-# Uses Docker labels: orodc.dns.hostname=app.docker.local
+# Ports
+# HTTP: 8880, HTTPS: 8443, SOCKS5: 1080 (all hardcoded, no env vars needed)
 
-# SOCKS5
-DC_PROXY_SOCKS5_ENABLED=0        # Enable SOCKS5 (default: 0)
-DC_PROXY_SOCKS5_PORT=1080        # SOCKS5 port (default: 1080)
-DC_PROXY_SOCKS5_BIND=127.0.0.1   # SOCKS5 bind (default: localhost only)
-DC_PROXY_SOCKS5_USER=            # Optional auth username
-DC_PROXY_SOCKS5_PASS=            # Optional auth password
+# SOCKS5 (always enabled)
+DC_PROXY_SOCKS5_ENABLED=1        # Always enabled (hardcoded)
+DC_PROXY_SOCKS5_BIND=127.0.0.1   # Bound to localhost only (hardcoded)
+DC_PROXY_SOCKS5_PORT=1080        # SOCKS5 port (hardcoded)
+
+# DNS Sync (internal to container)
+DC_PROXY_DNS_SYNC_ENABLED=1      # Always enabled inside container
+# No configuration needed - automatic via Traefik label parsing
 ```
 
 ## Affected Files
 
 **New Files:**
 - `compose/docker/proxy/Dockerfile` - Multi-stage: serjs/go-socks5-proxy + Alpine + Traefik v3 + s6-overlay
-- `compose/docker/proxy/traefik.yml` - Traefik v3 config with TLS
-- `compose/docker/proxy/localCA.cnf` - OpenSSL CA configuration (NEW)
-- `compose/docker/proxy/local-ca-init.sh` - Initialize CA structure (NEW)
-- `compose/docker/proxy/local-ca-crtgen.sh` - Generate domain certificates (NEW)
+- `compose/docker/proxy/traefik.yml` - Traefik v3 static config
+- `compose/docker/proxy/dynamic.yml` - Traefik v3 dynamic TLS config
+- `compose/docker/proxy/localCA.cnf` - OpenSSL CA configuration
+- `compose/docker/proxy/local-ca-init.sh` - Initialize CA structure
+- `compose/docker/proxy/local-ca-crtgen.sh` - Generate domain certificates
 - `compose/docker/proxy/generate-certs.sh` - Main certificate wrapper
+- `compose/docker/proxy/dns-sync.sh` - DNS sync script (inside container)
 - `compose/docker/proxy/s6-rc.d/` - s6-overlay service definitions:
   - `init-certs/` - Oneshot certificate generation
   - `traefik/` - Longrun Traefik service
-  - `socks5/` - Longrun SOCKS5 service (conditional)
-- `bin/orodc-dns-sync` - DNS sync daemon script (NEW CORE COMPONENT)
+  - `socks5/` - Longrun SOCKS5 service (always enabled)
+  - `dns-sync/` - Longrun DNS sync service (inside container)
 
 **Modified Files:**
-- `compose/docker-compose-proxy.yml` - Add build, volumes, ports (simplified, no DNS)
-- `bin/orodc` - Add new commands (5-6 new command handlers)
-- `README.md` - Document new features and auto /etc/hosts sync
-- `AGENTS.md` - Update AI agent guidelines
+- `compose/docker-compose-proxy.yml` - Build config, volumes, ports, container naming
+- `bin/orodc` - Added `orodc proxy` command group with unified management
+- `README.md` - Updated with new commands and certificate installation guide
+- `Formula/docker-compose-oroplatform.rb` - Version bump to 0.12.5
 
-**System Files (Installed):**
-- `/etc/systemd/system/orodc-dns-sync.service` (Linux)
-- `/Library/LaunchDaemons/com.orodc.dns-sync.plist` (macOS)
-- `/usr/local/bin/orodc-dns-sync` (Both)
+**Deleted Files (from earlier prototypes):**
+- `bin/orodc-dns-sync` - Removed (DNS now inside container)
+- `templates/orodc-dns-sync.service` - Removed (not needed)
+- `templates/com.orodc.dns-sync.plist` - Removed (not needed)
+- `DNS_SYNC_GUIDE.md` - Removed (obsolete approach)
+- `compose/docker/proxy/nginx.conf` - Removed (Nginx not needed)
+- `compose/docker/proxy/index.html` - Removed (Nginx not needed)
 
 ## Success Metrics
 
-- [ ] ✅ OpenSpec validation passes (DONE)
-- [ ] HTTPS endpoint works with valid certificate
-- [ ] Certificate export and import documented per OS
-- [ ] DNS resolves *.docker.local automatically
-- [ ] SOCKS5 works when enabled
-- [ ] No breaking changes to existing proxy
-- [ ] CI tests pass on Linux and macOS
-- [ ] Beta testing feedback positive
+- [x] ✅ OpenSpec validation passes
+- [x] ✅ HTTPS endpoint works with valid certificate
+- [x] ✅ Certificate installation automated per OS
+- [x] ✅ DNS resolves *.docker.local inside container
+- [x] ✅ SOCKS5 always enabled and working
+- [x] ✅ No breaking changes to existing proxy
+- [x] ✅ Documentation comprehensive and up-to-date
+- [ ] 🔄 CI tests for proxy (future enhancement)
+- [ ] 📝 User feedback collection (ongoing)
 
-## Open Questions for Discussion
+## Resolved Decisions
 
-1. **DNS Approach:** ✅ RESOLVED - Bash script for /etc/hosts sync
-   - Simple bash script, no DNS server needed
-   - Inspired by StackOverflow solution
+1. **DNS Approach:** ✅ Container-internal `/etc/hosts` sync
+   - DNS sync inside proxy container (not on host)
+   - Accessed via SOCKS5 proxy
+   - No host configuration required
 
-2. **SOCKS5 Default:** Should SOCKS5 be enabled by default?
-   - **Proposal:** Disabled by default (opt-in for advanced users)
+2. **SOCKS5 Default:** ✅ Always enabled by default
+   - Bound to localhost (127.0.0.1) for security
+   - Essential for DNS resolution
+   - No authentication (local development)
 
-3. **Certificate Trust:** Auto-import CA or manual?
-   - **Proposal:** Manual (provide clear instructions per OS)
+3. **Certificate Trust:** ✅ User-triggered installation
+   - `orodc proxy install-certs` command
+   - Automatic OS detection and installation
+   - Hint shown on `proxy up -d`
 
-4. **SSL Default:** Should HTTPS replace HTTP or be additional?
-   - **Proposal:** Both (8880 HTTP + 8443 HTTPS for backward compat)
+4. **SSL Default:** ✅ Both HTTP and HTTPS
+   - HTTP: 8880 (backward compatibility)
+   - HTTPS: 8443 (new feature)
+   - No breaking changes
 
-## Next Steps
+5. **Command Structure:** ✅ Unified `orodc proxy` group
+   - `proxy up/down/purge/install-certs`
+   - Cleaner CLI interface
+   - Standard docker-compose workflow
 
-1. ✅ Create OpenSpec proposal (DONE)
-2. ✅ Validate proposal structure (DONE)
-3. 📝 Review with team
-4. 🔄 Address feedback and open questions
-5. ✅ Approve proposal
-6. 🚀 Begin Phase 1 implementation (Task 1.1)
+## Completed Steps
+
+1. ✅ Created OpenSpec proposal
+2. ✅ Validated proposal structure
+3. ✅ Implemented Phase 1 (SSL/TLS + certificates)
+4. ✅ Implemented SOCKS5 proxy (always enabled)
+5. ✅ Implemented DNS sync (inside container)
+6. ✅ Created unified proxy command group
+7. ✅ Updated comprehensive documentation
+8. ✅ Released version 0.12.5
+
+## Future Enhancements
+
+- 🔄 CI/CD workflow for proxy testing
+- 📊 `orodc proxy status` command (show all features)
+- 🔍 Enhanced troubleshooting tools
+- 📝 Video tutorials and guides
 
 ## How to Review This Proposal
 

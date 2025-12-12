@@ -4,7 +4,7 @@
 
 **Modern CLI tool to run ORO applications locally or on a server.** Designed specifically for local development environments with enterprise-grade performance and developer experience.
 
-[![Version](https://img.shields.io/badge/Version-0.9.0-brightgreen.svg)](https://github.com/digitalspacestdio/homebrew-docker-compose-oroplatform/releases)
+[![Version](https://img.shields.io/badge/Version-0.12.5-brightgreen.svg)](https://github.com/digitalspacestdio/homebrew-docker-compose-oroplatform/releases)
 [![Homebrew](https://img.shields.io/badge/Homebrew-Available-orange.svg)](https://brew.sh/)
 [![Docker](https://img.shields.io/badge/Docker-Required-blue.svg)](https://www.docker.com/)
 [![macOS](https://img.shields.io/badge/macOS-Supported-green.svg)](https://www.apple.com/macos/)
@@ -247,14 +247,20 @@ This creates a configuration that proxies `*.docker.local` requests from host Tr
 
 **3. Start Traefik inside Docker:**
 
-Use the built-in OroDC command to install Traefik proxy:
+Use the built-in OroDC command to manage Traefik proxy:
 
 ```bash
-# Install Traefik with default settings (WARNING log level)
-orodc install-proxy
+# Start Traefik proxy (detached mode)
+orodc proxy up -d
 
-# Or with DEBUG logging
-DEBUG=1 orodc install-proxy
+# Install CA certificates to system trust store (optional)
+orodc proxy install-certs
+
+# Stop proxy (keeps volumes)
+orodc proxy down
+
+# Remove proxy and volumes
+orodc proxy purge
 ```
 
 **Configuration:** See [docker-compose-proxy.yml](compose/docker-compose-proxy.yml) in the repository for the complete Traefik configuration.
@@ -263,16 +269,36 @@ DEBUG=1 orodc install-proxy
 
 ### SSL Certificate Setup
 
-Install the self-signed root certificate to avoid browser security warnings:
+Install the self-signed root certificate to avoid browser security warnings.
 
-#### macOS
+#### 🚀 Automatic Installation (Recommended for Docker Proxy)
+
+If you're using OroDC's built-in Traefik proxy (`orodc proxy up -d`), use the automatic installer:
+
+```bash
+# Start proxy and install certificates automatically
+orodc proxy up -d
+orodc proxy install-certs
+```
+
+This command automatically:
+- ✅ Detects your OS (macOS, Linux, WSL2)
+- ✅ Installs CA certificate to system trust store
+- ✅ Configures NSS database for Chrome/Node.js (if certutil available)
+- ✅ Provides Windows instructions for WSL2 users
+
+#### 📋 Manual Installation (For Traefik on Host)
+
+If you're using `digitalspace-traefik` on the host system:
+
+##### macOS
 
 ```bash
 sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain \
   $(brew --prefix)/etc/openssl/localCA/root_ca.crt
 ```
 
-#### Linux (Debian/Ubuntu/WSL2)
+##### Linux (Debian/Ubuntu/WSL2)
 
 ```bash
 # Install certificate
@@ -288,7 +314,7 @@ certutil -d sql:$HOME/.pki/nssdb -A -t "C,," -n "Local Development" \
   -i $(brew --prefix)/etc/openssl/localCA/root_ca.crt
 ```
 
-#### Linux (Fedora/RHEL/WSL2)
+##### Linux (Fedora/RHEL/WSL2)
 
 ```bash
 # Convert to PEM
@@ -300,14 +326,14 @@ sudo mv /tmp/root_ca.pem /etc/pki/ca-trust/source/anchors/
 sudo update-ca-trust
 ```
 
-#### Windows (Host OS for WSL2)
+##### Windows (Host OS for WSL2)
 
-For browsers on Windows host to trust the certificate, you need to install it into Windows certificate store:
+For browsers on Windows host to trust the certificate:
 
 **Option 1: Using Windows Explorer (GUI)**
 
 ```bash
-# From WSL2: Copy certificate to Windows accessible location
+# From WSL2: Copy certificate to Windows
 cp /home/linuxbrew/.linuxbrew/etc/openssl/localCA/root_ca.crt /mnt/c/Users/$USER/Downloads/
 ```
 
@@ -338,24 +364,10 @@ Import-Certificate -FilePath "C:\Temp\root_ca.crt" -CertStoreLocation Cert:\Loca
 Get-ChildItem -Path Cert:\LocalMachine\Root | Where-Object {$_.Subject -like "*Local Development*"}
 ```
 
-**Option 3: Using certutil (Command Prompt as Administrator)**
-
-```bash
-# From WSL2: Copy certificate
-cp /home/linuxbrew/.linuxbrew/etc/openssl/localCA/root_ca.crt /mnt/c/Temp/root_ca.crt
-```
-
-Then open **Command Prompt as Administrator** on Windows:
-
-```cmd
-certutil -addstore -f "ROOT" C:\Temp\root_ca.crt
-```
-
 **Important Notes:**
-- You must install on **Windows Host** for Windows browsers (Chrome, Edge, Firefox on Windows)
-- WSL2 certificate installation (Linux steps above) only affects browsers **inside** WSL2
+- You must install on **Windows Host** for Windows browsers
+- WSL2 certificate installation only affects browsers **inside** WSL2
 - After installation, **restart all browsers** completely
-- You may need to clear browser SSL cache
 
 ### Verification
 
@@ -563,27 +575,61 @@ orodc database-cli                   # Direct database access
 orodc ssh                           # SSH into container
 
 # Proxy management
-orodc install-proxy                  # Install Traefik reverse proxy in Docker
+orodc proxy up -d                    # Start Traefik reverse proxy
+orodc proxy install-certs            # Install CA certificates to system
+orodc proxy down                     # Stop proxy (keeps volumes)
+orodc proxy purge                    # Remove proxy and volumes
 ```
 
 ### 🔌 Reverse Proxy Management
 
-OroDC includes a built-in command to install Traefik reverse proxy inside Docker. This is useful for **macOS** and **WSL2 + Docker Desktop** users (where Docker runs in a VM).
+OroDC includes built-in commands to manage Traefik reverse proxy inside Docker. This is useful for **macOS** and **WSL2 + Docker Desktop** users (where Docker runs in a VM).
 
-**Install Traefik Proxy:**
+**Proxy Commands:**
 
 ```bash
-# Install with default settings (WARNING log level)
-orodc install-proxy
+# Start Traefik proxy
+orodc proxy up -d                    # Start in detached mode
+orodc proxy up                       # Start with logs (foreground)
 
-# Install with DEBUG logging
-DEBUG=1 orodc install-proxy
+# Install CA certificates (optional, for HTTPS)
+orodc proxy install-certs            # Auto-installs to system trust store
+
+# Stop proxy
+orodc proxy down                     # Stop proxy (keeps volumes)
+
+# Remove proxy completely
+orodc proxy purge                    # Remove proxy and all volumes
+
+# With DEBUG logging
+DEBUG=1 orodc proxy up -d
 ```
 
 **Features:**
-- Dashboard: <http://localhost:8880/traefik/dashboard/>
-- Auto-routes all `*.docker.local` domains to OroDC containers
-- Built-in health monitoring
+- 🎯 Dashboard: <http://localhost:8880/traefik/dashboard/>
+- 🌐 Auto-routes all `*.docker.local` domains to OroDC containers
+- 🔒 Built-in SSL/TLS with self-signed certificates
+- 🧪 SOCKS5 proxy on `127.0.0.1:1080` for direct container access
+- 💾 Persistent certificate storage in Docker volumes
+- 🏥 Built-in health monitoring
+
+**Ports:**
+- HTTP: `8880` (host) → `80` (proxy)
+- HTTPS: `8443` (host) → `443` (proxy)
+- SOCKS5: `1080` (localhost only)
+
+**HTTPS Support:**
+After starting the proxy, install CA certificates to avoid browser warnings:
+
+```bash
+orodc proxy install-certs
+```
+
+This automatically:
+- Exports CA certificate from proxy container
+- Installs to system trust store (macOS/Linux/WSL2)
+- Configures NSS database for Chrome/Node.js
+- Provides Windows installation instructions (for WSL2)
 
 **Configuration:** See [docker-compose-proxy.yml](compose/docker-compose-proxy.yml) for complete Traefik configuration.
 
