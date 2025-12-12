@@ -1,11 +1,11 @@
 services:
-  traefik_docker_local:
-    hostname: traefik.docker.local
+  proxy:
+    hostname: proxy.docker.local
     build:
       context: ./docker/proxy
       args:
         TARGETARCH: ${TARGETARCH:-amd64}
-    container_name: traefik_docker_local
+    container_name: proxy.docker.local
     restart: always
     logging:
       driver: "json-file"
@@ -42,8 +42,8 @@ services:
       traefik.http.routers.traefik-api-path.middlewares: "traefik-api-stripprefix"
       traefik.http.middlewares.traefik-api-stripprefix.stripprefix.prefixes: "/traefik"
       
-      # Dashboard access via Host (for traefik.docker.local or traefik_docker_local via SOCKS5)
-      traefik.http.routers.traefik-api-host.rule: 'Host(`traefik.docker.local`) || Host(`traefik_docker_local`)'
+      # Dashboard access via Host (for proxy.docker.local via SOCKS5)
+      traefik.http.routers.traefik-api-host.rule: 'Host(`proxy.docker.local`)'
       traefik.http.routers.traefik-api-host.priority: 8000
       traefik.http.routers.traefik-api-host.entrypoints: "http"
       traefik.http.routers.traefik-api-host.service: "api@internal"
@@ -56,14 +56,14 @@ services:
       traefik.http.routers.traefik-api-path-https.middlewares: "traefik-api-stripprefix"
       traefik.http.routers.traefik-api-path-https.tls: "true"
       
-      traefik.http.routers.traefik-api-host-https.rule: 'Host(`traefik.docker.local`) || Host(`traefik_docker_local`)'
+      traefik.http.routers.traefik-api-host-https.rule: 'Host(`proxy.docker.local`)'
       traefik.http.routers.traefik-api-host-https.priority: 8000
       traefik.http.routers.traefik-api-host-https.entrypoints: "https"
       traefik.http.routers.traefik-api-host-https.service: "api@internal"
       traefik.http.routers.traefik-api-host-https.tls: "true"
       
       # DNS sync (auto-updates /etc/hosts inside proxy container)
-      orodc.dns.hostname: 'traefik.docker.local'
+      orodc.dns.hostname: 'proxy.docker.local'
     healthcheck:
       test: traefik healthcheck --ping
       start_period: 5s

@@ -40,8 +40,8 @@ update_hosts() {
             
             container_name=$(docker inspect -f "{{.Name}}" "$container_id" 2>/dev/null | sed 's/^\///' || echo "")
             
-            # Skip self (traefik_docker_local container)
-            if [[ "$container_name" == "traefik_docker_local" ]]; then
+            # Skip self (proxy.docker.local container)
+            if [[ "$container_name" == "proxy.docker.local" ]]; then
                 continue
             fi
             
