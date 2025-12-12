@@ -92,9 +92,11 @@ update_hosts() {
     fi
     
     # Build entries from deduplicated map
+    # Inside proxy container, all hostnames should resolve to 127.0.0.1 (Traefik)
+    # so both HTTP and HTTPS work through Traefik
     local entries=""
     for hostname in "${!host_map[@]}"; do
-        entries+="${host_map[$hostname]} ${hostname}"$'\n'
+        entries+="127.0.0.1 ${hostname}"$'\n'
     done
     
     # Update /etc/hosts
