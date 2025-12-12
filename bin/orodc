@@ -303,7 +303,7 @@ if [[ -z "$temp_first_non_flag_arg" && $# -gt 0 ]]; then
 fi
 
 # Handle proxy commands early - they don't require project initialization
-if [[ "$temp_first_non_flag_arg" == "install-proxy" ]] || [[ "$temp_first_non_flag_arg" == "export-proxy-cert" ]]; then
+if [[ "$temp_first_non_flag_arg" == "proxy" ]]; then
   # Initialize minimal dependencies for proxy commands
   DOCKER_BIN=$(resolve_bin "docker" "Docker is required. Install from https://docs.docker.com/get-docker/")
   DOCKER_COMPOSE_BIN="$DOCKER_BIN compose"
@@ -316,51 +316,28 @@ if [[ "$temp_first_non_flag_arg" == "install-proxy" ]] || [[ "$temp_first_non_fl
     DC_ORO_COMPOSE_DIR="/home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform/compose"
   fi
   
-  # Handle install-proxy command
-  if [[ "$temp_first_non_flag_arg" == "install-proxy" ]]; then
-    msg_info "Installing Traefik reverse proxy in Docker..."
+  PROXY_COMPOSE_FILE="${DC_ORO_COMPOSE_DIR}/docker-compose-proxy.yml"
+  
+  if [[ ! -f "$PROXY_COMPOSE_FILE" ]]; then
+    msg_error "Proxy compose file not found: $PROXY_COMPOSE_FILE"
+    exit 1
+  fi
+  
+  # Get proxy subcommand
+  PROXY_CMD="${2:-}"
+  shift 2 2>/dev/null || shift 1 2>/dev/null || true
+  
+  # Function to install CA certificates
+  install_proxy_certs() {
+    msg_info "Installing CA certificate to system trust store..."
     
-    # Create shared network if it doesn't exist
-    if ! ${DOCKER_BIN} network inspect dc_shared_net >/dev/null 2>&1; then
-      msg_info "Creating dc_shared_net network..."
-      ${DOCKER_BIN} network create dc_shared_net || {
-        msg_error "Failed to create dc_shared_net network"
-        exit 1
-      }
-    fi
-    
-    # Check if Traefik container is already running
-    if ${DOCKER_BIN} ps --filter "name=proxy" --format "{{.Names}}" | grep -q "^proxy$"; then
-      msg_info "Traefik proxy is already running"
-      ${DOCKER_BIN} ps --filter "name=proxy" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-      exit 0
-    fi
-    
-    # Use docker-compose-proxy.yml to start Traefik
-    PROXY_COMPOSE_FILE="${DC_ORO_COMPOSE_DIR}/docker-compose-proxy.yml"
-    
-    if [[ ! -f "$PROXY_COMPOSE_FILE" ]]; then
-      msg_error "Proxy compose file not found: $PROXY_COMPOSE_FILE"
+    # Check if proxy container is running
+    if ! ${DOCKER_BIN} ps --filter "name=proxy" --format "{{.Names}}" | grep -q "^proxy$"; then
+      msg_error "Proxy container is not running. Start it first with: orodc proxy up -d"
       exit 1
     fi
     
-    # Set log level based on DEBUG environment variable
-    if [[ "${DEBUG:-}" == "1" ]]; then
-      export TRAEFIK_LOG_LEVEL="DEBUG"
-      msg_info "Starting Traefik proxy container (DEBUG mode)..."
-    else
-      export TRAEFIK_LOG_LEVEL="WARNING"
-      msg_info "Starting Traefik proxy container..."
-    fi
-    
-    ${DOCKER_COMPOSE_BIN} -f "$PROXY_COMPOSE_FILE" up -d || {
-      msg_error "Failed to start Traefik proxy"
-      exit 1
-    }
-    
-    msg_info "Traefik proxy started successfully!"
-    
-    # Wait for proxy to be healthy
+    # Wait for container to be healthy
     msg_info "Waiting for proxy container to be healthy..."
     for i in {1..30}; do
       if ${DOCKER_BIN} ps --filter "name=proxy" --filter "health=healthy" --format "{{.Names}}" | grep -q "^proxy$"; then
@@ -369,190 +346,209 @@ if [[ "$temp_first_non_flag_arg" == "install-proxy" ]] || [[ "$temp_first_non_fl
       sleep 1
     done
     
-    # Export and install CA certificate
-    msg_info "Installing CA certificate to system trust store..."
-    
     INSTALL_DATE=$(date +%Y%m%d_%H%M%S)
     CERT_OUTPUT_PATH="${HOME}/root_ca_docker_local_${INSTALL_DATE}.crt"
     
     # Export certificate content (not symlink)
     ${DOCKER_BIN} exec proxy cat /certs/ca.crt > "${CERT_OUTPUT_PATH}" 2>/dev/null
     
-    if [[ -f "${CERT_OUTPUT_PATH}" ]] && [[ -s "${CERT_OUTPUT_PATH}" ]]; then
-      msg_info "CA certificate exported to: ${CERT_OUTPUT_PATH}"
-      
-      # Detect OS
-      IS_WSL=false
-      if grep -qi microsoft /proc/version 2>/dev/null || grep -qi wsl /proc/version 2>/dev/null; then
-        IS_WSL=true
+    if [[ ! -f "${CERT_OUTPUT_PATH}" ]] || [[ ! -s "${CERT_OUTPUT_PATH}" ]]; then
+      msg_error "Failed to export certificate from proxy container"
+      exit 1
+    fi
+    
+    msg_info "CA certificate exported to: ${CERT_OUTPUT_PATH}"
+    
+    # Detect OS
+    IS_WSL=false
+    if grep -qi microsoft /proc/version 2>/dev/null || grep -qi wsl /proc/version 2>/dev/null; then
+      IS_WSL=true
+    fi
+    
+    # Install certificate based on OS
+    if [[ "$OSTYPE" == "darwin"* ]]; then
+      # macOS
+      msg_info "Installing certificate to macOS System Keychain..."
+      if sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "${CERT_OUTPUT_PATH}" 2>/dev/null; then
+        msg_ok "Certificate installed to macOS System Keychain"
+        rm -f "${CERT_OUTPUT_PATH}"
+      else
+        msg_warning "Failed to install certificate automatically. Manual installation required:"
+        msg_info "  sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ${CERT_OUTPUT_PATH}"
       fi
       
-      # Install certificate based on OS
-      if [[ "$OSTYPE" == "darwin"* ]]; then
-        # macOS
-        msg_info "Installing certificate to macOS System Keychain..."
-        if sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "${CERT_OUTPUT_PATH}" 2>/dev/null; then
-          msg_ok "Certificate installed to macOS System Keychain"
+    elif [[ "$IS_WSL" == "true" ]]; then
+      # WSL2 - install to Linux and show Windows instructions
+      msg_info "Installing certificate to Linux (WSL)..."
+      
+      if [[ -f "/etc/debian_version" ]]; then
+        # Debian/Ubuntu
+        sudo cp "${CERT_OUTPUT_PATH}" /usr/local/share/ca-certificates/ 2>/dev/null && \
+        sudo update-ca-certificates 2>/dev/null && \
+        msg_ok "Certificate installed to Linux trust store"
+      fi
+      
+      # NSS database for Chrome/Node.js
+      if command -v certutil >/dev/null 2>&1; then
+        msg_info "Installing certificate to NSS database (Chrome/Node.js)..."
+        mkdir -p "${HOME}/.pki/nssdb" 2>/dev/null
+        certutil -d sql:"${HOME}/.pki/nssdb" -A -t "C,," -n "OroDC Docker Local CA" -i "${CERT_OUTPUT_PATH}" 2>/dev/null && \
+        msg_ok "Certificate installed to NSS database"
+      else
+        msg_info "For Chrome/Node.js support, install libnss3-tools:"
+        msg_info "  sudo apt install libnss3-tools"
+        msg_info "  mkdir -p \$HOME/.pki/nssdb"
+        msg_info "  certutil -d sql:\$HOME/.pki/nssdb -N"
+        msg_info "  certutil -d sql:\$HOME/.pki/nssdb -A -t \"C,,\" -n \"OroDC Docker Local CA\" -i ${CERT_OUTPUT_PATH}"
+      fi
+      
+      msg_warning "WSL2 detected. Certificate saved to: ${CERT_OUTPUT_PATH}"
+      msg_info ""
+      msg_info "To trust HTTPS in Windows host:"
+      msg_info "  1. Copy certificate to Windows: ${CERT_OUTPUT_PATH}"
+      msg_info "  2. Double-click the .crt file in Windows Explorer"
+      msg_info "  3. Click 'Install Certificate'"
+      msg_info "  4. Select 'Local Machine' and click Next"
+      msg_info "  5. Select 'Place all certificates in the following store'"
+      msg_info "  6. Click 'Browse' and select 'Trusted Root Certification Authorities'"
+      msg_info "  7. Click Next and Finish"
+      msg_info ""
+      
+    else
+      # Linux (non-WSL)
+      msg_info "Installing certificate to Linux trust store..."
+      
+      if [[ -f "/etc/debian_version" ]]; then
+        # Debian/Ubuntu
+        if sudo cp "${CERT_OUTPUT_PATH}" /usr/local/share/ca-certificates/ 2>/dev/null && \
+           sudo update-ca-certificates 2>/dev/null; then
+          msg_ok "Certificate installed to system trust store"
           rm -f "${CERT_OUTPUT_PATH}"
         else
           msg_warning "Failed to install certificate automatically. Manual installation required:"
-          msg_info "  sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ${CERT_OUTPUT_PATH}"
+          msg_info "  sudo cp ${CERT_OUTPUT_PATH} /usr/local/share/ca-certificates/"
+          msg_info "  sudo update-ca-certificates"
         fi
-        
-      elif [[ "$IS_WSL" == "true" ]]; then
-        # WSL2 - install to Linux and show Windows instructions
-        msg_info "Installing certificate to Linux (WSL)..."
-        
-        if [[ -f "/etc/debian_version" ]]; then
-          # Debian/Ubuntu
-          sudo cp "${CERT_OUTPUT_PATH}" /usr/local/share/ca-certificates/ 2>/dev/null && \
-          sudo update-ca-certificates 2>/dev/null && \
-          msg_ok "Certificate installed to Linux trust store"
-        fi
-        
-        # NSS database for Chrome/Node.js
-        if command -v certutil >/dev/null 2>&1; then
-          msg_info "Installing certificate to NSS database (Chrome/Node.js)..."
-          mkdir -p "${HOME}/.pki/nssdb" 2>/dev/null
-          certutil -d sql:"${HOME}/.pki/nssdb" -A -t "C,," -n "OroDC Docker Local CA" -i "${CERT_OUTPUT_PATH}" 2>/dev/null && \
-          msg_ok "Certificate installed to NSS database"
+      elif [[ -f "/etc/redhat-release" ]]; then
+        # RHEL/CentOS/Fedora
+        if sudo cp "${CERT_OUTPUT_PATH}" /etc/pki/ca-trust/source/anchors/ 2>/dev/null && \
+           sudo update-ca-trust 2>/dev/null; then
+          msg_ok "Certificate installed to system trust store"
+          rm -f "${CERT_OUTPUT_PATH}"
         else
-          msg_warning "certutil not found. For Chrome/Node.js support, install libnss3-tools:"
-          msg_info "  sudo apt install libnss3-tools"
-          msg_info "  mkdir -p \$HOME/.pki/nssdb"
-          msg_info "  certutil -d sql:\$HOME/.pki/nssdb -N"
-          msg_info "  certutil -d sql:\$HOME/.pki/nssdb -A -t \"C,,\" -n \"OroDC Docker Local CA\" -i ${CERT_OUTPUT_PATH}"
-        fi
-        
-        msg_warning "WSL2 detected. Certificate saved to: ${CERT_OUTPUT_PATH}"
-        msg_info ""
-        msg_info "To trust HTTPS in Windows host:"
-        msg_info "  1. Copy certificate to Windows: ${CERT_OUTPUT_PATH}"
-        msg_info "  2. Double-click the .crt file in Windows Explorer"
-        msg_info "  3. Click 'Install Certificate'"
-        msg_info "  4. Select 'Local Machine' and click Next"
-        msg_info "  5. Select 'Place all certificates in the following store'"
-        msg_info "  6. Click 'Browse' and select 'Trusted Root Certification Authorities'"
-        msg_info "  7. Click Next and Finish"
-        msg_info ""
-        
-      else
-        # Linux (non-WSL)
-        msg_info "Installing certificate to Linux trust store..."
-        
-        if [[ -f "/etc/debian_version" ]]; then
-          # Debian/Ubuntu
-          if sudo cp "${CERT_OUTPUT_PATH}" /usr/local/share/ca-certificates/ 2>/dev/null && \
-             sudo update-ca-certificates 2>/dev/null; then
-            msg_ok "Certificate installed to system trust store"
-            rm -f "${CERT_OUTPUT_PATH}"
-          else
-            msg_warning "Failed to install certificate automatically. Manual installation required:"
-            msg_info "  sudo cp ${CERT_OUTPUT_PATH} /usr/local/share/ca-certificates/"
-            msg_info "  sudo update-ca-certificates"
-          fi
-        elif [[ -f "/etc/redhat-release" ]]; then
-          # RHEL/CentOS/Fedora
-          if sudo cp "${CERT_OUTPUT_PATH}" /etc/pki/ca-trust/source/anchors/ 2>/dev/null && \
-             sudo update-ca-trust 2>/dev/null; then
-            msg_ok "Certificate installed to system trust store"
-            rm -f "${CERT_OUTPUT_PATH}"
-          else
-            msg_warning "Failed to install certificate automatically. Manual installation required:"
-            msg_info "  sudo cp ${CERT_OUTPUT_PATH} /etc/pki/ca-trust/source/anchors/"
-            msg_info "  sudo update-ca-trust"
-          fi
-        fi
-        
-        # NSS database for Chrome/Node.js
-        if command -v certutil >/dev/null 2>&1; then
-          msg_info "Installing certificate to NSS database (Chrome/Node.js)..."
-          mkdir -p "${HOME}/.pki/nssdb" 2>/dev/null
-          
-          # Initialize NSS DB if it doesn't exist
-          if [[ ! -f "${HOME}/.pki/nssdb/cert9.db" ]]; then
-            certutil -d sql:"${HOME}/.pki/nssdb" -N --empty-password 2>/dev/null
-          fi
-          
-          if certutil -d sql:"${HOME}/.pki/nssdb" -A -t "C,," -n "OroDC Docker Local CA" -i "${CERT_OUTPUT_PATH}" 2>/dev/null; then
-            msg_ok "Certificate installed to NSS database"
-            rm -f "${CERT_OUTPUT_PATH}"
-          fi
-        else
-          msg_info "For Chrome/Node.js support, install libnss3-tools:"
-          msg_info "  sudo apt install libnss3-tools"
-          msg_info "  mkdir -p \$HOME/.pki/nssdb"
-          msg_info "  certutil -d sql:\$HOME/.pki/nssdb -N"
-          msg_info "  certutil -d sql:\$HOME/.pki/nssdb -A -t \"C,,\" -n \"OroDC Docker Local CA\" -i ${CERT_OUTPUT_PATH}"
+          msg_warning "Failed to install certificate automatically. Manual installation required:"
+          msg_info "  sudo cp ${CERT_OUTPUT_PATH} /etc/pki/ca-trust/source/anchors/"
+          msg_info "  sudo update-ca-trust"
         fi
       fi
-    else
-      msg_warning "Failed to export certificate from proxy container"
+      
+      # NSS database for Chrome/Node.js
+      if command -v certutil >/dev/null 2>&1; then
+        msg_info "Installing certificate to NSS database (Chrome/Node.js)..."
+        mkdir -p "${HOME}/.pki/nssdb" 2>/dev/null
+        
+        # Initialize NSS DB if it doesn't exist
+        if [[ ! -f "${HOME}/.pki/nssdb/cert9.db" ]]; then
+          certutil -d sql:"${HOME}/.pki/nssdb" -N --empty-password 2>/dev/null
+        fi
+        
+        if certutil -d sql:"${HOME}/.pki/nssdb" -A -t "C,," -n "OroDC Docker Local CA" -i "${CERT_OUTPUT_PATH}" 2>/dev/null; then
+          msg_ok "Certificate installed to NSS database"
+          rm -f "${CERT_OUTPUT_PATH}"
+        fi
+      else
+        msg_info "For Chrome/Node.js support, install libnss3-tools:"
+        msg_info "  sudo apt install libnss3-tools"
+        msg_info "  mkdir -p \$HOME/.pki/nssdb"
+        msg_info "  certutil -d sql:\$HOME/.pki/nssdb -N"
+        msg_info "  certutil -d sql:\$HOME/.pki/nssdb -A -t \"C,,\" -n \"OroDC Docker Local CA\" -i ${CERT_OUTPUT_PATH}"
+      fi
     fi
     
-    msg_info ""
-    msg_info "Traefik proxy installation complete!"
-    msg_info "Dashboard: http://localhost:8880/traefik/dashboard/"
-    msg_info "Proxy HTTP:  http://localhost:8880"
-    msg_info "Proxy HTTPS: https://localhost:8443"
-    msg_info "SOCKS5:      127.0.0.1:1080"
-    msg_info ""
-    msg_info "All OroDC projects with *.docker.local domains will be automatically routed through this proxy."
-    msg_info ""
-    msg_info "Via SOCKS5 proxy (configure in browser):"
-    msg_info "  http://proxy.docker.local/traefik/dashboard/"
-    msg_info "  http://oroplatform.docker.local/"
-    msg_info ""
-    msg_info "To stop proxy: docker compose -f ${PROXY_COMPOSE_FILE} down"
-    msg_info "To view logs: docker logs proxy"
-    
-    exit 0
-  fi
+    msg_ok "Certificate installation complete!"
+  }
   
-  # Handle export-proxy-cert command
-  if [[ "$temp_first_non_flag_arg" == "export-proxy-cert" ]]; then
-    msg_info "Exporting OroDC Proxy CA Certificate..."
+  # Handle proxy subcommands
+  case "$PROXY_CMD" in
+    up)
+      msg_info "Starting Traefik proxy..."
+      
+      # Create shared network if it doesn't exist
+      if ! ${DOCKER_BIN} network inspect dc_shared_net >/dev/null 2>&1; then
+        msg_info "Creating dc_shared_net network..."
+        ${DOCKER_BIN} network create dc_shared_net || {
+          msg_error "Failed to create dc_shared_net network"
+          exit 1
+        }
+      fi
+      
+      # Set log level based on DEBUG environment variable
+      if [[ "${DEBUG:-}" == "1" ]]; then
+        export TRAEFIK_LOG_LEVEL="DEBUG"
+      else
+        export TRAEFIK_LOG_LEVEL="WARNING"
+      fi
+      
+      # Pass all remaining arguments to docker compose up
+      ${DOCKER_COMPOSE_BIN} -f "$PROXY_COMPOSE_FILE" up "$@" || {
+        msg_error "Failed to start Traefik proxy"
+        exit 1
+      }
+      
+      # If running in detached mode (-d), show info and certificate hint
+      if [[ "$*" == *"-d"* ]]; then
+        msg_ok "Traefik proxy started!"
+        msg_info ""
+        msg_info "Dashboard: http://localhost:8880/traefik/dashboard/"
+        msg_info "Proxy HTTP:  http://localhost:8880"
+        msg_info "Proxy HTTPS: https://localhost:8443"
+        msg_info "SOCKS5:      127.0.0.1:1080"
+        msg_info ""
+        msg_warning "To enable HTTPS for *.docker.local domains, install CA certificate:"
+        msg_info "  orodc proxy install-certs"
+        msg_info ""
+      fi
+      
+      exit 0
+      ;;
     
-    # Check if proxy container is running
-    if ! ${DOCKER_BIN} ps --filter "name=proxy" --format "{{.Names}}" | grep -q "^proxy$"; then
-      msg_error "Traefik proxy is not running. Start it first with: orodc install-proxy"
+    down)
+      msg_info "Stopping Traefik proxy..."
+      ${DOCKER_COMPOSE_BIN} -f "$PROXY_COMPOSE_FILE" down "$@" || {
+        msg_error "Failed to stop Traefik proxy"
+        exit 1
+      }
+      msg_ok "Traefik proxy stopped"
+      exit 0
+      ;;
+    
+    purge)
+      msg_info "Removing Traefik proxy and volumes..."
+      ${DOCKER_COMPOSE_BIN} -f "$PROXY_COMPOSE_FILE" down -v "$@" || {
+        msg_error "Failed to remove Traefik proxy"
+        exit 1
+      }
+      msg_ok "Traefik proxy removed (including volumes)"
+      exit 0
+      ;;
+    
+    install-certs)
+      install_proxy_certs
+      exit 0
+      ;;
+    
+    *)
+      msg_error "Unknown proxy command: ${PROXY_CMD}"
+      msg_info ""
+      msg_info "Available proxy commands:"
+      msg_info "  orodc proxy up [-d]       - Start proxy (use -d for detached mode)"
+      msg_info "  orodc proxy down          - Stop proxy (keeps volumes)"
+      msg_info "  orodc proxy purge         - Remove proxy and volumes"
+      msg_info "  orodc proxy install-certs - Install CA certificates to system"
+      msg_info ""
       exit 1
-    fi
-    
-    # Export certificate to user's home directory
-    CERT_OUTPUT_PATH="${HOME}/orodc-proxy-ca.crt"
-    
-    if ${DOCKER_BIN} cp proxy:/certs/ca.crt "${CERT_OUTPUT_PATH}" 2>/dev/null; then
-      msg_info "CA certificate exported successfully!"
-      msg_info "Certificate location: ${CERT_OUTPUT_PATH}"
-      msg_info ""
-      msg_info "To trust this certificate, follow instructions for your OS:"
-      msg_info ""
-      msg_info "macOS:"
-      msg_info "  sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ${CERT_OUTPUT_PATH}"
-      msg_info ""
-      msg_info "Linux (Debian/Ubuntu):"
-      msg_info "  sudo cp ${CERT_OUTPUT_PATH} /usr/local/share/ca-certificates/orodc-proxy-ca.crt"
-      msg_info "  sudo update-ca-certificates"
-      msg_info ""
-      msg_info "Linux (RHEL/CentOS/Fedora):"
-      msg_info "  sudo cp ${CERT_OUTPUT_PATH} /etc/pki/ca-trust/source/anchors/orodc-proxy-ca.crt"
-      msg_info "  sudo update-ca-trust"
-      msg_info ""
-      msg_info "Windows:"
-      msg_info "  1. Open ${CERT_OUTPUT_PATH} in Notepad"
-      msg_info "  2. Copy the contents to Windows (if using WSL)"
-      msg_info "  3. Save as .crt file on Windows"
-      msg_info "  4. Double-click and install to 'Trusted Root Certification Authorities'"
-      msg_info ""
-      msg_info "For browser-specific import (Firefox, etc.), see documentation."
-    else
-      msg_error "Failed to export certificate. Is the proxy container running?"
-      exit 1
-    fi
-    
-    exit 0
-  fi
+      ;;
+  esac
 fi
 
 # Check if we need argument parsing
