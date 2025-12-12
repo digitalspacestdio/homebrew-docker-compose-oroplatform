@@ -1,0 +1,46 @@
+services:
+  traefik_docker_local:
+    hostname: traefik.docker.local
+    image: traefik:v2.11
+    container_name: traefik_docker_local
+    command:
+        - "--ping=true"
+        - "--log.level=${TRAEFIK_LOG_LEVEL:-WARNING}"
+        - "--api=true"
+        - "--api.dashboard=true"
+        - "--providers.docker=true"
+        - "--providers.docker.exposedbydefault=false"
+        - "--entrypoints.default.address=:80"
+        - "--entrypoints.default.forwardedheaders.trustedips=0.0.0.0/0"
+        - "--entryPoints.default.forwardedHeaders.insecure"
+    restart: always
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+    ports:
+      - "${TRAEFIK_BIND_ADDRESS:-0.0.0.0}:${TRAEFIK_BIND_PORT:-8880}:80"
+    networks:
+      - "dc_shared_net"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    labels:
+      traefik.enable: 'true'
+      traefik.http.routers.traefik-api.rule: 'PathPrefix(`/traefik/dashboard`) || (PathPrefix(`/api`) && HeadersRegexp(`referer`, `/traefik/dashboard`))'
+      traefik.http.routers.traefik-api.priority: 9000
+      traefik.http.routers.traefik-api.entrypoints: "default"
+      traefik.http.routers.traefik-api.service: "api@internal"
+      traefik.http.routers.traefik-api.middlewares: "traefik-api-stripprefix"
+      traefik.http.middlewares.traefik-api-stripprefix.stripprefix.prefixes: "/traefik"
+    healthcheck:
+      test: traefik healthcheck --ping
+      start_period: 5s
+      interval: 5s
+      retries: 30
+
+networks:
+  dc_shared_net:
+    name: dc_shared_net
+    external: true
+

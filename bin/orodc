@@ -1591,6 +1591,60 @@ elif echo ${args[0]} | grep -i '^install$' > /dev/null; then
   exit 0
 fi
 
+# Handle install-proxy command - installs Traefik reverse proxy in Docker
+if [[ "$first_non_flag_arg" == "install-proxy" ]]; then
+  msg_info "Installing Traefik reverse proxy in Docker..."
+  
+  # Create shared network if it doesn't exist
+  if ! ${DOCKER_BIN} network inspect dc_shared_net >/dev/null 2>&1; then
+    msg_info "Creating dc_shared_net network..."
+    ${DOCKER_BIN} network create dc_shared_net || {
+      msg_error "Failed to create dc_shared_net network"
+      exit 1
+    }
+  fi
+  
+  # Check if Traefik container is already running
+  if ${DOCKER_BIN} ps --filter "name=traefik_docker_local" --format "{{.Names}}" | grep -q "traefik_docker_local"; then
+    msg_info "Traefik proxy is already running"
+    ${DOCKER_BIN} ps --filter "name=traefik_docker_local" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+    exit 0
+  fi
+  
+  # Use docker-compose-proxy.yml to start Traefik
+  PROXY_COMPOSE_FILE="${DC_ORO_COMPOSE_DIR}/docker-compose-proxy.yml"
+  
+  if [[ ! -f "$PROXY_COMPOSE_FILE" ]]; then
+    msg_error "Proxy compose file not found: $PROXY_COMPOSE_FILE"
+    exit 1
+  fi
+  
+  # Set log level based on DEBUG environment variable
+  if [[ "${DEBUG:-}" == "1" ]]; then
+    export TRAEFIK_LOG_LEVEL="DEBUG"
+    msg_info "Starting Traefik proxy container (DEBUG mode)..."
+  else
+    export TRAEFIK_LOG_LEVEL="WARNING"
+    msg_info "Starting Traefik proxy container..."
+  fi
+  
+  ${DOCKER_COMPOSE_BIN} -f "$PROXY_COMPOSE_FILE" up -d || {
+    msg_error "Failed to start Traefik proxy"
+    exit 1
+  }
+  
+  msg_info "Traefik proxy installed successfully!"
+  msg_info "Dashboard: http://localhost:8880/traefik/dashboard/"
+  msg_info "Proxy endpoint: http://localhost:8880"
+  msg_info ""
+  msg_info "All OroDC projects with *.docker.local domains will be automatically routed through this proxy."
+  msg_info ""
+  msg_info "To stop proxy: docker-compose -f ${PROXY_COMPOSE_FILE} down"
+  msg_info "To view logs: docker logs traefik_docker_local"
+  
+  exit 0
+fi
+
 # Handle tests commands - unified entry point
 if [[ "$first_non_flag_arg" == "tests" ]]; then
   # CRITICAL COMPOSE MERGING LOGIC - READ CAREFULLY BEFORE MODIFYING
