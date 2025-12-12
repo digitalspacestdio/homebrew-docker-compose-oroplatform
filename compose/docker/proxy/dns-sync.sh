@@ -27,7 +27,8 @@ extract_hosts_from_rule() {
 update_hosts() {
     log "Updating /etc/hosts inside container..."
     
-    local entries=""
+    # Use associative array to deduplicate hostnames
+    declare -A host_map
     
     # Use docker CLI if available
     if command -v docker >/dev/null 2>&1; then
@@ -38,8 +39,13 @@ update_hosts() {
             fi
             
             container_name=$(docker inspect -f "{{.Name}}" "$container_id" 2>/dev/null | sed 's/^\///' || echo "")
+            # Get IP from dc_shared_net network (preferred) or first available network
+            container_ip=$(docker inspect -f "{{.NetworkSettings.Networks.dc_shared_net.IPAddress}}" "$container_id" 2>/dev/null || echo "")
+            if [[ -z "$container_ip" ]] || [[ "$container_ip" == "<no value>" ]]; then
+                container_ip=$(docker inspect -f "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{break}}{{end}}" "$container_id" 2>/dev/null || echo "")
+            fi
             
-            if [[ -z "$container_name" ]]; then
+            if [[ -z "$container_name" ]] || [[ -z "$container_ip" ]]; then
                 continue
             fi
             
@@ -52,8 +58,8 @@ update_hosts() {
                 for h in "${HOSTNAMES[@]}"; do
                     h=$(echo "$h" | xargs)  # Trim
                     if [[ -n "$h" ]]; then
-                        entries+="${container_name} ${h}"$'\n'
-                        log "Mapping (custom): ${h} -> ${container_name}"
+                        host_map["$h"]="$container_ip"
+                        log "Found (custom): ${h} -> ${container_ip} (${container_name})"
                     fi
                 done
             fi
@@ -69,8 +75,8 @@ update_hosts() {
                     # Extract all Host() entries from the rule
                     while IFS= read -r hostname; do
                         if [[ -n "$hostname" ]]; then
-                            entries+="${container_name} ${hostname}"$'\n'
-                            log "Mapping (traefik): ${hostname} -> ${container_name}"
+                            host_map["$hostname"]="$container_ip"
+                            log "Found (traefik): ${hostname} -> ${container_ip} (${container_name})"
                         fi
                     done < <(extract_hosts_from_rule "$rule_value")
                 fi
@@ -78,6 +84,12 @@ update_hosts() {
             
         done < <(docker ps --filter "label=traefik.enable=true" --format "{{.ID}}" 2>/dev/null || echo "")
     fi
+    
+    # Build entries from deduplicated map
+    local entries=""
+    for hostname in "${!host_map[@]}"; do
+        entries+="${host_map[$hostname]} ${hostname}"$'\n'
+    done
     
     # Update /etc/hosts
     local temp_file
