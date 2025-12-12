@@ -5,7 +5,7 @@ services:
       context: ./docker/proxy
       args:
         TARGETARCH: ${TARGETARCH:-amd64}
-    container_name: proxy.docker.local
+    container_name: proxy
     restart: always
     logging:
       driver: "json-file"
