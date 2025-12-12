@@ -35,6 +35,7 @@
   - [Running Tests](#running-tests)
   - [Available Test Commands](#available-test-commands)
 - [🔧 Development Commands](#-development-commands)
+- [🔌 Reverse Proxy Management](#-reverse-proxy-management)
 - [🌐 Multiple Hosts Configuration](#-multiple-hosts-configuration)
 - [🌐 Dynamic Multisite Support via URL Paths](#-dynamic-multisite-support-via-url-paths)
 - [⚙️ Environment Variables](#️-environment-variables)
@@ -604,7 +605,55 @@ orodc bin/console cache:clear                  # Clear cache
 # Other tools
 orodc database-cli                   # Direct database access
 orodc ssh                           # SSH into container
+
+# Proxy management
+orodc install-proxy                  # Install Traefik reverse proxy in Docker
 ```
+
+### 🔌 Reverse Proxy Management
+
+OroDC includes a built-in command to install Traefik reverse proxy inside Docker. This is useful for:
+- **macOS** and **WSL2 + Docker Desktop** users (where Docker runs in a VM)
+- Creating a proxy chain: `Browser → Traefik (host) → Traefik (docker) → Containers`
+- Future features: built-in dnsmasq, HTTP/SOCKS5 proxy support
+
+**Install Traefik Proxy:**
+
+```bash
+orodc install-proxy
+```
+
+This command will:
+1. Create `dc_shared_net` Docker network (if not exists)
+2. Start Traefik container (`traefik_docker_local`) on port 8880
+3. Automatically route all `*.docker.local` domains to OroDC containers
+
+**Features:**
+- **Dashboard**: <http://localhost:8880/traefik/dashboard/>
+- **Proxy endpoint**: <http://localhost:8880>
+- **Auto-discovery**: Detects all Docker containers with Traefik labels
+- **Health checks**: Built-in health monitoring
+
+**Management:**
+
+```bash
+# View proxy status
+docker ps --filter name=traefik_docker_local
+
+# View logs
+docker logs traefik_docker_local
+
+# Restart proxy
+docker restart traefik_docker_local
+
+# Stop proxy
+docker stop traefik_docker_local
+
+# Remove proxy
+docker rm -f traefik_docker_local
+```
+
+**Note:** This is part of infrastructure setup for users who need Docker-based Traefik. For native Traefik installation (Linux), see [Infrastructure Setup](#-infrastructure-setup-traefik--dnsmasq--ssl) section if available, or use [homebrew-ngdev](https://github.com/digitalspacestdio/homebrew-ngdev).
 
 ### 🎯 Docker Compose Profiles
 
