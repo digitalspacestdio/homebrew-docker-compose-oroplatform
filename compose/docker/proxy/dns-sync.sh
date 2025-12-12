@@ -39,6 +39,12 @@ update_hosts() {
             fi
             
             container_name=$(docker inspect -f "{{.Name}}" "$container_id" 2>/dev/null | sed 's/^\///' || echo "")
+            
+            # Skip self (traefik_docker_local container)
+            if [[ "$container_name" == "traefik_docker_local" ]]; then
+                continue
+            fi
+            
             # Get IP from dc_shared_net network (preferred) or first available network
             container_ip=$(docker inspect -f "{{.NetworkSettings.Networks.dc_shared_net.IPAddress}}" "$container_id" 2>/dev/null || echo "")
             if [[ -z "$container_ip" ]] || [[ "$container_ip" == "<no value>" ]]; then
