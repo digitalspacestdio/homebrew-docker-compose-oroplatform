@@ -247,61 +247,17 @@ This creates a configuration that proxies `*.docker.local` requests from host Tr
 
 **3. Start Traefik inside Docker:**
 
-Create `docker-compose.yml` for Traefik in Docker:
-
-```yaml
-# ~/traefik-docker/docker-compose.yml
-services:
-  traefik_docker_local:
-    hostname: traefik.docker.local
-    image: traefik:v2.11
-    container_name: traefik_docker_local
-    command:
-        - "--ping=true"
-        - "--log.level=DEBUG"
-        - "--api=true"
-        - "--api.dashboard=true"
-        - "--providers.docker=true"
-        - "--providers.docker.exposedbydefault=false"
-        - "--entrypoints.default.address=:80"
-        - "--entrypoints.default.forwardedheaders.trustedips=0.0.0.0/0"
-        - "--entryPoints.default.forwardedHeaders.insecure"
-    restart: always
-    ports:
-      - "${TRAEFIK_BIND_ADDRESS:-0.0.0.0}:${TRAEFIK_BIND_PORT:-8880}:80"
-    networks:
-      - "dc_shared_net"
-    volumes:
-      - "/var/run/docker.sock:/var/run/docker.sock:ro"
-    labels:
-      traefik.enable: 'true'
-      traefik.http.routers.traefik-api.rule: 'PathPrefix(`/traefik/dashboard`) || (PathPrefix(`/api`) && HeadersRegexp(`referer`, `/traefik/dashboard`))'
-      traefik.http.routers.traefik-api.priority: 9000
-      traefik.http.routers.traefik-api.entrypoints: "default"
-      traefik.http.routers.traefik-api.service: "api@internal"
-      traefik.http.routers.traefik-api.middlewares: "traefik-api-stripprefix"
-      traefik.http.middlewares.traefik-api-stripprefix.stripprefix.prefixes: "/traefik"
-    healthcheck:
-      test: traefik healthcheck --ping
-      start_period: 5s
-      interval: 5s
-      retries: 30
-
-networks:
-  dc_shared_net:
-    name: dc_shared_net
-    external: true
-```
-
-**Start Docker Traefik:**
+Use the built-in OroDC command to install Traefik proxy:
 
 ```bash
-mkdir -p ~/traefik-docker
-cd ~/traefik-docker
-# Create docker-compose.yml (content above)
-docker network create dc_shared_net 2>/dev/null || true
-docker-compose up -d
+# Install Traefik with default settings (WARNING log level)
+orodc install-proxy
+
+# Or with DEBUG logging
+DEBUG=1 orodc install-proxy
 ```
+
+**Configuration:** See [docker-compose-proxy.yml](compose/docker-compose-proxy.yml) in the repository for the complete Traefik configuration.
 
 **Architecture:** `Browser → Traefik (host) → Traefik (docker) → Nginx (container)`
 
@@ -612,53 +568,26 @@ orodc install-proxy                  # Install Traefik reverse proxy in Docker
 
 ### 🔌 Reverse Proxy Management
 
-OroDC includes a built-in command to install Traefik reverse proxy inside Docker. This is useful for:
-- **macOS** and **WSL2 + Docker Desktop** users (where Docker runs in a VM)
-- Creating a proxy chain: `Browser → Traefik (host) → Traefik (docker) → Containers`
-- Future features: built-in dnsmasq, HTTP/SOCKS5 proxy support
+OroDC includes a built-in command to install Traefik reverse proxy inside Docker. This is useful for **macOS** and **WSL2 + Docker Desktop** users (where Docker runs in a VM).
 
 **Install Traefik Proxy:**
 
 ```bash
-# Install with default log level (WARNING)
+# Install with default settings (WARNING log level)
 orodc install-proxy
 
 # Install with DEBUG logging
 DEBUG=1 orodc install-proxy
 ```
 
-This command will:
-1. Create `dc_shared_net` Docker network (if not exists)
-2. Start Traefik container (`traefik_docker_local`) on port 8880
-3. Automatically route all `*.docker.local` domains to OroDC containers
-4. Set log level to DEBUG if `DEBUG=1`, otherwise WARNING
-
 **Features:**
-- **Dashboard**: <http://localhost:8880/traefik/dashboard/>
-- **Proxy endpoint**: <http://localhost:8880>
-- **Auto-discovery**: Detects all Docker containers with Traefik labels
-- **Health checks**: Built-in health monitoring
+- Dashboard: <http://localhost:8880/traefik/dashboard/>
+- Auto-routes all `*.docker.local` domains to OroDC containers
+- Built-in health monitoring
 
-**Management:**
+**Configuration:** See [docker-compose-proxy.yml](compose/docker-compose-proxy.yml) for complete Traefik configuration.
 
-```bash
-# View proxy status
-docker ps --filter name=traefik_docker_local
-
-# View logs
-docker logs traefik_docker_local
-
-# Restart proxy
-docker restart traefik_docker_local
-
-# Stop proxy
-docker stop traefik_docker_local
-
-# Remove proxy
-docker rm -f traefik_docker_local
-```
-
-**Note:** This is part of infrastructure setup for users who need Docker-based Traefik. For native Traefik installation (Linux), see [Infrastructure Setup](#-infrastructure-setup-traefik--dnsmasq--ssl) section if available, or use [homebrew-ngdev](https://github.com/digitalspacestdio/homebrew-ngdev).
+**Note:** For native Traefik installation (Linux), see [Infrastructure Setup](#-infrastructure-setup-traefik--dnsmasq--ssl) section.
 
 ### 🎯 Docker Compose Profiles
 
