@@ -33,7 +33,7 @@ To build the image manually:
 
 ```bash
 cd compose/docker/pgsql
-docker build --build-arg PG_VERSION=17.4 -t custom-postgres:17.4 .
+docker build --build-arg PG_VERSION=17.4 -t ghcr.io/digitalspacestdio/orodc-pgsql:17.4 .
 ```
 
 ## How It Works
