@@ -16,12 +16,12 @@ entryPoints:
   
   https:
     address: ":443"
-    http:
-      tls:
-        # Default certificate for *.docker.local
-        certificates:
-          - certFile: /certs/docker.local.crt
-            keyFile: /certs/docker.local.key
+
+# TLS Configuration
+tls:
+  certificates:
+    - certFile: /certs/docker.local.crt
+      keyFile: /certs/docker.local.key
 
 # API and Dashboard
 api:

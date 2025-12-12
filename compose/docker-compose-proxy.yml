@@ -13,8 +13,9 @@ services:
         max-size: "50m"
         max-file: "3"
     ports:
-      - "${TRAEFIK_BIND_ADDRESS:-0.0.0.0}:${TRAEFIK_BIND_PORT:-8880}:80"
-      - "${TRAEFIK_BIND_ADDRESS:-0.0.0.0}:${TRAEFIK_HTTPS_BIND_PORT:-8443}:443"
+      - "${TRAEFIK_BIND_ADDRESS:-127.0.0.1}:${TRAEFIK_BIND_PORT:-8880}:80"
+      - "${TRAEFIK_BIND_ADDRESS:-127.0.0.1}:${TRAEFIK_HTTPS_BIND_PORT:-8443}:443"
+      - "${TRAEFIK_BIND_ADDRESS:-127.0.0.1}:${DC_PROXY_SOCKS5_PORT:-1080}:1080"
     networks:
       - "dc_shared_net"
     volumes:
@@ -23,10 +24,12 @@ services:
     environment:
       - TRAEFIK_LOG_LEVEL=${TRAEFIK_LOG_LEVEL:-INFO}
       - CERT_DOMAIN=${CERT_DOMAIN:-docker.local}
-      - DC_PROXY_SOCKS5_ENABLED=${DC_PROXY_SOCKS5_ENABLED:-0}
-      - DC_PROXY_SOCKS5_BIND=${DC_PROXY_SOCKS5_BIND:-127.0.0.1}
+      - DC_PROXY_SOCKS5_ENABLED=${DC_PROXY_SOCKS5_ENABLED:-1}
+      - DC_PROXY_SOCKS5_BIND=${DC_PROXY_SOCKS5_BIND:-0.0.0.0}
       - DC_PROXY_SOCKS5_PORT=${DC_PROXY_SOCKS5_PORT:-1080}
       - DC_PROXY_DNS_SYNC_ENABLED=${DC_PROXY_DNS_SYNC_ENABLED:-1}
+      - SOCKS_ADDR=0.0.0.0:1080
+      - REQUIRE_AUTH=false
     labels:
       # Traefik routing
       traefik.enable: 'true'

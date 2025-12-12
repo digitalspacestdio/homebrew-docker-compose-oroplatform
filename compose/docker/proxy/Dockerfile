@@ -59,6 +59,13 @@ RUN chmod +x /usr/local/bin/*.sh
 COPY traefik.yml /etc/traefik/traefik.yml
 COPY s6-rc.d/ /etc/s6-overlay/s6-rc.d/
 
+# Register services in user bundle
+RUN mkdir -p /etc/s6-overlay/s6-rc.d/user/contents.d && \
+    touch /etc/s6-overlay/s6-rc.d/user/contents.d/init-certs && \
+    touch /etc/s6-overlay/s6-rc.d/user/contents.d/traefik && \
+    touch /etc/s6-overlay/s6-rc.d/user/contents.d/dns-sync && \
+    touch /etc/s6-overlay/s6-rc.d/user/contents.d/socks5
+
 # Expose ports
 EXPOSE 80 443
 
