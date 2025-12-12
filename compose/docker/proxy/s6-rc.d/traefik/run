@@ -1,0 +1,3 @@
+#!/command/with-contenv bash
+exec /usr/local/bin/traefik --configFile=/etc/traefik/traefik.yml
+

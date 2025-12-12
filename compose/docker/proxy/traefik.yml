@@ -1,0 +1,50 @@
+# Traefik v3 configuration
+global:
+  checkNewVersion: false
+  sendAnonymousUsage: false
+
+# Entry points
+entryPoints:
+  http:
+    address: ":80"
+    # Optional: HTTP to HTTPS redirect (commented out by default)
+    # http:
+    #   redirections:
+    #     entryPoint:
+    #       to: https
+    #       scheme: https
+  
+  https:
+    address: ":443"
+    http:
+      tls:
+        # Default certificate for *.docker.local
+        certificates:
+          - certFile: /certs/docker.local.crt
+            keyFile: /certs/docker.local.key
+
+# API and Dashboard
+api:
+  dashboard: true
+  insecure: false  # Access via Traefik routing, not separate port
+
+# Ping endpoint for health checks
+ping:
+  entryPoint: http
+
+# Providers
+providers:
+  docker:
+    endpoint: "unix:///var/run/docker.sock"
+    exposedByDefault: false
+    network: "dc_shared_net"
+
+# Logging
+log:
+  level: INFO
+  format: common
+
+# Access logs (optional)
+# accessLog:
+#   format: common
+

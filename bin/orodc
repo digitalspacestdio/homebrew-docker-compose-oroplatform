@@ -1645,6 +1645,51 @@ if [[ "$first_non_flag_arg" == "install-proxy" ]]; then
   exit 0
 fi
 
+# Handle export-proxy-cert command - exports CA certificate from proxy container
+if [[ "$first_non_flag_arg" == "export-proxy-cert" ]]; then
+  msg_info "Exporting OroDC Proxy CA Certificate..."
+  
+  # Check if proxy container is running
+  if ! ${DOCKER_BIN} ps --filter "name=traefik_docker_local" --format "{{.Names}}" | grep -q "traefik_docker_local"; then
+    msg_error "Traefik proxy is not running. Start it first with: orodc install-proxy"
+    exit 1
+  fi
+  
+  # Export certificate to user's home directory
+  CERT_OUTPUT_PATH="${HOME}/orodc-proxy-ca.crt"
+  
+  if ${DOCKER_BIN} cp traefik_docker_local:/certs/ca.crt "${CERT_OUTPUT_PATH}" 2>/dev/null; then
+    msg_info "CA certificate exported successfully!"
+    msg_info "Certificate location: ${CERT_OUTPUT_PATH}"
+    msg_info ""
+    msg_info "To trust this certificate, follow instructions for your OS:"
+    msg_info ""
+    msg_info "macOS:"
+    msg_info "  sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ${CERT_OUTPUT_PATH}"
+    msg_info ""
+    msg_info "Linux (Debian/Ubuntu):"
+    msg_info "  sudo cp ${CERT_OUTPUT_PATH} /usr/local/share/ca-certificates/orodc-proxy-ca.crt"
+    msg_info "  sudo update-ca-certificates"
+    msg_info ""
+    msg_info "Linux (RHEL/CentOS/Fedora):"
+    msg_info "  sudo cp ${CERT_OUTPUT_PATH} /etc/pki/ca-trust/source/anchors/orodc-proxy-ca.crt"
+    msg_info "  sudo update-ca-trust"
+    msg_info ""
+    msg_info "Windows:"
+    msg_info "  1. Open ${CERT_OUTPUT_PATH} in Notepad"
+    msg_info "  2. Copy the contents to Windows (if using WSL)"
+    msg_info "  3. Save as .crt file on Windows"
+    msg_info "  4. Double-click and install to 'Trusted Root Certification Authorities'"
+    msg_info ""
+    msg_info "For browser-specific import (Firefox, etc.), see documentation."
+  else
+    msg_error "Failed to export certificate. Is the proxy container running?"
+    exit 1
+  fi
+  
+  exit 0
+fi
+
 # Handle tests commands - unified entry point
 if [[ "$first_non_flag_arg" == "tests" ]]; then
   # CRITICAL COMPOSE MERGING LOGIC - READ CAREFULLY BEFORE MODIFYING

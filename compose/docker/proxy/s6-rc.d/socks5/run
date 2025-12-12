@@ -1,0 +1,25 @@
+#!/command/with-contenv bash
+
+# Check if SOCKS5 is enabled
+if [[ "${DC_PROXY_SOCKS5_ENABLED:-0}" != "1" ]]; then
+    echo "[INFO] SOCKS5 proxy is disabled (DC_PROXY_SOCKS5_ENABLED!=1)"
+    # Disable this service
+    s6-svc -d /run/service/socks5
+    exit 0
+fi
+
+# Configure bind address and port
+BIND="${DC_PROXY_SOCKS5_BIND:-127.0.0.1}"
+PORT="${DC_PROXY_SOCKS5_PORT:-1080}"
+
+# Security warning if binding to all interfaces
+if [[ "$BIND" == "0.0.0.0" ]]; then
+    echo "[WARN] SOCKS5 binding to 0.0.0.0 - accessible from network!"
+fi
+
+# Set SOCKS_ADDR for socks5 binary
+export SOCKS_ADDR="${BIND}:${PORT}"
+
+echo "[INFO] Starting SOCKS5 proxy on ${SOCKS_ADDR}"
+exec /usr/local/bin/socks5
+
