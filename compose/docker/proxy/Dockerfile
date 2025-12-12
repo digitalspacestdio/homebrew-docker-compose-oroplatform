@@ -12,7 +12,8 @@ RUN apk add --no-cache \
     curl \
     tzdata \
     xz \
-    docker-cli
+    docker-cli \
+    nginx
 
 # Set architecture variables for multi-arch support
 ARG TARGETARCH
@@ -60,15 +61,22 @@ RUN chmod +x /usr/local/bin/*.sh
 COPY traefik.yml /etc/traefik/traefik.yml
 COPY s6-rc.d/ /etc/s6-overlay/s6-rc.d/
 
+# Copy nginx configuration and HTML files
+COPY nginx.conf /etc/nginx/nginx.conf
+COPY index.html /var/www/html/index.html
+RUN mkdir -p /var/www/html /var/run && \
+    chmod +x /etc/s6-overlay/s6-rc.d/*/run 2>/dev/null || true
+
 # Register services in user bundle
 RUN mkdir -p /etc/s6-overlay/s6-rc.d/user/contents.d && \
     touch /etc/s6-overlay/s6-rc.d/user/contents.d/init-certs && \
     touch /etc/s6-overlay/s6-rc.d/user/contents.d/traefik && \
     touch /etc/s6-overlay/s6-rc.d/user/contents.d/dns-sync && \
-    touch /etc/s6-overlay/s6-rc.d/user/contents.d/socks5
+    touch /etc/s6-overlay/s6-rc.d/user/contents.d/socks5 && \
+    touch /etc/s6-overlay/s6-rc.d/user/contents.d/nginx
 
 # Expose ports
-EXPOSE 80 443
+EXPOSE 80 443 1080 8080
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
