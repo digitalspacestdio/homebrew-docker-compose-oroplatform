@@ -507,6 +507,26 @@ ORO_SECRET=ThisTokenIsNotSoSecretChangeIt  # Application secret
 DC_ORO_COMPOSER_AUTH=""            # Composer authentication JSON
 ```
 
+#### 🔌 WebSocket Configuration
+```bash
+# WebSocket server settings (where WS server listens)
+DC_ORO_WEBSOCKET_SERVER_DSN=//0.0.0.0:8080
+
+# WebSocket frontend settings (public URL for browser connections)
+DC_ORO_WEBSOCKET_FRONTEND_DSN=//*//ws
+
+# WebSocket backend settings (internal container communication)
+DC_ORO_WEBSOCKET_BACKEND_DSN=tcp://websocket:8080
+```
+
+**Notes:**
+- `WEBSOCKET_SERVER_DSN`: Internal address where WebSocket server binds
+- `WEBSOCKET_FRONTEND_DSN`: Public URL path for browser WebSocket connections (no port = auto-detect HTTP/HTTPS)
+- `WEBSOCKET_BACKEND_DSN`: TCP address for PHP backend to connect to WebSocket server
+- Frontend DSN uses `//*//ws` format (no port specified) to work with both HTTP:80 and HTTPS:443
+- All containers (fpm, cli, consumer, websocket) are configured with these variables
+- Nginx and Traefik automatically proxy `/ws` path to WebSocket server
+
 ### 📁 Sync Modes
 
 #### 🐧 `default` Mode (Linux/WSL Default)
