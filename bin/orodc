@@ -259,6 +259,7 @@ if [[ "$1" == "help" ]] || [[ "$1" == "man" ]]; then
     echo "   orodc --version                  # Check PHP version"
     echo "   orodc psql -l                    # List databases"
     echo "   orodc tests install              # Setup test environment"
+    echo "   orodc config-refresh             # Clear cached configs and force resync"
     echo
     echo "💡 For full documentation, run: brew info docker-compose-oroplatform"
   fi
@@ -1724,7 +1725,7 @@ fi
 is_orodc_special_command() {
   local cmd="$1"
   case "$cmd" in
-    psql|mysql|database-cli|ssh|cli|install|purge|help|man|tests|test|bash)
+    psql|mysql|database-cli|ssh|cli|install|purge|help|man|tests|test|bash|config-refresh|refresh-config)
       return 0
       ;;
     # Database import/export commands
@@ -2248,6 +2249,43 @@ fi
 
 if [[ -n "${DEBUG:-}" ]]; then
   echo "DEBUG: Checking purge condition: first_non_flag_arg='$first_non_flag_arg'" >&2
+fi
+
+# Handle config-refresh command (clear cached compose files and force resync)
+if [[ "$first_non_flag_arg" == "config-refresh" ]] || [[ "$first_non_flag_arg" == "refresh-config" ]]; then
+  msg_info "Clearing cached compose files from ${DC_ORO_CONFIG_DIR}..."
+  
+  # Remove compose files from config directory
+  if [[ -d "${DC_ORO_CONFIG_DIR}/compose" ]]; then
+    rm -rf "${DC_ORO_CONFIG_DIR}/compose"
+    msg_ok "Removed cached compose directory"
+  fi
+  
+  if [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
+    rm -f "${DC_ORO_CONFIG_DIR}/compose.yml"
+    msg_ok "Removed cached compose.yml"
+  fi
+  
+  # Remove docker directory
+  if [[ -d "${DC_ORO_CONFIG_DIR}/docker" ]]; then
+    rm -rf "${DC_ORO_CONFIG_DIR}/docker"
+    msg_ok "Removed cached docker directory"
+  fi
+  
+  # Remove cached profiles
+  if [[ -f "${DC_ORO_CONFIG_DIR}/.cached_profiles" ]]; then
+    rm -f "${DC_ORO_CONFIG_DIR}/.cached_profiles"
+    msg_ok "Removed cached profiles"
+  fi
+  
+  if [[ -f "${DC_ORO_CONFIG_DIR}/.cached_cli_profiles" ]]; then
+    rm -f "${DC_ORO_CONFIG_DIR}/.cached_cli_profiles"
+    msg_ok "Removed cached CLI profiles"
+  fi
+  
+  msg_ok "Cache cleared successfully!"
+  msg_info "Next orodc command will resync fresh compose files"
+  exit 0
 fi
 
 if [[ "$first_non_flag_arg" == "purge" ]]; then
