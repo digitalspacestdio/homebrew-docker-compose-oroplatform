@@ -344,6 +344,38 @@ version "1.0.0"
 ## Overview
 OroDC: CLI tool for ORO Platform (OroCRM, OroCommerce, OroPlatform) in Docker containers.
 
+## Architecture
+
+### Cross-Platform Path Resolution
+**CRITICAL**: OroDC uses dynamic Homebrew prefix detection for compose file paths.
+
+**Path Resolution Logic:**
+```bash
+# Get Homebrew prefix dynamically (works on macOS and Linux)
+BREW_PREFIX="$(brew --prefix)"
+
+# Try paths in order:
+# 1. Development tap directory: ${BREW_PREFIX}/Homebrew/Library/Taps/.../compose
+# 2. Installed pkgshare: ${BREW_PREFIX}/share/docker-compose-oroplatform/compose
+# 3. Relative to script: $SCRIPT_DIR/../compose
+```
+
+**Platform-Specific Homebrew Locations:**
+- **Linux**: `/home/linuxbrew/.linuxbrew`
+- **macOS Intel**: `/usr/local`
+- **macOS Apple Silicon**: `/opt/homebrew`
+
+**Why This Matters:**
+- ✅ Works on all platforms without hardcoded paths
+- ✅ Supports both development (tap) and installed modes
+- ✅ Eliminates "compose file not found" errors
+- ✅ Allows testing changes before Homebrew installation
+
+**Implementation:**
+- Formula copies entire `compose/` directory to `pkgshare`
+- Script detects paths dynamically via `brew --prefix`
+- Falls back to relative paths for development mode
+
 ## Core Rules
 
 ### 1. Smart PHP Command Detection
