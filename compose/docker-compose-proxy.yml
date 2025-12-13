@@ -7,6 +7,10 @@ services:
         TARGETARCH: ${TARGETARCH:-amd64}
     container_name: proxy
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     logging:
       driver: "json-file"
       options:

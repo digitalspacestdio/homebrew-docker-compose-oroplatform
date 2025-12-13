@@ -20,6 +20,10 @@ services:
     ports:
       - '${DC_ORO_DATABASE_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_MYSQL:-3306}:3306'
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 7G
     healthcheck:
       test: "mysqladmin ping --silent -u$${MYSQL_USER} -p$${MYSQL_PASSWORD}"
       start_period: 5s
@@ -52,6 +56,10 @@ services:
     depends_on:
       database:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     logging:
       driver: "json-file"
       options:

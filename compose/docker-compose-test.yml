@@ -59,6 +59,10 @@ services:
       - 'NODE_OPTIONS="--max-old-space-size=1024"'
       - 'XDEBUG_MODE=${XDEBUG_MODE_FPM:-off}'
     restart: "no"
+    deploy:
+      resources:
+        limits:
+          memory: 7G
     healthcheck:
       test: /bin/bash -c "</dev/tcp/localhost/9000"
       start_period: 5s
@@ -93,6 +97,10 @@ services:
       default:
         aliases:
           - localhost.com
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     healthcheck:
       test: /bin/bash -c "</dev/tcp/localhost/80"
       start_period: 5s
@@ -111,6 +119,10 @@ services:
     #  - "4444:4444"
     shm_size: "2g"
     restart: "no"
+    deploy:
+      resources:
+        limits:
+          memory: 7G
     # environment:
       # - SE_OPTS=--log-level FINE  # Not supported in Selenium 3.x
     healthcheck:
@@ -170,6 +182,10 @@ services:
       - 'ORO_ENV=test'
       - 'XDEBUG_MODE=${XDEBUG_MODE_CLI:-off}'
     restart: "no"
+    deploy:
+      resources:
+        limits:
+          memory: 7G
     logging:
       driver: "json-file"
       options:
@@ -246,6 +262,10 @@ services:
         condition: service_healthy
       test-fpm:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 7G
     logging:
       driver: "json-file"
       options:
