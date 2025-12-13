@@ -76,19 +76,41 @@ zstyle ':completion:*' menu select
 mkdir -p ~/.config
 starship preset plain-text-symbols -o ~/.config/starship.toml
 
-# Modify the existing [hostname] section instead of appending a duplicate
-sed -i '/\[hostname\]/,/^$/c\
-[hostname]\
-ssh_only = false\
-trim_at = ""\
-format = "[$hostname]($style) in "\
-style = "bold bright-yellow"\
-' ~/.config/starship.toml
+# Configure starship: customize hostname, PHP, Node.js format and git branch position
+cat >> ~/.config/starship.toml << 'STARSHIP_EOF'
 
-# Append vagrant config (doesn't conflict)
-echo '
+# Hostname configuration
+[hostname]
+ssh_only = false
+trim_at = ""
+format = "[$hostname]($style) in "
+style = "bold bright-yellow"
+
+# Disable vagrant (not used)
 [vagrant]
 disabled = true
-' >> ~/.config/starship.toml
+
+# PHP configuration - remove icon, show version inline
+[php]
+format = "via [$version]($style)"
+style = "bold blue"
+
+# Node.js configuration - remove icon, show version inline
+[nodejs]
+format = " / [$version]($style)"
+style = "bold green"
+
+# Git branch - move to end by adjusting format order
+format = """
+$username\
+$hostname\
+$directory\
+$php\
+$nodejs\
+$git_branch\
+$git_status\
+$character"""
+
+STARSHIP_EOF
 
 eval "$(starship init zsh)"
