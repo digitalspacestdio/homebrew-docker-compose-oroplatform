@@ -1,6 +1,5 @@
 services:
   database:
-    image: '${DC_ORO_PGSQL_IMAGE:-ghcr.io/digitalspacestdio/orodc-pgsql}:${DC_ORO_PGSQL_VERSION:-15.1}'
     build:
       context: ./docker/pgsql
       dockerfile: Dockerfile
@@ -36,7 +35,11 @@ services:
         max-size: "10m"
 
   database-cli:
-    image: '${DC_ORO_PGSQL_IMAGE:-ghcr.io/digitalspacestdio/orodc-pgsql}:${DC_ORO_PGSQL_VERSION:-15.1}'
+    build:
+      context: ./docker/pgsql
+      dockerfile: Dockerfile
+      args:
+        PG_VERSION: '${DC_ORO_PGSQL_VERSION:-15.1}'
     hostname: database-cli.${DC_ORO_NAME:-unnamed}.docker.local
     container_name: ${DC_ORO_NAME:-unnamed}_database_cli
     command: /bin/true
