@@ -2292,6 +2292,13 @@ if [[ "$is_docker_compose_cmd" == "true" ]]; then
   # Extract command (first element) and services (rest of elements)
   docker_cmd="${args[0]}"
   docker_services="${args[*]:1}"
+  
+  # Auto-add --build flag for 'up' command if not already present
+  # This ensures images are always rebuilt, preventing "executable not found" errors
+  if [[ "$docker_cmd" == "up" ]] && [[ ! " ${right_flags[*]} " =~ " --build " ]] && [[ ! " ${right_flags[*]} " =~ " --no-build " ]]; then
+    right_flags+=("--build")
+  fi
+  
   full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${docker_cmd} ${right_flags[*]} ${right_options[*]} ${docker_services}"
   DC_ORO_NAME="$DC_ORO_NAME" bash -c "$full_cmd"
   exit $?
