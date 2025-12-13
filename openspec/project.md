@@ -225,6 +225,95 @@ This shows:
 - Compose file inclusion: `bin/orodc:1259-1269`
 - Busybox cleanup: `bin/orodc:1270-1276`
 
+#### Configuration Caching and Updates
+
+OroDC caches compose files locally for performance and automatically keeps them synchronized with the latest Homebrew package versions.
+
+**Cache Directory Structure:**
+
+```
+${DC_ORO_CONFIG_DIR}/    # Default: ~/.orodc/{project_name}
+├── compose/             # Cached compose files (synced from Homebrew)
+├── docker/              # Cached Dockerfiles and build contexts
+├── compose.yml          # Generated merged configuration
+├── ssh_id_ed25519*      # SSH keys for remote mode
+├── .cached_profiles     # Cached Docker Compose profiles
+├── .cached_cli_profiles # Cached CLI-specific profiles
+└── .xdebug_env         # XDebug environment cache
+```
+
+**Automatic Sync Mechanism:**
+
+Every time `orodc` runs, it automatically synchronizes compose files from Homebrew:
+
+```bash
+# bin/orodc:787
+${RSYNC_BIN} -r --delete \
+  --exclude='ssh_id_*' \
+  --exclude='.cached_*' \
+  --exclude='compose.yml' \
+  --exclude='.xdebug_env' \
+  "${DIR}/compose/" "${DC_ORO_CONFIG_DIR}/"
+```
+
+**Key Features:**
+- `--delete`: Removes outdated cached files that no longer exist in source
+- **Protects**: SSH keys, cached profiles, generated compose.yml, XDebug environment
+- **Ensures**: Every run uses latest compose files from Homebrew package
+- **Automatic**: No manual intervention required for updates
+
+**Configuration Generation Chain:**
+
+1. **Sync** (line 787): `rsync --delete` copies fresh files from Homebrew to cache
+2. **Build** (line 1273): `DOCKER_COMPOSE_BIN_CMD` constructed from cached files
+3. **Generate** (line 2334): `docker compose config` merges files into `compose.yml`
+
+```bash
+# Example: PostgreSQL application
+rsync ${HOMEBREW}/compose/ → ~/.orodc/myproject/
+
+DOCKER_COMPOSE_BIN_CMD="docker compose \
+  -f ~/.orodc/myproject/docker-compose.yml \
+  -f ~/.orodc/myproject/docker-compose-pgsql.yml"
+
+docker compose config > ~/.orodc/myproject/compose.yml
+```
+
+**Manual Cache Refresh:**
+
+Force cache clear and resynchronization:
+
+```bash
+orodc config-refresh
+```
+
+This command:
+- Removes `compose/` and `docker/` directories from cache
+- Deletes generated `compose.yml`
+- Clears cached profiles (`.cached_profiles`, `.cached_cli_profiles`)
+- Forces fresh sync on next `orodc` command
+
+**Use Cases for config-refresh:**
+- After Homebrew package reinstall/upgrade
+- When compose files not updating as expected
+- Troubleshooting stale configuration issues
+- After manual edits to cached files (not recommended)
+
+**Common Scenarios:**
+
+**Problem**: Old database config with `build:` section persists after Homebrew update
+**Cause**: Cached `docker-compose-pgsql.yml` not removed by old rsync (no --delete flag)
+**Solution**: Automatic with rsync --delete; manual with `orodc config-refresh`
+
+**Problem**: Changes in Homebrew compose files not reflected
+**Cause**: Cache not regenerated between runs
+**Solution**: Automatic sync on every `orodc` run; force with `orodc config-refresh`
+
+**Implementation Reference:**
+- Rsync sync: `bin/orodc:787-792`
+- Config refresh command: `bin/orodc:2254-2288`
+- Compose generation: `bin/orodc:2326-2327`
+
 #### Multi-Stage Configuration
 Configuration hierarchy (lowest to highest priority):
 1. Hardcoded defaults in `bin/orodc`
