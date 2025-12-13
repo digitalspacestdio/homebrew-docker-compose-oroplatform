@@ -567,17 +567,62 @@ orodc install
 ### Container Issues
 ```bash
 orodc logs [service-name]          # Check logs
-DEBUG=1 orodc up -d               # Debug mode
+DEBUG=1 orodc up -d               # Debug mode with verbose output
 orodc down && orodc up -d --build # Force rebuild
 ```
 
-## Diagnostic Commands
+### Configuration Files Not Updating
+If compose files or configurations don't update after changes:
+
 ```bash
+# Reinstall formula to refresh all files
+brew reinstall digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform
+
+# Remove old config directory and restart
+rm -rf ~/.orodc/[project-name]
+orodc up -d
+```
+
+**When to use:**
+- After git pull/checkout when compose files should change but don't
+- When copied files in `~/.orodc/` are outdated
+- Formula was updated but changes not reflected
+
+## Diagnostic Commands
+
+**CRITICAL: Use `DEBUG=1` for troubleshooting!**
+
+```bash
+# Always start with DEBUG mode to see full execution flow
+DEBUG=1 orodc up -d               # See compose file loading, schema detection
+DEBUG=1 orodc config              # See merged configuration
+DEBUG=1 orodc [any-command]       # Verbose output for any command
+
+# View final merged Docker Compose configuration
+orodc config                      # Shows final compose.yml after merging all files
+orodc config | grep -A 20 "database:"  # Check specific service config
+
+# Other diagnostic commands
 orodc ps                          # Container status
-DEBUG=1 orodc [command]           # Debug output
-orodc logs [service]              # Service logs
+orodc logs [service]              # Service logs  
 orodc ssh                         # Container access
 ```
+
+**`orodc config` shows:**
+- **Final merged configuration** from all compose files (base + mode + database + user)
+- Which `image:` or `build:` is actually used for each service
+- All environment variables resolved with actual values
+- Complete service definitions after Docker Compose merge logic
+- Useful to verify which database image/build is active
+
+**DEBUG mode shows:**
+- Which compose files are being loaded
+- Database schema detection (DC_ORO_DATABASE_SCHEMA)
+- Environment variable resolution
+- Docker Compose command construction
+- Busybox cleanup operations
+
+**Pro tip:** Always use `orodc config` to inspect the final merged Docker Compose configuration when troubleshooting service definitions or image selection.
 
 ## Response Guidelines
 

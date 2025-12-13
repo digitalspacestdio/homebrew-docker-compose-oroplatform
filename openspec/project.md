@@ -22,18 +22,28 @@ The tool is distributed as a Homebrew formula and manages multi-container Docker
 - **File Sync**: Mutagen (macOS), Rsync (SSH mode), Native Docker volumes (Linux)
 
 ### Docker Images
-- **PHP Base**: Custom multi-arch images (ghcr.io/digitalspacestdio/orodc-php-node-symfony)
+
+#### Custom Built Images (via GitHub Actions)
+- **PHP Base**: `ghcr.io/digitalspacestdio/orodc-php-node-symfony`
   - PHP versions: 7.4, 8.1, 8.2, 8.3, 8.4, 8.5
   - Node.js versions: 18, 20, 22
   - Composer versions: 1, 2
   - Base distro: Alpine Linux
-- **Database**: PostgreSQL 15/16/17, MySQL 8
-- **Cache**: Redis 6.2/7.0
-- **Search**: Elasticsearch 8.10.3
-- **Queue**: RabbitMQ 3.9-management-alpine
-- **Web Server**: Nginx (latest)
-- **Mail**: MailHog (testing)
-- **Profiling**: XHGui + MongoDB
+- **PostgreSQL**: `ghcr.io/digitalspacestdio/orodc-pgsql:15.1`
+  - Based on official `postgres:15.1`
+  - Includes pgpool2 and pg_repack extensions
+  - Performance-optimized settings
+
+#### Official Images
+- **MySQL**: `mysql:8.0-oracle`
+- **Cache**: `redis:6.2`, `redis:7.0`
+- **Search**: `elasticsearch:8.10.3`
+- **Queue**: `oroinc/rabbitmq:3.9-1-management-alpine`
+- **Web Server**: `nginx:latest`
+- **Mail**: `cd2team/mailhog` (testing)
+- **Profiling**: `xhgui/xhgui` + `mongo:4.4`
+
+**Build Strategy**: All custom images are built in GitHub Actions and published to GitHub Container Registry. No local builds required.
 
 ### Infrastructure
 - **Reverse Proxy**: Traefik 2.x (host + Docker modes)
@@ -108,6 +118,112 @@ Docker Compose profiles for different workloads:
 - **websocket**: WebSocket server
 - **php-cli**: Standalone PHP CLI
 - **database-cli**: Database management tools
+
+#### Dynamic Compose File Loading
+OroDC dynamically assembles the Docker Compose command by conditionally including configuration files based on application state. This allows zero-configuration database selection and environment-specific customizations.
+
+**Loading Order and Priority:**
+
+1. **Base Configuration** (`docker-compose.yml`):
+   - Always loaded first
+   - Contains all core services with dummy database (busybox placeholder)
+   - Provides service definitions for FPM, CLI, Nginx, Redis, Elasticsearch, RabbitMQ, Mail
+
+2. **Sync Mode Configuration** (`docker-compose-default.yml`):
+   - Loaded when `DC_ORO_MODE=default`
+   - Adds volume mount configuration for native Docker volumes (Linux/WSL2)
+   - Skipped for mutagen/ssh modes which handle syncing separately
+
+3. **Database-Specific Configuration**:
+   - **PostgreSQL** (`docker-compose-pgsql.yml`):
+     - Loaded when `DC_ORO_DATABASE_SCHEMA` matches: `pgsql`, `postgres`, `postgresql`
+     - Uses pre-built image: `ghcr.io/digitalspacestdio/orodc-pgsql:15.1`
+     - Custom image includes pgpool2 and pg_repack extensions
+     - Sets `DC_ORO_DATABASE_PORT=5432`
+   - **MySQL/MariaDB** (`docker-compose-mysql.yml`):
+     - Loaded when `DC_ORO_DATABASE_SCHEMA` matches: `mysql`, `mariadb`
+     - Uses official image: `mysql:8.0-oracle`
+     - Sets `DC_ORO_DATABASE_PORT=3306`
+
+4. **User Custom Configuration** (`.docker-compose.user.yml`):
+   - Loaded last if exists in project root (`$DC_ORO_APPDIR`)
+   - Allows project-specific overrides and custom services
+   - Has highest priority due to Docker Compose merge order
+
+**Schema Detection Mechanism:**
+
+```bash
+# 1. Parse ORO_DB_URL environment variable (from .env-app or .env-app.local)
+parse_dsn_uri "$ORO_DB_URL" "database" "DC_ORO"
+
+# 2. Extract schema (postgres, mysql, etc.) into DC_ORO_DATABASE_SCHEMA
+# Example: postgres://user:pass@host:5432/db → DC_ORO_DATABASE_SCHEMA=postgres
+
+# 3. Include appropriate compose file
+if [[ "${DC_ORO_DATABASE_SCHEMA}" == "pgsql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgresql" ]]; then
+  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-pgsql.yml"
+elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "mariadb" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]]; then
+  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-mysql.yml"
+fi
+```
+
+**Busybox Cleanup:**
+
+After loading database-specific compose files, OroDC automatically removes any running dummy database containers:
+
+```bash
+# Detect busybox database container
+SERVICE_DATABASE_ID=$(${DOCKER_COMPOSE_BIN_CMD} ps -q database)
+if [[ -n "$SERVICE_DATABASE_ID" ]] && docker inspect -f '{{ .Config.Image }}' "$SERVICE_DATABASE_ID" | grep -q 'busybox'; then
+  # Stop and remove dummy container
+  ${DOCKER_COMPOSE_BIN_CMD} stop database
+  ${DOCKER_COMPOSE_BIN_CMD} rm -f database
+fi
+```
+
+**Final Command Example:**
+
+```bash
+# With PostgreSQL application:
+docker compose -f docker-compose.yml \
+               -f docker-compose-default.yml \
+               -f docker-compose-pgsql.yml \
+               -f .docker-compose.user.yml \
+               up -d
+
+# With MySQL application:
+docker compose -f docker-compose.yml \
+               -f docker-compose-default.yml \
+               -f docker-compose-mysql.yml \
+               up -d
+```
+
+**Debugging Dynamic Loading:**
+
+Use `DEBUG=1` to see the complete compose file loading sequence:
+
+```bash
+DEBUG=1 orodc up -d 2>&1 | grep -E "DATABASE_SCHEMA|docker-compose.*yml"
+```
+
+This shows:
+1. Schema detection: `export DC_ORO_DATABASE_SCHEMA=postgres`
+2. Base file loading: `-f docker-compose.yml`
+3. Mode file addition: `-f docker-compose-default.yml`
+4. Database file addition: `-f docker-compose-pgsql.yml`
+5. Final command execution
+
+**Common Issues:**
+
+- **Database container not starting**: Check `ORO_DB_URL` is set correctly in `.env-app.local`
+- **Busybox database persists**: `DC_ORO_DATABASE_SCHEMA` not detected - verify DSN parsing with `DEBUG=1`
+- **Wrong database type**: Schema detection case-sensitive - use lowercase values in `ORO_DB_URL`
+- **Container keeps stopping**: Normal behavior during busybox → real database transition
+
+**Implementation Reference:**
+- Database detection: `bin/orodc:1151` (parse_dsn_uri call)
+- Compose file inclusion: `bin/orodc:1259-1269`
+- Busybox cleanup: `bin/orodc:1270-1276`
 
 #### Multi-Stage Configuration
 Configuration hierarchy (lowest to highest priority):
