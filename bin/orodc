@@ -784,7 +784,14 @@ DOCKER_COMPOSE_BIN="$DOCKER_BIN compose"
 # This variable is reused throughout the script and in the test merging logic
 DOCKER_COMPOSE_BIN_CMD="$DOCKER_COMPOSE_BIN"
 DOCKER_COMPOSE_VERSION=$($DOCKER_COMPOSE_BIN_CMD version | grep -E '[0-9]+\.[0-9]+\.[0-9]+' -o | head -1 |awk -F. '{ print $1 }')
-${RSYNC_BIN} -r "${DIR}/compose/" "${DC_ORO_CONFIG_DIR}/"
+# Sync compose files with --delete to remove outdated cached configs
+# Exclude SSH keys, cached profiles, and generated compose.yml
+${RSYNC_BIN} -r --delete \
+  --exclude='ssh_id_*' \
+  --exclude='.cached_*' \
+  --exclude='compose.yml' \
+  --exclude='.xdebug_env' \
+  "${DIR}/compose/" "${DC_ORO_CONFIG_DIR}/"
 
 # Setup certificates synchronization
 setup_project_certificates() {
