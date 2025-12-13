@@ -1269,7 +1269,7 @@ elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "mariadb" ]] || [[ "${DC_ORO_DATABASE_SCH
 fi
 if ${DOCKER_COMPOSE_BIN_CMD} ps --services 2>/dev/null | grep database > /dev/null; then
   SERVICE_DATABASE_ID=$(${DOCKER_COMPOSE_BIN_CMD} ps -q database)
-  if [[ "" != $SERVICE_DATABASE_ID ]] && ${DOCKER_BIN} inspect -f '{{ .Config.Image }}' "$SERVICE_DATABASE_ID" | grep 'busybox'; then
+  if [[ "" != $SERVICE_DATABASE_ID ]] && ${DOCKER_BIN} inspect -f '{{ .Config.Image }}' "$SERVICE_DATABASE_ID" | grep -q 'busybox'; then
     ${DOCKER_COMPOSE_BIN_CMD} stop database
     ${DOCKER_COMPOSE_BIN_CMD} rm -f database
   fi

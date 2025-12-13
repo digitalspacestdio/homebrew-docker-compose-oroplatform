@@ -75,14 +75,20 @@ compinit
 zstyle ':completion:*' menu select
 mkdir -p ~/.config
 starship preset plain-text-symbols -o ~/.config/starship.toml
-echo '
-[hostname]
-ssh_only = false
-trim_at = ""
-format = "[$hostname]($style) in "
-style = "bold bright-yellow"
 
+# Modify the existing [hostname] section instead of appending a duplicate
+sed -i '/\[hostname\]/,/^$/c\
+[hostname]\
+ssh_only = false\
+trim_at = ""\
+format = "[$hostname]($style) in "\
+style = "bold bright-yellow"\
+' ~/.config/starship.toml
+
+# Append vagrant config (doesn't conflict)
+echo '
 [vagrant]
 disabled = true
 ' >> ~/.config/starship.toml
+
 eval "$(starship init zsh)"
