@@ -310,10 +310,25 @@ if [[ "$temp_first_non_flag_arg" == "proxy" ]]; then
   
   # Get OroDC install directory
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-  if [[ -d "$SCRIPT_DIR/../compose" ]]; then
+  
+  # Get Homebrew prefix dynamically (works on macOS and Linux)
+  BREW_PREFIX="$(brew --prefix 2>/dev/null || echo "/home/linuxbrew/.linuxbrew")"
+  
+  # Try multiple paths in order:
+  # 1. Development path (tap directory)
+  # 2. Homebrew installed path (pkgshare)
+  # 3. Relative to script location
+  if [[ -d "${BREW_PREFIX}/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform/compose" ]]; then
+    DC_ORO_COMPOSE_DIR="${BREW_PREFIX}/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform/compose"
+  elif [[ -d "${BREW_PREFIX}/share/docker-compose-oroplatform/compose" ]]; then
+    DC_ORO_COMPOSE_DIR="${BREW_PREFIX}/share/docker-compose-oroplatform/compose"
+  elif [[ -d "$SCRIPT_DIR/../compose" ]]; then
     DC_ORO_COMPOSE_DIR="$SCRIPT_DIR/../compose"
+  elif [[ -d "$SCRIPT_DIR/../share/docker-compose-oroplatform/compose" ]]; then
+    DC_ORO_COMPOSE_DIR="$SCRIPT_DIR/../share/docker-compose-oroplatform/compose"
   else
-    DC_ORO_COMPOSE_DIR="/home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform/compose"
+    msg_error "Could not find OroDC compose directory"
+    exit 1
   fi
   
   PROXY_COMPOSE_FILE="${DC_ORO_COMPOSE_DIR}/docker-compose-proxy.yml"
