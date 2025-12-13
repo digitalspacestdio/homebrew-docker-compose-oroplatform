@@ -1,0 +1,3 @@
+#!/command/execlineb -P
+/usr/local/bin/generate-certs.sh
+

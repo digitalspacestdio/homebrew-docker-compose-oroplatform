@@ -1,0 +1,11 @@
+# Dynamic TLS configuration
+tls:
+  certificates:
+    - certFile: /certs/docker.local.crt
+      keyFile: /certs/docker.local.key
+  stores:
+    default:
+      defaultCertificate:
+        certFile: /certs/docker.local.crt
+        keyFile: /certs/docker.local.key
+

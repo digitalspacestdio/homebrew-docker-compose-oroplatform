@@ -5,5 +5,9 @@ services:
     hostname: database.${DC_ORO_NAME:-unnamed}.docker.local
     command: sleep infinity
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 7G
     healthcheck:
       test: "sh -c 'exit 0'"

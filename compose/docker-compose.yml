@@ -5,6 +5,10 @@ services:
     hostname: database.${DC_ORO_NAME:-unnamed}.docker.local
     command: sleep infinity
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 7G
     healthcheck:
       test: "sh -c 'exit 0'"
   fpm:
@@ -74,6 +78,10 @@ services:
       database:
         condition: service_healthy
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 7G
     healthcheck:
       test: /bin/bash -c "</dev/tcp/localhost/9000"
       start_period: 5s
@@ -157,6 +165,10 @@ services:
         condition: service_healthy
       mail:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 7G
     logging:
       driver: "json-file"
       options:
@@ -235,6 +247,10 @@ services:
         condition: service_healthy
       fpm:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 7G
     logging:
       driver: "json-file"
       options:
@@ -270,10 +286,15 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=dc_shared_net"
-      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws.entrypoints=default"
-      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws.rule=${DC_ORO_TRAEFIK_RULE} && (PathPrefix(`/ws`) || HeadersRegexp(`Upgrade`, `(?i)websocket`))"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws.entrypoints=http"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws.rule=${DC_ORO_TRAEFIK_RULE} && (PathPrefix(`/ws`) || Header(`Upgrade`, `websocket`))"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws.service=${DC_ORO_NAME:-unnamed}-ws"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws.priority=100"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws-https.entrypoints=https"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws-https.rule=${DC_ORO_TRAEFIK_RULE} && (PathPrefix(`/ws`) || Header(`Upgrade`, `websocket`))"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws-https.service=${DC_ORO_NAME:-unnamed}-ws"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws-https.priority=100"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws-https.tls=true"
       - "traefik.http.services.${DC_ORO_NAME:-unnamed}-ws.loadbalancer.server.port=8080"
       - "traefik.http.services.${DC_ORO_NAME:-unnamed}-ws.loadbalancer.server.scheme=http"
     environment:
@@ -315,6 +336,10 @@ services:
     depends_on:
       database:
         condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 7G
     logging:
       driver: "json-file"
       options:
@@ -327,6 +352,30 @@ services:
     ports:
       - "${DC_ORO_MAIL_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_MAIL_WEBGUI:-8025}:8025"
     restart: always
+    networks:
+      - default
+      - dc_shared_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=dc_shared_net"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail.entrypoints=http"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail.rule=${DC_ORO_TRAEFIK_RULE} && PathPrefix(`/mailbox`)"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail.service=${DC_ORO_NAME:-unnamed}-mail"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail.middlewares=${DC_ORO_NAME:-unnamed}-mail-stripprefix"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail.priority=200"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-https.entrypoints=https"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-https.rule=${DC_ORO_TRAEFIK_RULE} && PathPrefix(`/mailbox`)"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-https.service=${DC_ORO_NAME:-unnamed}-mail"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-https.middlewares=${DC_ORO_NAME:-unnamed}-mail-stripprefix"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-https.priority=200"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-https.tls=true"
+      - "traefik.http.middlewares.${DC_ORO_NAME:-unnamed}-mail-stripprefix.stripprefix.prefixes=/mailbox"
+      - "traefik.http.services.${DC_ORO_NAME:-unnamed}-mail.loadbalancer.server.port=8025"
+      - "traefik.http.services.${DC_ORO_NAME:-unnamed}-mail.loadbalancer.server.scheme=http"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     healthcheck:
       test: "nc -vz -w 1 localhost 8025"
       start_period: 5s
@@ -349,6 +398,10 @@ services:
       mongodb:
         condition: service_healthy
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     healthcheck:
       test: nc -vz -w 1 localhost 80
       start_period: 5s
@@ -371,6 +424,10 @@ services:
     volumes:
       - '${DC_ORO_CONFIG_DIR:-.}/docker/mongo/initdb.d:/docker-entrypoint-initdb.d'
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 7G
     healthcheck:
       test: mongo --quiet --eval 'db.runCommand("ping").ok' xhgui
       start_period: 5s
@@ -396,6 +453,10 @@ services:
     ports:
       - "${DC_ORO_SEARCH_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_SEARCH:-9200}:9200"
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 4G
     healthcheck:
       test: /bin/bash -c "</dev/tcp/localhost/9200"
       start_period: 5s
@@ -439,12 +500,21 @@ services:
       - "traefik.http.middlewares.cors-${DC_ORO_NAME:-unnamed}.headers.accessControlAllowOriginList=*"
       - "traefik.http.middlewares.resp-headers-${DC_ORO_NAME:-unnamed}.headers.customResponseHeaders.X-Project-Name=${DC_ORO_NAME:-unnamed}"
       - "traefik.http.middlewares.resp-headers-${DC_ORO_NAME:-unnamed}.headers.customResponseHeaders.X-Website-Code-Traefik=from-traefik"
-      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}.entrypoints=default"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}.entrypoints=http"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}.middlewares=compress-${DC_ORO_NAME:-unnamed},cors-${DC_ORO_NAME:-unnamed},resp-headers-${DC_ORO_NAME:-unnamed}"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}.rule=${DC_ORO_TRAEFIK_RULE}"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}.service=${DC_ORO_NAME:-unnamed}"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-https.entrypoints=https"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-https.middlewares=compress-${DC_ORO_NAME:-unnamed},cors-${DC_ORO_NAME:-unnamed},resp-headers-${DC_ORO_NAME:-unnamed}"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-https.rule=${DC_ORO_TRAEFIK_RULE}"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-https.service=${DC_ORO_NAME:-unnamed}"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-https.tls=true"
       - "traefik.http.services.${DC_ORO_NAME:-unnamed}.loadbalancer.server.port=80"
       - "traefik.http.services.${DC_ORO_NAME:-unnamed}.loadbalancer.server.scheme=http"
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     healthcheck:
       test: /bin/bash -c "</dev/tcp/localhost/80"
       start_period: 5s
@@ -464,12 +534,16 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: ${DC_ORO_MQ_USER:-app}
       RABBITMQ_DEFAULT_PASS: ${DC_ORO_MQ_PASSWORD:-app}
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     healthcheck:
       test: nc -vz -w 1 localhost 5672
       start_period: 5s
       interval: 5s
       retries: 18
-    restart: always
     logging:
       driver: "json-file"
       options:
@@ -480,6 +554,10 @@ services:
     hostname: redis.${DC_ORO_NAME:-unnamed}.docker.local
     container_name: ${DC_ORO_NAME:-unnamed}_redis
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 256M
     healthcheck:
       test: /bin/bash -c "</dev/tcp/localhost/6379"
       start_period: 5s
@@ -570,6 +648,11 @@ services:
       - 'SYMFONY_ENV=${SYMFONY_ENV:-dev}'
       - 'XDEBUG_MODE=${XDEBUG_MODE_CLI:-off}'
       - 'ORO_SSH_PUBLIC_KEY=${ORO_SSH_PUBLIC_KEY:-""}'
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 7G
     logging:
       driver: "json-file"
       options:
@@ -579,7 +662,6 @@ services:
       start_period: 5s
       interval: 5s
       retries: 18
-    restart: always
 
 networks:
   dc_shared_net:

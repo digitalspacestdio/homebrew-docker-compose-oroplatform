@@ -1,0 +1,12 @@
+#!/command/with-contenv bash
+
+# Check if DNS sync is enabled (enabled by default for SOCKS5 mode)
+if [[ "${DC_PROXY_DNS_SYNC_ENABLED:-1}" != "1" ]]; then
+    echo "[INFO] DNS sync is disabled (DC_PROXY_DNS_SYNC_ENABLED!=1)"
+    s6-svc -d /run/service/dns-sync
+    exit 0
+fi
+
+echo "[INFO] Starting DNS sync service (container mode)"
+exec /usr/local/bin/dns-sync.sh
+
