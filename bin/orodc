@@ -2379,152 +2379,160 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
     esac
   }
   
-  # 1. PHP Version Selection
+  # 1. PHP Configuration
   echo ""
   msg_header "1. PHP Configuration"
-  PHP_VERSIONS=("8.3" "8.4" "8.5" "8.2" "8.1" "7.4")
-  SELECTED_PHP=$(prompt_select "Select PHP version:" "8.4" "${PHP_VERSIONS[@]}")
   
-  if [[ -n "${DEBUG:-}" ]]; then
-    >&2 echo "DEBUG: Selected PHP: '$SELECTED_PHP'"
-  fi
-  
-  # 2. Node.js Version Selection (based on PHP compatibility)
-  echo ""
-  msg_header "2. Node.js Configuration"
-  
-  # Get compatible Node.js versions as array
-  read -ra COMPATIBLE_NODE_VERSIONS <<< "$(get_compatible_node_versions "$SELECTED_PHP")"
-  
-  # Determine default Node.js version based on PHP
-  case "$SELECTED_PHP" in
-    8.5) DEFAULT_NODE="22" ;;
-    7.4) DEFAULT_NODE="18" ;;
-    8.1) DEFAULT_NODE="20" ;;
-    *) DEFAULT_NODE="20" ;;
-  esac
-  
-  # Ensure default is in compatible versions list
-  if [[ ! " ${COMPATIBLE_NODE_VERSIONS[*]} " =~ " ${DEFAULT_NODE} " ]]; then
-    DEFAULT_NODE="${COMPATIBLE_NODE_VERSIONS[0]}"
-  fi
-  
-  SELECTED_NODE=$(prompt_select "Select Node.js version (compatible with PHP $SELECTED_PHP):" "$DEFAULT_NODE" "${COMPATIBLE_NODE_VERSIONS[@]}")
-  
-  if [[ -n "${DEBUG:-}" ]]; then
-    >&2 echo "DEBUG: Selected Node.js: '$SELECTED_NODE'"
-  fi
-  
-  # 3. PHP Docker Image Selection
-  echo ""
-  msg_header "3. PHP Docker Image"
-  DEFAULT_PHP_IMAGE="ghcr.io/digitalspacestdio/orodc-php-node-symfony:${SELECTED_PHP}-node${SELECTED_NODE}-composer2-alpine"
-  msg_info "Default image: $DEFAULT_PHP_IMAGE"
-  
-  if prompt_yes_no "Use default PHP image?" "yes"; then
-    SELECTED_PHP_IMAGE="$DEFAULT_PHP_IMAGE"
-  else
+  if prompt_yes_no "Use custom PHP image?" "no"; then
     >&2 echo -n "Enter custom PHP image: "
     read SELECTED_PHP_IMAGE </dev/tty
-    SELECTED_PHP_IMAGE="${SELECTED_PHP_IMAGE:-$DEFAULT_PHP_IMAGE}"
+    # Extract versions from custom image if possible (or use defaults)
+    SELECTED_PHP="8.4"
+    SELECTED_NODE="22"
+  else
+    # Select PHP version
+    PHP_VERSIONS=("8.3" "8.4" "8.5" "8.2" "8.1" "7.4")
+    SELECTED_PHP=$(prompt_select "Select PHP version:" "8.4" "${PHP_VERSIONS[@]}")
+    
+    if [[ -n "${DEBUG:-}" ]]; then
+      >&2 echo "DEBUG: Selected PHP: '$SELECTED_PHP'"
+    fi
+    
+    # Select Node.js version (based on PHP compatibility)
+    read -ra COMPATIBLE_NODE_VERSIONS <<< "$(get_compatible_node_versions "$SELECTED_PHP")"
+    
+    # Determine default Node.js version based on PHP
+    case "$SELECTED_PHP" in
+      8.5) DEFAULT_NODE="22" ;;
+      7.4) DEFAULT_NODE="18" ;;
+      8.1) DEFAULT_NODE="20" ;;
+      *) DEFAULT_NODE="20" ;;
+    esac
+    
+    # Ensure default is in compatible versions list
+    if [[ ! " ${COMPATIBLE_NODE_VERSIONS[*]} " =~ " ${DEFAULT_NODE} " ]]; then
+      DEFAULT_NODE="${COMPATIBLE_NODE_VERSIONS[0]}"
+    fi
+    
+    SELECTED_NODE=$(prompt_select "Select Node.js version (compatible with PHP $SELECTED_PHP):" "$DEFAULT_NODE" "${COMPATIBLE_NODE_VERSIONS[@]}")
+    
+    if [[ -n "${DEBUG:-}" ]]; then
+      >&2 echo "DEBUG: Selected Node.js: '$SELECTED_NODE'"
+    fi
+    
+    # Build default image name
+    SELECTED_PHP_IMAGE="ghcr.io/digitalspacestdio/orodc-php-node-symfony:${SELECTED_PHP}-node${SELECTED_NODE}-composer2-alpine"
   fi
   
-  # 4. Database Selection
+  msg_info "PHP Image: $SELECTED_PHP_IMAGE"
+  
+  # 2. Database Configuration
   echo ""
-  msg_header "4. Database Configuration"
-  DB_TYPES=("PostgreSQL" "MySQL")
-  SELECTED_DB_TYPE=$(prompt_select "Select database type:" "PostgreSQL" "${DB_TYPES[@]}")
+  msg_header "2. Database Configuration"
   
-  if [[ -n "${DEBUG:-}" ]]; then
-    >&2 echo "DEBUG: Selected DB type: '$SELECTED_DB_TYPE'"
-  fi
-  
-  if [[ "$SELECTED_DB_TYPE" == "PostgreSQL" ]]; then
-    PGSQL_VERSIONS=("16.6" "17.4" "15.1")
-    SELECTED_DB_VERSION=$(prompt_select "Select PostgreSQL version:" "16.6" "${PGSQL_VERSIONS[@]}")
-    SELECTED_DB_SCHEMA="pgsql"
-    DEFAULT_DB_IMAGE="ghcr.io/digitalspacestdio/orodc-pgsql:${SELECTED_DB_VERSION}"
-  else
-    MYSQL_VERSIONS=("8.4" "8.0" "5.7" "9.0")
-    SELECTED_DB_VERSION=$(prompt_select "Select MySQL version:" "8.4" "${MYSQL_VERSIONS[@]}")
-    SELECTED_DB_SCHEMA="mysql"
-    DEFAULT_DB_IMAGE="mysql:${SELECTED_DB_VERSION}"
-  fi
-  
-  msg_info "Default database image: $DEFAULT_DB_IMAGE"
-  if prompt_yes_no "Use default database image?" "yes"; then
-    SELECTED_DB_IMAGE="$DEFAULT_DB_IMAGE"
-  else
+  if prompt_yes_no "Use custom database image?" "no"; then
     >&2 echo -n "Enter custom database image: "
     read SELECTED_DB_IMAGE </dev/tty
-    SELECTED_DB_IMAGE="${SELECTED_DB_IMAGE:-$DEFAULT_DB_IMAGE}"
+    # Default schema
+    SELECTED_DB_SCHEMA="pgsql"
+    SELECTED_DB_VERSION="custom"
+  else
+    # Select database type
+    DB_TYPES=("PostgreSQL" "MySQL")
+    SELECTED_DB_TYPE=$(prompt_select "Select database type:" "PostgreSQL" "${DB_TYPES[@]}")
+    
+    if [[ -n "${DEBUG:-}" ]]; then
+      >&2 echo "DEBUG: Selected DB type: '$SELECTED_DB_TYPE'"
+    fi
+    
+    # Select version based on type
+    if [[ "$SELECTED_DB_TYPE" == "PostgreSQL" ]]; then
+      PGSQL_VERSIONS=("16.6" "17.4" "15.1")
+      SELECTED_DB_VERSION=$(prompt_select "Select PostgreSQL version:" "16.6" "${PGSQL_VERSIONS[@]}")
+      SELECTED_DB_SCHEMA="pgsql"
+      SELECTED_DB_IMAGE="ghcr.io/digitalspacestdio/orodc-pgsql:${SELECTED_DB_VERSION}"
+    else
+      MYSQL_VERSIONS=("8.4" "8.0" "5.7" "9.0")
+      SELECTED_DB_VERSION=$(prompt_select "Select MySQL version:" "8.4" "${MYSQL_VERSIONS[@]}")
+      SELECTED_DB_SCHEMA="mysql"
+      SELECTED_DB_IMAGE="mysql:${SELECTED_DB_VERSION}"
+    fi
   fi
   
-  # 5. Search Engine Selection
+  msg_info "Database Image: $SELECTED_DB_IMAGE"
+  
+  # 3. Search Engine Configuration
   echo ""
-  msg_header "5. Search Engine Configuration"
-  SEARCH_TYPES=("Elasticsearch" "OpenSearch")
-  SELECTED_SEARCH_TYPE=$(prompt_select "Select search engine:" "Elasticsearch" "${SEARCH_TYPES[@]}")
+  msg_header "3. Search Engine Configuration"
   
-  if [[ "$SELECTED_SEARCH_TYPE" == "Elasticsearch" ]]; then
-    ELASTIC_VERSIONS=("8.10.3" "8.15.0" "7.17.0")
-    SELECTED_SEARCH_VERSION=$(prompt_select "Select Elasticsearch version:" "8.10.3" "${ELASTIC_VERSIONS[@]}")
-    DEFAULT_SEARCH_IMAGE="docker.elastic.co/elasticsearch/elasticsearch:${SELECTED_SEARCH_VERSION}"
-  else
-    OPENSEARCH_VERSIONS=("2.11.0" "2.15.0" "1.3.0")
-    SELECTED_SEARCH_VERSION=$(prompt_select "Select OpenSearch version:" "2.11.0" "${OPENSEARCH_VERSIONS[@]}")
-    DEFAULT_SEARCH_IMAGE="opensearchproject/opensearch:${SELECTED_SEARCH_VERSION}"
-  fi
-  
-  msg_info "Default search image: $DEFAULT_SEARCH_IMAGE"
-  if prompt_yes_no "Use default search engine image?" "yes"; then
-    SELECTED_SEARCH_IMAGE="$DEFAULT_SEARCH_IMAGE"
-  else
+  if prompt_yes_no "Use custom search engine image?" "no"; then
     >&2 echo -n "Enter custom search image: "
     read SELECTED_SEARCH_IMAGE </dev/tty
-    SELECTED_SEARCH_IMAGE="${SELECTED_SEARCH_IMAGE:-$DEFAULT_SEARCH_IMAGE}"
+    SELECTED_SEARCH_TYPE="Custom"
+    SELECTED_SEARCH_VERSION="custom"
+  else
+    # Select search engine type
+    SEARCH_TYPES=("Elasticsearch" "OpenSearch")
+    SELECTED_SEARCH_TYPE=$(prompt_select "Select search engine:" "Elasticsearch" "${SEARCH_TYPES[@]}")
+    
+    # Select version based on type
+    if [[ "$SELECTED_SEARCH_TYPE" == "Elasticsearch" ]]; then
+      ELASTIC_VERSIONS=("8.10.3" "8.15.0" "7.17.0")
+      SELECTED_SEARCH_VERSION=$(prompt_select "Select Elasticsearch version:" "8.10.3" "${ELASTIC_VERSIONS[@]}")
+      SELECTED_SEARCH_IMAGE="docker.elastic.co/elasticsearch/elasticsearch:${SELECTED_SEARCH_VERSION}"
+    else
+      OPENSEARCH_VERSIONS=("2.11.0" "2.15.0" "1.3.0")
+      SELECTED_SEARCH_VERSION=$(prompt_select "Select OpenSearch version:" "2.11.0" "${OPENSEARCH_VERSIONS[@]}")
+      SELECTED_SEARCH_IMAGE="opensearchproject/opensearch:${SELECTED_SEARCH_VERSION}"
+    fi
   fi
   
-  # 6. Cache Selection
+  msg_info "Search Image: $SELECTED_SEARCH_IMAGE"
+  
+  # 4. Cache Configuration
   echo ""
-  msg_header "6. Cache Configuration"
-  CACHE_TYPES=("Redis" "KeyDB")
-  SELECTED_CACHE_TYPE=$(prompt_select "Select cache engine:" "Redis" "${CACHE_TYPES[@]}")
+  msg_header "4. Cache Configuration"
   
-  if [[ "$SELECTED_CACHE_TYPE" == "Redis" ]]; then
-    REDIS_VERSIONS=("7.2" "7.4" "6.2")
-    SELECTED_CACHE_VERSION=$(prompt_select "Select Redis version:" "7.2" "${REDIS_VERSIONS[@]}")
-    DEFAULT_CACHE_IMAGE="redis:${SELECTED_CACHE_VERSION}-alpine"
-  else
-    KEYDB_VERSIONS=("6.3.4" "6.3.3")
-    SELECTED_CACHE_VERSION=$(prompt_select "Select KeyDB version:" "6.3.4" "${KEYDB_VERSIONS[@]}")
-    DEFAULT_CACHE_IMAGE="eqalpha/keydb:alpine_x86_64_v${SELECTED_CACHE_VERSION}"
-  fi
-  
-  msg_info "Default cache image: $DEFAULT_CACHE_IMAGE"
-  if prompt_yes_no "Use default cache image?" "yes"; then
-    SELECTED_CACHE_IMAGE="$DEFAULT_CACHE_IMAGE"
-  else
+  if prompt_yes_no "Use custom cache image?" "no"; then
     >&2 echo -n "Enter custom cache image: "
     read SELECTED_CACHE_IMAGE </dev/tty
-    SELECTED_CACHE_IMAGE="${SELECTED_CACHE_IMAGE:-$DEFAULT_CACHE_IMAGE}"
+    SELECTED_CACHE_TYPE="Custom"
+    SELECTED_CACHE_VERSION="custom"
+  else
+    # Select cache engine type
+    CACHE_TYPES=("Redis" "KeyDB")
+    SELECTED_CACHE_TYPE=$(prompt_select "Select cache engine:" "Redis" "${CACHE_TYPES[@]}")
+    
+    # Select version based on type
+    if [[ "$SELECTED_CACHE_TYPE" == "Redis" ]]; then
+      REDIS_VERSIONS=("7.2" "7.4" "6.2")
+      SELECTED_CACHE_VERSION=$(prompt_select "Select Redis version:" "7.2" "${REDIS_VERSIONS[@]}")
+      SELECTED_CACHE_IMAGE="redis:${SELECTED_CACHE_VERSION}-alpine"
+    else
+      KEYDB_VERSIONS=("6.3.4" "6.3.3")
+      SELECTED_CACHE_VERSION=$(prompt_select "Select KeyDB version:" "6.3.4" "${KEYDB_VERSIONS[@]}")
+      SELECTED_CACHE_IMAGE="eqalpha/keydb:alpine_x86_64_v${SELECTED_CACHE_VERSION}"
+    fi
   fi
   
-  # 7. RabbitMQ Selection
-  echo ""
-  msg_header "7. RabbitMQ Configuration"
-  RABBITMQ_VERSIONS=("3.13" "3.12" "3.11")
-  SELECTED_RABBITMQ_VERSION=$(prompt_select "Select RabbitMQ version:" "3.13" "${RABBITMQ_VERSIONS[@]}")
-  DEFAULT_RABBITMQ_IMAGE="rabbitmq:${SELECTED_RABBITMQ_VERSION}-management-alpine"
+  msg_info "Cache Image: $SELECTED_CACHE_IMAGE"
   
-  msg_info "Default RabbitMQ image: $DEFAULT_RABBITMQ_IMAGE"
-  if prompt_yes_no "Use default RabbitMQ image?" "yes"; then
-    SELECTED_RABBITMQ_IMAGE="$DEFAULT_RABBITMQ_IMAGE"
-  else
+  # 5. RabbitMQ Configuration
+  echo ""
+  msg_header "5. RabbitMQ Configuration"
+  
+  if prompt_yes_no "Use custom RabbitMQ image?" "no"; then
     >&2 echo -n "Enter custom RabbitMQ image: "
     read SELECTED_RABBITMQ_IMAGE </dev/tty
-    SELECTED_RABBITMQ_IMAGE="${SELECTED_RABBITMQ_IMAGE:-$DEFAULT_RABBITMQ_IMAGE}"
+    SELECTED_RABBITMQ_VERSION="custom"
+  else
+    # Select RabbitMQ version
+    RABBITMQ_VERSIONS=("3.13" "3.12" "3.11")
+    SELECTED_RABBITMQ_VERSION=$(prompt_select "Select RabbitMQ version:" "3.13" "${RABBITMQ_VERSIONS[@]}")
+    SELECTED_RABBITMQ_IMAGE="rabbitmq:${SELECTED_RABBITMQ_VERSION}-management-alpine"
   fi
+  
+  msg_info "RabbitMQ Image: $SELECTED_RABBITMQ_IMAGE"
   
   # Summary
   echo ""
