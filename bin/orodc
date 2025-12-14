@@ -2319,19 +2319,21 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
     local options=("$@")
     
     # Output to stderr to avoid interfering with return value
-    msg_info "$prompt" >&2
+    >&2 msg_info "$prompt"
     local i=1
     for opt in "${options[@]}"; do
       if [[ "$opt" == "$default" ]]; then
-        echo "  $i) $opt [default]" >&2
+        >&2 echo "  $i) $opt [default]"
       else
-        echo "  $i) $opt" >&2
+        >&2 echo "  $i) $opt"
       fi
       ((i++))
     done
     
-    # Read from terminal, prompt to stderr
-    read -p "Select [1-${#options[@]}] (default: $default): " selection </dev/tty >&2
+    # Read from terminal
+    local selection
+    >&2 echo -n "Select [1-${#options[@]}] (default: $default): "
+    read selection </dev/tty
     
     # Return selected value to stdout
     if [[ -z "$selection" ]]; then
@@ -2353,10 +2355,12 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
     local answer
     
     if [[ "$default" == "yes" ]]; then
-      read -p "$prompt [Y/n]: " answer </dev/tty >&2
+      >&2 echo -n "$prompt [Y/n]: "
+      read answer </dev/tty
       answer="${answer:-y}"
     else
-      read -p "$prompt [y/N]: " answer </dev/tty >&2
+      >&2 echo -n "$prompt [y/N]: "
+      read answer </dev/tty
       answer="${answer:-n}"
     fi
     
@@ -2403,7 +2407,8 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
   if prompt_yes_no "Use default PHP image?" "yes"; then
     SELECTED_PHP_IMAGE="$DEFAULT_PHP_IMAGE"
   else
-    read -p "Enter custom PHP image: " SELECTED_PHP_IMAGE </dev/tty >&2
+    >&2 echo -n "Enter custom PHP image: "
+    read SELECTED_PHP_IMAGE </dev/tty
     SELECTED_PHP_IMAGE="${SELECTED_PHP_IMAGE:-$DEFAULT_PHP_IMAGE}"
   fi
   
@@ -2429,7 +2434,8 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
   if prompt_yes_no "Use default database image?" "yes"; then
     SELECTED_DB_IMAGE="$DEFAULT_DB_IMAGE"
   else
-    read -p "Enter custom database image: " SELECTED_DB_IMAGE </dev/tty >&2
+    >&2 echo -n "Enter custom database image: "
+    read SELECTED_DB_IMAGE </dev/tty
     SELECTED_DB_IMAGE="${SELECTED_DB_IMAGE:-$DEFAULT_DB_IMAGE}"
   fi
   
@@ -2453,7 +2459,8 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
   if prompt_yes_no "Use default search engine image?" "yes"; then
     SELECTED_SEARCH_IMAGE="$DEFAULT_SEARCH_IMAGE"
   else
-    read -p "Enter custom search image: " SELECTED_SEARCH_IMAGE </dev/tty >&2
+    >&2 echo -n "Enter custom search image: "
+    read SELECTED_SEARCH_IMAGE </dev/tty
     SELECTED_SEARCH_IMAGE="${SELECTED_SEARCH_IMAGE:-$DEFAULT_SEARCH_IMAGE}"
   fi
   
@@ -2477,7 +2484,8 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
   if prompt_yes_no "Use default cache image?" "yes"; then
     SELECTED_CACHE_IMAGE="$DEFAULT_CACHE_IMAGE"
   else
-    read -p "Enter custom cache image: " SELECTED_CACHE_IMAGE </dev/tty >&2
+    >&2 echo -n "Enter custom cache image: "
+    read SELECTED_CACHE_IMAGE </dev/tty
     SELECTED_CACHE_IMAGE="${SELECTED_CACHE_IMAGE:-$DEFAULT_CACHE_IMAGE}"
   fi
   
@@ -2492,7 +2500,8 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
   if prompt_yes_no "Use default RabbitMQ image?" "yes"; then
     SELECTED_RABBITMQ_IMAGE="$DEFAULT_RABBITMQ_IMAGE"
   else
-    read -p "Enter custom RabbitMQ image: " SELECTED_RABBITMQ_IMAGE </dev/tty >&2
+    >&2 echo -n "Enter custom RabbitMQ image: "
+    read SELECTED_RABBITMQ_IMAGE </dev/tty
     SELECTED_RABBITMQ_IMAGE="${SELECTED_RABBITMQ_IMAGE:-$DEFAULT_RABBITMQ_IMAGE}"
   fi
   
