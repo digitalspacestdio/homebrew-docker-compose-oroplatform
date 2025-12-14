@@ -2317,9 +2317,10 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
     local default="$2"
     shift 2
     local options=("$@")
+    local result=""
     
     # Output to stderr to avoid interfering with return value
-    >&2 msg_info "$prompt"
+    >&2 echo -e "\033[36m==> $prompt\033[0m"
     local i=1
     for opt in "${options[@]}"; do
       if [[ "$opt" == "$default" ]]; then
@@ -2335,17 +2336,25 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
     >&2 echo -n "Select [1-${#options[@]}] (default: $default): "
     read selection </dev/tty
     
-    # Return selected value to stdout
+    # Determine result
     if [[ -z "$selection" ]]; then
-      echo "$default"
+      result="$default"
     else
       local idx=$((selection - 1))
       if [[ $idx -ge 0 && $idx -lt ${#options[@]} ]]; then
-        echo "${options[$idx]}"
+        result="${options[$idx]}"
       else
-        echo "$default"
+        result="$default"
       fi
     fi
+    
+    # Debug output if needed
+    if [[ -n "${DEBUG:-}" ]]; then
+      >&2 echo "DEBUG: prompt_select returned: '$result'"
+    fi
+    
+    # Return selected value to stdout
+    echo "$result"
   }
   
   # Function to prompt yes/no with default
@@ -2376,6 +2385,10 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
   PHP_VERSIONS=("8.3" "8.4" "8.5" "8.2" "8.1" "7.4")
   SELECTED_PHP=$(prompt_select "Select PHP version:" "8.4" "${PHP_VERSIONS[@]}")
   
+  if [[ -n "${DEBUG:-}" ]]; then
+    >&2 echo "DEBUG: Selected PHP: '$SELECTED_PHP'"
+  fi
+  
   # 2. Node.js Version Selection (based on PHP compatibility)
   echo ""
   msg_header "2. Node.js Configuration"
@@ -2398,6 +2411,10 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
   
   SELECTED_NODE=$(prompt_select "Select Node.js version (compatible with PHP $SELECTED_PHP):" "$DEFAULT_NODE" "${COMPATIBLE_NODE_VERSIONS[@]}")
   
+  if [[ -n "${DEBUG:-}" ]]; then
+    >&2 echo "DEBUG: Selected Node.js: '$SELECTED_NODE'"
+  fi
+  
   # 3. PHP Docker Image Selection
   echo ""
   msg_header "3. PHP Docker Image"
@@ -2417,6 +2434,10 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
   msg_header "4. Database Configuration"
   DB_TYPES=("PostgreSQL" "MySQL")
   SELECTED_DB_TYPE=$(prompt_select "Select database type:" "PostgreSQL" "${DB_TYPES[@]}")
+  
+  if [[ -n "${DEBUG:-}" ]]; then
+    >&2 echo "DEBUG: Selected DB type: '$SELECTED_DB_TYPE'"
+  fi
   
   if [[ "$SELECTED_DB_TYPE" == "PostgreSQL" ]]; then
     PGSQL_VERSIONS=("16.6" "17.4" "15.1")
@@ -2692,3 +2713,4 @@ full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${args[*
 
 DC_ORO_NAME="$DC_ORO_NAME" bash -c "$full_cmd"
 exit $?
+
