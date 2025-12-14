@@ -2319,8 +2319,22 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
     local options=("$@")
     local result=""
     
+    # Debug: show what we received
+    if [[ -n "${DEBUG:-}" ]]; then
+      >&2 echo "DEBUG: prompt='$prompt', default='$default', options count=${#options[@]}"
+      >&2 echo "DEBUG: options=(${options[*]})"
+    fi
+    
     # Output to stderr to avoid interfering with return value
     >&2 echo -e "\033[36m==> $prompt\033[0m"
+    
+    # Check if we have options
+    if [[ ${#options[@]} -eq 0 ]]; then
+      >&2 echo "ERROR: No options provided!"
+      echo "$default"
+      return
+    fi
+    
     local i=1
     for opt in "${options[@]}"; do
       if [[ "$opt" == "$default" ]]; then
