@@ -609,7 +609,7 @@ if [[ "$temp_first_non_flag_arg" == "proxy" ]]; then
         msg_info "Dashboard:    http://${TRAEFIK_BIND_ADDRESS:-127.0.0.1}:8880/traefik/dashboard/"
         msg_info "Proxy HTTP:   http://${TRAEFIK_BIND_ADDRESS:-127.0.0.1}:8880"
         msg_info "Proxy HTTPS:  https://${TRAEFIK_BIND_ADDRESS:-127.0.0.1}:8443"
-        msg_info "SOCKS5:       ${TRAEFIK_BIND_ADDRESS:-127.0.0.1}:1080"
+        msg_info "SOCKS5:       ${TRAEFIK_BIND_ADDRESS:-127.0.0.1}:${DC_PROXY_SOCKS5_PORT:-1080}"
         msg_info ""
         msg_warning "To enable HTTPS for *.docker.local domains, install CA certificate:"
         msg_info "  orodc proxy install-certs"
