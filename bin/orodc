@@ -2663,6 +2663,18 @@ if [[ "$first_non_flag_arg" == "purge" ]]; then
     echo "Removing docker volume: ${DC_ORO_NAME}_appcode"
     ${DOCKER_BIN} volume rm ${DC_ORO_NAME}'_appcode'
   }
+  
+  # Remove project-specific Docker images
+  PROJECT_IMAGES=$(${DOCKER_BIN} images --format "{{.Repository}}:{{.Tag}}" | grep "^${DC_ORO_NAME}-")
+  if [[ -n "$PROJECT_IMAGES" ]]; then
+    msg_info "Removing project images for: ${DC_ORO_NAME}"
+    echo "$PROJECT_IMAGES" | while read -r image; do
+      if [[ -n "$image" ]]; then
+        msg_info "  Removing image: $image"
+        ${DOCKER_BIN} rmi "$image" 2>/dev/null || true
+      fi
+    done
+  fi
 
   if [[ -d "${DC_ORO_CONFIG_DIR}" ]]; then
     rm -rf "${DC_ORO_CONFIG_DIR}"
