@@ -2318,19 +2318,22 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
     shift 2
     local options=("$@")
     
-    msg_info "$prompt"
+    # Output to stderr to avoid interfering with return value
+    msg_info "$prompt" >&2
     local i=1
     for opt in "${options[@]}"; do
       if [[ "$opt" == "$default" ]]; then
-        echo "  $i) $opt [default]"
+        echo "  $i) $opt [default]" >&2
       else
-        echo "  $i) $opt"
+        echo "  $i) $opt" >&2
       fi
       ((i++))
     done
     
-    read -p "Select [1-${#options[@]}] (default: $default): " selection
+    # Read from terminal, prompt to stderr
+    read -p "Select [1-${#options[@]}] (default: $default): " selection </dev/tty >&2
     
+    # Return selected value to stdout
     if [[ -z "$selection" ]]; then
       echo "$default"
     else
@@ -2347,12 +2350,13 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
   prompt_yes_no() {
     local prompt="$1"
     local default="${2:-yes}"
+    local answer
     
     if [[ "$default" == "yes" ]]; then
-      read -p "$prompt [Y/n]: " answer
+      read -p "$prompt [Y/n]: " answer </dev/tty >&2
       answer="${answer:-y}"
     else
-      read -p "$prompt [y/N]: " answer
+      read -p "$prompt [y/N]: " answer </dev/tty >&2
       answer="${answer:-n}"
     fi
     
@@ -2371,15 +2375,21 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
   # 2. Node.js Version Selection (based on PHP compatibility)
   echo ""
   msg_header "2. Node.js Configuration"
-  COMPATIBLE_NODE_VERSIONS=($(get_compatible_node_versions "$SELECTED_PHP"))
   
-  # Determine default Node.js version
-  if [[ "$SELECTED_PHP" == "8.5" ]]; then
-    DEFAULT_NODE="22"
-  elif [[ "$SELECTED_PHP" == "7.4" ]]; then
-    DEFAULT_NODE="18"
-  else
-    DEFAULT_NODE="20"
+  # Get compatible Node.js versions as array
+  read -ra COMPATIBLE_NODE_VERSIONS <<< "$(get_compatible_node_versions "$SELECTED_PHP")"
+  
+  # Determine default Node.js version based on PHP
+  case "$SELECTED_PHP" in
+    8.5) DEFAULT_NODE="22" ;;
+    7.4) DEFAULT_NODE="18" ;;
+    8.1) DEFAULT_NODE="20" ;;
+    *) DEFAULT_NODE="20" ;;
+  esac
+  
+  # Ensure default is in compatible versions list
+  if [[ ! " ${COMPATIBLE_NODE_VERSIONS[*]} " =~ " ${DEFAULT_NODE} " ]]; then
+    DEFAULT_NODE="${COMPATIBLE_NODE_VERSIONS[0]}"
   fi
   
   SELECTED_NODE=$(prompt_select "Select Node.js version (compatible with PHP $SELECTED_PHP):" "$DEFAULT_NODE" "${COMPATIBLE_NODE_VERSIONS[@]}")
@@ -2393,7 +2403,7 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
   if prompt_yes_no "Use default PHP image?" "yes"; then
     SELECTED_PHP_IMAGE="$DEFAULT_PHP_IMAGE"
   else
-    read -p "Enter custom PHP image: " SELECTED_PHP_IMAGE
+    read -p "Enter custom PHP image: " SELECTED_PHP_IMAGE </dev/tty >&2
     SELECTED_PHP_IMAGE="${SELECTED_PHP_IMAGE:-$DEFAULT_PHP_IMAGE}"
   fi
   
@@ -2419,7 +2429,7 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
   if prompt_yes_no "Use default database image?" "yes"; then
     SELECTED_DB_IMAGE="$DEFAULT_DB_IMAGE"
   else
-    read -p "Enter custom database image: " SELECTED_DB_IMAGE
+    read -p "Enter custom database image: " SELECTED_DB_IMAGE </dev/tty >&2
     SELECTED_DB_IMAGE="${SELECTED_DB_IMAGE:-$DEFAULT_DB_IMAGE}"
   fi
   
@@ -2443,7 +2453,7 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
   if prompt_yes_no "Use default search engine image?" "yes"; then
     SELECTED_SEARCH_IMAGE="$DEFAULT_SEARCH_IMAGE"
   else
-    read -p "Enter custom search image: " SELECTED_SEARCH_IMAGE
+    read -p "Enter custom search image: " SELECTED_SEARCH_IMAGE </dev/tty >&2
     SELECTED_SEARCH_IMAGE="${SELECTED_SEARCH_IMAGE:-$DEFAULT_SEARCH_IMAGE}"
   fi
   
@@ -2467,7 +2477,7 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
   if prompt_yes_no "Use default cache image?" "yes"; then
     SELECTED_CACHE_IMAGE="$DEFAULT_CACHE_IMAGE"
   else
-    read -p "Enter custom cache image: " SELECTED_CACHE_IMAGE
+    read -p "Enter custom cache image: " SELECTED_CACHE_IMAGE </dev/tty >&2
     SELECTED_CACHE_IMAGE="${SELECTED_CACHE_IMAGE:-$DEFAULT_CACHE_IMAGE}"
   fi
   
@@ -2482,7 +2492,7 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
   if prompt_yes_no "Use default RabbitMQ image?" "yes"; then
     SELECTED_RABBITMQ_IMAGE="$DEFAULT_RABBITMQ_IMAGE"
   else
-    read -p "Enter custom RabbitMQ image: " SELECTED_RABBITMQ_IMAGE
+    read -p "Enter custom RabbitMQ image: " SELECTED_RABBITMQ_IMAGE </dev/tty >&2
     SELECTED_RABBITMQ_IMAGE="${SELECTED_RABBITMQ_IMAGE:-$DEFAULT_RABBITMQ_IMAGE}"
   fi
   
