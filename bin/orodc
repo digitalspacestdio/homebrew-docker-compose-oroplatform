@@ -588,6 +588,38 @@ if [[ "$temp_first_non_flag_arg" == "proxy" ]]; then
         msg_info "Using bind address: ${TRAEFIK_BIND_ADDRESS} (from environment)"
       fi
       
+      # Configure SOCKS5 port if not set
+      if [[ -z "${DC_PROXY_SOCKS5_PORT:-}" ]]; then
+        msg_info ""
+        msg_info "SOCKS5 Proxy Port Configuration"
+        msg_info "================================"
+        msg_info ""
+        msg_info "Choose SOCKS5 proxy port:"
+        msg_info "  - Default: 1080 (standard SOCKS5 port)"
+        msg_info "  - Custom: any available port (e.g., 9999)"
+        msg_info ""
+        
+        # Interactive prompt
+        read -p "Enter SOCKS5 port (press Enter for default: 1080): " PORT_CHOICE
+        
+        if [[ -z "$PORT_CHOICE" ]]; then
+          export DC_PROXY_SOCKS5_PORT="1080"
+          msg_ok "Using default port: 1080"
+        else
+          export DC_PROXY_SOCKS5_PORT="$PORT_CHOICE"
+          msg_ok "Using custom port: ${PORT_CHOICE}"
+        fi
+        
+        msg_info ""
+        msg_info "To skip this prompt next time, set:"
+        msg_info "  export DC_PROXY_SOCKS5_PORT=${DC_PROXY_SOCKS5_PORT}"
+        msg_info "Or add to .env.orodc:"
+        msg_info "  echo 'DC_PROXY_SOCKS5_PORT=${DC_PROXY_SOCKS5_PORT}' >> .env.orodc"
+        msg_info ""
+      else
+        msg_info "Using SOCKS5 port: ${DC_PROXY_SOCKS5_PORT} (from environment)"
+      fi
+      
       # Set log level based on DEBUG environment variable
       if [[ "${DEBUG:-}" == "1" ]]; then
         export TRAEFIK_LOG_LEVEL="DEBUG"
