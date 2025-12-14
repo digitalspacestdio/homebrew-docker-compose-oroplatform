@@ -628,7 +628,7 @@ if [[ "$temp_first_non_flag_arg" == "proxy" ]]; then
       fi
       
       # Pass all remaining arguments to docker compose up
-      ${DOCKER_COMPOSE_BIN} -f "$PROXY_COMPOSE_FILE" up "$@" || {
+      ${DOCKER_COMPOSE_BIN} -p proxy -f "$PROXY_COMPOSE_FILE" up "$@" || {
         msg_error "Failed to start proxy services"
         exit 1
       }
@@ -654,7 +654,7 @@ if [[ "$temp_first_non_flag_arg" == "proxy" ]]; then
     
     down)
       msg_info "Stopping proxy services..."
-      ${DOCKER_COMPOSE_BIN} -f "$PROXY_COMPOSE_FILE" down "$@" || {
+      ${DOCKER_COMPOSE_BIN} -p proxy -f "$PROXY_COMPOSE_FILE" down "$@" || {
         msg_error "Failed to stop proxy services"
         exit 1
       }
@@ -664,7 +664,7 @@ if [[ "$temp_first_non_flag_arg" == "proxy" ]]; then
     
     purge)
       msg_info "Removing proxy services and volumes..."
-      ${DOCKER_COMPOSE_BIN} -f "$PROXY_COMPOSE_FILE" down -v "$@" || {
+      ${DOCKER_COMPOSE_BIN} -p proxy -f "$PROXY_COMPOSE_FILE" down -v "$@" || {
         msg_error "Failed to remove proxy services"
         exit 1
       }
