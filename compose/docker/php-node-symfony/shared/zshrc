@@ -74,10 +74,9 @@ compinit
 
 zstyle ':completion:*' menu select
 mkdir -p ~/.config
-starship preset plain-text-symbols -o ~/.config/starship.toml
 
 # Configure starship: customize hostname, PHP, Node.js format and git branch position
-cat >> ~/.config/starship.toml << 'STARSHIP_EOF'
+cat > ~/.config/starship.toml << 'STARSHIP_EOF'
 
 # Hostname configuration
 [hostname]
