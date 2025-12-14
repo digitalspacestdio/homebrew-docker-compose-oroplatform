@@ -22,7 +22,7 @@ msg_info() {
 
 # Function to display warning messages
 msg_warning() {
-  >&2 echo -e "\033[31m==> Warning: $1\033[0m"
+  >&2 echo -e "\033[33m==> Warning: $1\033[0m"
 }
 
 # Function to display success messages
@@ -644,6 +644,7 @@ if [[ "$temp_first_non_flag_arg" == "proxy" ]]; then
         msg_info "SOCKS5:       ${TRAEFIK_BIND_ADDRESS:-127.0.0.1}:${DC_PROXY_SOCKS5_PORT:-1080}"
         msg_info ""
         msg_warning "To enable HTTPS for *.docker.local domains, install CA certificate:"
+        msg_info ""
         msg_info "  orodc proxy install-certs"
         msg_info ""
       fi
