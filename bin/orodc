@@ -1620,13 +1620,17 @@ detect_php_version_from_composer() {
 # Get compatible Node.js version for PHP version
 get_compatible_node_version() {
   local php_version="$1"
-  case "$php_version" in
-    "8.5") echo "24" ;;
-    "8.4") echo "22" ;;
-    "8.3") echo "20" ;;
-    "8.2") echo "20" ;;
-    "8.1") echo "18" ;;
-    "7.4") echo "16" ;;
+  # Extract major.minor version only (e.g., "7.3.33" -> "7.3")
+  local php_mm=$(echo "$php_version" | sed -E 's/^([0-9]+\.[0-9]+).*/\1/')
+  
+  case "$php_mm" in
+    8.5*) echo "24" ;;
+    8.4*) echo "22" ;;
+    8.3*) echo "20" ;;
+    8.2*) echo "20" ;;
+    8.1*) echo "20" ;;
+    7.4*) echo "16" ;;
+    7.3*) echo "16" ;;
     *) echo "24" ;;  # Default to latest Node 24 for unknown PHP versions
   esac
 }
@@ -2599,6 +2603,7 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
   get_compatible_node_versions() {
     local php_ver="$1"
     case "$php_ver" in
+      7.3) echo "16" ;;
       7.4) echo "18 16" ;;
       8.1) echo "22 20 18 16" ;;
       8.2|8.3|8.4) echo "22 20 18" ;;
@@ -2728,7 +2733,7 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
     SELECTED_NODE="${EXISTING_NODE_VERSION:-22}"
   else
     # Select PHP version (sorted newest to oldest)
-    PHP_VERSIONS=("8.5" "8.4" "8.3" "8.2" "8.1" "7.4")
+    PHP_VERSIONS=("8.5" "8.4" "8.3" "8.2" "8.1" "7.4" "7.3")
     DEFAULT_PHP="${EXISTING_PHP_VERSION:-8.4}"
     SELECTED_PHP=$(prompt_select "Select PHP version:" "$DEFAULT_PHP" "${PHP_VERSIONS[@]}")
     
@@ -2745,8 +2750,9 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
     else
       case "$SELECTED_PHP" in
         8.5) DEFAULT_NODE="24" ;;
-        7.4) DEFAULT_NODE="18" ;;
-        8.1) DEFAULT_NODE="22" ;;
+        8.4) DEFAULT_NODE="22" ;;
+        8.1|8.2|8.3) DEFAULT_NODE="20" ;;
+        7.3|7.4) DEFAULT_NODE="16" ;;
         *) DEFAULT_NODE="22" ;;
       esac
       

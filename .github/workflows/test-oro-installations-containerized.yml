@@ -7,16 +7,13 @@ on:
       - 'compose/**'
       - 'bin/**'
       - '!compose/docker/**'  # Exclude docker files - they trigger via workflow_run
-  pull_request:
-    branches: [ main, master, develop ]
-    paths:
-      - 'compose/**'
-      - 'bin/**'
-      - '!compose/docker/**'  # Exclude docker files - they trigger via workflow_run
   
   # Run after Docker images are successfully built
   workflow_run:
-    workflows: ["Build & Publish PHP Base and PHP+Node.js multi-arch images to GHCR"]
+    workflows: 
+      - "Build & Publish PHP Base and PHP+Node.js multi-arch images to GHCR"
+      - "Build & Publish nginx multi-arch images to GHCR"
+      - "Build & Publish PostgreSQL multi-arch images to GHCR"
     types:
       - completed
     branches: [ master ]
