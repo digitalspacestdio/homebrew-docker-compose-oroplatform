@@ -1,5 +1,5 @@
-ARG ALPINE_VERSION=3.14
-ARG NODE_VERSION=16
+ARG ALPINE_VERSION=3.15
+ARG NODE_VERSION=18
 ARG PHP_VERSION=7.3
 ARG COMPOSER_VERSION=2
 
@@ -50,6 +50,10 @@ COPY --from=app_node /opt /opt
 
 # Smoke test for Node.js
 RUN node --version && npm --version && yarn --version
+
+# Set compiler flags for node-sass compatibility
+ENV CXXFLAGS="-std=c++14"
+ENV CFLAGS="-std=c++14"
 
 # Copy ofelia binary
 COPY --from=mcuadros/ofelia:latest /usr/bin/ofelia /usr/bin/ofelia

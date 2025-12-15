@@ -64,6 +64,10 @@ echo "developer ALL=(ALL) ALL" >> /etc/sudoers
 # Install Python 2 for Node.js modules
 apk add --no-cache python2
 
+# Install deps for node-sass
+echo "http://dl-cdn.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories
+apk add --no-cache gcc g++ make
+
 # Install and configure Zsh + Starship
 apk add --no-cache zsh
 
