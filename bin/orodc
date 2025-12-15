@@ -2804,13 +2804,23 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
     # Select version based on type (sorted newest to oldest)
     if [[ "$SELECTED_DB_TYPE" == "PostgreSQL" ]]; then
       PGSQL_VERSIONS=("17.4" "16.6" "15.1")
-      DEFAULT_PGSQL_VERSION="${EXISTING_DB_VERSION:-16.6}"
+      # Only use existing version if it's valid for PostgreSQL and schema hasn't changed
+      if [[ "$EXISTING_DB_SCHEMA" == "pgsql" ]] && [[ " ${PGSQL_VERSIONS[*]} " =~ " ${EXISTING_DB_VERSION} " ]]; then
+        DEFAULT_PGSQL_VERSION="$EXISTING_DB_VERSION"
+      else
+        DEFAULT_PGSQL_VERSION="16.6"
+      fi
       SELECTED_DB_VERSION=$(prompt_select "Select PostgreSQL version:" "$DEFAULT_PGSQL_VERSION" "${PGSQL_VERSIONS[@]}")
       SELECTED_DB_SCHEMA="pgsql"
       SELECTED_DB_IMAGE="ghcr.io/digitalspacestdio/orodc-pgsql:${SELECTED_DB_VERSION}"
     else
       MYSQL_VERSIONS=("9.0" "8.4" "8.0" "5.7")
-      DEFAULT_MYSQL_VERSION="${EXISTING_DB_VERSION:-8.4}"
+      # Only use existing version if it's valid for MySQL and schema hasn't changed
+      if [[ "$EXISTING_DB_SCHEMA" == "mysql" ]] && [[ " ${MYSQL_VERSIONS[*]} " =~ " ${EXISTING_DB_VERSION} " ]]; then
+        DEFAULT_MYSQL_VERSION="$EXISTING_DB_VERSION"
+      else
+        DEFAULT_MYSQL_VERSION="8.4"
+      fi
       SELECTED_DB_VERSION=$(prompt_select "Select MySQL version:" "$DEFAULT_MYSQL_VERSION" "${MYSQL_VERSIONS[@]}")
       SELECTED_DB_SCHEMA="mysql"
       SELECTED_DB_IMAGE="mysql:${SELECTED_DB_VERSION}"
@@ -2847,12 +2857,22 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
     # Select version based on type (sorted newest to oldest)
     if [[ "$SELECTED_SEARCH_TYPE" == "Elasticsearch" ]]; then
       ELASTIC_VERSIONS=("8.15.0" "8.10.3" "7.17.0")
-      DEFAULT_ELASTIC_VERSION="${EXISTING_SEARCH_VERSION:-8.15.0}"
+      # Only use existing version if it's valid for Elasticsearch and type hasn't changed
+      if [[ "$EXISTING_SEARCH_ENGINE" == "Elasticsearch" ]] && [[ " ${ELASTIC_VERSIONS[*]} " =~ " ${EXISTING_SEARCH_VERSION} " ]]; then
+        DEFAULT_ELASTIC_VERSION="$EXISTING_SEARCH_VERSION"
+      else
+        DEFAULT_ELASTIC_VERSION="8.15.0"
+      fi
       SELECTED_SEARCH_VERSION=$(prompt_select "Select Elasticsearch version:" "$DEFAULT_ELASTIC_VERSION" "${ELASTIC_VERSIONS[@]}")
       SELECTED_SEARCH_IMAGE="docker.elastic.co/elasticsearch/elasticsearch:${SELECTED_SEARCH_VERSION}"
     else
       OPENSEARCH_VERSIONS=("2.15.0" "2.11.0" "1.3.0")
-      DEFAULT_OPENSEARCH_VERSION="${EXISTING_SEARCH_VERSION:-2.15.0}"
+      # Only use existing version if it's valid for OpenSearch and type hasn't changed
+      if [[ "$EXISTING_SEARCH_ENGINE" == "OpenSearch" ]] && [[ " ${OPENSEARCH_VERSIONS[*]} " =~ " ${EXISTING_SEARCH_VERSION} " ]]; then
+        DEFAULT_OPENSEARCH_VERSION="$EXISTING_SEARCH_VERSION"
+      else
+        DEFAULT_OPENSEARCH_VERSION="2.15.0"
+      fi
       SELECTED_SEARCH_VERSION=$(prompt_select "Select OpenSearch version:" "$DEFAULT_OPENSEARCH_VERSION" "${OPENSEARCH_VERSIONS[@]}")
       SELECTED_SEARCH_IMAGE="opensearchproject/opensearch:${SELECTED_SEARCH_VERSION}"
     fi
@@ -2888,12 +2908,22 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
     # Select version based on type (sorted newest to oldest)
     if [[ "$SELECTED_CACHE_TYPE" == "Redis" ]]; then
       REDIS_VERSIONS=("7.4" "7.2" "6.2")
-      DEFAULT_REDIS_VERSION="${EXISTING_CACHE_VERSION:-7.4}"
+      # Only use existing version if it's valid for Redis and type hasn't changed
+      if [[ "$EXISTING_CACHE_ENGINE" == "Redis" ]] && [[ " ${REDIS_VERSIONS[*]} " =~ " ${EXISTING_CACHE_VERSION} " ]]; then
+        DEFAULT_REDIS_VERSION="$EXISTING_CACHE_VERSION"
+      else
+        DEFAULT_REDIS_VERSION="7.4"
+      fi
       SELECTED_CACHE_VERSION=$(prompt_select "Select Redis version:" "$DEFAULT_REDIS_VERSION" "${REDIS_VERSIONS[@]}")
       SELECTED_CACHE_IMAGE="redis:${SELECTED_CACHE_VERSION}-alpine"
     else
       KEYDB_VERSIONS=("6.3.4" "6.3.3")
-      DEFAULT_KEYDB_VERSION="${EXISTING_CACHE_VERSION:-6.3.4}"
+      # Only use existing version if it's valid for KeyDB and type hasn't changed
+      if [[ "$EXISTING_CACHE_ENGINE" == "KeyDB" ]] && [[ " ${KEYDB_VERSIONS[*]} " =~ " ${EXISTING_CACHE_VERSION} " ]]; then
+        DEFAULT_KEYDB_VERSION="$EXISTING_CACHE_VERSION"
+      else
+        DEFAULT_KEYDB_VERSION="6.3.4"
+      fi
       SELECTED_CACHE_VERSION=$(prompt_select "Select KeyDB version:" "$DEFAULT_KEYDB_VERSION" "${KEYDB_VERSIONS[@]}")
       SELECTED_CACHE_IMAGE="eqalpha/keydb:alpine_x86_64_v${SELECTED_CACHE_VERSION}"
     fi
