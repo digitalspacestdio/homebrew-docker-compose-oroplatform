@@ -396,6 +396,21 @@ orodc cli php --version           # Redundant
 - `.php` files → auto-redirect to PHP
 - `bin/console` or `bin/phpunit` → auto-redirect to CLI container
 
+**Composer Non-Interactive Mode:**
+- ALL composer commands (`install`, `update`, `require`, `create-project`) automatically run with `--no-interaction`
+- This prevents interactive prompts during installation and CI/CD
+- No need to manually add `--no-interaction` flag
+
+```bash
+# ✅ CORRECT - automatically runs with --no-interaction
+orodc composer install
+orodc composer update
+orodc composer require vendor/package
+
+# ℹ️ Flag added automatically, but you can specify it explicitly if needed
+orodc composer install --no-interaction  # Explicit flag is harmless
+```
+
 ### 2. Testing Commands
 Always use `orodc tests` prefix for test operations:
 

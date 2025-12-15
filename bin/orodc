@@ -2449,7 +2449,7 @@ fi
 if echo ${args[0]} | grep -i 'composer' | grep -i 'install' > /dev/null; then
   URL=${args[1]:-"https://${DC_ORO_NAME}.docker.local"}
   set -x
-  ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "composer install" || true
+  ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "composer install --no-interaction" || true
   exit 0
 fi
 
@@ -2670,6 +2670,26 @@ if [[ "$has_php_file" == true ]]; then
 fi
 fi
 
+# Auto-add --no-interaction to composer install/update commands
+if [[ "$first_non_flag_arg" == "composer" ]] && [[ "${args[1]}" =~ ^(install|update|require|create-project)$ ]]; then
+  # Check if --no-interaction is not already present
+  has_no_interaction=false
+  for flag in "${right_flags[@]}" "${right_options[@]}" "${args[@]:2}"; do
+    if [[ "$flag" == "--no-interaction" ]] || [[ "$flag" == "-n" ]]; then
+      has_no_interaction=true
+      break
+    fi
+  done
+  
+  if [[ "$has_no_interaction" == "false" ]]; then
+    # Add --no-interaction flag
+    right_flags+=("--no-interaction")
+    if [[ -n "${DEBUG:-}" ]]; then
+      echo "DEBUG: Auto-added --no-interaction to composer ${args[1]}" >&2
+    fi
+  fi
+fi
+
 # If command is not a docker compose built-in command and not a special orodc command, redirect to CLI container
 if [[ -n "${DEBUG:-}" ]]; then
   echo "DEBUG: Checking special commands: args[0]='${args[0]}', first_non_flag_arg='$first_non_flag_arg'" >&2
@@ -2707,7 +2727,7 @@ if echo ${args[0]} | grep -i '^install' | grep -i 'without' | grep -i 'demo' > /
   run_with_spinner "Clearing cache" "$cache_cmd" || exit $?
   
   # Run composer install with spinner
-  composer_cmd="${DOCKER_COMPOSE_RUN_CMD} cli bash -c \"composer install\""
+  composer_cmd="${DOCKER_COMPOSE_RUN_CMD} cli bash -c \"composer install --no-interaction\""
   run_with_spinner "Running composer install" "$composer_cmd" || exit $?
   
   # Run oro:install with spinner
@@ -2736,7 +2756,7 @@ elif echo ${args[0]} | grep -i '^install$' > /dev/null; then
   run_with_spinner "Clearing cache" "$cache_cmd" || exit $?
   
   # Run composer install with spinner
-  composer_cmd="${DOCKER_COMPOSE_RUN_CMD} cli bash -c \"composer install\""
+  composer_cmd="${DOCKER_COMPOSE_RUN_CMD} cli bash -c \"composer install --no-interaction\""
   run_with_spinner "Running composer install" "$composer_cmd" || exit $?
   
   # Run oro:install with spinner
