@@ -1510,12 +1510,13 @@ detect_php_version_from_composer() {
 get_compatible_node_version() {
   local php_version="$1"
   case "$php_version" in
+    "8.5") echo "24" ;;
     "8.4") echo "22" ;;
     "8.3") echo "20" ;;
     "8.2") echo "20" ;;
     "8.1") echo "18" ;;
     "7.4") echo "16" ;;
-    *) echo "22" ;;  # Default to Node 22 for unknown PHP versions
+    *) echo "24" ;;  # Default to latest Node 24 for unknown PHP versions
   esac
 }
 
@@ -1533,6 +1534,10 @@ if [[ -z $DC_ORO_PHP_VERSION ]]; then
   elif DC_ORO_PHP_VERSION=$(detect_php_version_from_composer); then
     export DC_ORO_PHP_VERSION
     msg_info "Detected PHP version from composer.json: $DC_ORO_PHP_VERSION"
+  # Priority 4: Default to latest available version (from GitHub Actions matrix)
+  else
+    export DC_ORO_PHP_VERSION="8.5"
+    msg_info "Using default PHP version: $DC_ORO_PHP_VERSION (latest available)"
   fi
 fi
 
@@ -1542,10 +1547,18 @@ if [[ -z $DC_ORO_NODE_VERSION ]]; then
   if [[ -f "$DC_ORO_APPDIR/.nvmrc" ]]; then
     export DC_ORO_NODE_VERSION=$(cat $DC_ORO_APPDIR/.nvmrc | head -n1)
     msg_info "Found .nvmrc with following version: $DC_ORO_NODE_VERSION"
-  # Priority 2: Compatibility matrix based on detected PHP version
+  # Priority 2: .node-version file (alternative to .nvmrc)
+  elif [[ -f "$DC_ORO_APPDIR/.node-version" ]]; then
+    export DC_ORO_NODE_VERSION=$(cat $DC_ORO_APPDIR/.node-version | head -n1)
+    msg_info "Found .node-version with following version: $DC_ORO_NODE_VERSION"
+  # Priority 3: Compatibility matrix based on detected PHP version
   elif [[ -n "$DC_ORO_PHP_VERSION" ]]; then
     export DC_ORO_NODE_VERSION=$(get_compatible_node_version "$DC_ORO_PHP_VERSION")
     msg_info "Using compatible Node.js version for PHP $DC_ORO_PHP_VERSION: $DC_ORO_NODE_VERSION"
+  # Priority 4: Default to latest available version (from GitHub Actions matrix)
+  else
+    export DC_ORO_NODE_VERSION="24"
+    msg_info "Using default Node.js version: $DC_ORO_NODE_VERSION (latest available)"
   fi
 fi
 
@@ -1687,7 +1700,7 @@ execute_in_container() {
       for file in "${external_files[@]}"; do
         filename=$(basename "$file")
         # Copy external file to shared-private volume via SSH container
-        if docker cp "$file" "${DC_ORO_NAME}_ssh_${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}:/private/$filename" 2>/dev/null; then
+        if docker cp "$file" "${DC_ORO_NAME}_ssh_${DC_ORO_PHP_VERSION:-8.5}-${DC_ORO_NODE_VERSION:-24}-${DC_ORO_COMPOSER_VERSION:-2}:/private/$filename" 2>/dev/null; then
           if [ "$DEBUG" ]; then echo "DEBUG: Copied external file $file to /private/$filename" >&2; fi
           # Update command arguments to use shared volume path
           for i in "${!updated_cmd_args[@]}"; do
