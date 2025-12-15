@@ -1625,7 +1625,7 @@ get_compatible_node_version() {
     "8.4") echo "22" ;;
     "8.3") echo "20" ;;
     "8.2") echo "20" ;;
-    "8.1") echo "18" ;;
+    "8.1") echo "20" ;;
     "7.4") echo "16" ;;
     "7.3") echo "18" ;;
     *) echo "24" ;;  # Default to latest Node 24 for unknown PHP versions
@@ -2747,8 +2747,10 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
     else
       case "$SELECTED_PHP" in
         8.5) DEFAULT_NODE="24" ;;
-        7.3|7.4) DEFAULT_NODE="18" ;;
-        8.1) DEFAULT_NODE="22" ;;
+        8.4) DEFAULT_NODE="22" ;;
+        8.1|8.2|8.3) DEFAULT_NODE="20" ;;
+        7.4) DEFAULT_NODE="16" ;;
+        7.3) DEFAULT_NODE="18" ;;
         *) DEFAULT_NODE="22" ;;
       esac
       
