@@ -2023,8 +2023,6 @@ if echo "$first_non_flag_arg" | grep -i 'import' | grep -i 'db\|database' > /dev
   
   import_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} run --quiet -i --rm -v \"${DB_DUMP}:/${DB_DUMP_BASENAME}\" database-cli bash -c \"$DB_IMPORT_CMD\""
   run_with_spinner "Importing database" "$import_cmd" || exit $?
-  
-  msg_ok "Database imported successfully"
   exit 0
 fi
 
@@ -2105,7 +2103,7 @@ if echo "$first_non_flag_arg" | grep -i 'export\|dump' | grep -i 'db\|database' 
   export_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} run --quiet --rm -v \"${DB_DUMP}:/${DB_DUMP_BASENAME}\" database-cli bash -c \"$DB_EXPORT_CMD | gzip > /${DB_DUMP_BASENAME}\""
   run_with_spinner "Exporting database" "$export_cmd" || exit $?
   
-  msg_ok "Database exported to: $DB_DUMP"
+  msg_info "Saved to: $DB_DUMP"
   exit 0
 fi
 
