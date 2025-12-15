@@ -35,6 +35,7 @@ services:
     hostname: database-cli.${DC_ORO_NAME:-unnamed}.docker.local
     container_name: ${DC_ORO_NAME:-unnamed}_database_cli
     command: /bin/true
+    restart: "no"
     labels:
       - 'project.name=${DC_ORO_NAME}'
     environment:
