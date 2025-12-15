@@ -555,7 +555,7 @@ orodc tests psql -l  # List databases
 ### 🔧 Development Commands
 
 ```bash
-# Composer commands
+# Composer commands (automatically run with --no-interaction)
 orodc composer install
 orodc composer update
 orodc composer require package/name
@@ -835,9 +835,15 @@ DC_ORO_MQ_URI=""                   # Message queue URI (empty = use DB)
 ORO_MAILER_DRIVER=smtp             # Mail driver
 ORO_MAILER_HOST=mail               # Mail host
 ORO_MAILER_PORT=1025               # Mail port
+ORO_MAILER_ENCRYPTION=""           # Mail encryption (tls/ssl)
+ORO_MAILER_USER=""                 # Mail username
+ORO_MAILER_PASSWORD=""             # Mail password
 
 # Security
 ORO_SECRET=ThisTokenIsNotSoSecretChangeIt  # Application secret
+
+# Features
+ORO_ENABLE_PRICE_SHARDING=0        # Enable price sharding (0 or 1)
 
 # Composer
 DC_ORO_COMPOSER_AUTH=""            # Composer authentication JSON
