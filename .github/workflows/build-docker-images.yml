@@ -272,14 +272,26 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          # PHP 7.3 + Node 16 + Composer 2 (amd64)
+          # PHP 7.3 + Node 16 + Composer 1, 2 (amd64)
+          - php: "7.3"
+            node: "16"
+            composer: "1"
+            arch: X64
+            arch_name: amd64
+            platform: linux/amd64
           - php: "7.3"
             node: "16"
             composer: "2"
             arch: X64
             arch_name: amd64
             platform: linux/amd64
-          # PHP 7.3 + Node 16 + Composer 2 (arm64)
+          # PHP 7.3 + Node 16 + Composer 1, 2 (arm64)
+          - php: "7.3"
+            node: "16"
+            composer: "1"
+            arch: ARM64
+            arch_name: arm64
+            platform: linux/arm64
           - php: "7.3"
             node: "16"
             composer: "2"
@@ -637,7 +649,10 @@ jobs:
     strategy:
       matrix:
         include:
-          # PHP 7.3 + Node 16 + Composer 2
+          # PHP 7.3 + Node 16 + Composer 1, 2
+          - php: "7.3"
+            node: "16"
+            composer: "1"
           - php: "7.3"
             node: "16"
             composer: "2"
