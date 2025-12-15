@@ -1620,14 +1620,17 @@ detect_php_version_from_composer() {
 # Get compatible Node.js version for PHP version
 get_compatible_node_version() {
   local php_version="$1"
-  case "$php_version" in
-    "8.5") echo "24" ;;
-    "8.4") echo "22" ;;
-    "8.3") echo "20" ;;
-    "8.2") echo "20" ;;
-    "8.1") echo "20" ;;
-    "7.4") echo "16" ;;
-    "7.3") echo "18" ;;
+  # Extract major.minor version only (e.g., "7.3.33" -> "7.3")
+  local php_mm=$(echo "$php_version" | sed -E 's/^([0-9]+\.[0-9]+).*/\1/')
+  
+  case "$php_mm" in
+    8.5*) echo "24" ;;
+    8.4*) echo "22" ;;
+    8.3*) echo "20" ;;
+    8.2*) echo "20" ;;
+    8.1*) echo "20" ;;
+    7.4*) echo "16" ;;
+    7.3*) echo "16" ;;
     *) echo "24" ;;  # Default to latest Node 24 for unknown PHP versions
   esac
 }
@@ -2600,7 +2603,7 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
   get_compatible_node_versions() {
     local php_ver="$1"
     case "$php_ver" in
-      7.3) echo "18" ;;
+      7.3) echo "16" ;;
       7.4) echo "18 16" ;;
       8.1) echo "22 20 18 16" ;;
       8.2|8.3|8.4) echo "22 20 18" ;;
@@ -2749,8 +2752,7 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
         8.5) DEFAULT_NODE="24" ;;
         8.4) DEFAULT_NODE="22" ;;
         8.1|8.2|8.3) DEFAULT_NODE="20" ;;
-        7.4) DEFAULT_NODE="16" ;;
-        7.3) DEFAULT_NODE="18" ;;
+        7.3|7.4) DEFAULT_NODE="16" ;;
         *) DEFAULT_NODE="22" ;;
       esac
       
