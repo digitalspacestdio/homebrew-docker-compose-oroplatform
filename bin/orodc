@@ -2219,16 +2219,28 @@ build_docker_compose_run_cmd() {
   local service="$1"
   local cmd_args=("${@:2}")
   
+  # Check if this is a composer command - use -T flag for non-interactive mode
+  local use_tty_flag="-i"
+  if [[ "$first_non_flag_arg" == "composer" ]]; then
+    use_tty_flag="-T"
+  fi
+  
   if [[ ${#left_flags[@]} -gt 0 ]] || [[ ${#left_options[@]} -gt 0 ]]; then
     # Place docker compose flags before 'run' command
     if [[ ${DOCKER_COMPOSE_VERSION} -gt 1 ]]; then
-      echo "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} run -i --rm ${service} ${cmd_args[*]} ${right_flags[*]} ${right_options[*]}"
+      echo "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} run ${use_tty_flag} --rm ${service} ${cmd_args[*]} ${right_flags[*]} ${right_options[*]}"
     else
       echo "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} run --rm ${service} ${cmd_args[*]} ${right_flags[*]} ${right_options[*]}"
     fi
   else
     # Use standard command without parsed flags
-    echo "${DOCKER_COMPOSE_RUN_CMD} ${service} ${cmd_args[*]}"
+    # For composer commands in DOCKER_COMPOSE_VERSION > 1, replace -i with -T in DOCKER_COMPOSE_RUN_CMD
+    if [[ "$first_non_flag_arg" == "composer" ]] && [[ ${DOCKER_COMPOSE_VERSION} -gt 1 ]]; then
+      local composer_run_cmd="${DOCKER_COMPOSE_RUN_CMD/-i /-T }"
+      echo "${composer_run_cmd} ${service} ${cmd_args[*]}"
+    else
+      echo "${DOCKER_COMPOSE_RUN_CMD} ${service} ${cmd_args[*]}"
+    fi
   fi
 }
 
