@@ -1191,67 +1191,94 @@ if [[ "$temp_first_non_flag_arg" == "image" ]]; then
       msg_header "Stage 1/2: PHP ${DC_ORO_PHP_VERSION} base image"
       msg_info ""
       
-      # Check if PHP base image already exists
+      # Check if image exists locally
       if ${DOCKER_BIN} images -q "${PHP_BASE_TAG}" 2>/dev/null | grep -q .; then
-        msg_ok "PHP base image already exists: ${PHP_BASE_TAG}"
-        msg_info "Skipping base image build (use --no-cache to rebuild)"
+        msg_ok "Image exists locally: ${PHP_BASE_TAG}"
+        IMAGE_SIZE=$(${DOCKER_BIN} images "${PHP_BASE_TAG}" --format "{{.Size}}")
+        msg_info "Image size: ${IMAGE_SIZE}"
       else
-        # Try to pull from registry first
-        SHOULD_PULL=false
+        msg_info "Image not found locally: ${PHP_BASE_TAG}"
+      fi
+      
+      msg_info ""
+      
+      # Always ask user what to do
+      SHOULD_PULL=false
+      SHOULD_BUILD=false
+      
+      if [[ -t 0 ]]; then
+        msg_info "Choose action:"
+        msg_info "  1) Pull from registry"
+        msg_info "  2) Build locally"
+        msg_info "  3) Skip"
+        msg_info ""
+        read -p "Your choice (1/2/3): " -n 1 -r
+        echo
         
-        # Ask user if they want to try pulling from registry
-        if [[ -t 0 ]]; then
-          msg_info "PHP base image not found locally: ${PHP_BASE_TAG}"
-          msg_info ""
-          read -p "Try to pull from registry? (y/N): " -n 1 -r
-          echo
-          if [[ $REPLY =~ ^[Yy]$ ]]; then
+        case $REPLY in
+          1)
             SHOULD_PULL=true
-          fi
-        fi
-        
-        if [[ "$SHOULD_PULL" == "true" ]]; then
-          msg_info "Attempting to pull from registry..."
-          if ${DOCKER_BIN} pull "${PHP_BASE_TAG}" 2>/dev/null; then
-            msg_ok "Successfully pulled from registry: ${PHP_BASE_TAG}"
-            IMAGE_SIZE=$(${DOCKER_BIN} images "${PHP_BASE_TAG}" --format "{{.Size}}")
-            msg_info "Image size: ${IMAGE_SIZE}"
-          else
-            msg_warning "Failed to pull from registry, will build locally"
-            SHOULD_PULL=false
-          fi
-        fi
-        
-        # Build locally if pull was not attempted or failed
-        if [[ "$SHOULD_PULL" == "false" ]]; then
-          msg_info "Building locally: ${PHP_BASE_TAG}"
-          msg_info "Dockerfile: ${PHP_DOCKERFILE}"
-          msg_info "This may take 5-10 minutes..."
+            ;;
+          2)
+            SHOULD_BUILD=true
+            ;;
+          3)
+            msg_info "Skipping PHP base image"
+            ;;
+          *)
+            msg_warning "Invalid choice, skipping"
+            ;;
+        esac
+      else
+        # Non-interactive: build by default
+        SHOULD_BUILD=true
+      fi
+      
+      if [[ "$SHOULD_PULL" == "true" ]]; then
+        msg_info "Attempting to pull from registry..."
+        if ${DOCKER_BIN} pull "${PHP_BASE_TAG}" 2>/dev/null; then
+          msg_ok "Successfully pulled from registry: ${PHP_BASE_TAG}"
+          IMAGE_SIZE=$(${DOCKER_BIN} images "${PHP_BASE_TAG}" --format "{{.Size}}")
+          msg_info "Image size: ${IMAGE_SIZE}"
+        else
+          msg_error "Failed to pull from registry"
           msg_info ""
-          
-          # Build PHP base image
-          BUILD_START=$(date +%s)
-          if ${DOCKER_BIN} build ${NO_CACHE_FLAG} \
-            -f "${PHP_DOCKERFILE}" \
-            -t "${PHP_BASE_TAG}" \
-            "${DOCKER_DIR}/php/"; then
-            BUILD_END=$(date +%s)
-            BUILD_DURATION=$((BUILD_END - BUILD_START))
-            msg_ok "PHP base image built successfully in ${BUILD_DURATION}s"
-            
-            # Verify image exists and get size
-            IMAGE_SIZE=$(${DOCKER_BIN} images "${PHP_BASE_TAG}" --format "{{.Size}}")
-            msg_info "Image size: ${IMAGE_SIZE}"
-          else
-            msg_error "PHP base image build failed"
-            msg_info ""
-            msg_info "Troubleshooting:"
-            msg_info "  - Check Docker daemon is running: docker ps"
-            msg_info "  - Check internet connectivity for package downloads"
-            msg_info "  - Try rebuilding without cache: orodc image build --no-cache"
-            msg_info "  - Check Docker logs for more details"
-            exit 1
+          read -p "Build locally instead? (Y/n): " -n 1 -r
+          echo
+          if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+            SHOULD_BUILD=true
           fi
+        fi
+      fi
+      
+      if [[ "$SHOULD_BUILD" == "true" ]]; then
+        msg_info "Building locally: ${PHP_BASE_TAG}"
+        msg_info "Dockerfile: ${PHP_DOCKERFILE}"
+        msg_info "This may take 5-10 minutes..."
+        msg_info ""
+        
+        # Build PHP base image
+        BUILD_START=$(date +%s)
+        if ${DOCKER_BIN} build ${NO_CACHE_FLAG} \
+          -f "${PHP_DOCKERFILE}" \
+          -t "${PHP_BASE_TAG}" \
+          "${DOCKER_DIR}/php/"; then
+          BUILD_END=$(date +%s)
+          BUILD_DURATION=$((BUILD_END - BUILD_START))
+          msg_ok "PHP base image built successfully in ${BUILD_DURATION}s"
+          
+          # Verify image exists and get size
+          IMAGE_SIZE=$(${DOCKER_BIN} images "${PHP_BASE_TAG}" --format "{{.Size}}")
+          msg_info "Image size: ${IMAGE_SIZE}"
+        else
+          msg_error "PHP base image build failed"
+          msg_info ""
+          msg_info "Troubleshooting:"
+          msg_info "  - Check Docker daemon is running: docker ps"
+          msg_info "  - Check internet connectivity for package downloads"
+          msg_info "  - Try rebuilding without cache: orodc image build --no-cache"
+          msg_info "  - Check Docker logs for more details"
+          exit 1
         fi
       fi
       
@@ -1261,71 +1288,98 @@ if [[ "$temp_first_non_flag_arg" == "image" ]]; then
       msg_header "Stage 2/2: PHP+Node.js final image"
       msg_info ""
       
-      # Check if PHP+Node.js final image already exists
+      # Check if image exists locally
       if ${DOCKER_BIN} images -q "${PHP_FINAL_TAG}" 2>/dev/null | grep -q .; then
-        msg_ok "PHP+Node.js final image already exists: ${PHP_FINAL_TAG}"
-        msg_info "Skipping final image build (use --no-cache to rebuild)"
+        msg_ok "Image exists locally: ${PHP_FINAL_TAG}"
+        IMAGE_SIZE=$(${DOCKER_BIN} images "${PHP_FINAL_TAG}" --format "{{.Size}}")
+        msg_info "Image size: ${IMAGE_SIZE}"
       else
-        # Try to pull from registry first
-        SHOULD_PULL_FINAL=false
+        msg_info "Image not found locally: ${PHP_FINAL_TAG}"
+      fi
+      
+      msg_info ""
+      
+      # Always ask user what to do
+      SHOULD_PULL_FINAL=false
+      SHOULD_BUILD_FINAL=false
+      
+      if [[ -t 0 ]]; then
+        msg_info "Choose action:"
+        msg_info "  1) Pull from registry"
+        msg_info "  2) Build locally"
+        msg_info "  3) Skip"
+        msg_info ""
+        read -p "Your choice (1/2/3): " -n 1 -r
+        echo
         
-        # Ask user if they want to try pulling from registry
-        if [[ -t 0 ]]; then
-          msg_info "PHP+Node.js final image not found locally: ${PHP_FINAL_TAG}"
-          msg_info ""
-          read -p "Try to pull from registry? (y/N): " -n 1 -r
-          echo
-          if [[ $REPLY =~ ^[Yy]$ ]]; then
+        case $REPLY in
+          1)
             SHOULD_PULL_FINAL=true
-          fi
-        fi
-        
-        if [[ "$SHOULD_PULL_FINAL" == "true" ]]; then
-          msg_info "Attempting to pull from registry..."
-          if ${DOCKER_BIN} pull "${PHP_FINAL_TAG}" 2>/dev/null; then
-            msg_ok "Successfully pulled from registry: ${PHP_FINAL_TAG}"
-            IMAGE_SIZE=$(${DOCKER_BIN} images "${PHP_FINAL_TAG}" --format "{{.Size}}")
-            msg_info "Image size: ${IMAGE_SIZE}"
-          else
-            msg_warning "Failed to pull from registry, will build locally"
-            SHOULD_PULL_FINAL=false
-          fi
-        fi
-        
-        # Build locally if pull was not attempted or failed
-        if [[ "$SHOULD_PULL_FINAL" == "false" ]]; then
-          msg_info "Building locally: ${PHP_FINAL_TAG}"
-          msg_info "Dockerfile: ${PHP_NODE_DOCKERFILE}"
-          msg_info "This may take 5-10 minutes..."
+            ;;
+          2)
+            SHOULD_BUILD_FINAL=true
+            ;;
+          3)
+            msg_info "Skipping PHP+Node.js final image"
+            ;;
+          *)
+            msg_warning "Invalid choice, skipping"
+            ;;
+        esac
+      else
+        # Non-interactive: build by default
+        SHOULD_BUILD_FINAL=true
+      fi
+      
+      if [[ "$SHOULD_PULL_FINAL" == "true" ]]; then
+        msg_info "Attempting to pull from registry..."
+        if ${DOCKER_BIN} pull "${PHP_FINAL_TAG}" 2>/dev/null; then
+          msg_ok "Successfully pulled from registry: ${PHP_FINAL_TAG}"
+          IMAGE_SIZE=$(${DOCKER_BIN} images "${PHP_FINAL_TAG}" --format "{{.Size}}")
+          msg_info "Image size: ${IMAGE_SIZE}"
+        else
+          msg_error "Failed to pull from registry"
           msg_info ""
-          
-          # Build PHP+Node.js final image
-          BUILD_START=$(date +%s)
-          if ${DOCKER_BIN} build ${NO_CACHE_FLAG} \
-            --build-arg PHP_VERSION="${DC_ORO_PHP_VERSION}" \
-            --build-arg NODE_VERSION="${DC_ORO_NODE_VERSION}" \
-            --build-arg COMPOSER_VERSION="${DC_ORO_COMPOSER_VERSION}" \
-            --build-arg PHP_IMAGE="${PHP_BASE_TAG}" \
-            -f "${DOCKER_DIR}/php-node-symfony/${DC_ORO_PHP_VERSION}/Dockerfile" \
-            -t "${PHP_FINAL_TAG}" \
-            "${DOCKER_DIR}/php-node-symfony/"; then
-            BUILD_END=$(date +%s)
-            BUILD_DURATION=$((BUILD_END - BUILD_START))
-            msg_ok "PHP+Node.js final image built successfully in ${BUILD_DURATION}s"
-            
-            # Verify image exists and get size
-            IMAGE_SIZE=$(${DOCKER_BIN} images "${PHP_FINAL_TAG}" --format "{{.Size}}")
-            msg_info "Image size: ${IMAGE_SIZE}"
-          else
-            msg_error "PHP+Node.js final image build failed"
-            msg_info ""
-            msg_info "Troubleshooting:"
-            msg_info "  - Check Docker daemon is running: docker ps"
-            msg_info "  - Check internet connectivity for package downloads"
-            msg_info "  - Try rebuilding without cache: orodc image build --no-cache"
-            msg_info "  - Check Docker logs for more details"
-            exit 1
+          read -p "Build locally instead? (Y/n): " -n 1 -r
+          echo
+          if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+            SHOULD_BUILD_FINAL=true
           fi
+        fi
+      fi
+      
+      if [[ "$SHOULD_BUILD_FINAL" == "true" ]]; then
+        msg_info "Building locally: ${PHP_FINAL_TAG}"
+        msg_info "Dockerfile: ${PHP_NODE_DOCKERFILE}"
+        msg_info "This may take 5-10 minutes..."
+        msg_info ""
+        
+        # Build PHP+Node.js final image
+        BUILD_START=$(date +%s)
+        if ${DOCKER_BIN} build ${NO_CACHE_FLAG} \
+          --build-arg PHP_VERSION="${DC_ORO_PHP_VERSION}" \
+          --build-arg NODE_VERSION="${DC_ORO_NODE_VERSION}" \
+          --build-arg COMPOSER_VERSION="${DC_ORO_COMPOSER_VERSION}" \
+          --build-arg PHP_IMAGE="${PHP_BASE_TAG}" \
+          -f "${DOCKER_DIR}/php-node-symfony/${DC_ORO_PHP_VERSION}/Dockerfile" \
+          -t "${PHP_FINAL_TAG}" \
+          "${DOCKER_DIR}/php-node-symfony/"; then
+          BUILD_END=$(date +%s)
+          BUILD_DURATION=$((BUILD_END - BUILD_START))
+          msg_ok "PHP+Node.js final image built successfully in ${BUILD_DURATION}s"
+          
+          # Verify image exists and get size
+          IMAGE_SIZE=$(${DOCKER_BIN} images "${PHP_FINAL_TAG}" --format "{{.Size}}")
+          msg_info "Image size: ${IMAGE_SIZE}"
+        else
+          msg_error "PHP+Node.js final image build failed"
+          msg_info ""
+          msg_info "Troubleshooting:"
+          msg_info "  - Check Docker daemon is running: docker ps"
+          msg_info "  - Check internet connectivity for package downloads"
+          msg_info "  - Try rebuilding without cache: orodc image build --no-cache"
+          msg_info "  - Check Docker logs for more details"
+          exit 1
         fi
       fi
       
