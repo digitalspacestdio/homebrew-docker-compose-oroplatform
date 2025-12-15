@@ -1149,9 +1149,9 @@ if [[ "$temp_first_non_flag_arg" == "image" ]]; then
       fi
       msg_info ""
       
-      # Define image tags
-      PHP_BASE_TAG="orodc-php:${DC_ORO_PHP_VERSION}-${DC_ORO_PHP_DIST}"
-      PHP_FINAL_TAG="orodc-php-node-symfony:${DC_ORO_PHP_VERSION}-node${DC_ORO_NODE_VERSION}-composer${DC_ORO_COMPOSER_VERSION}-${DC_ORO_PHP_DIST}"
+      # Define image tags with full registry path
+      PHP_BASE_TAG="ghcr.io/digitalspacestdio/orodc-php:${DC_ORO_PHP_VERSION}-${DC_ORO_PHP_DIST}"
+      PHP_FINAL_TAG="ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION}-node${DC_ORO_NODE_VERSION}-composer${DC_ORO_COMPOSER_VERSION}-${DC_ORO_PHP_DIST}"
       
       # Check if Dockerfiles exist
       PHP_DOCKERFILE="${DOCKER_DIR}/php/Dockerfile.${DC_ORO_PHP_VERSION}.${DC_ORO_PHP_DIST}"
@@ -1197,13 +1197,11 @@ if [[ "$temp_first_non_flag_arg" == "image" ]]; then
         msg_info "Skipping base image build (use --no-cache to rebuild)"
       else
         # Try to pull from registry first
-        REGISTRY_PHP_TAG="ghcr.io/digitalspacestdio/${PHP_BASE_TAG}"
         SHOULD_PULL=false
         
         # Ask user if they want to try pulling from registry
         if [[ -t 0 ]]; then
           msg_info "PHP base image not found locally: ${PHP_BASE_TAG}"
-          msg_info "Registry image: ${REGISTRY_PHP_TAG}"
           msg_info ""
           read -p "Try to pull from registry? (y/N): " -n 1 -r
           echo
@@ -1214,10 +1212,8 @@ if [[ "$temp_first_non_flag_arg" == "image" ]]; then
         
         if [[ "$SHOULD_PULL" == "true" ]]; then
           msg_info "Attempting to pull from registry..."
-          if ${DOCKER_BIN} pull "${REGISTRY_PHP_TAG}" 2>/dev/null; then
-            # Tag registry image as local image
-            ${DOCKER_BIN} tag "${REGISTRY_PHP_TAG}" "${PHP_BASE_TAG}"
-            msg_ok "Successfully pulled from registry: ${REGISTRY_PHP_TAG}"
+          if ${DOCKER_BIN} pull "${PHP_BASE_TAG}" 2>/dev/null; then
+            msg_ok "Successfully pulled from registry: ${PHP_BASE_TAG}"
             IMAGE_SIZE=$(${DOCKER_BIN} images "${PHP_BASE_TAG}" --format "{{.Size}}")
             msg_info "Image size: ${IMAGE_SIZE}"
           else
@@ -1271,13 +1267,11 @@ if [[ "$temp_first_non_flag_arg" == "image" ]]; then
         msg_info "Skipping final image build (use --no-cache to rebuild)"
       else
         # Try to pull from registry first
-        REGISTRY_FINAL_TAG="ghcr.io/digitalspacestdio/${PHP_FINAL_TAG}"
         SHOULD_PULL_FINAL=false
         
         # Ask user if they want to try pulling from registry
         if [[ -t 0 ]]; then
           msg_info "PHP+Node.js final image not found locally: ${PHP_FINAL_TAG}"
-          msg_info "Registry image: ${REGISTRY_FINAL_TAG}"
           msg_info ""
           read -p "Try to pull from registry? (y/N): " -n 1 -r
           echo
@@ -1288,10 +1282,8 @@ if [[ "$temp_first_non_flag_arg" == "image" ]]; then
         
         if [[ "$SHOULD_PULL_FINAL" == "true" ]]; then
           msg_info "Attempting to pull from registry..."
-          if ${DOCKER_BIN} pull "${REGISTRY_FINAL_TAG}" 2>/dev/null; then
-            # Tag registry image as local image
-            ${DOCKER_BIN} tag "${REGISTRY_FINAL_TAG}" "${PHP_FINAL_TAG}"
-            msg_ok "Successfully pulled from registry: ${REGISTRY_FINAL_TAG}"
+          if ${DOCKER_BIN} pull "${PHP_FINAL_TAG}" 2>/dev/null; then
+            msg_ok "Successfully pulled from registry: ${PHP_FINAL_TAG}"
             IMAGE_SIZE=$(${DOCKER_BIN} images "${PHP_FINAL_TAG}" --format "{{.Size}}")
             msg_info "Image size: ${IMAGE_SIZE}"
           else
@@ -1344,10 +1336,8 @@ if [[ "$temp_first_non_flag_arg" == "image" ]]; then
       msg_info "  - ${PHP_FINAL_TAG}"
       msg_info ""
       msg_header "Usage"
-      msg_info "To use locally built images, add to .env.orodc:"
-      msg_info "  DC_ORO_PHP_REGISTRY=''"
-      msg_info ""
-      msg_info "This forces OroDC to use local images instead of pulling from registry"
+      msg_info "Images are built with full registry path and ready to use."
+      msg_info "They can be used in FROM statements and pushed to registry."
       msg_info ""
       
       exit 0
