@@ -2701,6 +2701,7 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
   # Load existing configuration if available
   EXISTING_PHP_VERSION=""
   EXISTING_NODE_VERSION=""
+  EXISTING_COMPOSER_VERSION=""
   EXISTING_PHP_IMAGE=""
   EXISTING_DB_SCHEMA=""
   EXISTING_DB_VERSION=""
@@ -2732,6 +2733,7 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
       case "$key" in
         DC_ORO_PHP_VERSION) EXISTING_PHP_VERSION="$value" ;;
         DC_ORO_NODE_VERSION) EXISTING_NODE_VERSION="$value" ;;
+        DC_ORO_COMPOSER_VERSION) EXISTING_COMPOSER_VERSION="$value" ;;
         DC_ORO_PHP_IMAGE) EXISTING_PHP_IMAGE="$value" ;;
         DC_ORO_DATABASE_SCHEMA) EXISTING_DB_SCHEMA="$value" ;;
         DC_ORO_DATABASE_VERSION) EXISTING_DB_VERSION="$value" ;;
@@ -2882,6 +2884,7 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
     # Extract versions from custom image if possible (or use defaults/existing)
     SELECTED_PHP="${EXISTING_PHP_VERSION:-8.4}"
     SELECTED_NODE="${EXISTING_NODE_VERSION:-22}"
+    SELECTED_COMPOSER="${EXISTING_COMPOSER_VERSION:-2}"
   else
     # Select PHP version (sorted newest to oldest)
     PHP_VERSIONS=("8.5" "8.4" "8.3" "8.2" "8.1" "7.4" "7.3")
@@ -2919,8 +2922,31 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
       >&2 echo "DEBUG: Selected Node.js: '$SELECTED_NODE'"
     fi
     
+    # Select Composer version (only for PHP 7.3, others use Composer 2 automatically)
+    if [[ "$SELECTED_PHP" == "7.3" ]]; then
+      COMPOSER_VERSIONS=("1" "2")
+      # Default Composer version for PHP 7.3
+      if [[ -n "$EXISTING_COMPOSER_VERSION" ]]; then
+        DEFAULT_COMPOSER="$EXISTING_COMPOSER_VERSION"
+      else
+        DEFAULT_COMPOSER="1"
+      fi
+      
+      SELECTED_COMPOSER=$(prompt_select "Select Composer version:" "$DEFAULT_COMPOSER" "${COMPOSER_VERSIONS[@]}")
+      
+      if [[ -n "${DEBUG:-}" ]]; then
+        >&2 echo "DEBUG: Selected Composer: '$SELECTED_COMPOSER'"
+      fi
+    else
+      # PHP 7.4+ always uses Composer 2
+      SELECTED_COMPOSER="2"
+      if [[ -n "${DEBUG:-}" ]]; then
+        >&2 echo "DEBUG: Using Composer 2 (automatic for PHP $SELECTED_PHP)"
+      fi
+    fi
+    
     # Build default image name
-    SELECTED_PHP_IMAGE="ghcr.io/digitalspacestdio/orodc-php-node-symfony:${SELECTED_PHP}-node${SELECTED_NODE}-composer2-alpine"
+    SELECTED_PHP_IMAGE="ghcr.io/digitalspacestdio/orodc-php-node-symfony:${SELECTED_PHP}-node${SELECTED_NODE}-composer${SELECTED_COMPOSER}-alpine"
   fi
   
   msg_info "PHP Image: $SELECTED_PHP_IMAGE"
@@ -3121,6 +3147,7 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
   msg_header "Configuration Summary"
   echo "PHP Version: $SELECTED_PHP"
   echo "Node.js Version: $SELECTED_NODE"
+  echo "Composer Version: $SELECTED_COMPOSER"
   echo "PHP Image: $SELECTED_PHP_IMAGE"
   echo "Database: $SELECTED_DB_TYPE $SELECTED_DB_VERSION"
   echo "Database Image: $SELECTED_DB_IMAGE"
@@ -3183,6 +3210,7 @@ EOF
     # PHP Configuration
     update_env_var "$ENV_FILE" "DC_ORO_PHP_VERSION" "$SELECTED_PHP"
     update_env_var "$ENV_FILE" "DC_ORO_NODE_VERSION" "$SELECTED_NODE"
+    update_env_var "$ENV_FILE" "DC_ORO_COMPOSER_VERSION" "$SELECTED_COMPOSER"
     update_env_var "$ENV_FILE" "DC_ORO_PHP_IMAGE" "$SELECTED_PHP_IMAGE"
     
     # Database Configuration
