@@ -52,6 +52,105 @@ echo_warn() { msg_warning "$*"; }
 echo_error() { msg_error "$*"; }
 echo_header() { msg_header "$*"; }
 
+# Spinner animation for long-running commands
+show_spinner() {
+  local pid=$1
+  local message=$2
+  local spinstr='|/-\'
+  local delay=0.1
+  
+  # Only show spinner if running in terminal (not captured)
+  if [[ -t 2 ]]; then
+    tput civis 2>/dev/null || true
+    
+    while kill -0 "$pid" 2>/dev/null; do
+      local temp=${spinstr#?}
+      printf "\r\033[36m==> %s %c\033[0m" "$message" "$spinstr" >&2
+      spinstr=$temp${spinstr%"$temp"}
+      sleep $delay
+    done
+    
+    printf "\r\033[K" >&2
+    tput cnorm 2>/dev/null || true
+  else
+    # If not in terminal, just wait silently
+    while kill -0 "$pid" 2>/dev/null; do
+      sleep $delay
+    done
+  fi
+}
+
+# Execute command with spinner and log on error
+# Usage: run_with_spinner "message" "command"
+run_with_spinner() {
+  local message=$1
+  shift
+  local cmd="$*"
+  local log_file
+  log_file=$(mktemp /tmp/orodc-output.XXXXXX)
+  local exit_code=0
+  
+  eval "$cmd" > "$log_file" 2>&1 &
+  local cmd_pid=$!
+  
+  show_spinner $cmd_pid "$message"
+  
+  wait $cmd_pid || exit_code=$?
+  
+  if [[ $exit_code -ne 0 ]]; then
+    msg_error "Command failed"
+    echo "" >&2
+    cat "$log_file" >&2
+    rm -f "$log_file"
+    return $exit_code
+  fi
+  
+  rm -f "$log_file"
+  msg_ok "$message completed"
+  return 0
+}
+
+# Show service URLs after successful 'up' command
+show_service_urls() {
+  echo "" >&2
+  
+  # Check if proxy container is running
+  local proxy_running=false
+  if ${DOCKER_BIN} ps --filter "name=proxy" --filter "status=running" --format "{{.Names}}" 2>/dev/null | grep -q "^proxy$"; then
+    proxy_running=true
+  fi
+  
+  # Show domain URL if proxy is running
+  if [[ "$proxy_running" == "true" ]]; then
+    printf "\033[1;32m[${DC_ORO_NAME}] Application: https://${DC_ORO_NAME}.docker.local\033[0m\n"
+    echo "" >&2
+  fi
+  
+  # Always show localhost URLs
+  printf "\033[0;37m[${DC_ORO_NAME}] Application: http://localhost:${DC_ORO_PORT_NGINX}\033[0m\n"
+  printf "\033[0;37m[${DC_ORO_NAME}] Mailhog: http://localhost:${DC_ORO_PORT_MAIL_WEBGUI}\033[0m\n"
+  printf "\033[0;37m[${DC_ORO_NAME}] Elasticsearch: http://localhost:${DC_ORO_PORT_SEARCH}\033[0m\n"
+  printf "\033[0;37m[${DC_ORO_NAME}] Mq: http://localhost:${DC_ORO_PORT_MQ}\033[0m\n"
+  
+  if [[ "${DC_ORO_DATABASE_SCHEMA}" == "pdo_pgsql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgresql" ]];then
+    printf "\033[0;37m[${DC_ORO_NAME}] Database: 127.0.0.1:${DC_ORO_PORT_PGSQL}\033[0m\n"
+  elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "pdo_mysql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]];then
+    printf "\033[0;37m[${DC_ORO_NAME}] Database: 127.0.0.1:${DC_ORO_PORT_MYSQL}\033[0m\n"
+  fi
+
+  printf "\033[0;37m[${DC_ORO_NAME}] SSH: 127.0.0.1:${DC_ORO_PORT_SSH}\033[0m\n"
+  
+  # Show proxy hint if not running
+  if [[ "$proxy_running" == "false" ]]; then
+    echo "" >&2
+    msg_info "Want to use custom domains and SSL? Start the proxy:"
+    msg_info "  orodc proxy up -d"
+    msg_info "  orodc proxy install-certs"
+    msg_info ""
+    msg_info "Then access via: https://${DC_ORO_NAME}.docker.local"
+  fi
+}
+
 # Function to resolve binary location with error handling
 # Usage: resolve_bin "binary_name" ["install_instructions"]
 resolve_bin() {
@@ -500,11 +599,6 @@ if [[ "$temp_first_non_flag_arg" == "proxy" ]]; then
       
       # Configure Traefik bind address if not set
       if [[ -z "${TRAEFIK_BIND_ADDRESS:-}" ]]; then
-        msg_info ""
-        msg_info "Proxy Network Configuration"
-        msg_info "============================"
-        msg_info ""
-        
         # Auto-detect environment and suggest default
         IS_WSL=false
         IS_LIMA=false
@@ -533,89 +627,110 @@ if [[ "$temp_first_non_flag_arg" == "proxy" ]]; then
           SUGGESTED_REASON="Native Docker - bind to localhost only (secure)"
         fi
         
-        msg_info "Choose proxy bind address (affects HTTP, HTTPS, SOCKS5):"
-        msg_info ""
-        msg_info "  1) 127.0.0.1 (localhost only)"
-        msg_info "     - Most secure: Only accessible from this machine"
-        msg_info "     - Use for: Native Docker on macOS/Linux"
-        msg_info ""
-        msg_info "  2) 0.0.0.0 (all interfaces)"
-        msg_info "     - Allows access from: VM host + network"
-        msg_info "     - Use for: WSL2, Lima VM, remote access"
-        msg_info ""
-        
-        if [[ -n "$DETECTED_ENV" ]]; then
-          msg_info "Detected: ${DETECTED_ENV}"
-          msg_info "Suggested: ${SUGGESTED_BIND} (${SUGGESTED_REASON})"
+        # Check if running in non-interactive mode (CI/CD or piped)
+        if [[ ! -t 0 ]]; then
+          # Non-interactive: use suggested default
+          export TRAEFIK_BIND_ADDRESS="$SUGGESTED_BIND"
+          msg_info "Non-interactive mode: using default bind address: ${SUGGESTED_BIND}"
         else
-          msg_info "Could not detect environment"
-          msg_info "Suggested: ${SUGGESTED_BIND} (safe default)"
+          # Interactive mode: show prompts
+          msg_info ""
+          msg_info "Proxy Network Configuration"
+          msg_info "============================"
+          msg_info ""
+          
+          msg_info "Choose proxy bind address (affects HTTP, HTTPS, SOCKS5):"
+          msg_info ""
+          msg_info "  1) 127.0.0.1 (localhost only)"
+          msg_info "     - Most secure: Only accessible from this machine"
+          msg_info "     - Use for: Native Docker on macOS/Linux"
+          msg_info ""
+          msg_info "  2) 0.0.0.0 (all interfaces)"
+          msg_info "     - Allows access from: VM host + network"
+          msg_info "     - Use for: WSL2, Lima VM, remote access"
+          msg_info ""
+          
+          if [[ -n "$DETECTED_ENV" ]]; then
+            msg_info "Detected: ${DETECTED_ENV}"
+            msg_info "Suggested: ${SUGGESTED_BIND} (${SUGGESTED_REASON})"
+          else
+            msg_info "Could not detect environment"
+            msg_info "Suggested: ${SUGGESTED_BIND} (safe default)"
+          fi
+          
+          msg_info ""
+          
+          # Interactive prompt
+          read -p "Enter choice [1-2] or custom IP (press Enter for suggested: ${SUGGESTED_BIND}): " BIND_CHOICE
+          
+          case "$BIND_CHOICE" in
+            1)
+              export TRAEFIK_BIND_ADDRESS="127.0.0.1"
+              msg_ok "Using 127.0.0.1 (localhost only)"
+              ;;
+            2)
+              export TRAEFIK_BIND_ADDRESS="0.0.0.0"
+              msg_ok "Using 0.0.0.0 (all interfaces)"
+              msg_warning "Make sure your firewall is properly configured!"
+              ;;
+            "")
+              export TRAEFIK_BIND_ADDRESS="$SUGGESTED_BIND"
+              msg_ok "Using suggested: ${SUGGESTED_BIND}"
+              ;;
+            *)
+              # Custom IP address
+              export TRAEFIK_BIND_ADDRESS="$BIND_CHOICE"
+              msg_ok "Using custom bind address: ${BIND_CHOICE}"
+              ;;
+          esac
+          
+          msg_info ""
+          msg_info "To skip this prompt next time, set:"
+          msg_info "  export TRAEFIK_BIND_ADDRESS=${TRAEFIK_BIND_ADDRESS}"
+          msg_info "Or add to .env.orodc:"
+          msg_info "  echo 'TRAEFIK_BIND_ADDRESS=${TRAEFIK_BIND_ADDRESS}' >> .env.orodc"
+          msg_info ""
         fi
-        
-        msg_info ""
-        
-        # Interactive prompt
-        read -p "Enter choice [1-2] or custom IP (press Enter for suggested: ${SUGGESTED_BIND}): " BIND_CHOICE
-        
-        case "$BIND_CHOICE" in
-          1)
-            export TRAEFIK_BIND_ADDRESS="127.0.0.1"
-            msg_ok "Using 127.0.0.1 (localhost only)"
-            ;;
-          2)
-            export TRAEFIK_BIND_ADDRESS="0.0.0.0"
-            msg_ok "Using 0.0.0.0 (all interfaces)"
-            msg_warning "Make sure your firewall is properly configured!"
-            ;;
-          "")
-            export TRAEFIK_BIND_ADDRESS="$SUGGESTED_BIND"
-            msg_ok "Using suggested: ${SUGGESTED_BIND}"
-            ;;
-          *)
-            # Custom IP address
-            export TRAEFIK_BIND_ADDRESS="$BIND_CHOICE"
-            msg_ok "Using custom bind address: ${BIND_CHOICE}"
-            ;;
-        esac
-        
-        msg_info ""
-        msg_info "To skip this prompt next time, set:"
-        msg_info "  export TRAEFIK_BIND_ADDRESS=${TRAEFIK_BIND_ADDRESS}"
-        msg_info "Or add to .env.orodc:"
-        msg_info "  echo 'TRAEFIK_BIND_ADDRESS=${TRAEFIK_BIND_ADDRESS}' >> .env.orodc"
-        msg_info ""
       else
         msg_info "Using bind address: ${TRAEFIK_BIND_ADDRESS} (from environment)"
       fi
       
       # Configure SOCKS5 port if not set
       if [[ -z "${DC_PROXY_SOCKS5_PORT:-}" ]]; then
-        msg_info ""
-        msg_info "SOCKS5 Proxy Port Configuration"
-        msg_info "================================"
-        msg_info ""
-        msg_info "Choose SOCKS5 proxy port:"
-        msg_info "  - Default: 1080 (standard SOCKS5 port)"
-        msg_info "  - Custom: any available port (e.g., 9999)"
-        msg_info ""
-        
-        # Interactive prompt
-        read -p "Enter SOCKS5 port (press Enter for default: 1080): " PORT_CHOICE
-        
-        if [[ -z "$PORT_CHOICE" ]]; then
+        # Check if running in non-interactive mode (CI/CD or piped)
+        if [[ ! -t 0 ]]; then
+          # Non-interactive: use default port
           export DC_PROXY_SOCKS5_PORT="1080"
-          msg_ok "Using default port: 1080"
+          msg_info "Non-interactive mode: using default SOCKS5 port: 1080"
         else
-          export DC_PROXY_SOCKS5_PORT="$PORT_CHOICE"
-          msg_ok "Using custom port: ${PORT_CHOICE}"
+          # Interactive mode: show prompts
+          msg_info ""
+          msg_info "SOCKS5 Proxy Port Configuration"
+          msg_info "================================"
+          msg_info ""
+          msg_info "Choose SOCKS5 proxy port:"
+          msg_info "  - Default: 1080 (standard SOCKS5 port)"
+          msg_info "  - Custom: any available port (e.g., 9999)"
+          msg_info ""
+          
+          # Interactive prompt
+          read -p "Enter SOCKS5 port (press Enter for default: 1080): " PORT_CHOICE
+          
+          if [[ -z "$PORT_CHOICE" ]]; then
+            export DC_PROXY_SOCKS5_PORT="1080"
+            msg_ok "Using default port: 1080"
+          else
+            export DC_PROXY_SOCKS5_PORT="$PORT_CHOICE"
+            msg_ok "Using custom port: ${PORT_CHOICE}"
+          fi
+          
+          msg_info ""
+          msg_info "To skip this prompt next time, set:"
+          msg_info "  export DC_PROXY_SOCKS5_PORT=${DC_PROXY_SOCKS5_PORT}"
+          msg_info "Or add to .env.orodc:"
+          msg_info "  echo 'DC_PROXY_SOCKS5_PORT=${DC_PROXY_SOCKS5_PORT}' >> .env.orodc"
+          msg_info ""
         fi
-        
-        msg_info ""
-        msg_info "To skip this prompt next time, set:"
-        msg_info "  export DC_PROXY_SOCKS5_PORT=${DC_PROXY_SOCKS5_PORT}"
-        msg_info "Or add to .env.orodc:"
-        msg_info "  echo 'DC_PROXY_SOCKS5_PORT=${DC_PROXY_SOCKS5_PORT}' >> .env.orodc"
-        msg_info ""
       else
         msg_info "Using SOCKS5 port: ${DC_PROXY_SOCKS5_PORT} (from environment)"
       fi
@@ -628,14 +743,15 @@ if [[ "$temp_first_non_flag_arg" == "proxy" ]]; then
       fi
       
       # Pass all remaining arguments to docker compose up
-      ${DOCKER_COMPOSE_BIN} -p proxy -f "$PROXY_COMPOSE_FILE" up "$@" || {
-        msg_error "Failed to start proxy services"
-        exit 1
-      }
+      proxy_cmd="${DOCKER_COMPOSE_BIN} -p proxy -f \"$PROXY_COMPOSE_FILE\" up $*"
       
-      # If running in detached mode (-d), show info and certificate hint
-      if [[ "$*" == *"-d"* ]]; then
-        msg_ok "Proxy services started!"
+      # Use spinner for detached mode unless DEBUG is enabled
+      if [[ "$*" == *"-d"* ]] && [[ -z "${DEBUG:-}" ]]; then
+        run_with_spinner "Starting proxy services" "$proxy_cmd" || {
+          msg_error "Failed to start proxy services"
+          exit 1
+        }
+        
         msg_info ""
         msg_info "Bind address: ${TRAEFIK_BIND_ADDRESS:-127.0.0.1}"
         msg_info "Dashboard:    http://${TRAEFIK_BIND_ADDRESS:-127.0.0.1}:8880/traefik/dashboard/"
@@ -647,28 +763,52 @@ if [[ "$temp_first_non_flag_arg" == "proxy" ]]; then
         msg_info ""
         msg_info "  orodc proxy install-certs"
         msg_info ""
+      else
+        # Foreground mode or DEBUG mode - show full output
+        ${DOCKER_COMPOSE_BIN} -p proxy -f "$PROXY_COMPOSE_FILE" up "$@" || {
+          msg_error "Failed to start proxy services"
+          exit 1
+        }
       fi
       
       exit 0
       ;;
     
     down)
-      msg_info "Stopping proxy services..."
-      ${DOCKER_COMPOSE_BIN} -p proxy -f "$PROXY_COMPOSE_FILE" down "$@" || {
-        msg_error "Failed to stop proxy services"
-        exit 1
-      }
-      msg_ok "Proxy services stopped"
+      proxy_down_cmd="${DOCKER_COMPOSE_BIN} -p proxy -f \"$PROXY_COMPOSE_FILE\" down $*"
+      
+      # Use spinner unless DEBUG is enabled
+      if [[ -z "${DEBUG:-}" ]]; then
+        run_with_spinner "Stopping proxy services" "$proxy_down_cmd" || {
+          msg_error "Failed to stop proxy services"
+          exit 1
+        }
+      else
+        ${DOCKER_COMPOSE_BIN} -p proxy -f "$PROXY_COMPOSE_FILE" down "$@" || {
+          msg_error "Failed to stop proxy services"
+          exit 1
+        }
+        msg_ok "Proxy services stopped"
+      fi
       exit 0
       ;;
     
     purge)
-      msg_info "Removing proxy services and volumes..."
-      ${DOCKER_COMPOSE_BIN} -p proxy -f "$PROXY_COMPOSE_FILE" down -v "$@" || {
-        msg_error "Failed to remove proxy services"
-        exit 1
-      }
-      msg_ok "Proxy services removed (including volumes)"
+      proxy_purge_cmd="${DOCKER_COMPOSE_BIN} -p proxy -f \"$PROXY_COMPOSE_FILE\" down -v $*"
+      
+      # Use spinner unless DEBUG is enabled
+      if [[ -z "${DEBUG:-}" ]]; then
+        run_with_spinner "Removing proxy services and volumes" "$proxy_purge_cmd" || {
+          msg_error "Failed to remove proxy services"
+          exit 1
+        }
+      else
+        ${DOCKER_COMPOSE_BIN} -p proxy -f "$PROXY_COMPOSE_FILE" down -v "$@" || {
+          msg_error "Failed to remove proxy services"
+          exit 1
+        }
+        msg_ok "Proxy services removed (including volumes)"
+      fi
       exit 0
       ;;
     
@@ -1617,20 +1757,6 @@ fi
 if [[ "$first_non_flag_arg" == "up" ]]; then
   # Save profiles for future commands
   save_profiles
-  
-  
-  printf "\033[0;37m[${DC_ORO_NAME}] Application: http://localhost:${DC_ORO_PORT_NGINX}\033[0m\n"
-  printf "\033[0;37m[${DC_ORO_NAME}] Mailhog: http://localhost:${DC_ORO_PORT_MAIL_WEBGUI}\033[0m\n"
-  printf "\033[0;37m[${DC_ORO_NAME}] Elasticsearch: http://localhost:${DC_ORO_PORT_SEARCH}\033[0m\n"
-  printf "\033[0;37m[${DC_ORO_NAME}] Mq: http://localhost:${DC_ORO_PORT_MQ}\033[0m\n"
-  
-  if [[ "${DC_ORO_DATABASE_SCHEMA}" == "pdo_pgsql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgresql" ]];then
-    printf "\033[0;37m[${DC_ORO_NAME}] Database: 127.0.0.1:${DC_ORO_PORT_PGSQL}\033[0m\n"
-  elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "pdo_mysql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]];then
-    printf "\033[0;37m[${DC_ORO_NAME}] Database: 127.0.0.1:${DC_ORO_PORT_MYSQL}\033[0m\n"
-  fi
-
-  printf "\033[0;37m[${DC_ORO_NAME}] SSH: 127.0.0.1:${DC_ORO_PORT_SSH}\033[0m\n"
 fi
 
 
@@ -2647,33 +2773,70 @@ if [[ "$first_non_flag_arg" == "purge" ]]; then
     echo "DEBUG: Processing purge command with flags: ${left_flags[@]} ${left_options[@]}" >&2
   fi
   
-  if [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
-    bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} -f ${DC_ORO_CONFIG_DIR}/compose.yml down -v"
+  # Show warning and ask for confirmation
+  msg_warning "This will permanently delete ALL project data:"
+  msg_info "  - All Docker containers for project: ${DC_ORO_NAME}"
+  msg_info "  - All Docker volumes (database, uploads, cache)"
+  msg_info "  - All project-specific Docker images"
+  msg_info "  - Configuration directory: ${DC_ORO_CONFIG_DIR}"
+  echo "" >&2
+  
+  # Check if running in non-interactive mode (CI/CD or piped)
+  if [[ ! -t 0 ]] || [[ -n "${ORODC_PURGE_FORCE:-}" ]]; then
+    msg_warning "Running in non-interactive mode or ORODC_PURGE_FORCE is set, proceeding without confirmation"
   else
-    bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} down -v"
+    # Ask for confirmation
+    printf "\033[1;33mAre you sure you want to continue? [y/N]: \033[0m" >&2
+    read -r response
+    
+    if [[ ! "$response" =~ ^[Yy]$ ]]; then
+      msg_info "Purge cancelled"
+      exit 0
+    fi
+  fi
+  
+  echo "" >&2
+  
+  if [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
+    down_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} -f ${DC_ORO_CONFIG_DIR}/compose.yml down -v"
+  else
+    down_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} down -v"
+  fi
+  
+  # Use spinner for down command unless DEBUG mode is enabled
+  if [[ -z "${DEBUG:-}" ]]; then
+    run_with_spinner "Stopping and removing containers, volumes" "$down_cmd"
+  else
+    bash -c "$down_cmd"
   fi
 
   ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null && {
-    echo "Removing docker volume: ${DC_ORO_NAME}_appcode"
-    ${DOCKER_BIN} volume rm ${DC_ORO_NAME}'_appcode'
+    msg_info "Removing appcode volume"
+    ${DOCKER_BIN} volume rm ${DC_ORO_NAME}'_appcode' >/dev/null 2>&1
+    msg_ok "Appcode volume removed"
   }
   
   # Remove project-specific Docker images
   PROJECT_IMAGES=$(${DOCKER_BIN} images --format "{{.Repository}}:{{.Tag}}" | grep "^${DC_ORO_NAME}-")
   if [[ -n "$PROJECT_IMAGES" ]]; then
-    msg_info "Removing project images for: ${DC_ORO_NAME}"
+    IMAGE_COUNT=$(echo "$PROJECT_IMAGES" | wc -l)
+    msg_info "Removing ${IMAGE_COUNT} project image(s)"
     echo "$PROJECT_IMAGES" | while read -r image; do
       if [[ -n "$image" ]]; then
-        msg_info "  Removing image: $image"
-        ${DOCKER_BIN} rmi "$image" 2>/dev/null || true
+        ${DOCKER_BIN} rmi "$image" >/dev/null 2>&1 || true
       fi
     done
+    msg_ok "Project images removed"
   fi
 
   if [[ -d "${DC_ORO_CONFIG_DIR}" ]]; then
+    msg_info "Removing configuration directory"
     rm -rf "${DC_ORO_CONFIG_DIR}"
+    msg_ok "Configuration directory removed"
   fi
-
+  
+  echo "" >&2
+  msg_ok "Project ${DC_ORO_NAME} purged successfully"
   exit 0
 fi
 
@@ -2681,6 +2844,13 @@ if [[ "$first_non_flag_arg" == "down" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/compose.
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/compose.yml"
   # Combine all arguments into a single string for proper execution
   full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${args[*]} ${right_flags[*]} ${right_options[*]}"
+  
+  # Use spinner for down command unless DEBUG mode is enabled or verbose flag is set
+  if [[ -z "${DEBUG:-}" ]] && [[ ! " ${left_flags[*]} ${right_flags[*]} " =~ " --verbose " ]] && [[ ! " ${left_flags[*]} ${right_flags[*]} " =~ " -v " ]]; then
+    run_with_spinner "Stopping services" "$full_cmd"
+    exit $?
+  fi
+  
   bash -c "$full_cmd"
   exit $?
 fi
@@ -2696,12 +2866,65 @@ if [[ "$is_docker_compose_cmd" == "true" ]]; then
   docker_cmd="${args[0]}"
   docker_services="${args[*]:1}"
   
-  # Auto-add --build flag for 'up' command if not already present
-  # This ensures images are always rebuilt, preventing "executable not found" errors
-  if [[ "$docker_cmd" == "up" ]] && [[ ! " ${right_flags[*]} " =~ " --build " ]] && [[ ! " ${right_flags[*]} " =~ " --no-build " ]]; then
-    right_flags+=("--build")
+  # Handle 'up' command with separate build and start phases
+  if [[ "$docker_cmd" == "up" ]]; then
+    # Check if we should skip build phase
+    skip_build=false
+    if [[ " ${right_flags[*]} " =~ " --no-build " ]]; then
+      skip_build=true
+    fi
+    
+    # Use spinner for build and up unless DEBUG mode is enabled or verbose flag is set
+    use_spinner=true
+    if [[ -n "${DEBUG:-}" ]] || [[ " ${left_flags[*]} ${right_flags[*]} " =~ " --verbose " ]] || [[ " ${left_flags[*]} ${right_flags[*]} " =~ " -v " ]]; then
+      use_spinner=false
+    fi
+    
+    # Phase 1: Build images (unless --no-build is specified)
+    if [[ "$skip_build" == "false" ]]; then
+      build_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} build ${docker_services}"
+      if [[ "$use_spinner" == "true" ]]; then
+        DC_ORO_NAME="$DC_ORO_NAME" run_with_spinner "Building services" "$build_cmd" || exit $?
+      else
+        DC_ORO_NAME="$DC_ORO_NAME" bash -c "$build_cmd" || exit $?
+      fi
+    fi
+    
+    # Phase 2: Start services (without --build flag)
+    # Remove --build flag if present and construct up command
+    up_flags=()
+    for flag in "${right_flags[@]}"; do
+      if [[ "$flag" != "--build" ]]; then
+        up_flags+=("$flag")
+      fi
+    done
+    
+    up_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} up ${up_flags[*]} ${right_options[*]} ${docker_services}"
+    if [[ "$use_spinner" == "true" ]]; then
+      DC_ORO_NAME="$DC_ORO_NAME" run_with_spinner "Starting services" "$up_cmd" || exit $?
+      show_service_urls
+      exit 0
+    else
+      DC_ORO_NAME="$DC_ORO_NAME" bash -c "$up_cmd" || exit $?
+      show_service_urls
+      exit 0
+    fi
   fi
   
+  # Handle 'build' command
+  if [[ "$docker_cmd" == "build" ]]; then
+    full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${docker_cmd} ${right_flags[*]} ${right_options[*]} ${docker_services}"
+    
+    if [[ -z "${DEBUG:-}" ]] && [[ ! " ${left_flags[*]} ${right_flags[*]} " =~ " --verbose " ]] && [[ ! " ${left_flags[*]} ${right_flags[*]} " =~ " -v " ]]; then
+      DC_ORO_NAME="$DC_ORO_NAME" run_with_spinner "Building services" "$full_cmd"
+      exit $?
+    else
+      DC_ORO_NAME="$DC_ORO_NAME" bash -c "$full_cmd"
+      exit $?
+    fi
+  fi
+  
+  # Handle all other docker compose commands
   full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${docker_cmd} ${right_flags[*]} ${right_options[*]} ${docker_services}"
   DC_ORO_NAME="$DC_ORO_NAME" bash -c "$full_cmd"
   exit $?
