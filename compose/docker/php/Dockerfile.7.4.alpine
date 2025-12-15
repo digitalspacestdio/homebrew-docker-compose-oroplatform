@@ -1,8 +1,5 @@
 ARG ALPINE_VERSION=3.15
 ARG PHP_VERSION=7.4
-ARG COMPOSER_VERSION=2
-# Composer image
-FROM composer:${COMPOSER_VERSION} AS composer_app
 FROM php:${PHP_VERSION}-fpm-alpine${ALPINE_VERSION} AS app_php
 ARG STABILITY="stable"
 ENV STABILIT=${STABILITY}
@@ -142,6 +139,3 @@ RUN set -eux; \
   chmod 666 "${PHP_INI_DIR}/conf.d/docker-php-ext-xdebug.ini" 2>/dev/null || true; \
   \
   apk del .build-deps
-
-# Copy Composer from composer image (overwrite existing /usr/bin/composer)
-COPY --from=composer_app /usr/bin/composer /usr/bin/composer

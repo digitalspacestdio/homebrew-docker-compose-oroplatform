@@ -1,8 +1,5 @@
 ARG ALPINE_VERSION=3.15
 ARG PHP_VERSION=7.3
-ARG COMPOSER_VERSION=2
-# Composer image
-FROM composer:${COMPOSER_VERSION} AS composer_app
 FROM php:${PHP_VERSION}-fpm-alpine${ALPINE_VERSION} AS app_php
 ARG STABILITY="stable"
 ENV STABILIT=${STABILITY}
@@ -132,6 +129,3 @@ RUN set -eux; \
   apk add --no-cache --virtual .app-phpexts-rundeps $runDeps; \
   \
   apk del .build-deps
-
-# Copy Composer from composer image (overwrite existing /usr/bin/composer)
-COPY --from=composer_app /usr/bin/composer /usr/bin/composer
