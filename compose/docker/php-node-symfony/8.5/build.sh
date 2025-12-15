@@ -76,17 +76,16 @@ mkdir -p /tmp/starship && cd /tmp/starship
 wget -q "https://github.com/starship/starship/releases/latest/download/starship-${ARCH}.tar.gz"
 tar -xzf "starship-${ARCH}.tar.gz"
 install starship /usr/local/bin/starship
-echo 'eval "$(starship init zsh)"' >> /root/.zshrc
 rm -rf /tmp/starship
 cd /
 
 # Setup bash completion
 mkdir -p /etc/bash_completion.d
 if command -v composer >/dev/null 2>&1; then
-    composer completion bash > /etc/bash_completion.d/composer
+    composer completion bash > /etc/bash_completion.d/composer 2>/dev/null || true
 fi
 if command -v npm >/dev/null 2>&1; then
-    npm completion > /etc/bash_completion.d/npm
+    npm completion > /etc/bash_completion.d/npm 2>/dev/null || true
 fi
 
 # Create symlinks for image optimization tools

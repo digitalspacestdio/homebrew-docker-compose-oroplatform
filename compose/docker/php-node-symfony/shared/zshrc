@@ -80,6 +80,17 @@ clear
 autoload -Uz compinit
 compinit
 
+# Enable bash completion compatibility
+autoload -U bashcompinit
+bashcompinit
+
+# Load bash completions from /etc/bash_completion.d
+if [ -d /etc/bash_completion.d ]; then
+  for file in /etc/bash_completion.d/*; do
+    [ -f "$file" ] && source "$file" 2>/dev/null
+  done
+fi
+
 zstyle ':completion:*' menu select
 
 # Use separate history file per container to avoid conflicts
