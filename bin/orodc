@@ -2448,6 +2448,8 @@ fi
 
 if echo ${args[0]} | grep -i 'composer' | grep -i 'install' > /dev/null; then
   URL=${args[1]:-"https://${DC_ORO_NAME}.docker.local"}
+  # Create config/parameters.yml from dist file if not exists (prevents Incenteev interactive prompts)
+  ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "if [[ ! -f ${DC_ORO_APPDIR}/config/parameters.yml ]] && [[ -f ${DC_ORO_APPDIR}/config/parameters.yml.dist ]]; then cp ${DC_ORO_APPDIR}/config/parameters.yml.dist ${DC_ORO_APPDIR}/config/parameters.yml; fi" || true
   set -x
   ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "composer install --no-interaction" || true
   exit 0
@@ -2688,6 +2690,14 @@ if [[ "$first_non_flag_arg" == "composer" ]] && [[ "${args[1]}" =~ ^(install|upd
       echo "DEBUG: Auto-added --no-interaction to composer ${args[1]}" >&2
     fi
   fi
+  
+  # For composer install, create config/parameters.yml from dist file if not exists (prevents Incenteev interactive prompts)
+  if [[ "${args[1]}" == "install" ]]; then
+    ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "if [[ ! -f ${DC_ORO_APPDIR}/config/parameters.yml ]] && [[ -f ${DC_ORO_APPDIR}/config/parameters.yml.dist ]]; then cp ${DC_ORO_APPDIR}/config/parameters.yml.dist ${DC_ORO_APPDIR}/config/parameters.yml; fi" 2>/dev/null || true
+    if [[ -n "${DEBUG:-}" ]]; then
+      echo "DEBUG: Prepared config/parameters.yml from dist file" >&2
+    fi
+  fi
 fi
 
 # If command is not a docker compose built-in command and not a special orodc command, redirect to CLI container
@@ -2726,6 +2736,10 @@ if echo ${args[0]} | grep -i '^install' | grep -i 'without' | grep -i 'demo' > /
   cache_cmd="${DOCKER_COMPOSE_RUN_CMD} cli bash -c \"[[ -d ${DC_ORO_APPDIR}/var/cache ]] && rm -rf ${DC_ORO_APPDIR}/var/cache/* || true\""
   run_with_spinner "Clearing cache" "$cache_cmd" || exit $?
   
+  # Create config/parameters.yml from dist file if not exists (prevents Incenteev interactive prompts)
+  params_cmd="${DOCKER_COMPOSE_RUN_CMD} cli bash -c \"if [[ ! -f ${DC_ORO_APPDIR}/config/parameters.yml ]] && [[ -f ${DC_ORO_APPDIR}/config/parameters.yml.dist ]]; then cp ${DC_ORO_APPDIR}/config/parameters.yml.dist ${DC_ORO_APPDIR}/config/parameters.yml; fi\""
+  run_with_spinner "Preparing config files" "$params_cmd" || exit $?
+  
   # Run composer install with spinner
   composer_cmd="${DOCKER_COMPOSE_RUN_CMD} cli bash -c \"composer install --no-interaction\""
   run_with_spinner "Running composer install" "$composer_cmd" || exit $?
@@ -2754,6 +2768,10 @@ elif echo ${args[0]} | grep -i '^install$' > /dev/null; then
   # Clear cache
   cache_cmd="${DOCKER_COMPOSE_RUN_CMD} cli bash -c \"[[ -d ${DC_ORO_APPDIR}/var/cache ]] && rm -rf ${DC_ORO_APPDIR}/var/cache/* || true\""
   run_with_spinner "Clearing cache" "$cache_cmd" || exit $?
+  
+  # Create config/parameters.yml from dist file if not exists (prevents Incenteev interactive prompts)
+  params_cmd="${DOCKER_COMPOSE_RUN_CMD} cli bash -c \"if [[ ! -f ${DC_ORO_APPDIR}/config/parameters.yml ]] && [[ -f ${DC_ORO_APPDIR}/config/parameters.yml.dist ]]; then cp ${DC_ORO_APPDIR}/config/parameters.yml.dist ${DC_ORO_APPDIR}/config/parameters.yml; fi\""
+  run_with_spinner "Preparing config files" "$params_cmd" || exit $?
   
   # Run composer install with spinner
   composer_cmd="${DOCKER_COMPOSE_RUN_CMD} cli bash -c \"composer install --no-interaction\""
