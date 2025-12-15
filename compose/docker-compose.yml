@@ -191,7 +191,7 @@ services:
         PHP_GID: "${DC_ORO_PHP_GID:-1000}"
         COMPOSER_VERSION: "${DC_ORO_COMPOSER_VERSION:-2}"
     user: "${DC_ORO_USER_NAME:-developer}"
-    command: php bin/console oro:message-queue:consume -vv
+    command: sh -c 'until php bin/console oro:message-queue:consume -vv; do echo "Consumer crashed, restarting in 15s..."; sleep 15; done'
     volumes:
       - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
       - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
@@ -273,7 +273,7 @@ services:
         PHP_GID: "${DC_ORO_PHP_GID:-1000}"
         COMPOSER_VERSION: "${DC_ORO_COMPOSER_VERSION:-2}"
     user: "${DC_ORO_USER_NAME:-developer}"
-    command: php bin/console gos:websocket:server
+    command: sh -c 'until php bin/console gos:websocket:server; do echo "Websocket crashed, restarting in 15s..."; sleep 15; done'
     volumes:
       - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
       - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
