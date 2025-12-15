@@ -2543,15 +2543,15 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
   
   ENV_FILE="$DC_ORO_APPDIR/.env.orodc"
   
-  # Function to get compatible Node.js versions based on PHP version
+  # Function to get compatible Node.js versions based on PHP version (sorted newest to oldest)
   get_compatible_node_versions() {
     local php_ver="$1"
     case "$php_ver" in
-      7.4) echo "16 18" ;;
-      8.1) echo "16 18 20 22" ;;
-      8.2|8.3|8.4) echo "18 20 22" ;;
-      8.5) echo "22 24" ;;
-      *) echo "18 20 22" ;;
+      7.4) echo "18 16" ;;
+      8.1) echo "22 20 18 16" ;;
+      8.2|8.3|8.4) echo "22 20 18" ;;
+      8.5) echo "24 22" ;;
+      *) echo "22 20 18" ;;
     esac
   }
   
@@ -2654,8 +2654,8 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
     SELECTED_PHP="8.4"
     SELECTED_NODE="22"
   else
-    # Select PHP version
-    PHP_VERSIONS=("8.3" "8.4" "8.5" "8.2" "8.1" "7.4")
+    # Select PHP version (sorted newest to oldest)
+    PHP_VERSIONS=("8.5" "8.4" "8.3" "8.2" "8.1" "7.4")
     SELECTED_PHP=$(prompt_select "Select PHP version:" "8.4" "${PHP_VERSIONS[@]}")
     
     if [[ -n "${DEBUG:-}" ]]; then
@@ -2667,10 +2667,10 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
     
     # Determine default Node.js version based on PHP
     case "$SELECTED_PHP" in
-      8.5) DEFAULT_NODE="22" ;;
+      8.5) DEFAULT_NODE="24" ;;
       7.4) DEFAULT_NODE="18" ;;
-      8.1) DEFAULT_NODE="20" ;;
-      *) DEFAULT_NODE="20" ;;
+      8.1) DEFAULT_NODE="22" ;;
+      *) DEFAULT_NODE="22" ;;
     esac
     
     # Ensure default is in compatible versions list
@@ -2709,14 +2709,14 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
       >&2 echo "DEBUG: Selected DB type: '$SELECTED_DB_TYPE'"
     fi
     
-    # Select version based on type
+    # Select version based on type (sorted newest to oldest)
     if [[ "$SELECTED_DB_TYPE" == "PostgreSQL" ]]; then
-      PGSQL_VERSIONS=("16.6" "17.4" "15.1")
+      PGSQL_VERSIONS=("17.4" "16.6" "15.1")
       SELECTED_DB_VERSION=$(prompt_select "Select PostgreSQL version:" "16.6" "${PGSQL_VERSIONS[@]}")
       SELECTED_DB_SCHEMA="pgsql"
       SELECTED_DB_IMAGE="ghcr.io/digitalspacestdio/orodc-pgsql:${SELECTED_DB_VERSION}"
     else
-      MYSQL_VERSIONS=("8.4" "8.0" "5.7" "9.0")
+      MYSQL_VERSIONS=("9.0" "8.4" "8.0" "5.7")
       SELECTED_DB_VERSION=$(prompt_select "Select MySQL version:" "8.4" "${MYSQL_VERSIONS[@]}")
       SELECTED_DB_SCHEMA="mysql"
       SELECTED_DB_IMAGE="mysql:${SELECTED_DB_VERSION}"
@@ -2739,14 +2739,14 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
     SEARCH_TYPES=("Elasticsearch" "OpenSearch")
     SELECTED_SEARCH_TYPE=$(prompt_select "Select search engine:" "Elasticsearch" "${SEARCH_TYPES[@]}")
     
-    # Select version based on type
+    # Select version based on type (sorted newest to oldest)
     if [[ "$SELECTED_SEARCH_TYPE" == "Elasticsearch" ]]; then
-      ELASTIC_VERSIONS=("8.10.3" "8.15.0" "7.17.0")
-      SELECTED_SEARCH_VERSION=$(prompt_select "Select Elasticsearch version:" "8.10.3" "${ELASTIC_VERSIONS[@]}")
+      ELASTIC_VERSIONS=("8.15.0" "8.10.3" "7.17.0")
+      SELECTED_SEARCH_VERSION=$(prompt_select "Select Elasticsearch version:" "8.15.0" "${ELASTIC_VERSIONS[@]}")
       SELECTED_SEARCH_IMAGE="docker.elastic.co/elasticsearch/elasticsearch:${SELECTED_SEARCH_VERSION}"
     else
-      OPENSEARCH_VERSIONS=("2.11.0" "2.15.0" "1.3.0")
-      SELECTED_SEARCH_VERSION=$(prompt_select "Select OpenSearch version:" "2.11.0" "${OPENSEARCH_VERSIONS[@]}")
+      OPENSEARCH_VERSIONS=("2.15.0" "2.11.0" "1.3.0")
+      SELECTED_SEARCH_VERSION=$(prompt_select "Select OpenSearch version:" "2.15.0" "${OPENSEARCH_VERSIONS[@]}")
       SELECTED_SEARCH_IMAGE="opensearchproject/opensearch:${SELECTED_SEARCH_VERSION}"
     fi
   fi
@@ -2767,10 +2767,10 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
     CACHE_TYPES=("Redis" "KeyDB")
     SELECTED_CACHE_TYPE=$(prompt_select "Select cache engine:" "Redis" "${CACHE_TYPES[@]}")
     
-    # Select version based on type
+    # Select version based on type (sorted newest to oldest)
     if [[ "$SELECTED_CACHE_TYPE" == "Redis" ]]; then
-      REDIS_VERSIONS=("7.2" "7.4" "6.2")
-      SELECTED_CACHE_VERSION=$(prompt_select "Select Redis version:" "7.2" "${REDIS_VERSIONS[@]}")
+      REDIS_VERSIONS=("7.4" "7.2" "6.2")
+      SELECTED_CACHE_VERSION=$(prompt_select "Select Redis version:" "7.4" "${REDIS_VERSIONS[@]}")
       SELECTED_CACHE_IMAGE="redis:${SELECTED_CACHE_VERSION}-alpine"
     else
       KEYDB_VERSIONS=("6.3.4" "6.3.3")
