@@ -908,6 +908,155 @@ echo "DC_ORO_MODE=ssh" >> .env.orodc
 
 ## 🐳 Custom Docker Images
 
+### 🏗️ Building PHP+Node.js Images Locally
+
+OroDC provides a built-in command to build PHP+Node.js Docker images locally. This is useful when:
+- GitHub Container Registry is unavailable or blocked
+- Custom PHP or Node.js versions are required
+- Testing Dockerfile changes before CI/CD deployment
+- Working in air-gapped or restricted network environments
+
+#### ⚡ Quick Build
+
+```bash
+# Build images for current project configuration
+orodc image build
+
+# Build without cache (full rebuild)
+orodc image build --no-cache
+```
+
+#### 📋 How It Works
+
+The `orodc image build` command:
+
+1. **Detects versions** from your project configuration (`.env.orodc` or defaults)
+2. **Checks for existing images** locally to avoid unnecessary work
+3. **Offers registry pull** (Stage 1): Interactive prompt to pull PHP base image from GitHub Container Registry
+4. **Builds if needed** (Stage 1): Builds PHP base image locally if pull declined or failed
+5. **Offers registry pull** (Stage 2): Interactive prompt to pull PHP+Node.js final image
+6. **Builds if needed** (Stage 2): Builds final image locally if pull declined or failed
+7. **Tags locally**: All images are tagged without registry prefix for local use
+
+#### 🌐 Pull from Registry
+
+When an image is not found locally, OroDC will ask if you want to try pulling from GitHub Container Registry:
+
+```
+PHP base image not found locally: orodc-php:8.3-alpine
+Registry image: ghcr.io/digitalspacestdio/orodc-php:8.3-alpine
+
+Try to pull from registry? (y/N):
+```
+
+**Benefits of pulling:**
+- ⚡ Much faster than building (30 seconds vs 10 minutes)
+- 💾 Saves disk space (no build cache needed)
+- 🔄 Gets official pre-built images
+
+**When to build locally:**
+- Registry is unavailable or blocked
+- Testing custom Dockerfile modifications
+- Air-gapped environment without internet access
+
+#### ⚙️ Version Configuration
+
+Configure versions in `.env.orodc`:
+
+```bash
+# PHP and Node.js versions
+DC_ORO_PHP_VERSION=8.3
+DC_ORO_NODE_VERSION=20
+DC_ORO_COMPOSER_VERSION=2
+DC_ORO_PHP_DIST=alpine
+```
+
+Default versions (if not configured):
+- PHP: 8.4
+- Node.js: 22
+- Composer: 2
+- Distribution: alpine
+
+#### 🎯 Using Locally Built Images
+
+After building, force OroDC to use local images by adding to `.env.orodc`:
+
+```bash
+# Force local images (skip registry pull)
+DC_ORO_PHP_REGISTRY=''
+```
+
+Then restart your environment:
+
+```bash
+orodc down
+orodc up -d
+```
+
+#### 📦 Built Image Tags
+
+The command builds two images:
+
+1. **PHP Base Image**: `orodc-php:{version}-alpine`
+   - Example: `orodc-php:8.3-alpine`
+   - Size: ~1GB
+   - Build time: 5-10 minutes
+
+2. **PHP+Node.js Final Image**: `orodc-php-node-symfony:{php}-node{node}-composer{composer}-alpine`
+   - Example: `orodc-php-node-symfony:8.3-node20-composer2-alpine`
+   - Size: ~2GB
+   - Build time: 5-10 minutes
+
+#### 🔍 Available Versions
+
+To see available PHP versions:
+
+```bash
+ls compose/docker/php/Dockerfile.*.alpine
+# Output: Dockerfile.7.3.alpine, Dockerfile.7.4.alpine, etc.
+```
+
+Supported PHP versions: 7.3, 7.4, 8.1, 8.2, 8.3, 8.4, 8.5
+Supported Node.js versions: 18, 20, 22
+Supported Composer versions: 1, 2
+
+#### 💾 Disk Space Requirements
+
+- Minimum required: 5GB free space
+- PHP base image: ~1GB
+- PHP+Node.js final image: ~2GB
+- Build cache: ~1-2GB
+
+#### 🔄 Rebuilding Images
+
+```bash
+# Rebuild with cache (faster, reuses unchanged layers)
+orodc image build
+
+# Force complete rebuild without cache
+orodc image build --no-cache
+```
+
+#### 🐛 Troubleshooting
+
+**Build fails with "Dockerfile not found":**
+- Check `DC_ORO_PHP_VERSION` in `.env.orodc`
+- Run `ls compose/docker/php/Dockerfile.*.alpine` to see available versions
+
+**Build fails with disk space error:**
+- Check free space: `df -h`
+- Clean Docker cache: `docker system prune -a`
+- Remove unused images: `docker image prune -a`
+
+**Build fails with network error:**
+- Check internet connectivity
+- Try rebuilding with `--no-cache`
+- Check Docker daemon is running: `docker ps`
+
+**Built images not used by OroDC:**
+- Add `DC_ORO_PHP_REGISTRY=''` to `.env.orodc`
+- Restart environment: `orodc down && orodc up -d`
+
 ### 🛠️ Building Custom PostgreSQL Image
 
 You can create custom Docker images for any service and use them with OroDC. Here's an example of creating a PostgreSQL image with additional extensions:

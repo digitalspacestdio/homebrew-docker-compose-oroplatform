@@ -133,5 +133,5 @@ RUN set -eux; \
   \
   apk del .build-deps
 
-# Copy Composer from composer image
-COPY --from=composer_app /usr/bin/composer /usr/local/bin/composer
+# Copy Composer from composer image (overwrite existing /usr/bin/composer)
+COPY --from=composer_app /usr/bin/composer /usr/bin/composer
