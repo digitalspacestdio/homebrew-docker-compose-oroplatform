@@ -42,8 +42,8 @@
 - [x] 4.3 Document `.env.orodc` preservation behavior
 - [x] 4.4 Document PHP 7.3 support
 - [x] 4.5 Document updated PHP/Node.js compatibility matrix
-- [ ] 4.6 Create OpenSpec documentation for new capabilities
-- [ ] 4.7 Archive change proposal after completion
+- [x] 4.6 Create OpenSpec documentation for new capabilities
+- [x] 4.7 Archive change proposal after completion
 
 ## 5. Testing
 - [x] 5.1 Manual testing of spinner behavior in all commands
@@ -56,5 +56,10 @@
 
 ## Notes
 All implementation tasks are complete and merged to master via PR #138.
-Remaining tasks are for OpenSpec documentation and archival.
+OpenSpec documentation created with three new capabilities:
+- cli-ux: Command-line user experience and output formatting
+- interactive-init: Interactive configuration tool behavior  
+- php-compatibility: PHP version support and Node.js compatibility matrix
+
+Change archived on 2025-12-15 as `2025-12-15-improve-cli-ux-and-php-support`.
 

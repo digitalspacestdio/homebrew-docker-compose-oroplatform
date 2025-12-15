@@ -262,7 +262,7 @@ jobs:
   # ========================================
   
   build-php-node:
-    name: PHP-${{ matrix.php }}+NODE-${{ matrix.node }} (${{ matrix.arch_name }})
+    name: PHP-${{ matrix.php }}+NODE-${{ matrix.node }}+COMPOSER-${{ matrix.composer }} (${{ matrix.arch_name }})
     needs: [create-php-base-manifests]
     runs-on:
       - self-hosted
@@ -628,7 +628,7 @@ jobs:
               compose/docker/php-node-symfony
       
       # Push with retry
-      - name: Push PHP-${{ matrix.php }}+NODE-${{ matrix.node }} (${{ matrix.arch_name }})
+      - name: Push PHP-${{ matrix.php }}+NODE-${{ matrix.node }}+COMPOSER-${{ matrix.composer }} (${{ matrix.arch_name }})
         if: steps.check-rebuild.outputs.skip != 'true'
         uses: nick-invision/retry@v2
         with:
@@ -643,7 +643,7 @@ jobs:
   # ========================================
   
   create-php-node-manifests:
-    name: PHP-${{ matrix.php }}+NODE-${{ matrix.node }} (Manifest)
+    name: PHP-${{ matrix.php }}+NODE-${{ matrix.node }}+COMPOSER-${{ matrix.composer }} (Manifest)
     needs: [build-php-node]
     runs-on: ubuntu-latest
     strategy:
