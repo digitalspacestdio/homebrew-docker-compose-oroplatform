@@ -78,4 +78,4 @@ RUN git config --global url."https://github.com/".insteadOf git@github.com: \
     && git config --global url."https://gitlab.com/".insteadOf git@gitlab.com:
 
 VOLUME "/home/${PHP_USER_NAME}" "/root" "${APP_DIR}"
-CMD [ "zsh" ]
+# No default CMD - each service defines its own command (php-fpm, consumer, docker-sshd, etc)

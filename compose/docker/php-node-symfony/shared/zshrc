@@ -1,3 +1,11 @@
+# Only run for interactive shells
+[[ $- != *i* ]] && return
+
+# Skip if running as non-interactive (FPM, consumer, etc)
+if [[ -z "$PS1" ]]; then
+    return
+fi
+
 clear
 
 # # Colors
@@ -73,43 +81,89 @@ autoload -Uz compinit
 compinit
 
 zstyle ':completion:*' menu select
+
+# Use separate history file per container to avoid conflicts
+HISTFILE=~/.zsh_history_$(hostname)
+HISTSIZE=10000
+SAVEHIST=10000
+setopt SHARE_HISTORY
+
+# Key bindings for Home and End keys
+bindkey "^[[H" beginning-of-line    # Home
+bindkey "^[[F" end-of-line          # End
+bindkey "^[[1~" beginning-of-line   # Home (alternative)
+bindkey "^[[4~" end-of-line         # End (alternative)
+bindkey "^[[3~" delete-char         # Delete
+bindkey "^[[A" up-line-or-history   # Up arrow
+bindkey "^[[B" down-line-or-history # Down arrow
+
 mkdir -p ~/.config
 
-# Configure starship: customize hostname, PHP, Node.js format and git branch position
 cat > ~/.config/starship.toml << 'STARSHIP_EOF'
-
-# Hostname configuration
-[hostname]
-ssh_only = false
-trim_at = ""
-format = "[$hostname]($style) in "
-style = "bold bright-yellow"
-
-# Disable vagrant (not used)
-[vagrant]
-disabled = true
-
-# PHP configuration - remove icon, show version inline
-[php]
-format = "via [$version]($style)"
-style = "bold blue"
-
-# Node.js configuration - remove icon, show version inline
-[nodejs]
-format = " / [$version]($style)"
-style = "bold green"
-
-# Git branch - move to end by adjusting format order
 format = """
 $username\
 $hostname\
 $directory\
-$php\
-$nodejs\
 $git_branch\
 $git_status\
+$php\
+$nodejs\
+$cmd_duration\
+$line_break\
+$container\
 $character"""
+
+[username]
+format = "[$user]($style) in "
+show_always = true
+style_user = "bold blue"
+
+[hostname]
+ssh_only = false
+trim_at = "."
+format = "[$hostname]($style) in "
+style = "bold bright-red"
+
+[directory]
+format = "[$path]($style)[$read_only]($read_only_style) "
+style = "bold yellow"
+truncation_length = 3
+truncate_to_repo = true
+read_only = " [RO]"
+
+[git_branch]
+symbol = ""
+
+[nodejs]
+symbol = ""
+detect_extensions = ["js", "mjs", "cjs", "ts"]
+detect_files = ["package.json", ".node-version", ".nvmrc"]
+detect_folders = ["node_modules"]
+
+[php]
+symbol = ""
+detect_extensions = ["php"]
+detect_files = ["composer.json", "composer.lock", ".php-version"]
+detect_folders = ["vendor"]
+
+[character]
+success_symbol = "[❯](bold green)"
+error_symbol = "[❯](bold red)"
+
+[container]
+symbol = ""
+format = "[$symbol \\[$name\\]]($style) "
+
+[vagrant]
+disabled = true
+
+[cmd_duration]
+min_time = 1000
+format = "took [$duration]($style) "
+show_milliseconds = false
 
 STARSHIP_EOF
 
 eval "$(starship init zsh)"
+
+cd ${APP_DIR:-/var/www}
