@@ -52,6 +52,219 @@ echo_warn() { msg_warning "$*"; }
 echo_error() { msg_error "$*"; }
 echo_header() { msg_header "$*"; }
 
+# Spinner animation for long-running commands
+show_spinner() {
+  local pid=$1
+  local message=$2
+  local spinstr='|/-\'
+  local delay=0.1
+  
+  # Only show spinner if running in terminal (not captured)
+  if [[ -t 2 ]]; then
+    tput civis 2>/dev/null || true
+    
+    while kill -0 "$pid" 2>/dev/null; do
+      local temp=${spinstr#?}
+      printf "\r\033[36m==> %s %c\033[0m" "$message" "$spinstr" >&2
+      spinstr=$temp${spinstr%"$temp"}
+      sleep $delay
+    done
+    
+    printf "\r\033[K" >&2
+    tput cnorm 2>/dev/null || true
+  else
+    # If not in terminal, just wait silently
+    while kill -0 "$pid" 2>/dev/null; do
+      sleep $delay
+    done
+  fi
+}
+
+# Execute command with spinner and log on error
+# Usage: run_with_spinner "message" "command"
+run_with_spinner() {
+  local message=$1
+  shift
+  local cmd="$*"
+  local log_file
+  log_file=$(mktemp /tmp/orodc-output.XXXXXX)
+  local exit_code=0
+  
+  eval "$cmd" > "$log_file" 2>&1 &
+  local cmd_pid=$!
+  
+  show_spinner $cmd_pid "$message"
+  
+  wait $cmd_pid || exit_code=$?
+  
+  if [[ $exit_code -ne 0 ]]; then
+    msg_error "Command failed"
+    echo "" >&2
+    cat "$log_file" >&2
+    rm -f "$log_file"
+    return $exit_code
+  fi
+  
+  rm -f "$log_file"
+  msg_ok "$message completed"
+  return 0
+}
+
+# Interactive selector with validation and retry
+# Usage: prompt_selector "prompt text" "default" "option1:value1" "option2:value2" ...
+prompt_selector() {
+  local prompt="$1"
+  local default="$2"
+  shift 2
+  local options=("$@")
+  local choice=""
+  
+  while true; do
+    read -p "$prompt" choice
+    
+    # Empty input - use default
+    if [[ -z "$choice" ]]; then
+      if [[ -n "$default" ]]; then
+        echo "$default"
+        return 0
+      else
+        msg_error "Input required"
+        continue
+      fi
+    fi
+    
+    # Check if input is a number (option index)
+    if [[ "$choice" =~ ^[0-9]+$ ]]; then
+      local idx=$((choice - 1))
+      if [[ $idx -ge 0 ]] && [[ $idx -lt ${#options[@]} ]]; then
+        local option="${options[$idx]}"
+        echo "${option#*:}"  # Return value part
+        return 0
+      fi
+    fi
+    
+    # Check if input matches any value directly
+    for option in "${options[@]}"; do
+      local value="${option#*:}"
+      if [[ "$choice" == "$value" ]]; then
+        echo "$value"
+        return 0
+      fi
+    done
+    
+    # Check if it could be a custom value (for IP address case)
+    if [[ "$choice" =~ ^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+$ ]] || [[ "$choice" =~ ^[a-zA-Z0-9\.\-\_]+$ ]]; then
+      echo "$choice"
+      return 0
+    fi
+    
+    # Invalid input - show error and retry
+    msg_error "Invalid choice: '$choice'. Please try again."
+  done
+}
+
+# Prompt for port number with validation
+# Usage: prompt_port "prompt text" "default_port"
+prompt_port() {
+  local prompt="$1"
+  local default="$2"
+  local choice=""
+  
+  while true; do
+    read -p "$prompt" choice
+    
+    # Empty input - use default
+    if [[ -z "$choice" ]]; then
+      if [[ -n "$default" ]]; then
+        echo "$default"
+        return 0
+      else
+        msg_error "Port number required"
+        continue
+      fi
+    fi
+    
+    # Validate port number
+    if [[ "$choice" =~ ^[0-9]+$ ]] && [[ $choice -ge 1 ]] && [[ $choice -le 65535 ]]; then
+      echo "$choice"
+      return 0
+    else
+      msg_error "Invalid port: '$choice'. Port must be a number between 1 and 65535."
+    fi
+  done
+}
+
+# Prompt for yes/no confirmation with validation
+# Usage: confirm_yes_no "prompt text" "default" (default: yes or no)
+# Returns: 0 for yes, 1 for no
+confirm_yes_no() {
+  local prompt="$1"
+  local default="${2:-no}"
+  local answer
+  
+  while true; do
+    if [[ "$default" == "yes" ]]; then
+      printf "\033[1;33m%s [Y/n]: \033[0m" "$prompt" >&2
+      read -r answer </dev/tty 2>/dev/null || read -r answer
+      answer="${answer:-y}"
+    else
+      printf "\033[1;33m%s [y/N]: \033[0m" "$prompt" >&2
+      read -r answer </dev/tty 2>/dev/null || read -r answer
+      answer="${answer:-n}"
+    fi
+    
+    # Accept: y, yes, Y, YES, n, no, N, NO
+    case "${answer,,}" in  # Convert to lowercase
+      y|yes) return 0 ;;
+      n|no) return 1 ;;
+      *)
+        msg_error "Invalid input: '$answer'. Please enter 'y' (yes) or 'n' (no)."
+        ;;
+    esac
+  done
+}
+
+# Show service URLs after successful 'up' command
+show_service_urls() {
+  echo "" >&2
+  
+  # Check if proxy container is running
+  local proxy_running=false
+  if ${DOCKER_BIN} ps --filter "name=proxy" --filter "status=running" --format "{{.Names}}" 2>/dev/null | grep -q "^proxy$"; then
+    proxy_running=true
+  fi
+  
+  # Show domain URL if proxy is running
+  if [[ "$proxy_running" == "true" ]]; then
+    printf "\033[1;32m[${DC_ORO_NAME}] Application: https://${DC_ORO_NAME}.docker.local\033[0m\n"
+    echo "" >&2
+  fi
+  
+  # Always show localhost URLs
+  printf "\033[0;37m[${DC_ORO_NAME}] Application: http://localhost:${DC_ORO_PORT_NGINX}\033[0m\n"
+  printf "\033[0;37m[${DC_ORO_NAME}] Mailhog: http://localhost:${DC_ORO_PORT_MAIL_WEBGUI}\033[0m\n"
+  printf "\033[0;37m[${DC_ORO_NAME}] Elasticsearch: http://localhost:${DC_ORO_PORT_SEARCH}\033[0m\n"
+  printf "\033[0;37m[${DC_ORO_NAME}] Mq: http://localhost:${DC_ORO_PORT_MQ}\033[0m\n"
+  
+  if [[ "${DC_ORO_DATABASE_SCHEMA}" == "pdo_pgsql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgresql" ]];then
+    printf "\033[0;37m[${DC_ORO_NAME}] Database: 127.0.0.1:${DC_ORO_PORT_PGSQL}\033[0m\n"
+  elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "pdo_mysql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]];then
+    printf "\033[0;37m[${DC_ORO_NAME}] Database: 127.0.0.1:${DC_ORO_PORT_MYSQL}\033[0m\n"
+  fi
+
+  printf "\033[0;37m[${DC_ORO_NAME}] SSH: 127.0.0.1:${DC_ORO_PORT_SSH}\033[0m\n"
+  
+  # Show proxy hint if not running
+  if [[ "$proxy_running" == "false" ]]; then
+    echo "" >&2
+    msg_info "Want to use custom domains and SSL? Start the proxy:"
+    msg_info "  orodc proxy up -d"
+    msg_info "  orodc proxy install-certs"
+    msg_info ""
+    msg_info "Then access via: https://${DC_ORO_NAME}.docker.local"
+  fi
+}
+
 # Function to resolve binary location with error handling
 # Usage: resolve_bin "binary_name" ["install_instructions"]
 resolve_bin() {
@@ -500,11 +713,6 @@ if [[ "$temp_first_non_flag_arg" == "proxy" ]]; then
       
       # Configure Traefik bind address if not set
       if [[ -z "${TRAEFIK_BIND_ADDRESS:-}" ]]; then
-        msg_info ""
-        msg_info "Proxy Network Configuration"
-        msg_info "============================"
-        msg_info ""
-        
         # Auto-detect environment and suggest default
         IS_WSL=false
         IS_LIMA=false
@@ -533,89 +741,107 @@ if [[ "$temp_first_non_flag_arg" == "proxy" ]]; then
           SUGGESTED_REASON="Native Docker - bind to localhost only (secure)"
         fi
         
-        msg_info "Choose proxy bind address (affects HTTP, HTTPS, SOCKS5):"
-        msg_info ""
-        msg_info "  1) 127.0.0.1 (localhost only)"
-        msg_info "     - Most secure: Only accessible from this machine"
-        msg_info "     - Use for: Native Docker on macOS/Linux"
-        msg_info ""
-        msg_info "  2) 0.0.0.0 (all interfaces)"
-        msg_info "     - Allows access from: VM host + network"
-        msg_info "     - Use for: WSL2, Lima VM, remote access"
-        msg_info ""
-        
-        if [[ -n "$DETECTED_ENV" ]]; then
-          msg_info "Detected: ${DETECTED_ENV}"
-          msg_info "Suggested: ${SUGGESTED_BIND} (${SUGGESTED_REASON})"
+        # Check if running in non-interactive mode (CI/CD or piped)
+        if [[ ! -t 0 ]]; then
+          # Non-interactive: use suggested default
+          export TRAEFIK_BIND_ADDRESS="$SUGGESTED_BIND"
+          msg_info "Non-interactive mode: using default bind address: ${SUGGESTED_BIND}"
         else
-          msg_info "Could not detect environment"
-          msg_info "Suggested: ${SUGGESTED_BIND} (safe default)"
+          # Interactive mode: show prompts
+          msg_info ""
+          msg_info "Proxy Network Configuration"
+          msg_info "============================"
+          msg_info ""
+          
+          msg_info "Choose proxy bind address (affects HTTP, HTTPS, SOCKS5):"
+          msg_info ""
+          msg_info "  1) 127.0.0.1 (localhost only)"
+          msg_info "     - Most secure: Only accessible from this machine"
+          msg_info "     - Use for: Native Docker on macOS/Linux"
+          msg_info ""
+          msg_info "  2) 0.0.0.0 (all interfaces)"
+          msg_info "     - Allows access from: VM host + network"
+          msg_info "     - Use for: WSL2, Lima VM, remote access"
+          msg_info ""
+          
+          if [[ -n "$DETECTED_ENV" ]]; then
+            msg_info "Detected: ${DETECTED_ENV}"
+            msg_info "Suggested: ${SUGGESTED_BIND} (${SUGGESTED_REASON})"
+          else
+            msg_info "Could not detect environment"
+            msg_info "Suggested: ${SUGGESTED_BIND} (safe default)"
+          fi
+          
+          msg_info ""
+          
+          # Interactive prompt with validation
+          BIND_CHOICE=$(prompt_selector "Enter choice [1-2], IP address, or press Enter for suggested (${SUGGESTED_BIND}): " "$SUGGESTED_BIND" "1:127.0.0.1" "2:0.0.0.0")
+          
+          export TRAEFIK_BIND_ADDRESS="$BIND_CHOICE"
+          
+          case "$BIND_CHOICE" in
+            "127.0.0.1")
+              msg_ok "Using 127.0.0.1 (localhost only)"
+              ;;
+            "0.0.0.0")
+              msg_ok "Using 0.0.0.0 (all interfaces)"
+              msg_warning "Make sure your firewall is properly configured!"
+              ;;
+            "$SUGGESTED_BIND")
+              msg_ok "Using suggested: ${SUGGESTED_BIND}"
+              ;;
+            *)
+              msg_ok "Using custom bind address: ${BIND_CHOICE}"
+              ;;
+          esac
+          
+          msg_info ""
+          msg_info "To skip this prompt next time, set:"
+          msg_info "  export TRAEFIK_BIND_ADDRESS=${TRAEFIK_BIND_ADDRESS}"
+          msg_info "Or add to .env.orodc:"
+          msg_info "  echo 'TRAEFIK_BIND_ADDRESS=${TRAEFIK_BIND_ADDRESS}' >> .env.orodc"
+          msg_info ""
         fi
-        
-        msg_info ""
-        
-        # Interactive prompt
-        read -p "Enter choice [1-2] or custom IP (press Enter for suggested: ${SUGGESTED_BIND}): " BIND_CHOICE
-        
-        case "$BIND_CHOICE" in
-          1)
-            export TRAEFIK_BIND_ADDRESS="127.0.0.1"
-            msg_ok "Using 127.0.0.1 (localhost only)"
-            ;;
-          2)
-            export TRAEFIK_BIND_ADDRESS="0.0.0.0"
-            msg_ok "Using 0.0.0.0 (all interfaces)"
-            msg_warning "Make sure your firewall is properly configured!"
-            ;;
-          "")
-            export TRAEFIK_BIND_ADDRESS="$SUGGESTED_BIND"
-            msg_ok "Using suggested: ${SUGGESTED_BIND}"
-            ;;
-          *)
-            # Custom IP address
-            export TRAEFIK_BIND_ADDRESS="$BIND_CHOICE"
-            msg_ok "Using custom bind address: ${BIND_CHOICE}"
-            ;;
-        esac
-        
-        msg_info ""
-        msg_info "To skip this prompt next time, set:"
-        msg_info "  export TRAEFIK_BIND_ADDRESS=${TRAEFIK_BIND_ADDRESS}"
-        msg_info "Or add to .env.orodc:"
-        msg_info "  echo 'TRAEFIK_BIND_ADDRESS=${TRAEFIK_BIND_ADDRESS}' >> .env.orodc"
-        msg_info ""
       else
         msg_info "Using bind address: ${TRAEFIK_BIND_ADDRESS} (from environment)"
       fi
       
       # Configure SOCKS5 port if not set
       if [[ -z "${DC_PROXY_SOCKS5_PORT:-}" ]]; then
-        msg_info ""
-        msg_info "SOCKS5 Proxy Port Configuration"
-        msg_info "================================"
-        msg_info ""
-        msg_info "Choose SOCKS5 proxy port:"
-        msg_info "  - Default: 1080 (standard SOCKS5 port)"
-        msg_info "  - Custom: any available port (e.g., 9999)"
-        msg_info ""
-        
-        # Interactive prompt
-        read -p "Enter SOCKS5 port (press Enter for default: 1080): " PORT_CHOICE
-        
-        if [[ -z "$PORT_CHOICE" ]]; then
+        # Check if running in non-interactive mode (CI/CD or piped)
+        if [[ ! -t 0 ]]; then
+          # Non-interactive: use default port
           export DC_PROXY_SOCKS5_PORT="1080"
-          msg_ok "Using default port: 1080"
+          msg_info "Non-interactive mode: using default SOCKS5 port: 1080"
         else
+          # Interactive mode: show prompts
+          msg_info ""
+          msg_info "SOCKS5 Proxy Port Configuration"
+          msg_info "================================"
+          msg_info ""
+          msg_info "Choose SOCKS5 proxy port:"
+          msg_info "  - Default: 1080 (standard SOCKS5 port)"
+          msg_info "  - Custom: any available port (e.g., 9999)"
+          msg_info ""
+          
+          # Interactive prompt with validation
+          PORT_CHOICE=$(prompt_port "Enter SOCKS5 port (press Enter for default: 1080): " "1080")
+          
           export DC_PROXY_SOCKS5_PORT="$PORT_CHOICE"
-          msg_ok "Using custom port: ${PORT_CHOICE}"
+          
+          if [[ "$PORT_CHOICE" == "1080" ]]; then
+            msg_ok "Using default port: 1080"
+          else
+            msg_ok "Using custom port: ${PORT_CHOICE}"
+          fi
+          
+          msg_info ""
+          msg_info "To skip this prompt next time, set:"
+          msg_info "  export DC_PROXY_SOCKS5_PORT=${DC_PROXY_SOCKS5_PORT}"
+          msg_info "Or add to .env.orodc:"
+          msg_info "  echo 'DC_PROXY_SOCKS5_PORT=${DC_PROXY_SOCKS5_PORT}' >> .env.orodc"
+          msg_info ""
         fi
-        
-        msg_info ""
-        msg_info "To skip this prompt next time, set:"
-        msg_info "  export DC_PROXY_SOCKS5_PORT=${DC_PROXY_SOCKS5_PORT}"
-        msg_info "Or add to .env.orodc:"
-        msg_info "  echo 'DC_PROXY_SOCKS5_PORT=${DC_PROXY_SOCKS5_PORT}' >> .env.orodc"
-        msg_info ""
       else
         msg_info "Using SOCKS5 port: ${DC_PROXY_SOCKS5_PORT} (from environment)"
       fi
@@ -628,14 +854,15 @@ if [[ "$temp_first_non_flag_arg" == "proxy" ]]; then
       fi
       
       # Pass all remaining arguments to docker compose up
-      ${DOCKER_COMPOSE_BIN} -p proxy -f "$PROXY_COMPOSE_FILE" up "$@" || {
-        msg_error "Failed to start proxy services"
-        exit 1
-      }
+      proxy_cmd="${DOCKER_COMPOSE_BIN} -p proxy -f \"$PROXY_COMPOSE_FILE\" up $*"
       
-      # If running in detached mode (-d), show info and certificate hint
-      if [[ "$*" == *"-d"* ]]; then
-        msg_ok "Proxy services started!"
+      # Use spinner for detached mode unless DEBUG is enabled
+      if [[ "$*" == *"-d"* ]] && [[ -z "${DEBUG:-}" ]]; then
+        run_with_spinner "Starting proxy services" "$proxy_cmd" || {
+          msg_error "Failed to start proxy services"
+          exit 1
+        }
+        
         msg_info ""
         msg_info "Bind address: ${TRAEFIK_BIND_ADDRESS:-127.0.0.1}"
         msg_info "Dashboard:    http://${TRAEFIK_BIND_ADDRESS:-127.0.0.1}:8880/traefik/dashboard/"
@@ -647,28 +874,52 @@ if [[ "$temp_first_non_flag_arg" == "proxy" ]]; then
         msg_info ""
         msg_info "  orodc proxy install-certs"
         msg_info ""
+      else
+        # Foreground mode or DEBUG mode - show full output
+        ${DOCKER_COMPOSE_BIN} -p proxy -f "$PROXY_COMPOSE_FILE" up "$@" || {
+          msg_error "Failed to start proxy services"
+          exit 1
+        }
       fi
       
       exit 0
       ;;
     
     down)
-      msg_info "Stopping proxy services..."
-      ${DOCKER_COMPOSE_BIN} -p proxy -f "$PROXY_COMPOSE_FILE" down "$@" || {
-        msg_error "Failed to stop proxy services"
-        exit 1
-      }
-      msg_ok "Proxy services stopped"
+      proxy_down_cmd="${DOCKER_COMPOSE_BIN} -p proxy -f \"$PROXY_COMPOSE_FILE\" down $*"
+      
+      # Use spinner unless DEBUG is enabled
+      if [[ -z "${DEBUG:-}" ]]; then
+        run_with_spinner "Stopping proxy services" "$proxy_down_cmd" || {
+          msg_error "Failed to stop proxy services"
+          exit 1
+        }
+      else
+        ${DOCKER_COMPOSE_BIN} -p proxy -f "$PROXY_COMPOSE_FILE" down "$@" || {
+          msg_error "Failed to stop proxy services"
+          exit 1
+        }
+        msg_ok "Proxy services stopped"
+      fi
       exit 0
       ;;
     
     purge)
-      msg_info "Removing proxy services and volumes..."
-      ${DOCKER_COMPOSE_BIN} -p proxy -f "$PROXY_COMPOSE_FILE" down -v "$@" || {
-        msg_error "Failed to remove proxy services"
-        exit 1
-      }
-      msg_ok "Proxy services removed (including volumes)"
+      proxy_purge_cmd="${DOCKER_COMPOSE_BIN} -p proxy -f \"$PROXY_COMPOSE_FILE\" down -v $*"
+      
+      # Use spinner unless DEBUG is enabled
+      if [[ -z "${DEBUG:-}" ]]; then
+        run_with_spinner "Removing proxy services and volumes" "$proxy_purge_cmd" || {
+          msg_error "Failed to remove proxy services"
+          exit 1
+        }
+      else
+        ${DOCKER_COMPOSE_BIN} -p proxy -f "$PROXY_COMPOSE_FILE" down -v "$@" || {
+          msg_error "Failed to remove proxy services"
+          exit 1
+        }
+        msg_ok "Proxy services removed (including volumes)"
+      fi
       exit 0
       ;;
     
@@ -1370,12 +1621,13 @@ detect_php_version_from_composer() {
 get_compatible_node_version() {
   local php_version="$1"
   case "$php_version" in
+    "8.5") echo "24" ;;
     "8.4") echo "22" ;;
     "8.3") echo "20" ;;
     "8.2") echo "20" ;;
     "8.1") echo "18" ;;
     "7.4") echo "16" ;;
-    *) echo "22" ;;  # Default to Node 22 for unknown PHP versions
+    *) echo "24" ;;  # Default to latest Node 24 for unknown PHP versions
   esac
 }
 
@@ -1393,6 +1645,10 @@ if [[ -z $DC_ORO_PHP_VERSION ]]; then
   elif DC_ORO_PHP_VERSION=$(detect_php_version_from_composer); then
     export DC_ORO_PHP_VERSION
     msg_info "Detected PHP version from composer.json: $DC_ORO_PHP_VERSION"
+  # Priority 4: Default to latest available version (from GitHub Actions matrix)
+  else
+    export DC_ORO_PHP_VERSION="8.5"
+    msg_info "Using default PHP version: $DC_ORO_PHP_VERSION (latest available)"
   fi
 fi
 
@@ -1402,10 +1658,18 @@ if [[ -z $DC_ORO_NODE_VERSION ]]; then
   if [[ -f "$DC_ORO_APPDIR/.nvmrc" ]]; then
     export DC_ORO_NODE_VERSION=$(cat $DC_ORO_APPDIR/.nvmrc | head -n1)
     msg_info "Found .nvmrc with following version: $DC_ORO_NODE_VERSION"
-  # Priority 2: Compatibility matrix based on detected PHP version
+  # Priority 2: .node-version file (alternative to .nvmrc)
+  elif [[ -f "$DC_ORO_APPDIR/.node-version" ]]; then
+    export DC_ORO_NODE_VERSION=$(cat $DC_ORO_APPDIR/.node-version | head -n1)
+    msg_info "Found .node-version with following version: $DC_ORO_NODE_VERSION"
+  # Priority 3: Compatibility matrix based on detected PHP version
   elif [[ -n "$DC_ORO_PHP_VERSION" ]]; then
     export DC_ORO_NODE_VERSION=$(get_compatible_node_version "$DC_ORO_PHP_VERSION")
     msg_info "Using compatible Node.js version for PHP $DC_ORO_PHP_VERSION: $DC_ORO_NODE_VERSION"
+  # Priority 4: Default to latest available version (from GitHub Actions matrix)
+  else
+    export DC_ORO_NODE_VERSION="24"
+    msg_info "Using default Node.js version: $DC_ORO_NODE_VERSION (latest available)"
   fi
 fi
 
@@ -1547,7 +1811,7 @@ execute_in_container() {
       for file in "${external_files[@]}"; do
         filename=$(basename "$file")
         # Copy external file to shared-private volume via SSH container
-        if docker cp "$file" "${DC_ORO_NAME}_ssh_${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}:/private/$filename" 2>/dev/null; then
+        if docker cp "$file" "${DC_ORO_NAME}_ssh_${DC_ORO_PHP_VERSION:-8.5}-${DC_ORO_NODE_VERSION:-24}-${DC_ORO_COMPOSER_VERSION:-2}:/private/$filename" 2>/dev/null; then
           if [ "$DEBUG" ]; then echo "DEBUG: Copied external file $file to /private/$filename" >&2; fi
           # Update command arguments to use shared volume path
           for i in "${!updated_cmd_args[@]}"; do
@@ -1617,20 +1881,6 @@ fi
 if [[ "$first_non_flag_arg" == "up" ]]; then
   # Save profiles for future commands
   save_profiles
-  
-  
-  printf "\033[0;37m[${DC_ORO_NAME}] Application: http://localhost:${DC_ORO_PORT_NGINX}\033[0m\n"
-  printf "\033[0;37m[${DC_ORO_NAME}] Mailhog: http://localhost:${DC_ORO_PORT_MAIL_WEBGUI}\033[0m\n"
-  printf "\033[0;37m[${DC_ORO_NAME}] Elasticsearch: http://localhost:${DC_ORO_PORT_SEARCH}\033[0m\n"
-  printf "\033[0;37m[${DC_ORO_NAME}] Mq: http://localhost:${DC_ORO_PORT_MQ}\033[0m\n"
-  
-  if [[ "${DC_ORO_DATABASE_SCHEMA}" == "pdo_pgsql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgresql" ]];then
-    printf "\033[0;37m[${DC_ORO_NAME}] Database: 127.0.0.1:${DC_ORO_PORT_PGSQL}\033[0m\n"
-  elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "pdo_mysql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]];then
-    printf "\033[0;37m[${DC_ORO_NAME}] Database: 127.0.0.1:${DC_ORO_PORT_MYSQL}\033[0m\n"
-  fi
-
-  printf "\033[0;37m[${DC_ORO_NAME}] SSH: 127.0.0.1:${DC_ORO_PORT_SSH}\033[0m\n"
 fi
 
 
@@ -2293,19 +2543,71 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
   
   ENV_FILE="$DC_ORO_APPDIR/.env.orodc"
   
-  # Function to get compatible Node.js versions based on PHP version
+  # Load existing configuration if available
+  EXISTING_PHP_VERSION=""
+  EXISTING_NODE_VERSION=""
+  EXISTING_PHP_IMAGE=""
+  EXISTING_DB_SCHEMA=""
+  EXISTING_DB_VERSION=""
+  EXISTING_DB_IMAGE=""
+  EXISTING_SEARCH_ENGINE=""
+  EXISTING_SEARCH_VERSION=""
+  EXISTING_SEARCH_IMAGE=""
+  EXISTING_CACHE_ENGINE=""
+  EXISTING_CACHE_VERSION=""
+  EXISTING_CACHE_IMAGE=""
+  EXISTING_RABBITMQ_VERSION=""
+  EXISTING_RABBITMQ_IMAGE=""
+  
+  if [[ -f "$ENV_FILE" ]]; then
+    msg_info "Found existing configuration, loading current values..."
+    
+    # Source the file to load variables
+    while IFS='=' read -r key value; do
+      # Skip comments and empty lines
+      [[ "$key" =~ ^#.*$ ]] && continue
+      [[ -z "$key" ]] && continue
+      
+      # Remove quotes if present
+      value="${value%\"}"
+      value="${value#\"}"
+      value="${value%\'}"
+      value="${value#\'}"
+      
+      case "$key" in
+        DC_ORO_PHP_VERSION) EXISTING_PHP_VERSION="$value" ;;
+        DC_ORO_NODE_VERSION) EXISTING_NODE_VERSION="$value" ;;
+        DC_ORO_PHP_IMAGE) EXISTING_PHP_IMAGE="$value" ;;
+        DC_ORO_DATABASE_SCHEMA) EXISTING_DB_SCHEMA="$value" ;;
+        DC_ORO_DATABASE_VERSION) EXISTING_DB_VERSION="$value" ;;
+        DC_ORO_DATABASE_IMAGE) EXISTING_DB_IMAGE="$value" ;;
+        DC_ORO_SEARCH_ENGINE) EXISTING_SEARCH_ENGINE="$value" ;;
+        DC_ORO_SEARCH_VERSION) EXISTING_SEARCH_VERSION="$value" ;;
+        DC_ORO_SEARCH_IMAGE) EXISTING_SEARCH_IMAGE="$value" ;;
+        DC_ORO_CACHE_ENGINE) EXISTING_CACHE_ENGINE="$value" ;;
+        DC_ORO_CACHE_VERSION) EXISTING_CACHE_VERSION="$value" ;;
+        DC_ORO_CACHE_IMAGE) EXISTING_CACHE_IMAGE="$value" ;;
+        DC_ORO_RABBITMQ_VERSION) EXISTING_RABBITMQ_VERSION="$value" ;;
+        DC_ORO_RABBITMQ_IMAGE) EXISTING_RABBITMQ_IMAGE="$value" ;;
+      esac
+    done < "$ENV_FILE"
+    
+    echo ""
+  fi
+  
+  # Function to get compatible Node.js versions based on PHP version (sorted newest to oldest)
   get_compatible_node_versions() {
     local php_ver="$1"
     case "$php_ver" in
-      7.4) echo "16 18" ;;
-      8.1) echo "16 18 20 22" ;;
-      8.2|8.3|8.4) echo "18 20 22" ;;
-      8.5) echo "22 24" ;;
-      *) echo "18 20 22" ;;
+      7.4) echo "18 16" ;;
+      8.1) echo "22 20 18 16" ;;
+      8.2|8.3|8.4) echo "22 20 18" ;;
+      8.5) echo "24 22" ;;
+      *) echo "22 20 18" ;;
     esac
   }
   
-  # Function to prompt for selection
+  # Function to prompt for selection with validation and retry
   prompt_select() {
     local prompt="$1"
     local default="$2"
@@ -2319,9 +2621,6 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
       >&2 echo "DEBUG: options=(${options[*]})"
     fi
     
-    # Output to stderr to avoid interfering with return value
-    >&2 echo -e "\033[36m==> $prompt\033[0m"
-    
     # Check if we have options
     if [[ ${#options[@]} -eq 0 ]]; then
       >&2 echo "ERROR: No options provided!"
@@ -2329,32 +2628,46 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
       return
     fi
     
-    local i=1
-    for opt in "${options[@]}"; do
-      if [[ "$opt" == "$default" ]]; then
-        >&2 echo "  $i) $opt [default]"
-      else
-        >&2 echo "  $i) $opt"
+    while true; do
+      # Output to stderr to avoid interfering with return value
+      >&2 echo -e "\033[36m==> $prompt\033[0m"
+      
+      local i=1
+      for opt in "${options[@]}"; do
+        if [[ "$opt" == "$default" ]]; then
+          >&2 echo "  $i) $opt [default]"
+        else
+          >&2 echo "  $i) $opt"
+        fi
+        ((i++))
+      done
+      
+      # Read from terminal
+      local selection
+      >&2 echo -n "Select [1-${#options[@]}] (default: $default): "
+      read selection </dev/tty
+      
+      # Empty input - use default
+      if [[ -z "$selection" ]]; then
+        result="$default"
+        break
       fi
-      ((i++))
-    done
-    
-    # Read from terminal
-    local selection
-    >&2 echo -n "Select [1-${#options[@]}] (default: $default): "
-    read selection </dev/tty
-    
-    # Determine result
-    if [[ -z "$selection" ]]; then
-      result="$default"
-    else
+      
+      # Check if input is a valid number
+      if [[ ! "$selection" =~ ^[0-9]+$ ]]; then
+        >&2 echo -e "\033[31mInvalid input: '$selection'. Please enter a number between 1 and ${#options[@]}.\033[0m"
+        continue
+      fi
+      
+      # Check if number is in valid range
       local idx=$((selection - 1))
       if [[ $idx -ge 0 && $idx -lt ${#options[@]} ]]; then
         result="${options[$idx]}"
+        break
       else
-        result="$default"
+        >&2 echo -e "\033[31mInvalid choice: '$selection'. Please enter a number between 1 and ${#options[@]}.\033[0m"
       fi
-    fi
+    done
     
     # Debug output if needed
     if [[ -n "${DEBUG:-}" ]]; then
@@ -2365,42 +2678,59 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
     echo "$result"
   }
   
-  # Function to prompt yes/no with default
+  # Function to prompt yes/no with default and validation
   prompt_yes_no() {
     local prompt="$1"
     local default="${2:-yes}"
     local answer
     
-    if [[ "$default" == "yes" ]]; then
-      >&2 echo -n "$prompt [Y/n]: "
-      read answer </dev/tty
-      answer="${answer:-y}"
-    else
-      >&2 echo -n "$prompt [y/N]: "
-      read answer </dev/tty
-      answer="${answer:-n}"
-    fi
-    
-    case "$answer" in
-      [Yy]*) return 0 ;;
-      *) return 1 ;;
-    esac
+    while true; do
+      if [[ "$default" == "yes" ]]; then
+        >&2 echo -n "$prompt [Y/n]: "
+        read answer </dev/tty
+        answer="${answer:-y}"
+      else
+        >&2 echo -n "$prompt [y/N]: "
+        read answer </dev/tty
+        answer="${answer:-n}"
+      fi
+      
+      # Accept: y, yes, Y, YES, n, no, N, NO
+      case "${answer,,}" in  # Convert to lowercase
+        y|yes) return 0 ;;
+        n|no) return 1 ;;
+        *)
+          >&2 echo "Invalid input: '$answer'. Please enter 'y' (yes) or 'n' (no)."
+          ;;
+      esac
+    done
   }
   
   # 1. PHP Configuration
   echo ""
   msg_header "1. PHP Configuration"
   
-  if prompt_yes_no "Use custom PHP image?" "no"; then
-    >&2 echo -n "Enter custom PHP image: "
+  # Determine if using custom image
+  USE_CUSTOM_PHP=false
+  if [[ -n "$EXISTING_PHP_IMAGE" ]] && [[ ! "$EXISTING_PHP_IMAGE" =~ ^ghcr\.io/digitalspacestdio/orodc-php-node-symfony: ]]; then
+    USE_CUSTOM_PHP=true
+  fi
+  
+  if prompt_yes_no "Use custom PHP image?" "$([ "$USE_CUSTOM_PHP" = true ] && echo yes || echo no)"; then
+    >&2 echo -n "Enter custom PHP image$([ -n "$EXISTING_PHP_IMAGE" ] && echo " [current: $EXISTING_PHP_IMAGE]" || echo ""): "
     read SELECTED_PHP_IMAGE </dev/tty
-    # Extract versions from custom image if possible (or use defaults)
-    SELECTED_PHP="8.4"
-    SELECTED_NODE="22"
+    # If empty, keep existing
+    if [[ -z "$SELECTED_PHP_IMAGE" ]] && [[ -n "$EXISTING_PHP_IMAGE" ]]; then
+      SELECTED_PHP_IMAGE="$EXISTING_PHP_IMAGE"
+    fi
+    # Extract versions from custom image if possible (or use defaults/existing)
+    SELECTED_PHP="${EXISTING_PHP_VERSION:-8.4}"
+    SELECTED_NODE="${EXISTING_NODE_VERSION:-22}"
   else
-    # Select PHP version
-    PHP_VERSIONS=("8.3" "8.4" "8.5" "8.2" "8.1" "7.4")
-    SELECTED_PHP=$(prompt_select "Select PHP version:" "8.4" "${PHP_VERSIONS[@]}")
+    # Select PHP version (sorted newest to oldest)
+    PHP_VERSIONS=("8.5" "8.4" "8.3" "8.2" "8.1" "7.4")
+    DEFAULT_PHP="${EXISTING_PHP_VERSION:-8.4}"
+    SELECTED_PHP=$(prompt_select "Select PHP version:" "$DEFAULT_PHP" "${PHP_VERSIONS[@]}")
     
     if [[ -n "${DEBUG:-}" ]]; then
       >&2 echo "DEBUG: Selected PHP: '$SELECTED_PHP'"
@@ -2409,17 +2739,21 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
     # Select Node.js version (based on PHP compatibility)
     read -ra COMPATIBLE_NODE_VERSIONS <<< "$(get_compatible_node_versions "$SELECTED_PHP")"
     
-    # Determine default Node.js version based on PHP
-    case "$SELECTED_PHP" in
-      8.5) DEFAULT_NODE="22" ;;
-      7.4) DEFAULT_NODE="18" ;;
-      8.1) DEFAULT_NODE="20" ;;
-      *) DEFAULT_NODE="20" ;;
-    esac
-    
-    # Ensure default is in compatible versions list
-    if [[ ! " ${COMPATIBLE_NODE_VERSIONS[*]} " =~ " ${DEFAULT_NODE} " ]]; then
-      DEFAULT_NODE="${COMPATIBLE_NODE_VERSIONS[0]}"
+    # Determine default Node.js version based on PHP or existing config
+    if [[ -n "$EXISTING_NODE_VERSION" ]] && [[ " ${COMPATIBLE_NODE_VERSIONS[*]} " =~ " ${EXISTING_NODE_VERSION} " ]]; then
+      DEFAULT_NODE="$EXISTING_NODE_VERSION"
+    else
+      case "$SELECTED_PHP" in
+        8.5) DEFAULT_NODE="24" ;;
+        7.4) DEFAULT_NODE="18" ;;
+        8.1) DEFAULT_NODE="22" ;;
+        *) DEFAULT_NODE="22" ;;
+      esac
+      
+      # Ensure default is in compatible versions list
+      if [[ ! " ${COMPATIBLE_NODE_VERSIONS[*]} " =~ " ${DEFAULT_NODE} " ]]; then
+        DEFAULT_NODE="${COMPATIBLE_NODE_VERSIONS[0]}"
+      fi
     fi
     
     SELECTED_NODE=$(prompt_select "Select Node.js version (compatible with PHP $SELECTED_PHP):" "$DEFAULT_NODE" "${COMPATIBLE_NODE_VERSIONS[@]}")
@@ -2438,30 +2772,56 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
   echo ""
   msg_header "2. Database Configuration"
   
-  if prompt_yes_no "Use custom database image?" "no"; then
-    >&2 echo -n "Enter custom database image: "
+  # Determine if using custom database image
+  USE_CUSTOM_DB=false
+  if [[ -n "$EXISTING_DB_IMAGE" ]] && [[ ! "$EXISTING_DB_IMAGE" =~ ^(ghcr\.io/digitalspacestdio/orodc-pgsql:|mysql:) ]]; then
+    USE_CUSTOM_DB=true
+  fi
+  
+  if prompt_yes_no "Use custom database image?" "$([ "$USE_CUSTOM_DB" = true ] && echo yes || echo no)"; then
+    >&2 echo -n "Enter custom database image$([ -n "$EXISTING_DB_IMAGE" ] && echo " [current: $EXISTING_DB_IMAGE]" || echo ""): "
     read SELECTED_DB_IMAGE </dev/tty
-    # Default schema
-    SELECTED_DB_SCHEMA="pgsql"
-    SELECTED_DB_VERSION="custom"
+    # If empty, keep existing
+    if [[ -z "$SELECTED_DB_IMAGE" ]] && [[ -n "$EXISTING_DB_IMAGE" ]]; then
+      SELECTED_DB_IMAGE="$EXISTING_DB_IMAGE"
+    fi
+    SELECTED_DB_SCHEMA="${EXISTING_DB_SCHEMA:-pgsql}"
+    SELECTED_DB_VERSION="${EXISTING_DB_VERSION:-custom}"
   else
-    # Select database type
+    # Select database type based on existing or default
     DB_TYPES=("PostgreSQL" "MySQL")
-    SELECTED_DB_TYPE=$(prompt_select "Select database type:" "PostgreSQL" "${DB_TYPES[@]}")
+    if [[ "$EXISTING_DB_SCHEMA" == "mysql" ]]; then
+      DEFAULT_DB_TYPE="MySQL"
+    else
+      DEFAULT_DB_TYPE="PostgreSQL"
+    fi
+    SELECTED_DB_TYPE=$(prompt_select "Select database type:" "$DEFAULT_DB_TYPE" "${DB_TYPES[@]}")
     
     if [[ -n "${DEBUG:-}" ]]; then
       >&2 echo "DEBUG: Selected DB type: '$SELECTED_DB_TYPE'"
     fi
     
-    # Select version based on type
+    # Select version based on type (sorted newest to oldest)
     if [[ "$SELECTED_DB_TYPE" == "PostgreSQL" ]]; then
-      PGSQL_VERSIONS=("16.6" "17.4" "15.1")
-      SELECTED_DB_VERSION=$(prompt_select "Select PostgreSQL version:" "16.6" "${PGSQL_VERSIONS[@]}")
+      PGSQL_VERSIONS=("17.4" "16.6" "15.1")
+      # Only use existing version if it's valid for PostgreSQL and schema hasn't changed
+      if [[ "$EXISTING_DB_SCHEMA" == "pgsql" ]] && [[ " ${PGSQL_VERSIONS[*]} " =~ " ${EXISTING_DB_VERSION} " ]]; then
+        DEFAULT_PGSQL_VERSION="$EXISTING_DB_VERSION"
+      else
+        DEFAULT_PGSQL_VERSION="16.6"
+      fi
+      SELECTED_DB_VERSION=$(prompt_select "Select PostgreSQL version:" "$DEFAULT_PGSQL_VERSION" "${PGSQL_VERSIONS[@]}")
       SELECTED_DB_SCHEMA="pgsql"
       SELECTED_DB_IMAGE="ghcr.io/digitalspacestdio/orodc-pgsql:${SELECTED_DB_VERSION}"
     else
-      MYSQL_VERSIONS=("8.4" "8.0" "5.7" "9.0")
-      SELECTED_DB_VERSION=$(prompt_select "Select MySQL version:" "8.4" "${MYSQL_VERSIONS[@]}")
+      MYSQL_VERSIONS=("9.0" "8.4" "8.0" "5.7")
+      # Only use existing version if it's valid for MySQL and schema hasn't changed
+      if [[ "$EXISTING_DB_SCHEMA" == "mysql" ]] && [[ " ${MYSQL_VERSIONS[*]} " =~ " ${EXISTING_DB_VERSION} " ]]; then
+        DEFAULT_MYSQL_VERSION="$EXISTING_DB_VERSION"
+      else
+        DEFAULT_MYSQL_VERSION="8.4"
+      fi
+      SELECTED_DB_VERSION=$(prompt_select "Select MySQL version:" "$DEFAULT_MYSQL_VERSION" "${MYSQL_VERSIONS[@]}")
       SELECTED_DB_SCHEMA="mysql"
       SELECTED_DB_IMAGE="mysql:${SELECTED_DB_VERSION}"
     fi
@@ -2473,24 +2833,47 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
   echo ""
   msg_header "3. Search Engine Configuration"
   
-  if prompt_yes_no "Use custom search engine image?" "no"; then
-    >&2 echo -n "Enter custom search image: "
+  # Determine if using custom search image
+  USE_CUSTOM_SEARCH=false
+  if [[ -n "$EXISTING_SEARCH_IMAGE" ]] && [[ ! "$EXISTING_SEARCH_IMAGE" =~ ^(docker\.elastic\.co/elasticsearch/elasticsearch:|opensearchproject/opensearch:) ]]; then
+    USE_CUSTOM_SEARCH=true
+  fi
+  
+  if prompt_yes_no "Use custom search engine image?" "$([ "$USE_CUSTOM_SEARCH" = true ] && echo yes || echo no)"; then
+    >&2 echo -n "Enter custom search image$([ -n "$EXISTING_SEARCH_IMAGE" ] && echo " [current: $EXISTING_SEARCH_IMAGE]" || echo ""): "
     read SELECTED_SEARCH_IMAGE </dev/tty
-    SELECTED_SEARCH_TYPE="Custom"
-    SELECTED_SEARCH_VERSION="custom"
+    # If empty, keep existing
+    if [[ -z "$SELECTED_SEARCH_IMAGE" ]] && [[ -n "$EXISTING_SEARCH_IMAGE" ]]; then
+      SELECTED_SEARCH_IMAGE="$EXISTING_SEARCH_IMAGE"
+    fi
+    SELECTED_SEARCH_TYPE="${EXISTING_SEARCH_ENGINE:-Custom}"
+    SELECTED_SEARCH_VERSION="${EXISTING_SEARCH_VERSION:-custom}"
   else
-    # Select search engine type
+    # Select search engine type based on existing or default
     SEARCH_TYPES=("Elasticsearch" "OpenSearch")
-    SELECTED_SEARCH_TYPE=$(prompt_select "Select search engine:" "Elasticsearch" "${SEARCH_TYPES[@]}")
+    DEFAULT_SEARCH_TYPE="${EXISTING_SEARCH_ENGINE:-Elasticsearch}"
+    SELECTED_SEARCH_TYPE=$(prompt_select "Select search engine:" "$DEFAULT_SEARCH_TYPE" "${SEARCH_TYPES[@]}")
     
-    # Select version based on type
+    # Select version based on type (sorted newest to oldest)
     if [[ "$SELECTED_SEARCH_TYPE" == "Elasticsearch" ]]; then
-      ELASTIC_VERSIONS=("8.10.3" "8.15.0" "7.17.0")
-      SELECTED_SEARCH_VERSION=$(prompt_select "Select Elasticsearch version:" "8.10.3" "${ELASTIC_VERSIONS[@]}")
+      ELASTIC_VERSIONS=("8.15.0" "8.10.3" "7.17.0")
+      # Only use existing version if it's valid for Elasticsearch and type hasn't changed
+      if [[ "$EXISTING_SEARCH_ENGINE" == "Elasticsearch" ]] && [[ " ${ELASTIC_VERSIONS[*]} " =~ " ${EXISTING_SEARCH_VERSION} " ]]; then
+        DEFAULT_ELASTIC_VERSION="$EXISTING_SEARCH_VERSION"
+      else
+        DEFAULT_ELASTIC_VERSION="8.15.0"
+      fi
+      SELECTED_SEARCH_VERSION=$(prompt_select "Select Elasticsearch version:" "$DEFAULT_ELASTIC_VERSION" "${ELASTIC_VERSIONS[@]}")
       SELECTED_SEARCH_IMAGE="docker.elastic.co/elasticsearch/elasticsearch:${SELECTED_SEARCH_VERSION}"
     else
-      OPENSEARCH_VERSIONS=("2.11.0" "2.15.0" "1.3.0")
-      SELECTED_SEARCH_VERSION=$(prompt_select "Select OpenSearch version:" "2.11.0" "${OPENSEARCH_VERSIONS[@]}")
+      OPENSEARCH_VERSIONS=("2.15.0" "2.11.0" "1.3.0")
+      # Only use existing version if it's valid for OpenSearch and type hasn't changed
+      if [[ "$EXISTING_SEARCH_ENGINE" == "OpenSearch" ]] && [[ " ${OPENSEARCH_VERSIONS[*]} " =~ " ${EXISTING_SEARCH_VERSION} " ]]; then
+        DEFAULT_OPENSEARCH_VERSION="$EXISTING_SEARCH_VERSION"
+      else
+        DEFAULT_OPENSEARCH_VERSION="2.15.0"
+      fi
+      SELECTED_SEARCH_VERSION=$(prompt_select "Select OpenSearch version:" "$DEFAULT_OPENSEARCH_VERSION" "${OPENSEARCH_VERSIONS[@]}")
       SELECTED_SEARCH_IMAGE="opensearchproject/opensearch:${SELECTED_SEARCH_VERSION}"
     fi
   fi
@@ -2501,24 +2884,47 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
   echo ""
   msg_header "4. Cache Configuration"
   
-  if prompt_yes_no "Use custom cache image?" "no"; then
-    >&2 echo -n "Enter custom cache image: "
+  # Determine if using custom cache image
+  USE_CUSTOM_CACHE=false
+  if [[ -n "$EXISTING_CACHE_IMAGE" ]] && [[ ! "$EXISTING_CACHE_IMAGE" =~ ^(redis:|eqalpha/keydb:) ]]; then
+    USE_CUSTOM_CACHE=true
+  fi
+  
+  if prompt_yes_no "Use custom cache image?" "$([ "$USE_CUSTOM_CACHE" = true ] && echo yes || echo no)"; then
+    >&2 echo -n "Enter custom cache image$([ -n "$EXISTING_CACHE_IMAGE" ] && echo " [current: $EXISTING_CACHE_IMAGE]" || echo ""): "
     read SELECTED_CACHE_IMAGE </dev/tty
-    SELECTED_CACHE_TYPE="Custom"
-    SELECTED_CACHE_VERSION="custom"
+    # If empty, keep existing
+    if [[ -z "$SELECTED_CACHE_IMAGE" ]] && [[ -n "$EXISTING_CACHE_IMAGE" ]]; then
+      SELECTED_CACHE_IMAGE="$EXISTING_CACHE_IMAGE"
+    fi
+    SELECTED_CACHE_TYPE="${EXISTING_CACHE_ENGINE:-Custom}"
+    SELECTED_CACHE_VERSION="${EXISTING_CACHE_VERSION:-custom}"
   else
-    # Select cache engine type
+    # Select cache engine type based on existing or default
     CACHE_TYPES=("Redis" "KeyDB")
-    SELECTED_CACHE_TYPE=$(prompt_select "Select cache engine:" "Redis" "${CACHE_TYPES[@]}")
+    DEFAULT_CACHE_TYPE="${EXISTING_CACHE_ENGINE:-Redis}"
+    SELECTED_CACHE_TYPE=$(prompt_select "Select cache engine:" "$DEFAULT_CACHE_TYPE" "${CACHE_TYPES[@]}")
     
-    # Select version based on type
+    # Select version based on type (sorted newest to oldest)
     if [[ "$SELECTED_CACHE_TYPE" == "Redis" ]]; then
-      REDIS_VERSIONS=("7.2" "7.4" "6.2")
-      SELECTED_CACHE_VERSION=$(prompt_select "Select Redis version:" "7.2" "${REDIS_VERSIONS[@]}")
+      REDIS_VERSIONS=("7.4" "7.2" "6.2")
+      # Only use existing version if it's valid for Redis and type hasn't changed
+      if [[ "$EXISTING_CACHE_ENGINE" == "Redis" ]] && [[ " ${REDIS_VERSIONS[*]} " =~ " ${EXISTING_CACHE_VERSION} " ]]; then
+        DEFAULT_REDIS_VERSION="$EXISTING_CACHE_VERSION"
+      else
+        DEFAULT_REDIS_VERSION="7.4"
+      fi
+      SELECTED_CACHE_VERSION=$(prompt_select "Select Redis version:" "$DEFAULT_REDIS_VERSION" "${REDIS_VERSIONS[@]}")
       SELECTED_CACHE_IMAGE="redis:${SELECTED_CACHE_VERSION}-alpine"
     else
       KEYDB_VERSIONS=("6.3.4" "6.3.3")
-      SELECTED_CACHE_VERSION=$(prompt_select "Select KeyDB version:" "6.3.4" "${KEYDB_VERSIONS[@]}")
+      # Only use existing version if it's valid for KeyDB and type hasn't changed
+      if [[ "$EXISTING_CACHE_ENGINE" == "KeyDB" ]] && [[ " ${KEYDB_VERSIONS[*]} " =~ " ${EXISTING_CACHE_VERSION} " ]]; then
+        DEFAULT_KEYDB_VERSION="$EXISTING_CACHE_VERSION"
+      else
+        DEFAULT_KEYDB_VERSION="6.3.4"
+      fi
+      SELECTED_CACHE_VERSION=$(prompt_select "Select KeyDB version:" "$DEFAULT_KEYDB_VERSION" "${KEYDB_VERSIONS[@]}")
       SELECTED_CACHE_IMAGE="eqalpha/keydb:alpine_x86_64_v${SELECTED_CACHE_VERSION}"
     fi
   fi
@@ -2529,14 +2935,25 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
   echo ""
   msg_header "5. RabbitMQ Configuration"
   
-  if prompt_yes_no "Use custom RabbitMQ image?" "no"; then
-    >&2 echo -n "Enter custom RabbitMQ image: "
+  # Determine if using custom RabbitMQ image
+  USE_CUSTOM_RABBITMQ=false
+  if [[ -n "$EXISTING_RABBITMQ_IMAGE" ]] && [[ ! "$EXISTING_RABBITMQ_IMAGE" =~ ^rabbitmq: ]]; then
+    USE_CUSTOM_RABBITMQ=true
+  fi
+  
+  if prompt_yes_no "Use custom RabbitMQ image?" "$([ "$USE_CUSTOM_RABBITMQ" = true ] && echo yes || echo no)"; then
+    >&2 echo -n "Enter custom RabbitMQ image$([ -n "$EXISTING_RABBITMQ_IMAGE" ] && echo " [current: $EXISTING_RABBITMQ_IMAGE]" || echo ""): "
     read SELECTED_RABBITMQ_IMAGE </dev/tty
-    SELECTED_RABBITMQ_VERSION="custom"
+    # If empty, keep existing
+    if [[ -z "$SELECTED_RABBITMQ_IMAGE" ]] && [[ -n "$EXISTING_RABBITMQ_IMAGE" ]]; then
+      SELECTED_RABBITMQ_IMAGE="$EXISTING_RABBITMQ_IMAGE"
+    fi
+    SELECTED_RABBITMQ_VERSION="${EXISTING_RABBITMQ_VERSION:-custom}"
   else
-    # Select RabbitMQ version
+    # Select RabbitMQ version based on existing or default
     RABBITMQ_VERSIONS=("3.13" "3.12" "3.11")
-    SELECTED_RABBITMQ_VERSION=$(prompt_select "Select RabbitMQ version:" "3.13" "${RABBITMQ_VERSIONS[@]}")
+    DEFAULT_RABBITMQ_VERSION="${EXISTING_RABBITMQ_VERSION:-3.13}"
+    SELECTED_RABBITMQ_VERSION=$(prompt_select "Select RabbitMQ version:" "$DEFAULT_RABBITMQ_VERSION" "${RABBITMQ_VERSIONS[@]}")
     SELECTED_RABBITMQ_IMAGE="rabbitmq:${SELECTED_RABBITMQ_VERSION}-management-alpine"
   fi
   
@@ -2559,43 +2976,79 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
   echo ""
   
   if prompt_yes_no "Save configuration to $ENV_FILE?" "yes"; then
+    # Function to update or add env variable
+    update_env_var() {
+      local file="$1"
+      local key="$2"
+      local value="$3"
+      
+      if [[ -f "$file" ]]; then
+        # Check if key exists
+        if grep -q "^${key}=" "$file"; then
+          # Update existing key (preserve surrounding content)
+          sed -i.tmp "s|^${key}=.*|${key}=${value}|" "$file"
+          rm -f "${file}.tmp"
+        else
+          # Add new key
+          echo "${key}=${value}" >> "$file"
+        fi
+      else
+        # Create new file with key
+        echo "${key}=${value}" >> "$file"
+      fi
+    }
+    
     # Create backup if file exists
     if [[ -f "$ENV_FILE" ]]; then
       cp "$ENV_FILE" "${ENV_FILE}.backup.$(date +%Y%m%d_%H%M%S)"
       msg_info "Backup created: ${ENV_FILE}.backup.$(date +%Y%m%d_%H%M%S)"
-    fi
-    
-    # Write configuration
-    cat > "$ENV_FILE" << EOF
+    else
+      # Create new file with header
+      cat > "$ENV_FILE" << EOF
 # OroDC Configuration
 # Generated by 'orodc init' on $(date)
 
-# PHP Configuration
-DC_ORO_PHP_VERSION=$SELECTED_PHP
-DC_ORO_NODE_VERSION=$SELECTED_NODE
-DC_ORO_PHP_IMAGE=$SELECTED_PHP_IMAGE
-
-# Database Configuration
-DC_ORO_DATABASE_SCHEMA=$SELECTED_DB_SCHEMA
-DC_ORO_DATABASE_VERSION=$SELECTED_DB_VERSION
-DC_ORO_DATABASE_IMAGE=$SELECTED_DB_IMAGE
-
-# Search Engine Configuration
-DC_ORO_SEARCH_ENGINE=$SELECTED_SEARCH_TYPE
-DC_ORO_SEARCH_VERSION=$SELECTED_SEARCH_VERSION
-DC_ORO_SEARCH_IMAGE=$SELECTED_SEARCH_IMAGE
-
-# Cache Configuration
-DC_ORO_CACHE_ENGINE=$SELECTED_CACHE_TYPE
-DC_ORO_CACHE_VERSION=$SELECTED_CACHE_VERSION
-DC_ORO_CACHE_IMAGE=$SELECTED_CACHE_IMAGE
-
-# RabbitMQ Configuration
-DC_ORO_RABBITMQ_VERSION=$SELECTED_RABBITMQ_VERSION
-DC_ORO_RABBITMQ_IMAGE=$SELECTED_RABBITMQ_IMAGE
 EOF
+    fi
+    
+    # Update configuration variables (preserves other variables)
+    msg_info "Updating configuration..."
+    
+    # Update header comment if this is a new init
+    if ! grep -q "# Last updated:" "$ENV_FILE" 2>/dev/null; then
+      sed -i.tmp "1i# Last updated: $(date)" "$ENV_FILE"
+      rm -f "${ENV_FILE}.tmp"
+    else
+      sed -i.tmp "s|^# Last updated:.*|# Last updated: $(date)|" "$ENV_FILE"
+      rm -f "${ENV_FILE}.tmp"
+    fi
+    
+    # PHP Configuration
+    update_env_var "$ENV_FILE" "DC_ORO_PHP_VERSION" "$SELECTED_PHP"
+    update_env_var "$ENV_FILE" "DC_ORO_NODE_VERSION" "$SELECTED_NODE"
+    update_env_var "$ENV_FILE" "DC_ORO_PHP_IMAGE" "$SELECTED_PHP_IMAGE"
+    
+    # Database Configuration
+    update_env_var "$ENV_FILE" "DC_ORO_DATABASE_SCHEMA" "$SELECTED_DB_SCHEMA"
+    update_env_var "$ENV_FILE" "DC_ORO_DATABASE_VERSION" "$SELECTED_DB_VERSION"
+    update_env_var "$ENV_FILE" "DC_ORO_DATABASE_IMAGE" "$SELECTED_DB_IMAGE"
+    
+    # Search Engine Configuration
+    update_env_var "$ENV_FILE" "DC_ORO_SEARCH_ENGINE" "$SELECTED_SEARCH_TYPE"
+    update_env_var "$ENV_FILE" "DC_ORO_SEARCH_VERSION" "$SELECTED_SEARCH_VERSION"
+    update_env_var "$ENV_FILE" "DC_ORO_SEARCH_IMAGE" "$SELECTED_SEARCH_IMAGE"
+    
+    # Cache Configuration
+    update_env_var "$ENV_FILE" "DC_ORO_CACHE_ENGINE" "$SELECTED_CACHE_TYPE"
+    update_env_var "$ENV_FILE" "DC_ORO_CACHE_VERSION" "$SELECTED_CACHE_VERSION"
+    update_env_var "$ENV_FILE" "DC_ORO_CACHE_IMAGE" "$SELECTED_CACHE_IMAGE"
+    
+    # RabbitMQ Configuration
+    update_env_var "$ENV_FILE" "DC_ORO_RABBITMQ_VERSION" "$SELECTED_RABBITMQ_VERSION"
+    update_env_var "$ENV_FILE" "DC_ORO_RABBITMQ_IMAGE" "$SELECTED_RABBITMQ_IMAGE"
     
     msg_ok "Configuration saved to $ENV_FILE"
+    msg_info "All other variables in the file were preserved"
     msg_info "You can now run 'orodc install' to set up your environment"
   else
     msg_info "Configuration not saved"
@@ -2647,33 +3100,67 @@ if [[ "$first_non_flag_arg" == "purge" ]]; then
     echo "DEBUG: Processing purge command with flags: ${left_flags[@]} ${left_options[@]}" >&2
   fi
   
-  if [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
-    bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} -f ${DC_ORO_CONFIG_DIR}/compose.yml down -v"
+  # Show warning and ask for confirmation
+  msg_warning "This will permanently delete ALL project data:"
+  msg_info "  - All Docker containers for project: ${DC_ORO_NAME}"
+  msg_info "  - All Docker volumes (database, uploads, cache)"
+  msg_info "  - All project-specific Docker images"
+  msg_info "  - Configuration directory: ${DC_ORO_CONFIG_DIR}"
+  echo "" >&2
+  
+  # Check if running in non-interactive mode (CI/CD or piped)
+  if [[ ! -t 0 ]] || [[ -n "${ORODC_PURGE_FORCE:-}" ]]; then
+    msg_warning "Running in non-interactive mode or ORODC_PURGE_FORCE is set, proceeding without confirmation"
   else
-    bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} down -v"
+    # Ask for confirmation with validation
+    if ! confirm_yes_no "Are you sure you want to continue?" "no"; then
+      msg_info "Purge cancelled"
+      exit 0
+    fi
+  fi
+  
+  echo "" >&2
+  
+  if [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
+    down_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} -f ${DC_ORO_CONFIG_DIR}/compose.yml down -v"
+  else
+    down_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} down -v"
+  fi
+  
+  # Use spinner for down command unless DEBUG mode is enabled
+  if [[ -z "${DEBUG:-}" ]]; then
+    run_with_spinner "Stopping and removing containers, volumes" "$down_cmd"
+  else
+    bash -c "$down_cmd"
   fi
 
   ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null && {
-    echo "Removing docker volume: ${DC_ORO_NAME}_appcode"
-    ${DOCKER_BIN} volume rm ${DC_ORO_NAME}'_appcode'
+    msg_info "Removing appcode volume"
+    ${DOCKER_BIN} volume rm ${DC_ORO_NAME}'_appcode' >/dev/null 2>&1
+    msg_ok "Appcode volume removed"
   }
   
   # Remove project-specific Docker images
   PROJECT_IMAGES=$(${DOCKER_BIN} images --format "{{.Repository}}:{{.Tag}}" | grep "^${DC_ORO_NAME}-")
   if [[ -n "$PROJECT_IMAGES" ]]; then
-    msg_info "Removing project images for: ${DC_ORO_NAME}"
+    IMAGE_COUNT=$(echo "$PROJECT_IMAGES" | wc -l)
+    msg_info "Removing ${IMAGE_COUNT} project image(s)"
     echo "$PROJECT_IMAGES" | while read -r image; do
       if [[ -n "$image" ]]; then
-        msg_info "  Removing image: $image"
-        ${DOCKER_BIN} rmi "$image" 2>/dev/null || true
+        ${DOCKER_BIN} rmi "$image" >/dev/null 2>&1 || true
       fi
     done
+    msg_ok "Project images removed"
   fi
 
   if [[ -d "${DC_ORO_CONFIG_DIR}" ]]; then
+    msg_info "Removing configuration directory"
     rm -rf "${DC_ORO_CONFIG_DIR}"
+    msg_ok "Configuration directory removed"
   fi
-
+  
+  echo "" >&2
+  msg_ok "Project ${DC_ORO_NAME} purged successfully"
   exit 0
 fi
 
@@ -2681,6 +3168,13 @@ if [[ "$first_non_flag_arg" == "down" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/compose.
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/compose.yml"
   # Combine all arguments into a single string for proper execution
   full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${args[*]} ${right_flags[*]} ${right_options[*]}"
+  
+  # Use spinner for down command unless DEBUG mode is enabled or verbose flag is set
+  if [[ -z "${DEBUG:-}" ]] && [[ ! " ${left_flags[*]} ${right_flags[*]} " =~ " --verbose " ]] && [[ ! " ${left_flags[*]} ${right_flags[*]} " =~ " -v " ]]; then
+    run_with_spinner "Stopping services" "$full_cmd"
+    exit $?
+  fi
+  
   bash -c "$full_cmd"
   exit $?
 fi
@@ -2696,12 +3190,65 @@ if [[ "$is_docker_compose_cmd" == "true" ]]; then
   docker_cmd="${args[0]}"
   docker_services="${args[*]:1}"
   
-  # Auto-add --build flag for 'up' command if not already present
-  # This ensures images are always rebuilt, preventing "executable not found" errors
-  if [[ "$docker_cmd" == "up" ]] && [[ ! " ${right_flags[*]} " =~ " --build " ]] && [[ ! " ${right_flags[*]} " =~ " --no-build " ]]; then
-    right_flags+=("--build")
+  # Handle 'up' command with separate build and start phases
+  if [[ "$docker_cmd" == "up" ]]; then
+    # Check if we should skip build phase
+    skip_build=false
+    if [[ " ${right_flags[*]} " =~ " --no-build " ]]; then
+      skip_build=true
+    fi
+    
+    # Use spinner for build and up unless DEBUG mode is enabled or verbose flag is set
+    use_spinner=true
+    if [[ -n "${DEBUG:-}" ]] || [[ " ${left_flags[*]} ${right_flags[*]} " =~ " --verbose " ]] || [[ " ${left_flags[*]} ${right_flags[*]} " =~ " -v " ]]; then
+      use_spinner=false
+    fi
+    
+    # Phase 1: Build images (unless --no-build is specified)
+    if [[ "$skip_build" == "false" ]]; then
+      build_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} build ${docker_services}"
+      if [[ "$use_spinner" == "true" ]]; then
+        DC_ORO_NAME="$DC_ORO_NAME" run_with_spinner "Building services" "$build_cmd" || exit $?
+      else
+        DC_ORO_NAME="$DC_ORO_NAME" bash -c "$build_cmd" || exit $?
+      fi
+    fi
+    
+    # Phase 2: Start services (without --build flag)
+    # Remove --build flag if present and construct up command
+    up_flags=()
+    for flag in "${right_flags[@]}"; do
+      if [[ "$flag" != "--build" ]]; then
+        up_flags+=("$flag")
+      fi
+    done
+    
+    up_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} up ${up_flags[*]} ${right_options[*]} ${docker_services}"
+    if [[ "$use_spinner" == "true" ]]; then
+      DC_ORO_NAME="$DC_ORO_NAME" run_with_spinner "Starting services" "$up_cmd" || exit $?
+      show_service_urls
+      exit 0
+    else
+      DC_ORO_NAME="$DC_ORO_NAME" bash -c "$up_cmd" || exit $?
+      show_service_urls
+      exit 0
+    fi
   fi
   
+  # Handle 'build' command
+  if [[ "$docker_cmd" == "build" ]]; then
+    full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${docker_cmd} ${right_flags[*]} ${right_options[*]} ${docker_services}"
+    
+    if [[ -z "${DEBUG:-}" ]] && [[ ! " ${left_flags[*]} ${right_flags[*]} " =~ " --verbose " ]] && [[ ! " ${left_flags[*]} ${right_flags[*]} " =~ " -v " ]]; then
+      DC_ORO_NAME="$DC_ORO_NAME" run_with_spinner "Building services" "$full_cmd"
+      exit $?
+    else
+      DC_ORO_NAME="$DC_ORO_NAME" bash -c "$full_cmd"
+      exit $?
+    fi
+  fi
+  
+  # Handle all other docker compose commands
   full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${docker_cmd} ${right_flags[*]} ${right_options[*]} ${docker_services}"
   DC_ORO_NAME="$DC_ORO_NAME" bash -c "$full_cmd"
   exit $?

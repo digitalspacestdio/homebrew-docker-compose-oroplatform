@@ -589,8 +589,16 @@ OroDC includes built-in commands to manage Traefik reverse proxy inside Docker. 
 
 ```bash
 # Start Traefik proxy
-orodc proxy up -d                    # Start in detached mode
+orodc proxy up -d                    # Start in detached mode (interactive prompts)
 orodc proxy up                       # Start with logs (foreground)
+
+# Non-interactive mode (CI/CD, scripts) - uses defaults
+echo "" | orodc proxy up -d          # Auto-uses: 127.0.0.1, port 1080
+
+# Skip prompts with environment variables
+export TRAEFIK_BIND_ADDRESS=127.0.0.1
+export DC_PROXY_SOCKS5_PORT=1080
+orodc proxy up -d
 
 # Install CA certificates (optional, for HTTPS)
 orodc proxy install-certs            # Auto-installs to system trust store
@@ -604,6 +612,10 @@ orodc proxy purge                    # Remove proxy and all volumes
 # With DEBUG logging
 DEBUG=1 orodc proxy up -d
 ```
+
+**Non-Interactive Defaults:**
+- Bind address: `127.0.0.1` (or `0.0.0.0` if WSL2/Lima VM detected)
+- SOCKS5 port: `1080`
 
 **Features:**
 - 🎯 Dashboard: <http://localhost:8880/traefik/dashboard/>
@@ -1107,6 +1119,9 @@ brew install mutagen-io/mutagen/mutagen
 # Permission issues
 orodc purge && orodc install
 
+# Force purge without confirmation (CI/CD)
+ORODC_PURGE_FORCE=1 orodc purge
+
 # Check logs
 orodc logs [service-name]
 
@@ -1114,7 +1129,119 @@ orodc logs [service-name]
 DEBUG=1 orodc [command]
 ```
 
+### ⚠️ Purge Command Safety
+
+The `orodc purge` command requires confirmation before deleting data:
+
+```bash
+# Interactive mode (asks for confirmation)
+orodc purge
+# Output shows warning and prompts: Are you sure? [y/N]
+
+# Non-interactive mode (CI/CD, scripts)
+ORODC_PURGE_FORCE=1 orodc purge
+# Proceeds without asking
+```
+
+**What gets deleted:**
+- All Docker containers for the project
+- All Docker volumes (database data, uploads, cache)
+- All project-specific Docker images
+- Configuration directory (`~/.orodc/project-name`)
+
+**Data that survives purge:**
+- Your application source code
+- `.env.orodc` configuration file
+- Git repository and commits
+```
+
+### 🔇 Clean Output Mode (Default)
+
+By default, `orodc` provides clean, minimal output with a spinner for long-running operations:
+
+```bash
+# Clean output with spinner (default)
+orodc up -d
+# Output:
+# ==> Found .php-version with following version: 8.4
+# ==> Found .nvmrc with following version: 22
+# ==> Building services completed
+# ==> Starting services completed
+#
+# [oroplatform] Application: http://localhost:30180
+# [oroplatform] Mailhog: http://localhost:30125
+# [oroplatform] Elasticsearch: http://localhost:30192
+# [oroplatform] Mq: http://localhost:30172
+# [oroplatform] Database: 127.0.0.1:30132
+# [oroplatform] SSH: 127.0.0.1:30122
+#
+# ==> Want to use custom domains and SSL? Start the proxy:
+# ==>   orodc proxy up -d
+# ==>   orodc proxy install-certs
+# ==>
+# ==> Then access via: https://oroplatform.docker.local
+
+# With proxy running (orodc proxy up -d)
+orodc up -d
+# Output:
+# ==> Found .php-version with following version: 8.4
+# ==> Found .nvmrc with following version: 22
+# ==> Building services completed
+# ==> Starting services completed
+#
+# [oroplatform] Application: https://oroplatform.docker.local  (bold green)
+#
+# [oroplatform] Application: http://localhost:30180
+# [oroplatform] Mailhog: http://localhost:30125
+# [oroplatform] Elasticsearch: http://localhost:30192
+# [oroplatform] Mq: http://localhost:30172
+# [oroplatform] Database: 127.0.0.1:30132
+# [oroplatform] SSH: 127.0.0.1:30122
+
+orodc down
+# Output:
+# ==> Stopping services completed
+
+orodc proxy up -d
+# Output:
+# ==> Starting proxy services completed
+# ==> Bind address: 127.0.0.1
+# ==> Dashboard:    http://127.0.0.1:8880/traefik/dashboard/
+# ...
+
+orodc proxy down
+# Output:
+# ==> Stopping proxy services completed
+
+orodc purge
+# Output:
+# ==> Warning: This will permanently delete ALL project data:
+# ==>   - All Docker containers for project: oroplatform
+# ==>   - All Docker volumes (database, uploads, cache)
+# ==>   - All project-specific Docker images
+# ==>   - Configuration directory: /home/user/.orodc/oroplatform
+#
+# Are you sure you want to continue? [y/N]: y
+#
+# ==> Stopping and removing containers, volumes completed
+# ==> Removing 5 project image(s)
+# ==> Project images removed
+# ==> Removing configuration directory
+# ==> Configuration directory removed
+#
+# ==> Project oroplatform purged successfully
+```
+
+**Benefits:**
+- Minimal, distraction-free output
+- Spinner animation during build/up/down/proxy operations
+- Full logs shown ONLY on errors
+- Faster visual feedback
+- Automatic proxy domain detection - shows `https://*.docker.local` when proxy is running
+
 ### 🔍 Debug Mode
+
+For detailed troubleshooting, enable debug output:
 
 ```bash
 # Enable debug output for any command
@@ -1122,6 +1249,24 @@ DEBUG=1 orodc up -d
 DEBUG=1 orodc install
 DEBUG=1 orodc bin/console cache:clear
 ```
+
+**When to use DEBUG mode:**
+- Troubleshooting Docker Compose issues
+- Investigating build failures
+- Understanding environment variable resolution
+- Seeing full Docker command execution
+
+### 📝 Verbose Mode
+
+Use `--verbose` or `-v` flags to see Docker Compose output without debug shell tracing:
+
+```bash
+# Verbose Docker output without shell debugging
+orodc up -d --verbose
+orodc build --verbose
+```
+
+This shows full Docker build/compose output while keeping shell commands clean.
 
 ## 🤝 Contributing
 
