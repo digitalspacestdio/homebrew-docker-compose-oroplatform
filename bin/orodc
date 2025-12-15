@@ -2607,7 +2607,7 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
     esac
   }
   
-  # Function to prompt for selection
+  # Function to prompt for selection with validation and retry
   prompt_select() {
     local prompt="$1"
     local default="$2"
@@ -2621,9 +2621,6 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
       >&2 echo "DEBUG: options=(${options[*]})"
     fi
     
-    # Output to stderr to avoid interfering with return value
-    >&2 echo -e "\033[36m==> $prompt\033[0m"
-    
     # Check if we have options
     if [[ ${#options[@]} -eq 0 ]]; then
       >&2 echo "ERROR: No options provided!"
@@ -2631,32 +2628,46 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
       return
     fi
     
-    local i=1
-    for opt in "${options[@]}"; do
-      if [[ "$opt" == "$default" ]]; then
-        >&2 echo "  $i) $opt [default]"
-      else
-        >&2 echo "  $i) $opt"
+    while true; do
+      # Output to stderr to avoid interfering with return value
+      >&2 echo -e "\033[36m==> $prompt\033[0m"
+      
+      local i=1
+      for opt in "${options[@]}"; do
+        if [[ "$opt" == "$default" ]]; then
+          >&2 echo "  $i) $opt [default]"
+        else
+          >&2 echo "  $i) $opt"
+        fi
+        ((i++))
+      done
+      
+      # Read from terminal
+      local selection
+      >&2 echo -n "Select [1-${#options[@]}] (default: $default): "
+      read selection </dev/tty
+      
+      # Empty input - use default
+      if [[ -z "$selection" ]]; then
+        result="$default"
+        break
       fi
-      ((i++))
-    done
-    
-    # Read from terminal
-    local selection
-    >&2 echo -n "Select [1-${#options[@]}] (default: $default): "
-    read selection </dev/tty
-    
-    # Determine result
-    if [[ -z "$selection" ]]; then
-      result="$default"
-    else
+      
+      # Check if input is a valid number
+      if [[ ! "$selection" =~ ^[0-9]+$ ]]; then
+        >&2 echo -e "\033[31mInvalid input: '$selection'. Please enter a number between 1 and ${#options[@]}.\033[0m"
+        continue
+      fi
+      
+      # Check if number is in valid range
       local idx=$((selection - 1))
       if [[ $idx -ge 0 && $idx -lt ${#options[@]} ]]; then
         result="${options[$idx]}"
+        break
       else
-        result="$default"
+        >&2 echo -e "\033[31mInvalid choice: '$selection'. Please enter a number between 1 and ${#options[@]}.\033[0m"
       fi
-    fi
+    done
     
     # Debug output if needed
     if [[ -n "${DEBUG:-}" ]]; then
