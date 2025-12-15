@@ -2,7 +2,7 @@ class DockerComposeOroplatform < Formula
   desc "CLI tool to run ORO applications locally or on a server"
   homepage "https://github.com/digitalspacestdio/homebrew-docker-compose-oroplatform"
   url "file:///dev/null"
-  version "0.12.17"
+  version "0.12.18"
   sha256 "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
 
   def self.aliases

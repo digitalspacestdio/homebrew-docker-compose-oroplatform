@@ -1,3 +1,11 @@
+# Only run for interactive shells
+[[ $- != *i* ]] && return
+
+# Skip if running as non-interactive (FPM, consumer, etc)
+if [[ -z "$PS1" ]]; then
+    return
+fi
+
 clear
 
 # # Colors
@@ -73,6 +81,12 @@ autoload -Uz compinit
 compinit
 
 zstyle ':completion:*' menu select
+
+# Use separate history file per container to avoid conflicts
+HISTFILE=~/.zsh_history_$(hostname)
+HISTSIZE=10000
+SAVEHIST=10000
+setopt SHARE_HISTORY
 
 # Key bindings for Home and End keys
 bindkey "^[[H" beginning-of-line    # Home
@@ -152,5 +166,4 @@ STARSHIP_EOF
 
 eval "$(starship init zsh)"
 
-cd ${APP_DIR:-/var/www}
 cd ${APP_DIR:-/var/www}
