@@ -312,6 +312,32 @@ git commit -m "more changes"  # ❌ NEVER do this after merge!
 - `feature/php-auto-detection`
 - `docs/installation-guide`
 
+---
+
+## 🔴 **IMPORTANT: When User Says "Version" or "About Version"**
+
+**💡 90% of the time this refers to the Homebrew Formula version!**
+
+When the user mentions:
+- "про версию" (about version)
+- "обновляй версию" (update version)
+- "версию" (version)
+- "version"
+
+**Default Action:** Update the version in `Formula/docker-compose-oroplatform.rb`
+
+**File location:** `Formula/docker-compose-oroplatform.rb`
+**Line to update:** `version "X.Y.Z"`
+
+**Only 10% of cases** might refer to:
+- Docker image versions
+- PHP/Node versions
+- Dependency versions
+
+**When in doubt, ASK:** "Do you mean the Homebrew formula version?"
+
+---
+
 ### 📦 **Formula Versioning Examples:**
 
 ```ruby
