@@ -68,9 +68,6 @@ ENV APP_DIR=${APP_DIR}
 RUN /tmp/build.sh && rm /tmp/build.sh
 
 # Copy additional configuration files from shared
-COPY shared/msmtprc-none.tmpl /msmtprc-none.tmpl
-COPY shared/msmtprc-tls.tmpl /msmtprc-tls.tmpl
-COPY shared/msmtprc-starttls.tmpl /msmtprc-starttls.tmpl
 COPY shared/zshrc /.zshrc
 
 WORKDIR ${APP_DIR}

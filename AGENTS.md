@@ -94,6 +94,42 @@ git checkout -b fix/descriptive-task-name
 
 ---
 
+# 🔴 **CRITICAL: NEVER MODIFY USER FILES WITHOUT PERMISSION!**
+
+## ⚡ **MANDATORY RULE: RESPECT USER ENVIRONMENT BOUNDARIES!**
+
+**🚨 NEVER MODIFY FILES OUTSIDE PROJECT WITHOUT EXPLICIT USER PERMISSION:**
+
+**⛔ FORBIDDEN WITHOUT PERMISSION:**
+- ❌ User home directory files (~/.zshrc, ~/.bashrc, ~/.profile)
+- ❌ User config files outside project (~/.config/*, ~/.env, etc.)
+- ❌ Project-specific user files (project/.env.orodc, project/config.local.yml)
+- ❌ System files (/etc/*)
+- ❌ Any file outside current git repository
+
+**✅ ALLOWED WITHOUT ASKING:**
+- ✅ Files within current git repository (tracked by git)
+- ✅ Temporary files in project directory for demonstration
+- ✅ Files explicitly mentioned by user as targets
+
+**💡 WHEN USER NEEDS EXTERNAL FILE CHANGES:**
+- 🗣️ Show the commands user should run
+- 📋 Provide instructions to copy-paste
+- ⚠️ Explain what changes are needed and why
+- 🚫 NEVER execute the changes yourself
+
+**EXAMPLE - CORRECT APPROACH:**
+```bash
+# ❌ WRONG: Modifying user file directly
+echo "export VAR=value" >> ~/.zshrc
+
+# ✅ CORRECT: Show user what to add
+# User should add to ~/.zshrc:
+# export VAR=value
+```
+
+---
+
 # 🚨 **CRITICAL: PRE-PUSH MANDATORY SYNC!**
 
 ## ⚡ **BEFORE ANY BRANCH CREATION - MANDATORY STEPS:**
