@@ -1,0 +1,99 @@
+name: Build & Publish Mailpit multi-arch images to GHCR
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'compose/docker/mail/**'
+      - '.github/workflows/build-docker-mail.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build-mail-amd64:
+    name: Build Mailpit AMD64
+    runs-on: [self-hosted, Linux, X64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build & Push AMD64 Image
+        uses: docker/build-push-action@v5
+        with:
+          context: compose/docker/mail
+          file: compose/docker/mail/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/orodc-mail:amd64
+          cache-from: type=gha,scope=mail-amd64
+          cache-to: type=gha,mode=max,scope=mail-amd64
+
+  build-mail-arm64:
+    name: Build Mailpit ARM64
+    runs-on: [self-hosted, Linux, ARM64]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Build & Push ARM64 Image
+        uses: docker/build-push-action@v5
+        with:
+          context: compose/docker/mail
+          file: compose/docker/mail/Dockerfile
+          platforms: linux/arm64
+          push: true
+          tags: ghcr.io/${{ github.repository_owner }}/orodc-mail:arm64
+          cache-from: type=gha,scope=mail-arm64
+          cache-to: type=gha,mode=max,scope=mail-arm64
+
+  create-mail-manifest:
+    name: Create multi-arch manifest
+    needs: [build-mail-amd64, build-mail-arm64]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Create and push multi-arch manifest
+        run: |
+          # Create multi-arch manifest with :latest tag
+          docker buildx imagetools create \
+            --tag ghcr.io/${{ github.repository_owner }}/orodc-mail:latest \
+            ghcr.io/${{ github.repository_owner }}/orodc-mail:amd64 \
+            ghcr.io/${{ github.repository_owner }}/orodc-mail:arm64
+          
+          # Also create without :latest suffix for backward compatibility
+          docker buildx imagetools create \
+            --tag ghcr.io/${{ github.repository_owner }}/orodc-mail \
+            ghcr.io/${{ github.repository_owner }}/orodc-mail:amd64 \
+            ghcr.io/${{ github.repository_owner }}/orodc-mail:arm64
+          
+          echo "Created multi-arch manifest for Mailpit"
+
