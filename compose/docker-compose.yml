@@ -65,7 +65,7 @@ services:
       - 'ORO_MAILER_DRIVER=${ORO_MAILER_DRIVER:-smtp}'
       - 'ORO_MAILER_HOST=${ORO_MAILER_HOST:-mail}'
       - 'ORO_MAILER_PORT=${ORO_MAILER_PORT:-1025}'
-      - 'ORO_MAILER_ENCRYPTION=${ORO_MAILER_ENCRYPTION:-}'
+      - 'ORO_MAILER_ENCRYPTION=${ORO_MAILER_ENCRYPTION:-tls}'
       - 'ORO_MAILER_USER=${ORO_MAILER_USER:-}'
       - 'ORO_MAILER_PASSWORD=${ORO_MAILER_PASSWORD:-}'
       - 'ORO_SECRET=${ORO_SECRET-ThisTokenIsNotSoSecretChangeIt}'
@@ -150,7 +150,7 @@ services:
       - 'ORO_MAILER_DRIVER=${ORO_MAILER_DRIVER:-smtp}'
       - 'ORO_MAILER_HOST=${ORO_MAILER_HOST:-mail}'
       - 'ORO_MAILER_PORT=${ORO_MAILER_PORT:-1025}'
-      - 'ORO_MAILER_ENCRYPTION=${ORO_MAILER_ENCRYPTION:-}'
+      - 'ORO_MAILER_ENCRYPTION=${ORO_MAILER_ENCRYPTION:-tls}'
       - 'ORO_MAILER_USER=${ORO_MAILER_USER:-}'
       - 'ORO_MAILER_PASSWORD=${ORO_MAILER_PASSWORD:-}'
       - 'ORO_SECRET=${ORO_SECRET-ThisTokenIsNotSoSecretChangeIt}'
@@ -235,7 +235,7 @@ services:
       - 'ORO_MAILER_DRIVER=${ORO_MAILER_DRIVER:-smtp}'
       - 'ORO_MAILER_HOST=${ORO_MAILER_HOST:-mail}'
       - 'ORO_MAILER_PORT=${ORO_MAILER_PORT:-1025}'
-      - 'ORO_MAILER_ENCRYPTION=${ORO_MAILER_ENCRYPTION:-}'
+      - 'ORO_MAILER_ENCRYPTION=${ORO_MAILER_ENCRYPTION:-tls}'
       - 'ORO_MAILER_USER=${ORO_MAILER_USER:-}'
       - 'ORO_MAILER_PASSWORD=${ORO_MAILER_PASSWORD:-}'
       - 'ORO_SECRET=${ORO_SECRET-ThisTokenIsNotSoSecretChangeIt}'
@@ -339,7 +339,7 @@ services:
       - 'ORO_MAILER_DRIVER=${ORO_MAILER_DRIVER:-smtp}'
       - 'ORO_MAILER_HOST=${ORO_MAILER_HOST:-mail}'
       - 'ORO_MAILER_PORT=${ORO_MAILER_PORT:-1025}'
-      - 'ORO_MAILER_ENCRYPTION=${ORO_MAILER_ENCRYPTION:-}'
+      - 'ORO_MAILER_ENCRYPTION=${ORO_MAILER_ENCRYPTION:-tls}'
       - 'ORO_MAILER_USER=${ORO_MAILER_USER:-}'
       - 'ORO_MAILER_PASSWORD=${ORO_MAILER_PASSWORD:-}'
       - 'ORO_SECRET=${ORO_SECRET-ThisTokenIsNotSoSecretChangeIt}'
@@ -408,7 +408,7 @@ services:
         limits:
           memory: 256M
     healthcheck:
-      test: "sh -c 'nc -zv localhost 1025 && nc -zv localhost 465'"
+      test: "nc -vz -w 1 localhost 8025"
       start_period: 10s
       interval: 5s
       retries: 18
@@ -672,7 +672,7 @@ services:
       - 'ORO_MAILER_DRIVER=${ORO_MAILER_DRIVER:-smtp}'
       - 'ORO_MAILER_HOST=${ORO_MAILER_HOST:-mail}'
       - 'ORO_MAILER_PORT=${ORO_MAILER_PORT:-1025}'
-      - 'ORO_MAILER_ENCRYPTION=${ORO_MAILER_ENCRYPTION:-}'
+      - 'ORO_MAILER_ENCRYPTION=${ORO_MAILER_ENCRYPTION:-tls}'
       - 'ORO_MAILER_USER=${ORO_MAILER_USER:-}'
       - 'ORO_MAILER_PASSWORD=${ORO_MAILER_PASSWORD:-}'
       - 'ORO_SECRET=${ORO_SECRET-ThisTokenIsNotSoSecretChangeIt}'
