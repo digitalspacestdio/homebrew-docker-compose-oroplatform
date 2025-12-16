@@ -230,6 +230,7 @@ jobs:
           max_attempts: 5
           retry_wait_seconds: 40
           command: |
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker push ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-alpine-${{ matrix.arch_name }}
 
   # ========================================
@@ -253,6 +254,7 @@ jobs:
       
       - name: Create and push manifest
         run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
           docker buildx imagetools create -t ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.version }}-alpine \
             ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.version }}-alpine-amd64 \
             ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.version }}-alpine-arm64
@@ -636,6 +638,7 @@ jobs:
           max_attempts: 5
           retry_wait_seconds: 40
           command: |
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker push ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-node${{ matrix.node }}-composer${{ matrix.composer }}-alpine-${{ matrix.arch_name }}
 
   # ========================================
@@ -729,6 +732,7 @@ jobs:
       
       - name: Create and push manifest
         run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
           docker buildx imagetools create -t ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-node${{ matrix.node }}-composer${{ matrix.composer }}-alpine \
             ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-node${{ matrix.node }}-composer${{ matrix.composer }}-alpine-amd64 \
             ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-node${{ matrix.node }}-composer${{ matrix.composer }}-alpine-arm64
