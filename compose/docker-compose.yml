@@ -373,9 +373,7 @@ services:
     volumes:
       - mail-certs:/certs
     ports:
-      - "${DC_ORO_MAIL_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_MAIL_SMTP:-1025}:1025"
-      - "${DC_ORO_MAIL_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_MAIL_SMTPS:-30465}:465"
-      - "${DC_ORO_MAIL_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_MAIL_WEBGUI:-8025}:8025"
+      - "${DC_ORO_MAIL_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_MAIL_WEBGUI:-${DC_ORO_PORT_PREFIX}25}:8025"
     environment:
       - MP_SMTP_BIND_ADDR=0.0.0.0:1025
       - MP_SMTP_TLS_BIND_ADDR=:465
