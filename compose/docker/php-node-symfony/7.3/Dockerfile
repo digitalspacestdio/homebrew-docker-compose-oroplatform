@@ -12,7 +12,6 @@ FROM composer:${COMPOSER_VERSION} AS composer_app
 # Use our base PHP image with all PHP modules pre-compiled
 FROM ghcr.io/digitalspacestdio/orodc-php:${PHP_VERSION}-alpine
 
-
 # Set up user environment variables (base image uses root)
 ARG PHP_UID=1000
 ENV PHP_UID=${PHP_UID}
