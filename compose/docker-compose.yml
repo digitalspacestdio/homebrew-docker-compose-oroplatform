@@ -408,7 +408,7 @@ services:
         limits:
           memory: 256M
     healthcheck:
-      test: "sh -c 'nc -zv localhost 1025 && nc -zv localhost 465'"
+      test: "nc -vz -w 1 localhost 8025"
       start_period: 10s
       interval: 5s
       retries: 18
