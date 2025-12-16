@@ -366,6 +366,7 @@ services:
         max-size: "10m"
 
   mail:
+    image: ghcr.io/digitalspacestdio/orodc-mail
     build:
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/mail"
     container_name: ${DC_ORO_NAME:-unnamed}_mail

@@ -1,5 +1,8 @@
 FROM axllent/mailpit:latest
 
+# Install openssl for certificate generation
+RUN apk add --no-cache openssl
+
 # Copy certificate generation script
 COPY generate-certs.sh /usr/local/bin/generate-certs.sh
 RUN chmod +x /usr/local/bin/generate-certs.sh
