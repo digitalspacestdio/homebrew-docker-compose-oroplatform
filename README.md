@@ -830,14 +830,70 @@ DC_ORO_MQ_URI=""                   # Message queue URI (empty = use DB)
 ```
 
 #### 📧 Mail & Debugging
+
+The mail service (Mailpit) supports both encrypted and unencrypted SMTP connections for testing email functionality locally.
+
+**Mail Service Access:**
+- Web UI: `http://localhost:8025` or via Traefik at `https://<project>.docker.local/mailbox`
+- SMTP Port 1025: Unencrypted (default, backward compatible)
+- SMTP Port 465: Implicit TLS (encrypted from start)
+- SMTP Port 587: STARTTLS (encryption negotiated after connection)
+
+**Mail Configuration:**
+
 ```bash
-# Mail settings
-ORO_MAILER_DRIVER=smtp             # Mail driver
-ORO_MAILER_HOST=mail               # Mail host
-ORO_MAILER_PORT=1025               # Mail port
-ORO_MAILER_ENCRYPTION=""           # Mail encryption (tls/ssl)
-ORO_MAILER_USER=""                 # Mail username
-ORO_MAILER_PASSWORD=""             # Mail password
+# Unencrypted SMTP (default, backward compatible)
+ORO_MAILER_DRIVER=smtp
+ORO_MAILER_HOST=mail
+ORO_MAILER_PORT=1025
+ORO_MAILER_ENCRYPTION=""           # Empty or "none" for unencrypted
+
+# STARTTLS (recommended for production-like testing)
+ORO_MAILER_DRIVER=smtp
+ORO_MAILER_HOST=mail
+ORO_MAILER_PORT=587
+ORO_MAILER_ENCRYPTION=starttls     # STARTTLS encryption
+
+# Implicit TLS (legacy but secure)
+ORO_MAILER_DRIVER=smtp
+ORO_MAILER_HOST=mail
+ORO_MAILER_PORT=465
+ORO_MAILER_ENCRYPTION=tls          # Implicit TLS encryption
+
+# Authentication (not required for local dev)
+ORO_MAILER_USER=""                 # Mail username (unused in dev)
+ORO_MAILER_PASSWORD=""             # Mail password (unused in dev)
+```
+
+**TLS Certificate Management:**
+- Certificates are automatically generated on first mail service start
+- Self-signed certificates are stored in the `mail-certs` Docker volume
+- PHP containers automatically mount certificates read-only at `/certs/mail.crt`
+- Certificates persist across container restarts
+
+**Testing Email Sending:**
+
+```bash
+# Test unencrypted SMTP (port 1025)
+echo "Subject: Test\n\nUnencrypted email" | orodc exec fpm msmtp -t test@example.com
+
+# Test STARTTLS (port 587)
+# Set ORO_MAILER_PORT=587 and ORO_MAILER_ENCRYPTION=starttls in .env.orodc
+# Then restart containers: orodc restart
+echo "Subject: Test STARTTLS\n\nSTARTTLS email" | orodc exec fpm msmtp -t test@example.com
+
+# Test implicit TLS (port 465)
+# Set ORO_MAILER_PORT=465 and ORO_MAILER_ENCRYPTION=tls in .env.orodc
+# Then restart containers: orodc restart
+echo "Subject: Test TLS\n\nTLS email" | orodc exec fpm msmtp -t test@example.com
+```
+
+**Troubleshooting:**
+
+- **"certificate verify failed"**: Check that `/certs/mail.crt` exists in PHP containers
+- **"connection refused"**: Verify mail service is running: `orodc ps | grep mail`
+- **"wrong version number"**: Port/encryption mismatch (e.g., port 1025 with TLS enabled)
+- **"encryption is not supported"**: Use port 1025 with `ORO_MAILER_ENCRYPTION=""` or upgrade to mailpit
 
 # Security
 ORO_SECRET=ThisTokenIsNotSoSecretChangeIt  # Application secret
@@ -1153,9 +1209,10 @@ DC_ORO_PHP_DIST=alpine              # Base distribution (alpine)
 DC_ORO_NGINX_IMAGE=mynginx
 DC_ORO_NGINX_VERSION=latest
 
-# MailHog (email testing)
-DC_ORO_MAILHOG_IMAGE=mymailhog
-DC_ORO_MAILHOG_VERSION=latest
+# Mailpit (email testing) - replaced MailHog
+DC_ORO_PORT_MAIL_SMTP=1025        # SMTP port (unencrypted)
+DC_ORO_PORT_MAIL_SMTPS=30465     # SMTPS port (TLS)
+DC_ORO_PORT_MAIL_WEBGUI=8025     # Web UI port
 
 # XHGui (profiling interface)
 DC_ORO_XHGUI_IMAGE=myxhgui
@@ -1324,7 +1381,7 @@ orodc up -d
 # ==> Starting services completed
 #
 # [oroplatform] Application: http://localhost:30180
-# [oroplatform] Mailhog: http://localhost:30125
+# [oroplatform] Mailpit: http://localhost:8025
 # [oroplatform] Elasticsearch: http://localhost:30192
 # [oroplatform] Mq: http://localhost:30172
 # [oroplatform] Database: 127.0.0.1:30132
@@ -1347,7 +1404,7 @@ orodc up -d
 # [oroplatform] Application: https://oroplatform.docker.local  (bold green)
 #
 # [oroplatform] Application: http://localhost:30180
-# [oroplatform] Mailhog: http://localhost:30125
+# [oroplatform] Mailpit: http://localhost:8025
 # [oroplatform] Elasticsearch: http://localhost:30192
 # [oroplatform] Mq: http://localhost:30172
 # [oroplatform] Database: 127.0.0.1:30132

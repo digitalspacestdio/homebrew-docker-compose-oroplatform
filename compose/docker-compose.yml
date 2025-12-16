@@ -33,6 +33,7 @@ services:
       - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
       - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
       - "home-root:/root"
+      - "mail-certs:/certs:ro"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -117,6 +118,7 @@ services:
       - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
       - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
       - "home-root:/root"
+      - "mail-certs:/certs:ro"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -204,6 +206,7 @@ services:
       - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
       - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
       - "home-root:/root"
+      - "mail-certs:/certs:ro"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     restart: always
     environment:
@@ -290,6 +293,7 @@ services:
       - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
       - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
       - "home-root:/root"
+      - "mail-certs:/certs:ro"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     restart: always
     networks:
@@ -362,11 +366,23 @@ services:
         max-size: "10m"
 
   mail:
-    image: "cd2team/mailhog"
+    build:
+      context: "${DC_ORO_CONFIG_DIR:-.}/docker/mail"
     container_name: ${DC_ORO_NAME:-unnamed}_mail
     hostname: mail.${DC_ORO_NAME:-unnamed}.docker.local
+    volumes:
+      - mail-certs:/certs
     ports:
+      - "${DC_ORO_MAIL_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_MAIL_SMTP:-1025}:1025"
+      - "${DC_ORO_MAIL_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_MAIL_SMTPS:-30465}:465"
       - "${DC_ORO_MAIL_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_MAIL_WEBGUI:-8025}:8025"
+    environment:
+      - MP_SMTP_BIND_ADDR=0.0.0.0:1025
+      - MP_SMTP_TLS_BIND_ADDR=:465
+      - MP_SMTP_TLS_CERT=/certs/mail.crt
+      - MP_SMTP_TLS_KEY=/certs/mail.key
+      - MP_SMTP_AUTH_ACCEPT_ANY=1
+      - MP_WEBROOT=/mailbox
     restart: always
     networks:
       - default
@@ -393,8 +409,8 @@ services:
         limits:
           memory: 256M
     healthcheck:
-      test: "nc -vz -w 1 localhost 8025"
-      start_period: 5s
+      test: "sh -c 'nc -zv localhost 1025 && nc -zv localhost 465'"
+      start_period: 10s
       interval: 5s
       retries: 18
 
@@ -609,6 +625,7 @@ services:
       - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
       - "home-root:/root"
       - "ssh-hostkeys:/etc/ssh/hostkeys"
+      - "mail-certs:/certs:ro"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     ports:
       - "${DC_ORO_SSH_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_SSH:-2222}:22"
@@ -698,4 +715,6 @@ volumes:
   home-root:
     driver: local
   search-data:
+    driver: local
+  mail-certs:
     driver: local
