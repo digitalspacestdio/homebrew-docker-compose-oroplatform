@@ -2774,8 +2774,17 @@ if echo ${args[0]} | grep -i '^install' | grep -i 'without' | grep -i 'demo' > /
   cache_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm cli bash -c \"[[ -d ${DC_ORO_APPDIR}/var/cache ]] && rm -rf ${DC_ORO_APPDIR}/var/cache/* || true\""
   run_with_spinner "Clearing cache" "$cache_cmd" || exit $?
   
-  # Create config/parameters.yml from dist file if not exists (prevents Incenteev interactive prompts)
-  params_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm cli bash -c \"if [[ ! -f ${DC_ORO_APPDIR}/config/parameters.yml ]] && [[ -f ${DC_ORO_APPDIR}/config/parameters.yml.dist ]]; then cp ${DC_ORO_APPDIR}/config/parameters.yml.dist ${DC_ORO_APPDIR}/config/parameters.yml; fi\""
+  # Backup existing config/parameters.yml if exists, then create from dist file
+  params_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm cli bash -c \"
+    if [[ -f ${DC_ORO_APPDIR}/config/parameters.yml ]]; then
+      BACKUP_NAME=\\\"${DC_ORO_APPDIR}/config/parameters.yml.\$(date +%Y%m%d%H%M).backup\\\"
+      mv ${DC_ORO_APPDIR}/config/parameters.yml \\\"\\\${BACKUP_NAME}\\\"
+      echo \\\"Backed up existing parameters.yml to \\\${BACKUP_NAME}\\\"
+    fi
+    if [[ -f ${DC_ORO_APPDIR}/config/parameters.yml.dist ]]; then
+      cp ${DC_ORO_APPDIR}/config/parameters.yml.dist ${DC_ORO_APPDIR}/config/parameters.yml
+    fi
+  \""
   run_with_spinner "Preparing config files" "$params_cmd" || exit $?
   
   # Run composer install with spinner (use -T to disable pseudo-TTY for non-interactive mode)
@@ -2790,14 +2799,6 @@ if echo ${args[0]} | grep -i '^install' | grep -i 'without' | grep -i 'demo' > /
   install_end_time=$(date +%s)
   install_duration=$((install_end_time - install_start_time))
   save_timing "install" "$install_duration"
-  
-  # Configure mail TLS settings in .env.orodc
-  ENV_FILE="$DC_ORO_APPDIR/.env.orodc"
-  update_env_var "$ENV_FILE" "ORO_MAILER_DRIVER" "smtp"
-  update_env_var "$ENV_FILE" "ORO_MAILER_HOST" "mail"
-  update_env_var "$ENV_FILE" "ORO_MAILER_PORT" "587"
-  update_env_var "$ENV_FILE" "ORO_MAILER_ENCRYPTION" "starttls"
-  msg_info "Configured mail TLS settings (SMTP + STARTTLS) in .env.orodc"
   
   msg_ok "Installation completed in ${install_duration}s"
   
@@ -2815,8 +2816,17 @@ elif echo ${args[0]} | grep -i '^install$' > /dev/null; then
   cache_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm cli bash -c \"[[ -d ${DC_ORO_APPDIR}/var/cache ]] && rm -rf ${DC_ORO_APPDIR}/var/cache/* || true\""
   run_with_spinner "Clearing cache" "$cache_cmd" || exit $?
   
-  # Create config/parameters.yml from dist file if not exists (prevents Incenteev interactive prompts)
-  params_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm cli bash -c \"if [[ ! -f ${DC_ORO_APPDIR}/config/parameters.yml ]] && [[ -f ${DC_ORO_APPDIR}/config/parameters.yml.dist ]]; then cp ${DC_ORO_APPDIR}/config/parameters.yml.dist ${DC_ORO_APPDIR}/config/parameters.yml; fi\""
+  # Backup existing config/parameters.yml if exists, then create from dist file
+  params_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm cli bash -c \"
+    if [[ -f ${DC_ORO_APPDIR}/config/parameters.yml ]]; then
+      BACKUP_NAME=\\\"${DC_ORO_APPDIR}/config/parameters.yml.\$(date +%Y%m%d%H%M).backup\\\"
+      mv ${DC_ORO_APPDIR}/config/parameters.yml \\\"\\\${BACKUP_NAME}\\\"
+      echo \\\"Backed up existing parameters.yml to \\\${BACKUP_NAME}\\\"
+    fi
+    if [[ -f ${DC_ORO_APPDIR}/config/parameters.yml.dist ]]; then
+      cp ${DC_ORO_APPDIR}/config/parameters.yml.dist ${DC_ORO_APPDIR}/config/parameters.yml
+    fi
+  \""
   run_with_spinner "Preparing config files" "$params_cmd" || exit $?
   
   # Run composer install with spinner (use -T to disable pseudo-TTY for non-interactive mode)
@@ -2831,14 +2841,6 @@ elif echo ${args[0]} | grep -i '^install$' > /dev/null; then
   install_end_time=$(date +%s)
   install_duration=$((install_end_time - install_start_time))
   save_timing "install" "$install_duration"
-  
-  # Configure mail TLS settings in .env.orodc
-  ENV_FILE="$DC_ORO_APPDIR/.env.orodc"
-  update_env_var "$ENV_FILE" "ORO_MAILER_DRIVER" "smtp"
-  update_env_var "$ENV_FILE" "ORO_MAILER_HOST" "mail"
-  update_env_var "$ENV_FILE" "ORO_MAILER_PORT" "587"
-  update_env_var "$ENV_FILE" "ORO_MAILER_ENCRYPTION" "starttls"
-  msg_info "Configured mail TLS settings (SMTP + STARTTLS) in .env.orodc"
   
   msg_ok "Installation completed in ${install_duration}s"
   
@@ -3155,7 +3157,7 @@ if [[ "$first_non_flag_arg" == "init" ]]; then
   msg_info "This will help you configure services for your project"
   echo ""
   
-  ENV_FILE="$DC_ORO_APPDIR/.env.orodc"
+  ENV_FILE=".env.orodc"
   
   # Load existing configuration if available
   EXISTING_PHP_VERSION=""
