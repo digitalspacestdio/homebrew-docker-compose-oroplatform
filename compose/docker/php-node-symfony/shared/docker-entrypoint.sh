@@ -33,23 +33,6 @@ if [[ $XDEBUG_MODE = "off" ]]; then
 	rm -f "${PHP_INI_DIR}/conf.d/app.xdebug.ini" 2>/dev/null || true
 fi
 
-# Configure msmtprc based on ORO_MAILER_ENCRYPTION
-ORO_MAILER_ENCRYPTION=${ORO_MAILER_ENCRYPTION:-}
-if [ "$ORO_MAILER_ENCRYPTION" = "tls" ]; then
-	template="/msmtprc-tls.tmpl"
-elif [ "$ORO_MAILER_ENCRYPTION" = "starttls" ]; then
-	template="/msmtprc-starttls.tmpl"
-else
-	template="/msmtprc-none.tmpl"
-fi
-
-if [ -f "$template" ]; then
-	cp "$template" /.msmtprc
-	echo "[INFO] Configured msmtprc from $template (ORO_MAILER_ENCRYPTION=${ORO_MAILER_ENCRYPTION:-none})"
-else
-	echo "[WARN] msmtprc template $template not found, using default"
-fi
-
 chmod +x ${PHP_USER_HOME}/.profile
 
 export PHP_IDE_CONFIG="serverName=$(hostname | cut -d. -f2-)"
