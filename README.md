@@ -16,6 +16,7 @@
 
 ## 📋 Table of Contents
 
+- [📚 Documentation](#-documentation)
 - [✨ Key Features](#-key-features)
 - [🚀 Quick Start](#-quick-start)
 - [⚠️ Critical Testing Requirements](#️-critical-testing-requirements)
@@ -43,6 +44,16 @@
 - [🐛 XDEBUG Configuration](#-xdebug-configuration)
 - [🔄 Working with Existing Projects](#-working-with-existing-projects)
 - [🆘 Troubleshooting](#-troubleshooting)
+
+---
+
+## 📚 Documentation
+
+**For developers and contributors:**
+- **[DEVELOPMENT.md](DEVELOPMENT.md)** - Development guide with workflows, commands, and troubleshooting
+- **[LOCAL-TESTING.md](LOCAL-TESTING.md)** - Comprehensive testing methods and procedures
+- **[AGENTS.md](AGENTS.md)** - AI agent guidelines for working with this project
+- **[openspec/project.md](openspec/project.md)** - Project architecture and technical context
 
 ---
 
