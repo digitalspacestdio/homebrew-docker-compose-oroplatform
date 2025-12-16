@@ -354,6 +354,56 @@ version "1.0.0"
 
 ---
 
+## 🔴 **IMPORTANT: When User Says "Version" or "About Version"**
+
+**💡 90% of the time this refers to the Homebrew Formula version!**
+
+When the user mentions:
+- "про версию" (about version)
+- "обновляй версию" (update version)
+- "версию" (version)
+- "version"
+
+**Default Action:** Update the version in `Formula/docker-compose-oroplatform.rb`
+
+**File location:** `Formula/docker-compose-oroplatform.rb`
+**Line to update:** `version "X.Y.Z"`
+
+**Only 10% of cases** might refer to:
+- Docker image versions
+- PHP/Node versions
+- Dependency versions
+
+**When in doubt, ASK:** "Do you mean the Homebrew formula version?"
+
+---
+
+### 📦 **Formula Versioning Examples:**
+
+```ruby
+# Before (in Formula/docker-compose-oroplatform.rb)
+version "0.8.6"
+
+# After - Bug fix
+version "0.8.7"
+
+# After - New feature
+version "0.9.0"
+
+# After - Breaking change
+version "1.0.0"
+```
+
+### ⚠️ **CRITICAL: Version Update is Mandatory!**
+
+- **ALWAYS** update the version before committing changes to `compose/` or `bin/`
+- **NEVER** commit without version increment when modifying core functionality
+- Version updates ensure proper Homebrew package management
+
+---
+**Remember: Version first, branch first, commit later! 📦🌳**
+---
+
 # 📋 **AI AGENT RESPONSE GUIDELINES**
 
 ## Always Include:
