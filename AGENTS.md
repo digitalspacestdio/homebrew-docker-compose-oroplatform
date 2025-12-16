@@ -25,6 +25,35 @@ This document contains guidelines for AI agents working with the homebrew-docker
 
 # 🔴🔴🔴 **CRITICAL: "NEW BRANCH" ALWAYS MEANS FROM UPSTREAM!**
 
+## ⚠️ **AFTER CREATING ANY BRANCH - ALWAYS CHECK MERGE CONFLICTS!**
+
+**After creating and pushing ANY new branch:**
+
+1. **ALWAYS verify it can auto-merge into master:**
+   ```bash
+   git fetch origin
+   # Check if branch needs rebase
+   git merge-base origin/master HEAD
+   ```
+
+2. **If branch is NOT cleanly based on latest master:**
+   ```bash
+   # Immediately rebase on master
+   git rebase origin/master
+   # Resolve conflicts
+   git push origin <branch-name> --force-with-lease
+   ```
+
+3. **WHY THIS MATTERS:**
+   - User sees "Can't automatically merge" on GitHub
+   - User has to manually ask to fix it EVERY TIME
+   - Wastes time and creates friction
+   - **PREVENT THIS** by ensuring clean rebase before final push
+
+**RULE:** Never leave a branch with merge conflicts. Always test merge-ability.
+
+---
+
 ## ⚡ **WHEN USER SAYS "CREATE NEW BRANCH" OR "NEW BRANCH":**
 
 **THIS ALWAYS MEANS:**
