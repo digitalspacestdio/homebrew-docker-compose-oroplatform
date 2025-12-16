@@ -25,6 +25,35 @@ This document contains guidelines for AI agents working with the homebrew-docker
 
 # 🔴🔴🔴 **CRITICAL: "NEW BRANCH" ALWAYS MEANS FROM UPSTREAM!**
 
+## ⚠️ **AFTER CREATING ANY BRANCH - ALWAYS CHECK MERGE CONFLICTS!**
+
+**After creating and pushing ANY new branch:**
+
+1. **ALWAYS verify it can auto-merge into master:**
+   ```bash
+   git fetch origin
+   # Check if branch needs rebase
+   git merge-base origin/master HEAD
+   ```
+
+2. **If branch is NOT cleanly based on latest master:**
+   ```bash
+   # Immediately rebase on master
+   git rebase origin/master
+   # Resolve conflicts
+   git push origin <branch-name> --force-with-lease
+   ```
+
+3. **WHY THIS MATTERS:**
+   - User sees "Can't automatically merge" on GitHub
+   - User has to manually ask to fix it EVERY TIME
+   - Wastes time and creates friction
+   - **PREVENT THIS** by ensuring clean rebase before final push
+
+**RULE:** Never leave a branch with merge conflicts. Always test merge-ability.
+
+---
+
 ## ⚡ **WHEN USER SAYS "CREATE NEW BRANCH" OR "NEW BRANCH":**
 
 **THIS ALWAYS MEANS:**
@@ -312,6 +341,32 @@ git commit -m "more changes"  # ❌ NEVER do this after merge!
 - `feature/php-auto-detection`
 - `docs/installation-guide`
 
+---
+
+## 🔴 **IMPORTANT: When User Says "Version" or "About Version"**
+
+**💡 90% of the time this refers to the Homebrew Formula version!**
+
+When the user mentions:
+- "про версию" (about version)
+- "обновляй версию" (update version)
+- "версию" (version)
+- "version"
+
+**Default Action:** Update the version in `Formula/docker-compose-oroplatform.rb`
+
+**File location:** `Formula/docker-compose-oroplatform.rb`
+**Line to update:** `version "X.Y.Z"`
+
+**Only 10% of cases** might refer to:
+- Docker image versions
+- PHP/Node versions
+- Dependency versions
+
+**When in doubt, ASK:** "Do you mean the Homebrew formula version?"
+
+---
+
 ### 📦 **Formula Versioning Examples:**
 
 ```ruby
@@ -400,9 +455,12 @@ orodc cli php --version           # Redundant
 - ALL composer commands (`install`, `update`, `require`, `create-project`) automatically run with `--no-interaction`
 - This prevents interactive prompts during installation and CI/CD
 - No need to manually add `--no-interaction` flag
+- For `composer install`, automatically creates `config/parameters.yml` from `.dist` file if not exists
+- Uses `docker compose run -T` (disable pseudo-TTY) to ensure Composer IO detects non-interactive mode
+- This prevents Incenteev ParameterHandler from prompting for parameters interactively
 
 ```bash
-# ✅ CORRECT - automatically runs with --no-interaction
+# ✅ CORRECT - automatically runs with --no-interaction and -T flag
 orodc composer install
 orodc composer update
 orodc composer require vendor/package
