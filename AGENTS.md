@@ -28,6 +28,35 @@ This document contains ONLY instructions for AI agents working with homebrew-doc
 
 # 🔴🔴🔴 **CRITICAL: "NEW BRANCH" ALWAYS MEANS FROM UPSTREAM!**
 
+## ⚠️ **AFTER CREATING ANY BRANCH - ALWAYS CHECK MERGE CONFLICTS!**
+
+**After creating and pushing ANY new branch:**
+
+1. **ALWAYS verify it can auto-merge into master:**
+   ```bash
+   git fetch origin
+   # Check if branch needs rebase
+   git merge-base origin/master HEAD
+   ```
+
+2. **If branch is NOT cleanly based on latest master:**
+   ```bash
+   # Immediately rebase on master
+   git rebase origin/master
+   # Resolve conflicts
+   git push origin <branch-name> --force-with-lease
+   ```
+
+3. **WHY THIS MATTERS:**
+   - User sees "Can't automatically merge" on GitHub
+   - User has to manually ask to fix it EVERY TIME
+   - Wastes time and creates friction
+   - **PREVENT THIS** by ensuring clean rebase before final push
+
+**RULE:** Never leave a branch with merge conflicts. Always test merge-ability.
+
+---
+
 ## ⚡ **WHEN USER SAYS "CREATE NEW BRANCH" OR "NEW BRANCH":**
 
 **THIS ALWAYS MEANS:**
@@ -338,6 +367,30 @@ version "1.0.0"
 - Default workflow: `git pull --rebase origin master` or `git rebase master` after updating from remote
 - When updating branches: always sync with remote first, then rebase feature branches
 - Exception: Only merge local branches if user explicitly asks
+
+## Fork vs Upstream Remotes (CRITICAL):
+- **origin = your fork** (where you push branches)
+- **main = upstream repository** (where PR base branches live)
+- **Upstream base branch name is `master`** (remote ref: `main/master`)
+
+**If GitHub PR says "Can’t automatically merge":** you must test against **upstream base**, not your fork:
+
+```bash
+# Update remotes
+git fetch origin
+git fetch main
+
+# On your PR branch:
+git checkout <your-pr-branch>
+git merge --no-ff --no-commit main/master   # reproduce real PR conflicts locally
+
+# Resolve conflicts, then:
+git add -A
+git commit
+git push origin <your-pr-branch>
+```
+
+**Rule:** Checking `origin/master` or `origin/main` is NOT sufficient for mergeability into upstream. Always check `main/master`.
 
 ---
 
