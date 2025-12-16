@@ -2219,16 +2219,28 @@ build_docker_compose_run_cmd() {
   local service="$1"
   local cmd_args=("${@:2}")
   
+  # Check if this is a composer command - use -T flag for non-interactive mode
+  local use_tty_flag="-i"
+  if [[ "$first_non_flag_arg" == "composer" ]]; then
+    use_tty_flag="-T"
+  fi
+  
   if [[ ${#left_flags[@]} -gt 0 ]] || [[ ${#left_options[@]} -gt 0 ]]; then
     # Place docker compose flags before 'run' command
     if [[ ${DOCKER_COMPOSE_VERSION} -gt 1 ]]; then
-      echo "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} run -i --rm ${service} ${cmd_args[*]} ${right_flags[*]} ${right_options[*]}"
+      echo "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} run ${use_tty_flag} --rm ${service} ${cmd_args[*]} ${right_flags[*]} ${right_options[*]}"
     else
       echo "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} run --rm ${service} ${cmd_args[*]} ${right_flags[*]} ${right_options[*]}"
     fi
   else
     # Use standard command without parsed flags
-    echo "${DOCKER_COMPOSE_RUN_CMD} ${service} ${cmd_args[*]}"
+    # For composer commands in DOCKER_COMPOSE_VERSION > 1, replace -i with -T in DOCKER_COMPOSE_RUN_CMD
+    if [[ "$first_non_flag_arg" == "composer" ]] && [[ ${DOCKER_COMPOSE_VERSION} -gt 1 ]]; then
+      local composer_run_cmd="${DOCKER_COMPOSE_RUN_CMD/-i /-T }"
+      echo "${composer_run_cmd} ${service} ${cmd_args[*]}"
+    else
+      echo "${DOCKER_COMPOSE_RUN_CMD} ${service} ${cmd_args[*]}"
+    fi
   fi
 }
 
@@ -2448,8 +2460,10 @@ fi
 
 if echo ${args[0]} | grep -i 'composer' | grep -i 'install' > /dev/null; then
   URL=${args[1]:-"https://${DC_ORO_NAME}.docker.local"}
+  # Create config/parameters.yml from dist file if not exists (prevents Incenteev interactive prompts)
+  ${DOCKER_COMPOSE_BIN_CMD} run --rm cli bash -c "if [[ ! -f ${DC_ORO_APPDIR}/config/parameters.yml ]] && [[ -f ${DC_ORO_APPDIR}/config/parameters.yml.dist ]]; then cp ${DC_ORO_APPDIR}/config/parameters.yml.dist ${DC_ORO_APPDIR}/config/parameters.yml; fi" || true
   set -x
-  ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "composer install --no-interaction" || true
+  ${DOCKER_COMPOSE_BIN_CMD} run --rm -T cli bash -c "composer install --no-interaction" || true
   exit 0
 fi
 
@@ -2688,6 +2702,14 @@ if [[ "$first_non_flag_arg" == "composer" ]] && [[ "${args[1]}" =~ ^(install|upd
       echo "DEBUG: Auto-added --no-interaction to composer ${args[1]}" >&2
     fi
   fi
+  
+  # For composer install, create config/parameters.yml from dist file if not exists (prevents Incenteev interactive prompts)
+  if [[ "${args[1]}" == "install" ]]; then
+    ${DOCKER_COMPOSE_BIN_CMD} run --rm cli bash -c "if [[ ! -f ${DC_ORO_APPDIR}/config/parameters.yml ]] && [[ -f ${DC_ORO_APPDIR}/config/parameters.yml.dist ]]; then cp ${DC_ORO_APPDIR}/config/parameters.yml.dist ${DC_ORO_APPDIR}/config/parameters.yml; fi" 2>/dev/null || true
+    if [[ -n "${DEBUG:-}" ]]; then
+      echo "DEBUG: Prepared config/parameters.yml from dist file" >&2
+    fi
+  fi
 fi
 
 # If command is not a docker compose built-in command and not a special orodc command, redirect to CLI container
@@ -2723,15 +2745,19 @@ if echo ${args[0]} | grep -i '^install' | grep -i 'without' | grep -i 'demo' > /
   install_start_time=$(date +%s)
   
   # Clear cache
-  cache_cmd="${DOCKER_COMPOSE_RUN_CMD} cli bash -c \"[[ -d ${DC_ORO_APPDIR}/var/cache ]] && rm -rf ${DC_ORO_APPDIR}/var/cache/* || true\""
+  cache_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm cli bash -c \"[[ -d ${DC_ORO_APPDIR}/var/cache ]] && rm -rf ${DC_ORO_APPDIR}/var/cache/* || true\""
   run_with_spinner "Clearing cache" "$cache_cmd" || exit $?
   
-  # Run composer install with spinner
-  composer_cmd="${DOCKER_COMPOSE_RUN_CMD} cli bash -c \"composer install --no-interaction\""
+  # Create config/parameters.yml from dist file if not exists (prevents Incenteev interactive prompts)
+  params_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm cli bash -c \"if [[ ! -f ${DC_ORO_APPDIR}/config/parameters.yml ]] && [[ -f ${DC_ORO_APPDIR}/config/parameters.yml.dist ]]; then cp ${DC_ORO_APPDIR}/config/parameters.yml.dist ${DC_ORO_APPDIR}/config/parameters.yml; fi\""
+  run_with_spinner "Preparing config files" "$params_cmd" || exit $?
+  
+  # Run composer install with spinner (use -T to disable pseudo-TTY for non-interactive mode)
+  composer_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm -T cli bash -c \"composer install --no-interaction\""
   run_with_spinner "Running composer install" "$composer_cmd" || exit $?
   
-  # Run oro:install with spinner
-  install_cmd="${DOCKER_COMPOSE_RUN_CMD} cli bash -c \"php bin/console --env=prod --timeout=1800 oro:install --language=en --formatting-code=en_US --organization-name='Acme Inc.' --user-name=admin --user-email=admin@example.com --user-firstname=John --user-lastname=Doe --user-password='\\\$ecretPassw0rd' --application-url='https://${DC_ORO_NAME:-unnamed}.docker.local/' --sample-data=n\""
+  # Run oro:install with spinner (use -T to disable pseudo-TTY for non-interactive mode)
+  install_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm -T cli bash -c \"php bin/console --env=prod --timeout=1800 oro:install --language=en --formatting-code=en_US --organization-name='Acme Inc.' --user-name=admin --user-email=admin@example.com --user-firstname=John --user-lastname=Doe --user-password='\\\$ecretPassw0rd' --application-url='https://${DC_ORO_NAME:-unnamed}.docker.local/' --sample-data=n\""
   run_with_spinner "Installing OroPlatform without demo data" "$install_cmd" || exit $?
   
   # Calculate and save total install time
@@ -2752,15 +2778,19 @@ elif echo ${args[0]} | grep -i '^install$' > /dev/null; then
   install_start_time=$(date +%s)
   
   # Clear cache
-  cache_cmd="${DOCKER_COMPOSE_RUN_CMD} cli bash -c \"[[ -d ${DC_ORO_APPDIR}/var/cache ]] && rm -rf ${DC_ORO_APPDIR}/var/cache/* || true\""
+  cache_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm cli bash -c \"[[ -d ${DC_ORO_APPDIR}/var/cache ]] && rm -rf ${DC_ORO_APPDIR}/var/cache/* || true\""
   run_with_spinner "Clearing cache" "$cache_cmd" || exit $?
   
-  # Run composer install with spinner
-  composer_cmd="${DOCKER_COMPOSE_RUN_CMD} cli bash -c \"composer install --no-interaction\""
+  # Create config/parameters.yml from dist file if not exists (prevents Incenteev interactive prompts)
+  params_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm cli bash -c \"if [[ ! -f ${DC_ORO_APPDIR}/config/parameters.yml ]] && [[ -f ${DC_ORO_APPDIR}/config/parameters.yml.dist ]]; then cp ${DC_ORO_APPDIR}/config/parameters.yml.dist ${DC_ORO_APPDIR}/config/parameters.yml; fi\""
+  run_with_spinner "Preparing config files" "$params_cmd" || exit $?
+  
+  # Run composer install with spinner (use -T to disable pseudo-TTY for non-interactive mode)
+  composer_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm -T cli bash -c \"composer install --no-interaction\""
   run_with_spinner "Running composer install" "$composer_cmd" || exit $?
   
-  # Run oro:install with spinner
-  install_cmd="${DOCKER_COMPOSE_RUN_CMD} cli bash -c \"php bin/console --env=prod --timeout=1800 oro:install --language=en --formatting-code=en_US --organization-name='Acme Inc.' --user-name=admin --user-email=admin@example.com --user-firstname=John --user-lastname=Doe --user-password='\\\$ecretPassw0rd' --application-url='https://${DC_ORO_NAME:-unnamed}.docker.local/' --sample-data=y\""
+  # Run oro:install with spinner (use -T to disable pseudo-TTY for non-interactive mode)
+  install_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm -T cli bash -c \"php bin/console --env=prod --timeout=1800 oro:install --language=en --formatting-code=en_US --organization-name='Acme Inc.' --user-name=admin --user-email=admin@example.com --user-firstname=John --user-lastname=Doe --user-password='\\\$ecretPassw0rd' --application-url='https://${DC_ORO_NAME:-unnamed}.docker.local/' --sample-data=y\""
   run_with_spinner "Installing OroPlatform with sample data" "$install_cmd" || exit $?
   
   # Calculate and save total install time

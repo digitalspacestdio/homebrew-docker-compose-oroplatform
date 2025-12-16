@@ -400,9 +400,12 @@ orodc cli php --version           # Redundant
 - ALL composer commands (`install`, `update`, `require`, `create-project`) automatically run with `--no-interaction`
 - This prevents interactive prompts during installation and CI/CD
 - No need to manually add `--no-interaction` flag
+- For `composer install`, automatically creates `config/parameters.yml` from `.dist` file if not exists
+- Uses `docker compose run -T` (disable pseudo-TTY) to ensure Composer IO detects non-interactive mode
+- This prevents Incenteev ParameterHandler from prompting for parameters interactively
 
 ```bash
-# ✅ CORRECT - automatically runs with --no-interaction
+# ✅ CORRECT - automatically runs with --no-interaction and -T flag
 orodc composer install
 orodc composer update
 orodc composer require vendor/package
