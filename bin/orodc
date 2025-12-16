@@ -2001,6 +2001,14 @@ export DC_ORO_PHP_USER_GROUP=${DC_ORO_USER_GROUP}
 export DC_ORO_PHP_USER_UID=${DC_ORO_USER_UID}
 export DC_ORO_PHP_USER_GID=${DC_ORO_USER_GID}
 
+# Export mailer configuration with defaults (tls = STARTTLS)
+export ORO_MAILER_DRIVER=${ORO_MAILER_DRIVER:-smtp}
+export ORO_MAILER_HOST=${ORO_MAILER_HOST:-mail}
+export ORO_MAILER_PORT=${ORO_MAILER_PORT:-1025}
+export ORO_MAILER_ENCRYPTION=${ORO_MAILER_ENCRYPTION:-tls}
+export ORO_MAILER_USER=${ORO_MAILER_USER:-}
+export ORO_MAILER_PASSWORD=${ORO_MAILER_PASSWORD:-}
+
 NETWORK_NAME="dc_shared_net"
 # Check if the Docker network already exists
 if ! docker network ls --format '{{.Name}}' | grep -qw "$NETWORK_NAME"; then
