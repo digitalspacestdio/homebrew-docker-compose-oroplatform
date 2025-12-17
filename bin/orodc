@@ -1222,15 +1222,17 @@ if [[ "$temp_first_non_flag_arg" == "image" ]]; then
       
       # Always ask user what to do
       SHOULD_PULL=false
+      SHOULD_FORCE_PULL=false
       SHOULD_BUILD=false
       
       if [[ -t 0 ]]; then
         msg_info "Choose action:"
         msg_info "  1) Pull from registry"
-        msg_info "  2) Build locally"
-        msg_info "  3) Skip"
+        msg_info "  2) Force Pull (remove local + pull)"
+        msg_info "  3) Build locally"
+        msg_info "  4) Skip"
         msg_info ""
-        read -p "Your choice (1/2/3): " -n 1 -r
+        read -p "Your choice (1/2/3/4): " -n 1 -r
         echo
         
         case $REPLY in
@@ -1238,9 +1240,12 @@ if [[ "$temp_first_non_flag_arg" == "image" ]]; then
             SHOULD_PULL=true
             ;;
           2)
-            SHOULD_BUILD=true
+            SHOULD_FORCE_PULL=true
             ;;
           3)
+            SHOULD_BUILD=true
+            ;;
+          4)
             msg_info "Skipping PHP base image"
             ;;
           *)
@@ -1256,6 +1261,24 @@ if [[ "$temp_first_non_flag_arg" == "image" ]]; then
         msg_info "Attempting to pull from registry..."
         if ${DOCKER_BIN} pull "${PHP_BASE_TAG}" 2>/dev/null; then
           msg_ok "Successfully pulled from registry: ${PHP_BASE_TAG}"
+          IMAGE_SIZE=$(${DOCKER_BIN} images "${PHP_BASE_TAG}" --format "{{.Size}}")
+          msg_info "Image size: ${IMAGE_SIZE}"
+        else
+          msg_error "Failed to pull from registry"
+          msg_info ""
+          read -p "Build locally instead? (Y/n): " -n 1 -r
+          echo
+          if [[ ! $REPLY =~ ^[Nn]$ ]]; then
+            SHOULD_BUILD=true
+          fi
+        fi
+      fi
+
+      if [[ "$SHOULD_FORCE_PULL" == "true" ]]; then
+        msg_info "Force Pull selected: removing local image (if present) and pulling from registry..."
+        ${DOCKER_BIN} rmi -f "${PHP_BASE_TAG}" >/dev/null 2>&1 || true
+        if ${DOCKER_BIN} pull "${PHP_BASE_TAG}" 2>/dev/null; then
+          msg_ok "Successfully force pulled from registry: ${PHP_BASE_TAG}"
           IMAGE_SIZE=$(${DOCKER_BIN} images "${PHP_BASE_TAG}" --format "{{.Size}}")
           msg_info "Image size: ${IMAGE_SIZE}"
         else
