@@ -51,19 +51,17 @@ services:
       traefik.http.routers.traefik-api-host.entrypoints: "http"
       traefik.http.routers.traefik-api-host.service: "api@internal"
       
-      # HTTPS versions
-      traefik.http.routers.traefik-api-path-https.rule: 'PathPrefix(`/traefik/dashboard`) || PathPrefix(`/api`)'
-      traefik.http.routers.traefik-api-path-https.priority: 9000
-      traefik.http.routers.traefik-api-path-https.entrypoints: "https"
-      traefik.http.routers.traefik-api-path-https.service: "api@internal"
-      traefik.http.routers.traefik-api-path-https.middlewares: "traefik-api-stripprefix"
-      traefik.http.routers.traefik-api-path-https.tls: "true"
+      # Default entrypoint versions (TLS is terminated by proxy entrypoint)
+      traefik.http.routers.traefik-api-path-default.rule: 'PathPrefix(`/traefik/dashboard`) || PathPrefix(`/api`)'
+      traefik.http.routers.traefik-api-path-default.priority: 9000
+      traefik.http.routers.traefik-api-path-default.entrypoints: "default"
+      traefik.http.routers.traefik-api-path-default.service: "api@internal"
+      traefik.http.routers.traefik-api-path-default.middlewares: "traefik-api-stripprefix"
       
-      traefik.http.routers.traefik-api-host-https.rule: 'Host(`proxy.docker.local`)'
-      traefik.http.routers.traefik-api-host-https.priority: 8000
-      traefik.http.routers.traefik-api-host-https.entrypoints: "https"
-      traefik.http.routers.traefik-api-host-https.service: "api@internal"
-      traefik.http.routers.traefik-api-host-https.tls: "true"
+      traefik.http.routers.traefik-api-host-default.rule: 'Host(`proxy.docker.local`)'
+      traefik.http.routers.traefik-api-host-default.priority: 8000
+      traefik.http.routers.traefik-api-host-default.entrypoints: "default"
+      traefik.http.routers.traefik-api-host-default.service: "api@internal"
       
       # DNS sync (auto-updates /etc/hosts inside proxy container)
       orodc.dns.hostname: 'proxy.docker.local'
