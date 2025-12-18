@@ -11,10 +11,10 @@ entryPoints:
     # http:
     #   redirections:
     #     entryPoint:
-    #       to: https
+    #       to: default
     #       scheme: https
   
-  https:
+  default:
     address: ":443"
     http:
       tls:
