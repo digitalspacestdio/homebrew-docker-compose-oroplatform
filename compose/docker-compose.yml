@@ -3,6 +3,9 @@ services:
     image: 'busybox'
     container_name: ${DC_ORO_NAME:-unnamed}_database
     hostname: database.${DC_ORO_NAME:-unnamed}.docker.local
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     command: sleep infinity
     restart: always
     deploy:
@@ -14,6 +17,9 @@ services:
   fpm:
     container_name: "${DC_ORO_NAME:-unnamed}_fpm_${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}"
     hostname: fpm.${DC_ORO_NAME:-unnamed}.docker.local
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     build:
       dockerfile: Dockerfile.project
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/project-php-node-symfony"
@@ -100,6 +106,9 @@ services:
   cli:
     container_name: "${DC_ORO_NAME:-unnamed}_cli_${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}"
     hostname: cli.${DC_ORO_NAME:-unnamed}.docker.local
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     build:
       dockerfile: Dockerfile.project
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/project-php-node-symfony"
@@ -187,6 +196,9 @@ services:
   consumer:
     container_name: "${DC_ORO_NAME:-unnamed}_consumer_${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}"
     hostname: consumer.${DC_ORO_NAME:-unnamed}.docker.local
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     build:
       dockerfile: Dockerfile.project
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/project-php-node-symfony"
@@ -274,6 +286,9 @@ services:
   websocket:
     container_name: "${DC_ORO_NAME:-unnamed}_websocket_${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}"
     hostname: websocket.${DC_ORO_NAME:-unnamed}.docker.local
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     build:
       dockerfile: Dockerfile.project
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/project-php-node-symfony"
@@ -370,6 +385,9 @@ services:
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/mail"
     container_name: ${DC_ORO_NAME:-unnamed}_mail
     hostname: mail.${DC_ORO_NAME:-unnamed}.docker.local
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     volumes:
       - mail-certs:/certs
     ports:
@@ -414,6 +432,9 @@ services:
   xhgui:
     image: "xhgui/xhgui:0.18.4"
     hostname: xhgui.${DC_ORO_NAME:-unnamed}.docker.local
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     profiles: ["xhprof"]
     volumes:
       - "${DC_ORO_CONFIG_DIR:-.}/docker/xhgui/config:/var/www/xhgui/config"
@@ -445,6 +466,9 @@ services:
     image: percona/percona-server-mongodb:4.4
     hostname: mongodb.${DC_ORO_NAME:-unnamed}.docker.local
     container_name: ${DC_ORO_NAME:-unnamed}_mongodb
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     profiles: ["xhprof"]
     # (case sensitive) engine: mmapv1, rocksdb, wiredTiger, inMemory
     command: --storageEngine=wiredTiger
@@ -471,6 +495,9 @@ services:
     image: '${DC_ORO_ELASTICSEARCH_IMAGE:-elasticsearch}:${DC_ORO_ELASTICSEARCH_VERSION:-8.10.3}'
     hostname: search.${DC_ORO_NAME:-unnamed}.docker.local
     container_name: ${DC_ORO_NAME:-unnamed}_search
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     volumes:
       - "search-data:/usr/share/elasticsearch/data:delegated"
     environment:
@@ -500,6 +527,9 @@ services:
     image: ghcr.io/digitalspacestdio/orodc-nginx
     hostname: nginx.${DC_ORO_NAME:-unnamed}.docker.local
     container_name: ${DC_ORO_NAME:-unnamed}_nginx
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     build:
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/nginx"
       args:
@@ -557,6 +587,9 @@ services:
     image: oroinc/rabbitmq:3.9-1-management-alpine
     hostname: mq.${DC_ORO_NAME:-unnamed}.docker.local
     container_name: ${DC_ORO_NAME:-unnamed}_mq
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     ports:
       - "${DC_ORO_MQ_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_MQ:-15672}:15672"
     environment:
@@ -581,6 +614,9 @@ services:
     image: redis:6.2
     hostname: redis.${DC_ORO_NAME:-unnamed}.docker.local
     container_name: ${DC_ORO_NAME:-unnamed}_redis
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     restart: always
     deploy:
       resources:
@@ -599,6 +635,9 @@ services:
   ssh:
     container_name: "${DC_ORO_NAME:-unnamed}_ssh_${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}"
     hostname: ssh.${DC_ORO_NAME:-unnamed}.docker.local
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     build:
       dockerfile: Dockerfile.project
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/project-php-node-symfony"
