@@ -3,6 +3,9 @@ services:
     image: '${DC_ORO_MYSQL_IMAGE:-mysql:8.0-oracle}'
     container_name: ${DC_ORO_NAME:-unnamed}_database
     hostname: database.${DC_ORO_NAME:-unnamed}.docker.local
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     command: '--federated --default-authentication-plugin=mysql_native_password'
     cap_add:
       - SYS_NICE
@@ -38,6 +41,9 @@ services:
     image: '${DC_ORO_MYSQL_IMAGE:-mysql:8.0-oracle}'
     container_name: ${DC_ORO_NAME:-unnamed}_database_cli
     hostname: database-cli.${DC_ORO_NAME:-unnamed}.docker.local
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     command: /bin/true
     restart: "no"
     labels:

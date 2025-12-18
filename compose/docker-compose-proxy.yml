@@ -6,6 +6,9 @@ services:
       args:
         TARGETARCH: ${TARGETARCH:-amd64}
     container_name: proxy
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     restart: always
     deploy:
       resources:

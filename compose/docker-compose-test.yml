@@ -2,6 +2,9 @@ services:
   test-fpm:
     container_name: "${DC_ORO_NAME:-unnamed}_test_fpm_${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}"
     hostname: test-fpm.${DC_ORO_NAME:-unnamed}.docker.local
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     image: ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.4}-node${DC_ORO_NODE_VERSION:-22}-composer${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}
     build:
       dockerfile: Dockerfile.${DC_ORO_PHP_VERSION:-8.4}.${DC_ORO_PHP_DIST:-alpine}
@@ -81,6 +84,9 @@ services:
     image: ghcr.io/digitalspacestdio/orodc-nginx
     hostname: test-nginx.${DC_ORO_NAME:-unnamed}.docker.local
     container_name: ${DC_ORO_NAME:-unnamed}_test_nginx
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     build:
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/nginx"
       args:
@@ -119,6 +125,9 @@ services:
     image: selenium/standalone-chrome:3.141.59-20210607
     hostname: test-selenium.${DC_ORO_NAME:-unnamed}.docker.local
     container_name: ${DC_ORO_NAME:-unnamed}_test_selenium
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     #ports:
     #  - "4444:4444"
     shm_size: "2g"
@@ -142,6 +151,9 @@ services:
   test-cli:
     container_name: "${DC_ORO_NAME:-unnamed}_test_cli_${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}"
     hostname: test-cli.${DC_ORO_NAME:-unnamed}.docker.local
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     image: ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.4}-node${DC_ORO_NODE_VERSION:-22}-composer${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}
     user: "${DC_ORO_USER_NAME:-developer}"
     volumes:
@@ -198,6 +210,9 @@ services:
   test-consumer:
     container_name: "${DC_ORO_NAME:-unnamed}_test_consumer_${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}"
     hostname: test-consumer.${DC_ORO_NAME:-unnamed}.docker.local
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     image: ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.4}-node${DC_ORO_NODE_VERSION:-22}-composer${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}
     build:
       dockerfile: Dockerfile.${DC_ORO_PHP_VERSION:-8.4}.${DC_ORO_PHP_DIST:-alpine}
