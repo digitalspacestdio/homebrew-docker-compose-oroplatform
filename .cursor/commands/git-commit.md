@@ -7,17 +7,30 @@ description: Create a commit following project rules - update version, check bra
 
 **CRITICAL RULES:**
 1. **NEVER commit to master/main** - Always work in feature/fix/update/docs/refactor branches
-2. **MANDATORY**: Update version in `Formula/docker-compose-oroplatform.rb` BEFORE committing
-3. Use descriptive commit messages
-4. Follow semantic versioning rules
+2. **MANDATORY**: Before creating ANY branch, sync with remote main first:
+   ```bash
+   git fetch --all
+   git checkout master
+   git pull main master    # Pull from upstream (main remote)
+   git push origin master  # Update your fork
+   ```
+3. **MANDATORY**: All branches MUST be created from synced master/main:
+   ```bash
+   git checkout -b feature/descriptive-name
+   # or fix/, update/, docs/, refactor/
+   ```
+4. **MANDATORY**: Update version in `Formula/docker-compose-oroplatform.rb` BEFORE committing
+5. Use descriptive commit messages
+6. Follow semantic versioning rules
 
 **Steps:**
 1. **Check current branch:**
    ```bash
    git branch --show-current
    ```
-   - If on `master` or `main`: STOP and inform user - must create branch first
+   - If on `master` or `main`: STOP and inform user - must create branch first (after syncing with remote main)
    - If branch name doesn't match pattern `feature/`, `fix/`, `update/`, `docs/`, `refactor/`: Warn user
+   - If branch was created without syncing with remote main: Warn user and suggest recreating branch
 
 2. **Update version in Formula (MANDATORY):**
    ```bash
