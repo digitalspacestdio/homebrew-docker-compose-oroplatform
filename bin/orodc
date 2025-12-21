@@ -2,6 +2,18 @@
 set -e
 if [ "$DEBUG" ]; then set -x; fi
 
+# Debug logging to file (always enabled for debugging menu issues)
+DEBUG_LOG="/tmp/orodc-debug.log"
+debug_log() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$DEBUG_LOG"
+}
+
+# Clear log on new session
+if [[ "${ORODC_LOG_CLEARED:-}" != "1" ]]; then
+  echo "=== New orodc session $(date '+%Y-%m-%d %H:%M:%S') ===" > "$DEBUG_LOG"
+  export ORODC_LOG_CLEARED=1
+fi
+
 # Restore cursor visibility on exit
 trap 'tput cnorm 2>/dev/null || true' EXIT
 
@@ -400,6 +412,1392 @@ show_service_urls() {
   fi
 }
 
+# ============================================================================
+# Interactive Menu System
+# ============================================================================
+
+# Get environment registry file path
+get_environment_registry_file() {
+  local registry_dir="${HOME}/.orodc"
+  mkdir -p "$registry_dir"
+  echo "${registry_dir}/environments.json"
+}
+
+# Read environment registry
+get_environment_registry() {
+  local registry_file=$(get_environment_registry_file)
+  if [[ -f "$registry_file" ]]; then
+    cat "$registry_file" 2>/dev/null || echo '{"environments":[]}'
+  else
+    echo '{"environments":[]}'
+  fi
+}
+
+# Write environment registry
+write_environment_registry() {
+  local registry_file=$(get_environment_registry_file)
+  local json_content="$1"
+  echo "$json_content" > "$registry_file" 2>/dev/null || return 1
+}
+
+# Check if environment is registered
+is_environment_registered() {
+  local env_name="$1"
+
+  # Check if jq is available
+  if ! command -v jq >/dev/null 2>&1; then
+    return 1
+  fi
+
+  local registry=$(get_environment_registry)
+  local count=$(echo "$registry" | jq --arg name "$env_name" '[.environments[] | select(.name == $name)] | length')
+
+  if [[ "$count" -gt 0 ]]; then
+    return 0
+  else
+    return 1
+  fi
+}
+
+# Clean up non-existent environments from registry
+cleanup_registry() {
+  if ! command -v jq >/dev/null 2>&1; then
+    return 0
+  fi
+
+  local registry=$(get_environment_registry)
+  local env_count=$(echo "$registry" | jq '.environments | length')
+  local cleaned_registry="$registry"
+  local removed_count=0
+
+  local i=0
+  while [[ $i -lt $env_count ]]; do
+    local env_name=$(echo "$registry" | jq -r ".environments[$i].name")
+    local env_path=$(echo "$registry" | jq -r ".environments[$i].path")
+    local config_dir=$(echo "$registry" | jq -r ".environments[$i].config_dir")
+    local should_remove=false
+
+    # Check if path exists
+    if [[ ! -d "$env_path" ]]; then
+      debug_log "cleanup_registry: Removing '$env_name' - path does not exist: $env_path"
+      should_remove=true
+    fi
+
+    # Check if config directory exists
+    if [[ -n "$config_dir" ]] && [[ ! -d "$config_dir" ]]; then
+      debug_log "cleanup_registry: Removing '$env_name' - config_dir does not exist: $config_dir"
+      should_remove=true
+    fi
+
+    # Check if compose.yml exists in config directory
+    # If compose.yml is missing, the project cannot be started and should be removed
+    if [[ -n "$config_dir" ]] && [[ -d "$config_dir" ]] && [[ ! -f "${config_dir}/compose.yml" ]]; then
+      debug_log "cleanup_registry: Removing '$env_name' - compose.yml missing in $config_dir"
+      should_remove=true
+    fi
+
+    if [[ "$should_remove" == "true" ]]; then
+      cleaned_registry=$(echo "$cleaned_registry" | jq --arg name "$env_name" '.environments = (.environments | map(select(.name != $name)))')
+      removed_count=$((removed_count + 1))
+    fi
+
+    i=$((i + 1))
+  done
+
+  if [[ $removed_count -gt 0 ]]; then
+    write_environment_registry "$cleaned_registry"
+    debug_log "cleanup_registry: Removed $removed_count environment(s)"
+  fi
+}
+
+# Register or update environment in registry
+register_environment() {
+  local env_name="$1"
+  local env_path="$2"
+  local config_dir="$3"
+  
+  local registry=$(get_environment_registry)
+  local timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
+  
+  # Check if jq is available
+  if ! command -v jq >/dev/null 2>&1; then
+    msg_warning "jq not found, skipping environment registration"
+    return 0
+  fi
+  
+  # Ensure absolute path - always use realpath
+  local absolute_path=$(realpath "$env_path" 2>/dev/null || echo "$env_path")
+  if [[ -n "$absolute_path" ]] && [[ "$absolute_path" != "$env_path" ]]; then
+    env_path="$absolute_path"
+  fi
+  
+  # Remove existing entry if present
+  registry=$(echo "$registry" | jq --arg name "$env_name" '.environments = (.environments | map(select(.name != $name)))')
+  
+  # Add new entry
+  registry=$(echo "$registry" | jq --arg name "$env_name" \
+    --arg path "$env_path" \
+    --arg config "$config_dir" \
+    --arg timestamp "$timestamp" \
+    '.environments += [{
+      "name": $name,
+      "path": $path,
+      "config_dir": $config,
+      "last_used": $timestamp
+    }]')
+  
+  write_environment_registry "$registry"
+}
+
+# Check if directory is an OroPlatform project
+is_oroplatform_project() {
+  local dir="${1:-$PWD}"
+  
+  # Exclude Homebrew formula/tap directories
+  if [[ "$dir" == *"/Homebrew/Library/Taps/"* ]] || [[ "$dir" == *"/Cellar/"* ]] || [[ "$dir" == *"/Caskroom/"* ]]; then
+    return 1
+  fi
+  
+  # Check for common OroPlatform indicators
+  if [[ -f "$dir/composer.json" ]] || [[ -f "$dir/app/config/parameters.yml" ]] || [[ -d "$dir/bin" ]] || [[ -f "$dir/bin/console" ]]; then
+    return 0
+  fi
+  return 1
+}
+
+# Get environment status (running/stopped/uninitialized)
+get_environment_status() {
+  local env_name="$1"
+  local check_dir="${2:-$PWD}"
+  
+  if [[ -z "$env_name" ]]; then
+    echo "unknown"
+    return
+  fi
+  
+  # First check if this is an OroPlatform project
+  if ! is_oroplatform_project "$check_dir"; then
+    echo "uninitialized"
+    return
+  fi
+  
+  # Check if Docker is available
+  if ! command -v docker >/dev/null 2>&1 && [[ -z "${DOCKER_BIN:-}" ]]; then
+    echo "unknown"
+    return
+  fi
+  
+  local docker_cmd="${DOCKER_BIN:-docker}"
+  
+  # Check if any containers for this project are running
+  local project_name="${env_name}"
+  if ${docker_cmd} ps --filter "label=com.docker.compose.project=${project_name}" --format "{{.Names}}" 2>/dev/null | grep -q .; then
+    echo "running"
+  else
+    echo "stopped"
+  fi
+}
+
+# Scan and auto-register environments from ~/.orodc/* directories
+scan_and_register_environments() {
+  # DO NOT auto-register environments from ~/.orodc scanning
+  # Environments are registered only when user runs init or docker compose commands
+  # This prevents wrong paths from being registered
+  debug_log "scan_and_register_environments: Skipped (no auto-registration)"
+}
+
+# Get real environment path from Docker mounts
+get_environment_real_path() {
+  local env_name="$1"
+  local docker_cmd="${DOCKER_BIN:-docker}"
+  
+  # Try to find containers for this project
+  local containers=$(${docker_cmd} ps -a --filter "label=com.docker.compose.project=${env_name}" --format "{{.Names}}" 2>/dev/null | head -1)
+  
+  if [[ -z "$containers" ]]; then
+    echo ""
+    return 1
+  fi
+  
+  # Get mounts from the first container
+  local mounts=$(${docker_cmd} inspect "$containers" --format '{{json .Mounts}}' 2>/dev/null)
+  
+  if [[ -z "$mounts" ]] || [[ "$mounts" == "null" ]]; then
+    echo ""
+    return 1
+  fi
+  
+  # Try to find source path from mounts (look for bind mounts with application directory)
+  # Check for common mount patterns: /app, /var/www, or paths containing the project name
+  local real_path=$(echo "$mounts" | jq -r '.[] | select(.Type == "bind") | select(.Source != null) | .Source' 2>/dev/null | grep -E "(/app|/var/www|${env_name})" | head -1)
+  
+  # If not found, try to get any bind mount source that looks like a project directory
+  if [[ -z "$real_path" ]]; then
+    real_path=$(echo "$mounts" | jq -r '.[] | select(.Type == "bind") | select(.Source != null and (.Source | contains("/home") or contains("/Users") or contains("/var/www"))) | .Source' 2>/dev/null | head -1)
+  fi
+  
+  # Verify the path exists and contains typical OroPlatform files
+  if [[ -n "$real_path" ]] && [[ -d "$real_path" ]]; then
+    # Check if it looks like an OroPlatform project
+    if [[ -f "$real_path/composer.json" ]] || [[ -f "$real_path/app/config/parameters.yml" ]] || [[ -d "$real_path/bin" ]]; then
+      echo "$real_path"
+      return 0
+    fi
+  fi
+  
+  echo ""
+  return 1
+}
+
+# List all environments and allow selection
+list_environments() {
+  # Clean up non-existent environments first
+  cleanup_registry
+
+  local registry=$(get_environment_registry)
+
+  if ! command -v jq >/dev/null 2>&1; then
+    msg_error "jq is required for environment listing"
+    return 1
+  fi
+
+  local env_count=$(echo "$registry" | jq '.environments | length')
+
+  echo "" >&2
+  msg_header "Environments"
+  echo "" >&2
+  printf "%-5s %-32s %-24s %s\n" "NUM" "NAME" "STATUS" "PATH" >&2
+  printf "%-5s %-32s %-24s %s\n" "---" "----" "------" "----" >&2
+
+  local env_names=()
+  local env_paths=()
+  local env_config_dirs=()
+  local display_count=0
+
+  # First, add current environment if it exists and is not registered
+  debug_log "list_environments: DC_ORO_NAME='${DC_ORO_NAME:-<not set>}' DC_ORO_CONFIG_DIR='${DC_ORO_CONFIG_DIR:-<not set>}'"
+
+  if [[ -n "${DC_ORO_NAME:-}" ]] && [[ -n "${DC_ORO_CONFIG_DIR:-}" ]]; then
+    debug_log "list_environments: Checking if '${DC_ORO_NAME}' is registered"
+
+    if ! is_environment_registered "${DC_ORO_NAME}"; then
+      debug_log "list_environments: '${DC_ORO_NAME}' is NOT registered"
+      local current_path=$(realpath "$PWD" 2>/dev/null || echo "$PWD")
+      local current_status=$(get_environment_status "${DC_ORO_NAME}" "$current_path")
+      debug_log "list_environments: current_status='$current_status' current_path='$current_path'"
+
+      # Show if it has a status (not uninitialized means it's been set up)
+      if [[ "$current_status" != "uninitialized" ]] && [[ -n "$current_status" ]]; then
+        debug_log "list_environments: Adding current unregistered env to list"
+        env_names+=("${DC_ORO_NAME}")
+        env_config_dirs+=("${DC_ORO_CONFIG_DIR}")
+        env_paths+=("$current_path")
+
+        local display_name="${DC_ORO_NAME}"
+        if [[ ${#display_name} -gt 32 ]]; then
+          display_name="${display_name:0:29}..."
+        fi
+
+        # Add (unregistered) to status
+        local display_status="${current_status} (unregistered)"
+
+        display_count=$((display_count + 1))
+        printf "%-5s %-32s %-24s %s\n" "$display_count" "$display_name" "$display_status" "$current_path" >&2
+      else
+        debug_log "list_environments: Skipping - status is '$current_status'"
+      fi
+    else
+      debug_log "list_environments: '${DC_ORO_NAME}' IS registered, skipping"
+    fi
+  else
+    debug_log "list_environments: DC_ORO_NAME or DC_ORO_CONFIG_DIR not set"
+  fi
+
+  # Then add all registered environments
+  local i=0
+  while [[ $i -lt $env_count ]]; do
+    local env_name=$(echo "$registry" | jq -r ".environments[$i].name")
+    local config_dir=$(echo "$registry" | jq -r ".environments[$i].config_dir")
+    local registry_path=$(echo "$registry" | jq -r ".environments[$i].path")
+
+    local env_status=$(get_environment_status "$env_name")
+
+    # Skip if uninitialized and no compose.yml (never been set up)
+    if [[ "$env_status" == "uninitialized" ]] && [[ -n "$config_dir" ]] && [[ ! -f "${config_dir}/compose.yml" ]]; then
+      debug_log "list_environments: Skipping '$env_name' - uninitialized and no compose.yml"
+      i=$((i + 1))
+      continue
+    fi
+
+    # Check if registered (should be, but double-check)
+    local display_status="$env_status"
+    if ! is_environment_registered "$env_name"; then
+      display_status="${env_status} (unregistered)"
+    fi
+
+    # Ensure registry_path is absolute
+    local absolute_registry_path=$(realpath "$registry_path" 2>/dev/null || echo "$registry_path")
+
+    # Check if path exists, show "-" if not
+    local display_path="$absolute_registry_path"
+    if [[ ! -d "$absolute_registry_path" ]]; then
+      display_path="-"
+    fi
+
+    env_names+=("$env_name")
+    env_config_dirs+=("$config_dir")
+    env_paths+=("$absolute_registry_path")
+
+    debug_log "list_environments: Added env='$env_name' path='$absolute_registry_path' display='$display_path'"
+
+    # Truncate name to 32 characters if longer
+    local display_name="$env_name"
+    if [[ ${#display_name} -gt 32 ]]; then
+      display_name="${display_name:0:29}..."
+    fi
+
+    display_count=$((display_count + 1))
+    printf "%-5s %-32s %-24s %s\n" "$display_count" "$display_name" "$display_status" "$display_path" >&2
+    i=$((i + 1))
+  done
+  
+  if [[ $display_count -eq 0 ]]; then
+    msg_info "No valid environments found (all missing compose.yml)"
+    return 0
+  fi
+  echo "" >&2
+  
+  # Allow selection
+  echo -n "Select environment number to switch (or Enter to return): " >&2
+  read -r selection
+  
+  if [[ -z "$selection" ]]; then
+    return 0
+  fi
+  
+  if [[ "$selection" =~ ^[0-9]+$ ]] && [[ $selection -ge 1 ]] && [[ $selection -le $display_count ]]; then
+    local idx=$((selection - 1))
+    local selected_name="${env_names[$idx]}"
+    local selected_path="${env_paths[$idx]}"
+    local selected_config_dir="${env_config_dirs[$idx]}"
+
+      debug_log "list_environments: Selected idx=$idx name='$selected_name' path='$selected_path' config='$selected_config_dir'"
+
+      # If path doesn't exist, ask user to provide it
+      if [[ ! -d "$selected_path" ]]; then
+        echo "" >&2
+        msg_warning "Path not found: $selected_path"
+        msg_info "Please enter the correct path to the project directory:"
+        echo -n "> " >&2
+        read -r user_path
+
+        if [[ -z "$user_path" ]]; then
+          msg_error "Path not provided"
+          echo "" >&2
+          echo -n "Press Enter to continue..." >&2
+          read -r
+          return 1
+        fi
+
+        # Expand tilde and make absolute
+        user_path="${user_path/#\~/$HOME}"
+        user_path=$(realpath "$user_path" 2>/dev/null || echo "$user_path")
+
+        if [[ ! -d "$user_path" ]]; then
+          msg_error "Directory does not exist: $user_path"
+          echo "" >&2
+          echo -n "Press Enter to continue..." >&2
+          read -r
+          return 1
+        fi
+
+        # Update selected_path and registry
+        selected_path="$user_path"
+        register_environment "$selected_name" "$selected_path" "$selected_config_dir"
+        msg_ok "Path updated in registry"
+      fi
+      
+      msg_info "Switching to environment: $selected_name"
+      msg_info "Changing directory to: $selected_path"
+      
+      # Change directory - use realpath to ensure absolute path
+      local absolute_path=$(realpath "$selected_path" 2>/dev/null || echo "$selected_path")
+      
+      if [[ ! -d "$absolute_path" ]]; then
+        msg_error "Environment path does not exist: $absolute_path"
+        echo "" >&2
+        echo -n "Press Enter to continue..." >&2
+        read -r
+        return 1
+      fi
+      
+      msg_info "Switching to environment: $selected_name"
+      msg_info "Changing directory to: $absolute_path"
+      
+      # Update last_used timestamp in registry with absolute path
+      register_environment "$selected_name" "$absolute_path" "$selected_config_dir"
+
+      # Restart the entire script in the new directory
+      # Export selected environment name so it's preserved after exec
+      export ORODC_SELECTED_ENV_NAME="$selected_name"
+      export ORODC_SELECTED_ENV_PATH="$absolute_path"
+      export ORODC_SELECTED_ENV_CONFIG="$selected_config_dir"
+
+      debug_log "list_environments: Exporting ORODC_SELECTED_ENV_NAME='$selected_name' PATH='$absolute_path' CONFIG='$selected_config_dir'"
+      # Unset all environment-related variables to force recalculation
+      unset DC_ORO_NAME
+      unset DC_ORO_CONFIG_DIR
+      unset DC_ORO_APPDIR
+      unset COMPOSE_PROJECT_NAME
+      
+      # Change directory and exec script in new directory
+      # CRITICAL: cd must happen before exec, and exec must use absolute path to script
+      cd "$absolute_path" || {
+        msg_error "Failed to change directory to $absolute_path"
+        return 1
+      }
+      
+      msg_ok "Successfully switched to environment: $selected_name"
+      echo "" >&2
+      
+      # Get absolute path to script for exec (important for proper execution)
+      local script_path=$(realpath "$0" 2>/dev/null || echo "$0")
+      if [[ ! "$script_path" = /* ]]; then
+        # If still relative, try to find it in PATH
+        script_path=$(command -v "$0" 2>/dev/null || echo "$0")
+      fi
+      
+      # This ensures all environment variables are properly reinitialized in new directory
+      exec "$script_path"
+  else
+    msg_error "Invalid selection: $selection"
+    return 1
+  fi
+}
+
+# Get last used environment from registry
+get_last_used_environment() {
+  local registry=$(get_environment_registry)
+  
+  if ! command -v jq >/dev/null 2>&1; then
+    return 1
+  fi
+  
+  local env_count=$(echo "$registry" | jq '.environments | length')
+  if [[ "$env_count" == "0" ]]; then
+    return 1
+  fi
+  
+  # Find environment with latest last_used timestamp that has compose.yml
+  local last_env=""
+  local last_timestamp=0
+  
+  local i=0
+  while [[ $i -lt $env_count ]]; do
+    local env_name=$(echo "$registry" | jq -r ".environments[$i].name")
+    local env_path=$(echo "$registry" | jq -r ".environments[$i].path")
+    local config_dir=$(echo "$registry" | jq -r ".environments[$i].config_dir")
+    local last_used=$(echo "$registry" | jq -r ".environments[$i].last_used // \"0\"")
+    
+    # Skip if compose.yml doesn't exist
+    if [[ -n "$config_dir" ]] && [[ ! -f "${config_dir}/compose.yml" ]]; then
+      i=$((i + 1))
+      continue
+    fi
+    
+    # Convert timestamp to number for comparison
+    local timestamp_num=0
+    if [[ "$last_used" != "null" ]] && [[ "$last_used" != "0" ]] && [[ -n "$last_used" ]]; then
+      timestamp_num=$(date -d "$last_used" +%s 2>/dev/null || echo "0")
+    fi
+    
+    if [[ $timestamp_num -gt $last_timestamp ]] && [[ -d "$env_path" ]]; then
+      last_timestamp=$timestamp_num
+      last_env="$env_path"
+    fi
+    
+    i=$((i + 1))
+  done
+  
+  if [[ -n "$last_env" ]] && [[ -d "$last_env" ]]; then
+    echo "$last_env"
+    return 0
+  fi
+  
+  return 1
+}
+
+# Detect current environment (NO auto-registration)
+detect_current_environment() {
+  # This function no longer auto-registers environments
+  # Environments are registered only after 'init' or when compose.yml is created
+  debug_log "detect_current_environment: Called (no auto-registration)"
+}
+
+# Check if we're in a project directory
+# Returns 0 if in project, 1 if not
+check_in_project() {
+  if [[ -z "${DC_ORO_NAME:-}" ]] || [[ -z "${DC_ORO_CONFIG_DIR:-}" ]]; then
+    msg_error "No project found in current directory"
+    msg_info "Please navigate to a project directory or select a project from the list (option 1)"
+    echo "" >&2
+    return 1
+  fi
+  return 0
+}
+
+# Manage domains interactively
+manage_domains() {
+  local env_file="${DC_ORO_APPDIR}/.env.orodc"
+  if [[ ! -f "$env_file" ]]; then
+    env_file="${DC_ORO_CONFIG_DIR}/.env.orodc"
+  fi
+  
+  local current_hosts=""
+  if [[ -f "$env_file" ]]; then
+    current_hosts=$(grep "^DC_ORO_EXTRA_HOSTS=" "$env_file" 2>/dev/null | cut -d'=' -f2- | tr -d '"' | tr -d "'" || echo "")
+  fi
+  
+  echo "" >&2
+  msg_header "Domain Management"
+  echo "" >&2
+  if [[ -n "$current_hosts" ]]; then
+    msg_info "Current domains: $current_hosts"
+  else
+    msg_info "No domains currently configured"
+  fi
+  echo "" >&2
+  
+  local domains=()
+  if [[ -n "$current_hosts" ]]; then
+    IFS=',' read -ra domains <<< "$current_hosts"
+  fi
+  
+  while true; do
+    echo -n "Add domain (or 'remove' to delete, 'done' to finish): " >&2
+    read -r input
+    
+    if [[ -z "$input" ]]; then
+      continue
+    fi
+    
+    if [[ "$input" == "done" ]]; then
+      break
+    fi
+    
+    if [[ "$input" == "remove" ]]; then
+      if [[ ${#domains[@]} -eq 0 ]]; then
+        msg_warning "No domains to remove"
+        continue
+      fi
+      
+      echo "" >&2
+      msg_info "Current domains:"
+      local i=0
+      for domain in "${domains[@]}"; do
+        echo "  $((i + 1)). $domain" >&2
+        i=$((i + 1))
+      done
+      echo "" >&2
+      echo -n "Enter domain number to remove: " >&2
+      read -r num
+      
+      if [[ "$num" =~ ^[0-9]+$ ]] && [[ $num -ge 1 ]] && [[ $num -le ${#domains[@]} ]]; then
+        local idx=$((num - 1))
+        unset "domains[$idx]"
+        domains=("${domains[@]}")
+        msg_ok "Domain removed"
+      else
+        msg_error "Invalid selection"
+      fi
+      continue
+    fi
+    
+    # Validate and add domain
+    local domain=$(echo "$input" | xargs)  # trim whitespace
+    
+    # Handle short names (add .docker.local)
+    if [[ ! "$domain" =~ \. ]]; then
+      domain="${domain}.docker.local"
+    fi
+    
+    # Basic validation
+    if [[ "$domain" =~ ^[a-zA-Z0-9._-]+$ ]]; then
+      domains+=("$domain")
+      msg_ok "Domain added: $domain"
+    else
+      msg_error "Invalid domain format: $domain"
+    fi
+  done
+  
+  # Update .env.orodc file
+  local new_hosts=$(IFS=','; echo "${domains[*]}")
+  if [[ -n "$new_hosts" ]]; then
+    update_env_var "$env_file" "DC_ORO_EXTRA_HOSTS" "$new_hosts"
+    msg_ok "Domains updated: $new_hosts"
+  else
+    # Remove the line if no domains
+    if [[ -f "$env_file" ]]; then
+      sed -i.tmp '/^DC_ORO_EXTRA_HOSTS=/d' "$env_file"
+      rm -f "${env_file}.tmp"
+    fi
+    msg_ok "All domains removed"
+  fi
+}
+
+# List database dump files in var/backup/ directory
+list_database_dumps() {
+  local project_dir="${DC_ORO_APPDIR:-$PWD}"
+  local backup_dir="${project_dir}/var/backup"
+  local var_dir="${project_dir}/var"
+  
+  local dumps=()
+  
+  # Check backup directory first
+  if [[ -d "$backup_dir" ]]; then
+    while IFS= read -r -d '' file; do
+      dumps+=("$file")
+    done < <(find "$backup_dir" -maxdepth 1 -type f \( -name "*.sql" -o -name "*.sql.gz" \) -print0 2>/dev/null | sort -z)
+  fi
+  
+  # Fallback to var/ directory if backup is empty
+  if [[ ${#dumps[@]} -eq 0 ]] && [[ -d "$var_dir" ]]; then
+    while IFS= read -r -d '' file; do
+      dumps+=("$file")
+    done < <(find "$var_dir" -maxdepth 1 -type f \( -name "*.sql" -o -name "*.sql.gz" \) -print0 2>/dev/null | sort -z)
+  fi
+  
+  if [[ ${#dumps[@]} -eq 0 ]]; then
+    return 1
+  fi
+  
+  printf '%s\n' "${dumps[@]}"
+}
+
+# Export database to var/backup/ folder
+export_database_interactive() {
+  # Use project directory, fallback to current directory
+  local project_dir="${DC_ORO_APPDIR:-$PWD}"
+  local backup_dir="${project_dir}/var/backup"
+  mkdir -p "$backup_dir"
+  
+  local default_filename="database-$(date +'%Y%m%d%H%M%S').sql.gz"
+  echo -n "Enter filename [default: $default_filename]: " >&2
+  read -r filename
+  
+  if [[ -z "$filename" ]]; then
+    filename="$default_filename"
+  fi
+  
+  # Ensure .sql.gz extension
+  if [[ ! "$filename" =~ \.(sql|sql\.gz)$ ]]; then
+    filename="${filename}.sql.gz"
+  fi
+  
+  local dump_path="${backup_dir}/${filename}"
+  
+  # Use existing exportdb logic
+  DB_DUMP="$dump_path"
+  DB_DUMP_BASENAME=$(echo "${DB_DUMP##*/}")
+  touch "${DB_DUMP}"
+  
+  if [[ $DC_ORO_DATABASE_SCHEMA == "pgsql" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgres" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgresql" ]]; then
+    DB_EXPORT_CMD="PGPASSWORD=\$DC_ORO_DATABASE_PASSWORD pg_dump -Fp --clean --if-exists -h \$DC_ORO_DATABASE_HOST -p \$DC_ORO_DATABASE_PORT -U \$DC_ORO_DATABASE_USER -d \$DC_ORO_DATABASE_DBNAME"
+  elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "mariadb" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]];then
+    DB_EXPORT_CMD="MYSQL_PWD=\$DC_ORO_DATABASE_PASSWORD mysqldump --no-tablespaces --column-statistics=0 --set-gtid-purged=OFF --quick --max-allowed-packet=16M --disable-keys --hex-blob --no-autocommit --insert-ignore --skip-lock-tables --single-transaction -h\$DC_ORO_DATABASE_HOST -P\$DC_ORO_DATABASE_PORT -u\$DC_ORO_DATABASE_USER \$DC_ORO_DATABASE_DBNAME | sed -E 's/[Dd][Ee][Ff][Ii][Nn][Ee][Rr][ ]*=[ ]*[^*]*\*/DEFINER=CURRENT_USER \*/'"
+  fi
+  
+  msg_info "Starting export of the database..."
+  msg_info "Database: $DC_ORO_DATABASE_HOST:$DC_ORO_DATABASE_PORT/$DC_ORO_DATABASE_DBNAME"
+  msg_info "Export to: $DB_DUMP"
+  
+  export_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} run --quiet --rm -v \"${DB_DUMP}:/${DB_DUMP_BASENAME}\" database-cli bash -c \"$DB_EXPORT_CMD | gzip > /${DB_DUMP_BASENAME}\""
+  run_with_spinner "Exporting database" "$export_cmd" || return $?
+  
+  msg_ok "Database exported successfully"
+  msg_info "File: $DB_DUMP"
+  msg_info "Size: $(du -h "$DB_DUMP" | cut -f1)"
+}
+
+# Import database from var/backup/ folder or file path
+import_database_interactive() {
+  # Use project directory, fallback to current directory
+  local project_dir="${DC_ORO_APPDIR:-$PWD}"
+  local backup_dir="${project_dir}/var/backup"
+  local var_dir="${project_dir}/var"
+  local dumps=()
+  local dump_files=()
+  
+  # Get dumps using list_database_dumps (checks var/backup/ first, then var/)
+  while IFS= read -r file; do
+    if [[ -n "$file" ]]; then
+      dumps+=("$file")
+      dump_files+=("$file")
+    fi
+  done < <(list_database_dumps 2>/dev/null || true)
+  
+  local selected_file=""
+  
+  if [[ ${#dumps[@]} -gt 0 ]]; then
+    echo "" >&2
+    msg_header "Available Database Dumps"
+    echo "" >&2
+    local i=1
+    for dump in "${dumps[@]}"; do
+      local basename_dump=$(basename "$dump")
+      local size=$(du -h "$dump" 2>/dev/null | cut -f1)
+      printf "  %2d) %s (%s)\n" "$i" "$basename_dump" "$size" >&2
+      i=$((i + 1))
+    done
+    echo "" >&2
+    echo -n "Select dump number or enter file path: " >&2
+    read -r input
+    
+    if [[ "$input" =~ ^[0-9]+$ ]] && [[ $input -ge 1 ]] && [[ $input -le ${#dumps[@]} ]]; then
+      selected_file="${dumps[$((input - 1))]}"
+    elif [[ -n "$input" ]]; then
+      # Try as file path
+      if [[ -r "$input" ]]; then
+        selected_file=$(realpath "$input")
+      elif [[ -r "${project_dir}/${input}" ]]; then
+        selected_file=$(realpath "${project_dir}/${input}")
+      elif [[ -r "${backup_dir}/${input}" ]]; then
+        selected_file=$(realpath "${backup_dir}/${input}")
+      elif [[ -r "${var_dir}/${input}" ]]; then
+        selected_file=$(realpath "${var_dir}/${input}")
+      else
+        msg_error "File not found or not readable: $input"
+        return 1
+      fi
+    else
+      msg_error "No selection made"
+      return 1
+    fi
+  else
+    echo -n "Enter database dump file path: " >&2
+    read -r input
+    
+    if [[ -z "$input" ]]; then
+      msg_error "No file provided"
+      return 1
+    fi
+    
+    if [[ -r "$input" ]]; then
+      selected_file=$(realpath "$input")
+    elif [[ -r "${backup_dir}/${input}" ]]; then
+      selected_file=$(realpath "${backup_dir}/${input}")
+    elif [[ -r "${var_dir}/${input}" ]]; then
+      selected_file=$(realpath "${var_dir}/${input}")
+    elif [[ -r "${project_dir}/${input}" ]]; then
+      selected_file=$(realpath "${project_dir}/${input}")
+    else
+      msg_error "File not found or not readable: $input"
+      return 1
+    fi
+  fi
+  
+  if [[ -z "$selected_file" ]] || [[ ! -r "$selected_file" ]]; then
+    msg_error "Invalid file: $selected_file"
+    return 1
+  fi
+  
+  # Use existing importdb logic
+  DB_DUMP="$selected_file"
+  DB_DUMP_BASENAME=$(echo "${DB_DUMP##*/}")
+  
+  if [[ $DC_ORO_DATABASE_SCHEMA == "pdo_pgsql" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgres" ]];then
+    DB_IMPORT_CMD="sed -E 's/[Oo][Ww][Nn][Ee][Rr]:[[:space:]]*[a-zA-Z0-9_]+/Owner: '\$DC_ORO_DATABASE_USER'/g' | sed -E 's/[Oo][Ww][Nn][Ee][Rr][[:space:]]+[Tt][Oo][[:space:]]+[a-zA-Z0-9_]+/OWNER TO '\$DC_ORO_DATABASE_USER'/g' | sed -E '/^[[:space:]]*[Rr][Ee][Vv][Oo][Kk][Ee][[:space:]]+[Aa][Ll][Ll]/d' | sed -e '/SET transaction_timeout = 0;/d' | sed -E '/^\\\\restrict|^\\\\unrestrict/d' | PGPASSWORD=\$DC_ORO_DATABASE_PASSWORD psql --set ON_ERROR_STOP=on -h \$DC_ORO_DATABASE_HOST -p \$DC_ORO_DATABASE_PORT -U \$DC_ORO_DATABASE_USER -d \$DC_ORO_DATABASE_DBNAME -1 >/dev/null"
+  elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "pdo_mysql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]];then
+    DB_IMPORT_CMD="sed -E 's/[Dd][Ee][Ff][Ii][Nn][Ee][Rr][ ]*=[ ]*[^*]*\*/DEFINER=CURRENT_USER \*/' | MYSQL_PWD=\$DC_ORO_DATABASE_PASSWORD mysql -h\$DC_ORO_DATABASE_HOST -P\$DC_ORO_DATABASE_PORT -u\$DC_ORO_DATABASE_USER \$DC_ORO_DATABASE_DBNAME"
+  fi
+  
+  if echo ${DB_DUMP_BASENAME} | grep -i 'sql\.gz$' > /dev/null; then
+    DB_IMPORT_CMD="zcat ${DB_DUMP_BASENAME} | sed -E 's/^[[:space:]]*[Cc][Rr][Ee][Aa][Tt][Ee][[:space:]]+[Ff][Uu][Nn][Cc][Tt][Ii][Oo][Nn]/CREATE OR REPLACE FUNCTION/g' | ${DB_IMPORT_CMD}"
+  else
+    DB_IMPORT_CMD="cat /${DB_DUMP_BASENAME} | sed -E 's/^[[:space:]]*[Cc][Rr][Ee][Aa][Tt][Ee][[:space:]]+[Ff][Uu][Nn][Cc][Tt][Ii][Oo][Nn]/CREATE OR REPLACE FUNCTION/g' | ${DB_IMPORT_CMD}"
+  fi
+  
+  msg_info "Starting import of the database dump..."
+  msg_info "From: $DB_DUMP"
+  msg_info "File size: $(du -h "$DB_DUMP" | cut -f1)"
+  msg_info "Database: $DC_ORO_DATABASE_HOST:$DC_ORO_DATABASE_PORT/$DC_ORO_DATABASE_DBNAME"
+  
+  import_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} run --quiet -i --rm -v \"${DB_DUMP}:/${DB_DUMP_BASENAME}\" database-cli bash -c \"$DB_IMPORT_CMD\""
+  run_with_spinner "Importing database" "$import_cmd" || return $?
+  
+  msg_ok "Database imported successfully"
+}
+
+# Configure application URL interactively
+configure_url_interactive() {
+  local current_url="https://${DC_ORO_NAME}.docker.local"
+  
+  # Try to get current URL from Oro config
+  if command -v jq >/dev/null 2>&1; then
+    local url_from_config=$(${DOCKER_COMPOSE_RUN_CMD} cli bash -c "php bin/console oro:config:get oro_website.secure_url" 2>/dev/null | grep -v "^\s*$" | tail -1 | xargs || echo "")
+    if [[ -n "$url_from_config" ]] && [[ "$url_from_config" != "null" ]]; then
+      current_url="$url_from_config"
+    fi
+  fi
+  
+  echo "" >&2
+  msg_header "Configure Application URL"
+  echo "" >&2
+  msg_info "Current URL: $current_url"
+  echo "" >&2
+  echo -n "Enter new application URL [default: https://${DC_ORO_NAME}.docker.local]: " >&2
+  read -r new_url
+  
+  if [[ -z "$new_url" ]]; then
+    new_url="https://${DC_ORO_NAME}.docker.local"
+  fi
+  
+  # Validate URL format
+  if [[ ! "$new_url" =~ ^https?:// ]]; then
+    msg_error "URL must start with http:// or https://"
+    return 1
+  fi
+  
+  # Use existing updateurl logic
+  URL="$new_url"
+  ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "php bin/console oro:config:update oro_website.secure_url ${URL}" || true
+  ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "php bin/console oro:config:update oro_ui.application_url ${URL}" || true
+  ${DOCKER_COMPOSE_RUN_CMD} cli bash -c "php bin/console oro:config:update oro_website.url ${URL}" || true
+  
+  msg_ok "Application URL updated to: $new_url"
+}
+
+# Platform update with service management
+platform_update_interactive() {
+  msg_header "Platform Update"
+  echo "" >&2
+  msg_info "Stopping application services..."
+  
+  # Stop application services but keep dependencies
+  # Services to stop: fpm, nginx, websocket, consumer
+  # Services to keep: database, redis, elasticsearch, rabbitmq
+  local services_to_stop=("fpm" "nginx" "websocket" "consumer")
+  for service in "${services_to_stop[@]}"; do
+    ${DOCKER_COMPOSE_BIN_CMD} stop "$service" >/dev/null 2>&1 || true
+  done
+  
+  msg_info "Running platform update..."
+  
+  # Clear cache and run update
+  local update_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm cli bash -c \"rm -rf var/cache/* || true; php bin/console oro:platform:update --force\""
+  run_with_spinner "Updating platform" "$update_cmd" || return $?
+  
+  msg_ok "Platform update completed"
+  echo "" >&2
+  
+  if confirm_yes_no "Restart services?" "yes"; then
+    msg_info "Restarting services..."
+    ${DOCKER_COMPOSE_BIN_CMD} up -d >/dev/null 2>&1
+    msg_ok "Services restarted"
+  fi
+}
+
+# Run command and ask to return to menu
+run_command_with_menu_return() {
+  local cmd=("$@")
+
+  # Run command
+  "$0" "${cmd[@]}"
+  local exit_code=$?
+
+  echo "" >&2
+  # Ask to return to menu
+  if confirm_yes_no "Return to menu?" "yes"; then
+    show_interactive_menu
+  else
+    exit $exit_code
+  fi
+}
+
+# Show interactive menu
+show_interactive_menu() {
+  # Handle Ctrl+C gracefully
+  trap 'echo ""; echo ""; msg_info "Goodbye!"; exit 0' SIGINT
+
+  # Debug output
+  if [[ -n "${DEBUG:-}" ]]; then
+    echo "[DEBUG show_interactive_menu] PWD: $PWD" >&2
+    echo "[DEBUG show_interactive_menu] DC_ORO_NAME: ${DC_ORO_NAME:-<not set>}" >&2
+    echo "[DEBUG show_interactive_menu] DC_ORO_APPDIR: ${DC_ORO_APPDIR:-<not set>}" >&2
+    echo "[DEBUG show_interactive_menu] DC_ORO_CONFIG_DIR: ${DC_ORO_CONFIG_DIR:-<not set>}" >&2
+  fi
+
+  # Auto-register current environment
+  detect_current_environment
+
+  # Scan and register other environments
+  scan_and_register_environments
+
+  # Clean up non-existent environments from registry
+  cleanup_registry
+
+  # Initialize Docker Compose variables for menu functions
+  BREW_BIN=$(resolve_bin "brew")
+  DOCKER_BIN=$(resolve_bin "docker")
+  DOCKER_COMPOSE_BIN="$DOCKER_BIN compose"
+  DOCKER_COMPOSE_BIN_CMD="$DOCKER_COMPOSE_BIN"
+
+  # Initialize argument arrays as empty for menu functions
+  left_flags=()
+  left_options=()
+  right_flags=()
+  right_options=()
+
+  # Get DIR for any operations that need it
+  DIR=$("$BREW_BIN" --prefix docker-compose-oroplatform)/share/docker-compose-oroplatform
+
+  # Build compose command with config files (needed for menu functions)
+  if [[ -n "${DC_ORO_CONFIG_DIR:-}" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose.yml" ]]; then
+    DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose.yml"
+  fi
+
+  # Set DOCKER_COMPOSE_RUN_CMD after compose files are added
+  DOCKER_COMPOSE_RUN_CMD="${DOCKER_COMPOSE_BIN_CMD} run --rm"
+
+  local current_status=$(get_environment_status "${DC_ORO_NAME}" "$PWD")
+  local status_display=""
+  local is_registered=false
+
+  # Check if environment is registered
+  if [[ -n "${DC_ORO_NAME:-}" ]] && is_environment_registered "${DC_ORO_NAME}"; then
+    is_registered=true
+  fi
+
+  if [[ "$current_status" == "running" ]]; then
+    if [[ "$is_registered" == "true" ]]; then
+      status_display="\033[32mrunning\033[0m"
+    else
+      status_display="\033[32mrunning\033[0m \033[33m(unregistered)\033[0m"
+    fi
+  elif [[ "$current_status" == "uninitialized" ]]; then
+    status_display="\033[33muninitialized\033[0m"
+  else
+    if [[ "$is_registered" == "true" ]]; then
+      status_display="\033[31mstopped\033[0m"
+    else
+      status_display="\033[31mstopped\033[0m \033[33m(unregistered)\033[0m"
+    fi
+  fi
+  
+  clear
+  echo -e "\033[1;34m========================================\033[0m" >&2
+  echo -e "\033[1;34m    OroDC Interactive Menu\033[0m" >&2
+  echo -e "\033[1;34m========================================\033[0m" >&2
+  echo "" >&2
+  msg_info "Welcome to OroDC Interactive Menu!"
+  msg_info "Manage your Application development environments easily."
+  echo "" >&2
+  echo "Select an option:" >&2
+  echo "" >&2
+  
+  # Get terminal width, default to 80 if not available
+  local term_width=${COLUMNS:-80}
+  local use_two_columns=false
+  if [[ $term_width -ge 100 ]]; then
+    use_two_columns=true
+  fi
+  
+  if [[ "$use_two_columns" == "true" ]]; then
+    # Two column layout
+    printf "  \033[1;36m%-30s\033[0m  \033[1;33m%-30s\033[0m\n" "Environment Management:" "Configuration:" >&2
+    printf "  %-30s  %-30s\n" "  1) List all environments" "  7) Add/Manage domains" >&2
+    printf "  %-30s  %-30s\n" "  2) Initialize environment" "  8) Configure URL" >&2
+    printf "  %-30s  %-30s\n" "  3) Start environment" "" >&2
+    printf "  %-30s  %-30s\n" "  4) Stop environment" "" >&2
+    printf "  %-30s  %-30s\n" "  5) Delete environment" "" >&2
+    printf "  %-30s  %-30s\n" "  6) Connect via SSH" "" >&2
+    echo "" >&2
+    printf "  \033[1;35m%-30s\033[0m  \033[1;32m%-30s\033[0m\n" "Database:" "Maintenance:" >&2
+    printf "  %-30s  %-30s\n" "  9)  Export database" "  11) Clear cache" >&2
+    printf "  %-30s  %-30s\n" "  10) Import database" "  12) Platform update" >&2
+    printf "  %-30s  %-30s\n" "" "  13) Run doctor" >&2
+    echo "" >&2
+    printf "  \033[1;37m%-30s\033[0m  \033[1;31m%-30s\033[0m\n" "Other:" "Installation:" >&2
+    printf "  %-30s  %-30s\n" "  14) Image build" "  17) Install with demo" >&2
+    printf "  %-30s  %-30s\n" "  15) Start proxy" "  18) Install without demo" >&2
+    printf "  %-30s  %-30s\n" "  16) Stop proxy" "" >&2
+  else
+    # Single column layout (original)
+    echo -e "\033[1;36mEnvironment Management:\033[0m" >&2
+    echo "  1)  List all environments" >&2
+    echo "  2)  Initialize environment and determine versions" >&2
+    echo "  3)  Start environment in current folder" >&2
+    echo "  4)  Stop environment" >&2
+    echo "  5)  Delete environment" >&2
+    echo "  6)  Connect via SSH" >&2
+    echo "" >&2
+    echo -e "\033[1;33mConfiguration:\033[0m" >&2
+    echo "  7)  Add/Manage domains" >&2
+    echo "  8)  Configure application URL" >&2
+    echo "" >&2
+    echo -e "\033[1;35mDatabase:\033[0m" >&2
+    echo "  9)  Export database" >&2
+    echo "  10) Import database" >&2
+    echo "" >&2
+    echo -e "\033[1;32mMaintenance:\033[0m" >&2
+    echo "  11) Clear cache" >&2
+    echo "  12) Platform update" >&2
+    echo "  13) Run doctor (show ps)" >&2
+    echo "" >&2
+    echo -e "\033[1;37mOther:\033[0m" >&2
+    echo "  14) Image build" >&2
+    echo "  15) Start proxy" >&2
+    echo "  16) Stop proxy" >&2
+    echo "" >&2
+    echo -e "\033[1;31mInstallation:\033[0m" >&2
+    echo "  17) Install with demo data" >&2
+    echo "  18) Install without demo data" >&2
+  fi
+  
+  echo "" >&2
+  # Show current environment or "-" if not in a project
+  local env_display="${DC_ORO_NAME:--}"
+  if [[ "$env_display" != "-" ]]; then
+    echo -e "Current Environment: \033[1m${env_display}\033[0m ($status_display)" >&2
+  else
+    echo -e "Current Environment: \033[1m-\033[0m (\033[33mnot in project\033[0m)" >&2
+  fi
+
+  # Use DC_ORO_APPDIR if set, otherwise PWD if in project, otherwise "-"
+  local display_dir="${DC_ORO_APPDIR:-}"
+  if [[ -z "$display_dir" ]]; then
+    if [[ -n "${DC_ORO_NAME:-}" ]]; then
+      # We're in a project but DC_ORO_APPDIR not set yet, use PWD
+      display_dir="$(realpath "$(pwd)" 2>/dev/null || pwd)"
+    else
+      display_dir="-"
+    fi
+  fi
+
+  if [[ "$display_dir" == "-" ]]; then
+    echo -e "Current Directory: \033[2m-\033[0m" >&2
+  else
+    echo -e "Current Directory: $display_dir" >&2
+  fi
+  echo "" >&2
+  echo -n "Enter option [1-18] or 'q' to quit: " >&2
+  read -r choice
+  
+  case "$choice" in
+    1)
+      list_environments
+      local list_result=$?
+      # If list_environments switched directory, it will exec the script itself
+      # So we only get here if no switch happened
+      if [[ $list_result -ne 2 ]]; then
+        echo "" >&2
+        echo -n "Press Enter to continue..." >&2
+        read -r
+        show_interactive_menu
+      fi
+      ;;
+    2)
+      echo "" >&2
+      # Call init command
+      run_command_with_menu_return init
+      ;;
+    3)
+      echo "" >&2
+      if ! check_in_project; then
+        echo -n "Press Enter to continue..." >&2
+        read -r
+        show_interactive_menu
+        exit
+      fi
+      # Call up command
+      run_command_with_menu_return up -d
+      ;;
+    4)
+      echo "" >&2
+      if ! check_in_project; then
+        echo -n "Press Enter to continue..." >&2
+        read -r
+        show_interactive_menu
+        exit
+      fi
+      # Call down command
+      run_command_with_menu_return down
+      ;;
+    5)
+      echo "" >&2
+      if ! check_in_project; then
+        echo -n "Press Enter to continue..." >&2
+        read -r
+        show_interactive_menu
+        exit
+      fi
+      if confirm_yes_no "Are you sure you want to delete this environment? This will purge all data and remove config directory." "no"; then
+        run_command_with_menu_return purge --yes
+        echo "" >&2
+        
+        # Remove config directory
+        if [[ -n "${DC_ORO_CONFIG_DIR:-}" ]] && [[ -d "${DC_ORO_CONFIG_DIR}" ]]; then
+          msg_info "Removing config directory: ${DC_ORO_CONFIG_DIR}"
+          rm -rf "${DC_ORO_CONFIG_DIR}" 2>/dev/null && msg_ok "Config directory removed" || msg_warning "Failed to remove config directory"
+        fi
+        
+        msg_ok "Environment deleted successfully"
+        echo "" >&2
+        echo -n "Press Enter to continue..." >&2
+        read -r
+        show_interactive_menu
+      else
+        show_interactive_menu
+      fi
+      ;;
+    6)
+      if ! check_in_project; then
+        echo -n "Press Enter to continue..." >&2
+        read -r
+        show_interactive_menu
+        exit
+      fi
+      # Call ssh command
+      run_command_with_menu_return ssh
+      ;;
+    7)
+      if ! check_in_project; then
+        echo -n "Press Enter to continue..." >&2
+        read -r
+        show_interactive_menu
+        exit
+      fi
+      manage_domains
+      echo "" >&2
+      if confirm_yes_no "Return to menu?" "yes"; then
+        show_interactive_menu
+      else
+        exit 0
+      fi
+      ;;
+    8)
+      if ! check_in_project; then
+        echo -n "Press Enter to continue..." >&2
+        read -r
+        show_interactive_menu
+        exit
+      fi
+      configure_url_interactive
+      echo "" >&2
+      if confirm_yes_no "Return to menu?" "yes"; then
+        show_interactive_menu
+      else
+        exit 0
+      fi
+      ;;
+    9)
+      if ! check_in_project; then
+        echo -n "Press Enter to continue..." >&2
+        read -r
+        show_interactive_menu
+        exit
+      fi
+      export_database_interactive
+      echo "" >&2
+      if confirm_yes_no "Return to menu?" "yes"; then
+        show_interactive_menu
+      else
+        exit 0
+      fi
+      ;;
+    10)
+      if ! check_in_project; then
+        echo -n "Press Enter to continue..." >&2
+        read -r
+        show_interactive_menu
+        exit
+      fi
+      import_database_interactive
+      echo "" >&2
+      if confirm_yes_no "Return to menu?" "yes"; then
+        show_interactive_menu
+      else
+        exit 0
+      fi
+      ;;
+    11)
+      echo "" >&2
+      if ! check_in_project; then
+        echo -n "Press Enter to continue..." >&2
+        read -r
+        show_interactive_menu
+        exit
+      fi
+      # Call cache clear command
+      run_command_with_menu_return cache clear
+      ;;
+    12)
+      if ! check_in_project; then
+        echo -n "Press Enter to continue..." >&2
+        read -r
+        show_interactive_menu
+        exit
+      fi
+      platform_update_interactive
+      echo "" >&2
+      if confirm_yes_no "Return to menu?" "yes"; then
+        show_interactive_menu
+      else
+        exit 0
+      fi
+      ;;
+    13)
+      echo "" >&2
+      msg_header "Environment Status"
+      echo "" >&2
+      # Initialize required environment variables to avoid warnings
+      export DC_ORO_PORT_PREFIX=${DC_ORO_PORT_PREFIX:-"301"}
+      # Build Traefik rule if not set
+      if [[ -z "${DC_ORO_TRAEFIK_RULE:-}" ]]; then
+        local traefik_rule="Host(\`${DC_ORO_NAME:-unnamed}.docker.local\`)"
+        if [[ -n "${DC_ORO_EXTRA_HOSTS:-}" ]]; then
+          IFS=',' read -ra HOSTS <<< "$DC_ORO_EXTRA_HOSTS"
+          for host in "${HOSTS[@]}"; do
+            host=$(echo "$host" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+            if [[ -n "$host" ]]; then
+              if [[ "$host" != *.* ]]; then
+                host="$host.docker.local"
+              fi
+              traefik_rule="$traefik_rule || Host(\`$host\`)"
+            fi
+          done
+        fi
+        export DC_ORO_TRAEFIK_RULE="$traefik_rule"
+      fi
+      # Ensure Docker Compose command is initialized
+      local docker_cmd="${DOCKER_BIN:-docker}"
+      local compose_cmd="${docker_cmd} compose"
+
+      # Show only container name and status
+      printf "%-40s %-15s\n" "CONTAINER" "STATUS" >&2
+      printf "%-40s %-15s\n" "----------------------------------------" "---------------" >&2
+
+      local output_file=$(mktemp)
+
+      # Build compose command
+      local compose_ps_cmd="${compose_cmd}"
+      if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose.yml" ]]; then
+        compose_ps_cmd="${compose_ps_cmd} -f ${DC_ORO_CONFIG_DIR}/docker-compose.yml"
+      fi
+      compose_ps_cmd="${compose_ps_cmd} -p ${DC_ORO_NAME}"
+
+      # Try JSON format first (more reliable)
+      local ps_output=$(${compose_ps_cmd} ps --format json 2>&1 | grep -v "WARN\[0000\]" || true)
+
+      if command -v jq >/dev/null 2>&1 && echo "$ps_output" | jq -e '. | length > 0' >/dev/null 2>&1; then
+        # Parse JSON output and write to file
+        echo "$ps_output" | jq -r '.[] | "\(.Name)\t\(.State)"' 2>/dev/null > "$output_file"
+      else
+        # Fallback: use table format
+        ${compose_ps_cmd} ps --format "table {{.Name}}\t{{.State}}" 2>&1 | grep -v "WARN\[0000\]" | tail -n +2 > "$output_file" || true
+      fi
+
+      # Display results from file
+      local has_output=false
+      if [[ -s "$output_file" ]]; then
+        while IFS=$'\t' read -r name state; do
+          if [[ -n "$name" ]] && [[ "$name" != "NAME" ]] && [[ "$name" != "null" ]] && [[ "$name" != "" ]]; then
+            printf "%-40s %-15s\n" "$name" "$state" >&2
+            has_output=true
+          fi
+        done < "$output_file"
+      fi
+
+      rm -f "$output_file"
+
+      if [[ "$has_output" == "false" ]]; then
+        msg_info "No containers found for this environment."
+        msg_info "Start the environment with option 3 to see containers here."
+      fi
+
+      echo "" >&2
+      echo -n "Press Enter to continue..." >&2
+      read -r
+      show_interactive_menu
+      ;;
+    14)
+      echo "" >&2
+      msg_info "Image build - rebuild or pull PHP images"
+      echo "" >&2
+      if confirm_yes_no "Build images with cache?" "yes"; then
+        run_command_with_menu_return image build
+      else
+        if confirm_yes_no "Build images without cache (full rebuild)?" "no"; then
+          run_command_with_menu_return image build --no-cache
+        else
+          show_interactive_menu
+        fi
+      fi
+      ;;
+    15)
+      echo "" >&2
+      msg_info "Starting proxy..."
+      run_command_with_menu_return proxy up -d
+      ;;
+    16)
+      echo "" >&2
+      if confirm_yes_no "Are you sure you want to stop the proxy?" "no"; then
+        msg_info "Stopping proxy..."
+        run_command_with_menu_return proxy down
+      else
+        show_interactive_menu
+      fi
+      ;;
+    17)
+      echo "" >&2
+      msg_warning "WARNING: This will PURGE all existing data (database, cache, volumes) and reinstall!"
+      echo "" >&2
+      if confirm_yes_no "Install Application WITH demo data? (purge + install)" "no"; then
+        msg_info "Starting fresh installation with demo data..."
+        msg_info "Step 1: Purging existing environment..."
+        echo "" >&2
+        "$0" purge --yes 2>&1 || true
+        echo "" >&2
+        msg_info "Step 2: Running installation (this may take 5-30 minutes depending on hardware)..."
+        echo "" >&2
+        run_command_with_menu_return install with demo
+      else
+        show_interactive_menu
+      fi
+      ;;
+    18)
+      echo "" >&2
+      msg_warning "WARNING: This will PURGE all existing data (database, cache, volumes) and reinstall!"
+      echo "" >&2
+      if confirm_yes_no "Install Application WITHOUT demo data? (purge + install)" "no"; then
+        msg_info "Starting fresh installation without demo data..."
+        msg_info "Step 1: Purging existing environment..."
+        echo "" >&2
+        "$0" purge --yes 2>&1 || true
+        echo "" >&2
+        msg_info "Step 2: Running installation (this may take 5-30 minutes depending on hardware)..."
+        echo "" >&2
+        run_command_with_menu_return install without demo
+      else
+        show_interactive_menu
+      fi
+      ;;
+    q|Q)
+      echo "" >&2
+      msg_info "Goodbye!"
+      exit 0
+      ;;
+    *)
+      echo "" >&2
+      msg_error "Invalid option: $choice"
+      echo "" >&2
+      echo -n "Press Enter to continue..." >&2
+      read -r
+      show_interactive_menu
+      ;;
+  esac
+}
+
 # Function to resolve binary location with error handling
 # Usage: resolve_bin "binary_name" ["install_instructions"]
 resolve_bin() {
@@ -490,15 +1888,78 @@ args=()
 args_input=("$@")
 
 # Save and load XDEBUG_MODE* environment variables
-export PWD=$(pwd)
-export DC_ORO_NAME=${DC_ORO_NAME-$(basename $(pwd))}
+# Use realpath to ensure we have absolute path (important after menu switch)
+export PWD=$(realpath "$(pwd)" 2>/dev/null || pwd)
+# Use selected environment name if available (from menu switch), otherwise use basename
+# Compare using realpath to handle symlinks and relative paths
+current_pwd=$(realpath "$(pwd)" 2>/dev/null || pwd)
+selected_path_normalized=$(realpath "${ORODC_SELECTED_ENV_PATH:-}" 2>/dev/null || echo "${ORODC_SELECTED_ENV_PATH:-}")
+
+debug_log "Script start: PWD='$PWD' current_pwd='$current_pwd'"
+debug_log "Script start: ORODC_SELECTED_ENV_NAME='${ORODC_SELECTED_ENV_NAME:-<not set>}' PATH='${ORODC_SELECTED_ENV_PATH:-<not set>}' CONFIG='${ORODC_SELECTED_ENV_CONFIG:-<not set>}'"
+
+if [[ -n "${ORODC_SELECTED_ENV_NAME:-}" ]] && [[ -n "${ORODC_SELECTED_ENV_PATH:-}" ]]; then
+  debug_log "Script start: Processing ORODC_SELECTED_ENV_* variables"
+
+  # Debug output if DEBUG is set
+  if [[ -n "${DEBUG:-}" ]]; then
+    echo "[DEBUG] ORODC_SELECTED_ENV_NAME: ${ORODC_SELECTED_ENV_NAME}" >&2
+    echo "[DEBUG] ORODC_SELECTED_ENV_PATH: ${ORODC_SELECTED_ENV_PATH}" >&2
+    echo "[DEBUG] current_pwd: $current_pwd" >&2
+    echo "[DEBUG] selected_path_normalized: $selected_path_normalized" >&2
+    echo "[DEBUG] Comparison: '$current_pwd' == '$selected_path_normalized'" >&2
+  fi
+  
+  # Check if we're in the selected directory (with tolerance for path variations)
+  if [[ "$current_pwd" == "$selected_path_normalized" ]]; then
+    debug_log "Script start: Paths match - setting DC_ORO_NAME='${ORODC_SELECTED_ENV_NAME}' DC_ORO_APPDIR='${ORODC_SELECTED_ENV_PATH}'"
+    export DC_ORO_NAME="${ORODC_SELECTED_ENV_NAME}"
+    if [[ -n "${ORODC_SELECTED_ENV_CONFIG:-}" ]]; then
+      export DC_ORO_CONFIG_DIR="${ORODC_SELECTED_ENV_CONFIG}"
+    else
+      export DC_ORO_CONFIG_DIR="$HOME/.$(basename $0)/${DC_ORO_NAME}"
+    fi
+    # Set DC_ORO_APPDIR to the selected path to ensure correct project directory
+    export DC_ORO_APPDIR="${ORODC_SELECTED_ENV_PATH}"
+    # Clear selection variables after use
+    unset ORODC_SELECTED_ENV_NAME
+    unset ORODC_SELECTED_ENV_PATH
+    unset ORODC_SELECTED_ENV_CONFIG
+  else
+    # If paths don't match, we might need to cd first
+    # This can happen if exec didn't preserve the directory change
+    if [[ -d "$selected_path_normalized" ]]; then
+      debug_log "Script start: Paths don't match - cd to '$selected_path_normalized'"
+      if [[ -n "${DEBUG:-}" ]]; then
+        echo "[DEBUG] Paths don't match, changing directory to: $selected_path_normalized" >&2
+      fi
+      cd "$selected_path_normalized" || true
+      export PWD=$(realpath "$(pwd)" 2>/dev/null || pwd)
+      debug_log "Script start: After cd - PWD='$PWD' setting DC_ORO_NAME='${ORODC_SELECTED_ENV_NAME}' DC_ORO_APPDIR='${ORODC_SELECTED_ENV_PATH}'"
+      export DC_ORO_NAME="${ORODC_SELECTED_ENV_NAME}"
+      if [[ -n "${ORODC_SELECTED_ENV_CONFIG:-}" ]]; then
+        export DC_ORO_CONFIG_DIR="${ORODC_SELECTED_ENV_CONFIG}"
+      else
+        export DC_ORO_CONFIG_DIR="$HOME/.$(basename $0)/${DC_ORO_NAME}"
+      fi
+      export DC_ORO_APPDIR="${ORODC_SELECTED_ENV_PATH}"
+      # Clear selection variables after use
+      unset ORODC_SELECTED_ENV_NAME
+      unset ORODC_SELECTED_ENV_PATH
+      unset ORODC_SELECTED_ENV_CONFIG
+    fi
+  fi
+else
+  # Always recalculate DC_ORO_NAME from current directory to ensure it's correct after switching
+  export DC_ORO_NAME=$(basename $(pwd))
+  # Allow override of config directory via environment variable
+  if [[ -z "${DC_ORO_CONFIG_DIR}" ]]; then
+    export DC_ORO_CONFIG_DIR="$HOME/.$(basename $0)/${DC_ORO_NAME}"
+  fi
+fi
 # CRITICAL: Set Docker Compose project name to match OroDC project name
 # This ensures volumes and networks use consistent naming with DC_ORO_NAME
 export COMPOSE_PROJECT_NAME="$DC_ORO_NAME"
-# Allow override of config directory via environment variable
-if [[ -z "${DC_ORO_CONFIG_DIR}" ]]; then
-  export DC_ORO_CONFIG_DIR="$HOME/.$(basename $0)/${DC_ORO_NAME}"
-fi
 
 if [[ ! -d "${DC_ORO_CONFIG_DIR}" ]]; then
     mkdir -p "${DC_ORO_CONFIG_DIR}"
@@ -612,6 +2073,31 @@ if [[ "$1" == "help" ]] || [[ "$1" == "man" ]]; then
     echo "💡 For full documentation, run: brew info docker-compose-oroplatform"
   fi
   exit 0
+fi
+
+# Show interactive menu when no arguments provided and in interactive terminal
+# This must be checked VERY EARLY, before any argument parsing
+if [[ $# -eq 0 ]] && [[ -t 0 ]] && [[ -z "${ORODC_NO_MENU:-}" ]]; then
+  # Check if current directory is an OroPlatform project
+  if ! is_oroplatform_project "$PWD"; then
+    # Try to switch to last used environment
+    last_env=$(get_last_used_environment 2>/dev/null)
+    if [[ -n "$last_env" ]] && [[ -d "$last_env" ]] && [[ "$last_env" != "$PWD" ]]; then
+      msg_info "No project found in current directory."
+      msg_info "Switching to last used environment: $(basename "$last_env")"
+      cd "$last_env" || {
+        show_interactive_menu
+        exit $?
+      }
+      # Restart script in new directory
+      unset DC_ORO_NAME
+      unset DC_ORO_CONFIG_DIR
+      unset COMPOSE_PROJECT_NAME
+      exec "$0"
+    fi
+  fi
+  show_interactive_menu
+  exit $?
 fi
 
 # Function to get first non-flag argument
@@ -1905,11 +3391,12 @@ find-up () {
   echo "$path"
 }
 
-if [[ -z $DC_ORO_APPDIR ]]; then
-  export DC_ORO_APPDIR=$(find-up composer.json "$PWD/www")
+# Only set DC_ORO_APPDIR if not already set (e.g., from menu switch)
+if [[ -z "${DC_ORO_APPDIR:-}" ]]; then
+  export DC_ORO_APPDIR=$(find-up composer.json)
 fi
 
-if [[ -z $DC_ORO_APPDIR ]]; then
+if [[ -z "${DC_ORO_APPDIR:-}" ]]; then
   if [ -z "$(ls -A "$PWD")" ]; then
     export DC_ORO_APPDIR="$PWD"
   else
@@ -2591,6 +4078,31 @@ is_orodc_special_command() {
   esac
 }
 
+# Show interactive menu when no arguments provided and in interactive terminal
+# This must be checked BEFORE PHP redirect to prevent menu from being bypassed
+if [[ $# -eq 0 ]] && [[ -z "${first_non_flag_arg:-}" ]] && [[ ${#args[@]} -eq 0 ]] && [[ ${#left_flags[@]} -eq 0 ]] && [[ ${#right_flags[@]} -eq 0 ]] && [[ ${#left_options[@]} -eq 0 ]] && [[ ${#right_options[@]} -eq 0 ]] && [[ -t 0 ]] && [[ -z "${ORODC_NO_MENU:-}" ]]; then
+  # Check if current directory is an OroPlatform project
+  if ! is_oroplatform_project "$PWD"; then
+    # Try to switch to last used environment
+    last_env=$(get_last_used_environment 2>/dev/null)
+    if [[ -n "$last_env" ]] && [[ -d "$last_env" ]] && [[ "$last_env" != "$PWD" ]]; then
+      msg_info "No project found in current directory."
+      msg_info "Switching to last used environment: $(basename "$last_env")"
+      cd "$last_env" || {
+        show_interactive_menu
+        exit $?
+      }
+      # Restart script in new directory
+      unset DC_ORO_NAME
+      unset DC_ORO_CONFIG_DIR
+      unset COMPOSE_PROJECT_NAME
+      exec "$0"
+    fi
+  fi
+  show_interactive_menu
+  exit $?
+fi
+
 # Handle PHP flags (redirect to PHP CLI when appropriate)
 # Only redirect with bash -c for implicit PHP commands (flags only, no command)
 # For explicit 'php' command, use direct exec for interactive mode
@@ -2839,7 +4351,7 @@ if echo ${args[0]} | grep -i '^install' | grep -i 'without' | grep -i 'demo' > /
   
   # Run oro:install with spinner (use -T to disable pseudo-TTY for non-interactive mode)
   install_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm -T cli bash -c \"php bin/console --env=prod --timeout=1800 oro:install --language=en --formatting-code=en_US --organization-name='Acme Inc.' --user-name=admin --user-email=admin@example.com --user-firstname=John --user-lastname=Doe --user-password='\\\$ecretPassw0rd' --application-url='https://${DC_ORO_NAME:-unnamed}.docker.local/' --sample-data=n\""
-  run_with_spinner "Installing OroPlatform without demo data" "$install_cmd" || exit $?
+  run_with_spinner "Installing Application without demo data" "$install_cmd" || exit $?
   
   # Calculate and save total install time
   install_end_time=$(date +%s)
@@ -2881,7 +4393,7 @@ elif echo ${args[0]} | grep -i '^install$' > /dev/null; then
   
   # Run oro:install with spinner (use -T to disable pseudo-TTY for non-interactive mode)
   install_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm -T cli bash -c \"php bin/console --env=prod --timeout=1800 oro:install --language=en --formatting-code=en_US --organization-name='Acme Inc.' --user-name=admin --user-email=admin@example.com --user-firstname=John --user-lastname=Doe --user-password='\\\$ecretPassw0rd' --application-url='https://${DC_ORO_NAME:-unnamed}.docker.local/' --sample-data=y\""
-  run_with_spinner "Installing OroPlatform with sample data" "$install_cmd" || exit $?
+  run_with_spinner "Installing Application with sample data" "$install_cmd" || exit $?
   
   # Calculate and save total install time
   install_end_time=$(date +%s)
@@ -3742,10 +5254,16 @@ EOF
     msg_ok "Configuration saved to $ENV_FILE"
     msg_info "All other variables in the file were preserved"
     msg_info "You can now run 'orodc install' to set up your environment"
+
+    # Register environment in registry after successful init
+    if [[ -n "${DC_ORO_NAME:-}" ]] && [[ -n "${DC_ORO_CONFIG_DIR:-}" ]]; then
+      debug_log "init: Registering environment name='${DC_ORO_NAME}' path='$PWD' config='${DC_ORO_CONFIG_DIR}'"
+      register_environment "${DC_ORO_NAME}" "$PWD" "${DC_ORO_CONFIG_DIR}"
+    fi
   else
     msg_info "Configuration not saved"
   fi
-  
+
   exit 0
 fi
 
@@ -3866,12 +5384,25 @@ if [[ "$is_docker_compose_cmd" == "true" ]]; then
   # Generate config file only if it doesn't exist or if it's a management command (up, down, purge, etc.)
   if [[ ! -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]] || [[ "${args[0]}" =~ ^(up|down|purge|build|pull|push|restart|start|stop|kill|rm|create)$ ]]; then
     DC_ORO_NAME="$DC_ORO_NAME" bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} config" > "${DC_ORO_CONFIG_DIR}/compose.yml" 2>/dev/null || true
+
+    # Register environment after creating compose.yml
+    if [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]] && [[ -n "${DC_ORO_NAME:-}" ]] && [[ -n "${DC_ORO_CONFIG_DIR:-}" ]]; then
+      debug_log "compose.yml created: Registering environment name='${DC_ORO_NAME}' path='$PWD' config='${DC_ORO_CONFIG_DIR}'"
+      register_environment "${DC_ORO_NAME}" "$PWD" "${DC_ORO_CONFIG_DIR}"
+    fi
   fi
   # For docker compose commands, proper order is: command flags services
   # Extract command (first element) and services (rest of elements)
   docker_cmd="${args[0]}"
   docker_services="${args[*]:1}"
-  
+
+  # Check if we're in a project for commands that require it
+  if [[ "$docker_cmd" =~ ^(up|down|start|stop|restart|ps|logs|exec|run)$ ]]; then
+    if ! check_in_project; then
+      exit 1
+    fi
+  fi
+
   # Handle 'up' command with separate build and start phases
   if [[ "$docker_cmd" == "up" ]]; then
     # Get previous timing for statistics only
@@ -3995,4 +5526,3 @@ full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${args[*
 
 DC_ORO_NAME="$DC_ORO_NAME" bash -c "$full_cmd"
 exit $?
-
