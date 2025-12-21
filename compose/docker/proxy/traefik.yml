@@ -5,7 +5,7 @@ global:
 
 # Entry points
 entryPoints:
-  http:
+  web:
     address: ":80"
     # Optional: HTTP to HTTPS redirect (commented out by default)
     # http:
@@ -27,7 +27,7 @@ api:
 
 # Ping endpoint for health checks
 ping:
-  entryPoint: http
+  entryPoint: web
 
 # Providers
 providers:
@@ -48,4 +48,3 @@ log:
 # Access logs (optional)
 # accessLog:
 #   format: common
-
