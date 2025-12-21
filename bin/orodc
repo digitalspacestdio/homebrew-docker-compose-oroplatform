@@ -1359,6 +1359,74 @@ show_interactive_menu() {
   # Set DOCKER_COMPOSE_RUN_CMD after compose files are added
   DOCKER_COMPOSE_RUN_CMD="${DOCKER_COMPOSE_BIN_CMD} run --rm"
 
+  # Initialize required environment variables to avoid warnings
+  export DC_ORO_PORT_PREFIX=${DC_ORO_PORT_PREFIX:-"301"}
+  # Build Traefik rule if not set
+  if [[ -z "${DC_ORO_TRAEFIK_RULE:-}" ]]; then
+    local traefik_rule="Host(\`${DC_ORO_NAME:-unnamed}.docker.local\`)"
+    if [[ -n "${DC_ORO_EXTRA_HOSTS:-}" ]]; then
+      IFS=',' read -ra HOSTS <<< "$DC_ORO_EXTRA_HOSTS"
+      for host in "${HOSTS[@]}"; do
+        host=$(echo "$host" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        if [[ -n "$host" ]]; then
+          if [[ "$host" != *.* ]]; then
+            host="$host.docker.local"
+          fi
+          traefik_rule="$traefik_rule || Host(\`$host\`)"
+        fi
+      done
+    fi
+    export DC_ORO_TRAEFIK_RULE="$traefik_rule"
+  fi
+
+  # Use batch port resolution for better performance
+  if [[ -n "${DC_ORO_NAME:-}" ]] && [[ -n "${DC_ORO_CONFIG_DIR:-}" ]]; then
+    BATCH_PORTS=$(orodc-find_free_port --batch ${DC_ORO_NAME} $DC_ORO_CONFIG_DIR \
+      nginx "${DC_ORO_PORT_PREFIX}80" \
+      xhgui "${DC_ORO_PORT_PREFIX}81" \
+      database "${DC_ORO_PORT_PREFIX}06" \
+      database "${DC_ORO_PORT_PREFIX}32" \
+      search "${DC_ORO_PORT_PREFIX}92" \
+      mq "${DC_ORO_PORT_PREFIX}72" \
+      redis "${DC_ORO_PORT_PREFIX}79" \
+      mail "${DC_ORO_PORT_PREFIX}25" \
+      ssh "${DC_ORO_PORT_PREFIX}22")
+
+    # Parse batch results and export individual port variables
+    while IFS=':' read -r service port; do
+      case "$service" in
+        nginx)
+          export DC_ORO_PORT_NGINX="$port"
+          ;;
+        xhgui)
+          export DC_ORO_PORT_XHGUI="$port"
+          ;;
+        database)
+          if [[ -z "$DC_ORO_PORT_MYSQL" ]]; then
+            export DC_ORO_PORT_MYSQL="$port"
+          else
+            export DC_ORO_PORT_PGSQL="$port"
+          fi
+          ;;
+        search)
+          export DC_ORO_PORT_SEARCH="$port"
+          ;;
+        mq)
+          export DC_ORO_PORT_MQ="$port"
+          ;;
+        redis)
+          export DC_ORO_PORT_REDIS="$port"
+          ;;
+        mail)
+          export DC_ORO_PORT_MAIL_WEBGUI="$port"
+          ;;
+        ssh)
+          export DC_ORO_PORT_SSH="$port"
+          ;;
+      esac
+    done <<< "$BATCH_PORTS"
+  fi
+
   local current_status=$(get_environment_status "${DC_ORO_NAME}" "$PWD")
   local status_display=""
   local is_registered=false
@@ -1650,25 +1718,6 @@ show_interactive_menu() {
       echo "" >&2
       msg_header "Environment Status"
       echo "" >&2
-      # Initialize required environment variables to avoid warnings
-      export DC_ORO_PORT_PREFIX=${DC_ORO_PORT_PREFIX:-"301"}
-      # Build Traefik rule if not set
-      if [[ -z "${DC_ORO_TRAEFIK_RULE:-}" ]]; then
-        local traefik_rule="Host(\`${DC_ORO_NAME:-unnamed}.docker.local\`)"
-        if [[ -n "${DC_ORO_EXTRA_HOSTS:-}" ]]; then
-          IFS=',' read -ra HOSTS <<< "$DC_ORO_EXTRA_HOSTS"
-          for host in "${HOSTS[@]}"; do
-            host=$(echo "$host" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-            if [[ -n "$host" ]]; then
-              if [[ "$host" != *.* ]]; then
-                host="$host.docker.local"
-              fi
-              traefik_rule="$traefik_rule || Host(\`$host\`)"
-            fi
-          done
-        fi
-        export DC_ORO_TRAEFIK_RULE="$traefik_rule"
-      fi
       # Ensure Docker Compose command is initialized
       local docker_cmd="${DOCKER_BIN:-docker}"
       local compose_cmd="${docker_cmd} compose"
