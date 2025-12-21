@@ -317,7 +317,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=dc_shared_net"
-      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws.entrypoints=http"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws.entrypoints=web"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws.rule=${DC_ORO_TRAEFIK_RULE} && (PathPrefix(`/ws`) || Header(`Upgrade`, `websocket`))"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws.service=${DC_ORO_NAME:-unnamed}-ws"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws.priority=100"
@@ -406,7 +406,7 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=dc_shared_net"
-      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail.entrypoints=http"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail.entrypoints=web"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail.rule=${DC_ORO_TRAEFIK_RULE} && PathPrefix(`/mailbox`)"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail.service=${DC_ORO_NAME:-unnamed}-mail"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail.middlewares=${DC_ORO_NAME:-unnamed}-mail-stripprefix"
@@ -559,7 +559,7 @@ services:
       - "traefik.http.middlewares.cors-${DC_ORO_NAME:-unnamed}.headers.accessControlAllowOriginList=*"
       - "traefik.http.middlewares.resp-headers-${DC_ORO_NAME:-unnamed}.headers.customResponseHeaders.X-Project-Name=${DC_ORO_NAME:-unnamed}"
       - "traefik.http.middlewares.resp-headers-${DC_ORO_NAME:-unnamed}.headers.customResponseHeaders.X-Website-Code-Traefik=from-traefik"
-      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}.entrypoints=http"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}.entrypoints=web"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}.middlewares=compress-${DC_ORO_NAME:-unnamed},cors-${DC_ORO_NAME:-unnamed},resp-headers-${DC_ORO_NAME:-unnamed}"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}.rule=${DC_ORO_TRAEFIK_RULE}"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}.service=${DC_ORO_NAME:-unnamed}"

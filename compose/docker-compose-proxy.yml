@@ -43,7 +43,7 @@ services:
       # Dashboard access via PathPrefix (for localhost:8880/traefik/dashboard)
       traefik.http.routers.traefik-api-path.rule: 'PathPrefix(`/traefik/dashboard`) || PathPrefix(`/api`)'
       traefik.http.routers.traefik-api-path.priority: 9000
-      traefik.http.routers.traefik-api-path.entrypoints: "http"
+      traefik.http.routers.traefik-api-path.entrypoints: "web"
       traefik.http.routers.traefik-api-path.service: "api@internal"
       traefik.http.routers.traefik-api-path.middlewares: "traefik-api-stripprefix"
       traefik.http.middlewares.traefik-api-stripprefix.stripprefix.prefixes: "/traefik"
@@ -51,7 +51,7 @@ services:
       # Dashboard access via Host (for proxy.docker.local via SOCKS5)
       traefik.http.routers.traefik-api-host.rule: 'Host(`proxy.docker.local`)'
       traefik.http.routers.traefik-api-host.priority: 8000
-      traefik.http.routers.traefik-api-host.entrypoints: "http"
+      traefik.http.routers.traefik-api-host.entrypoints: "web"
       traefik.http.routers.traefik-api-host.service: "api@internal"
       
       # Default entrypoint versions (TLS is terminated by proxy entrypoint)
@@ -82,4 +82,3 @@ networks:
   dc_shared_net:
     name: dc_shared_net
     external: true
-
