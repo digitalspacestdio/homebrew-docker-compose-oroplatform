@@ -93,31 +93,47 @@ get_env_file_paths() {
 }
 
 # Update or add environment variable in .env.orodc file
-# Uses same logic as initialize_environment: saves to local if exists, otherwise to global
-# Usage: update_env_var "VAR_NAME" "value"
+# Supports two usage patterns:
+#   1. update_env_var "VAR_NAME" "value" - auto-determines file (local if exists, otherwise global)
+#   2. update_env_var "env_file" "VAR_NAME" "value" - saves to specific file
+# Usage: 
+#   update_env_var "VAR_NAME" "value"
+#   update_env_var "/path/to/.env.orodc" "VAR_NAME" "value"
 update_env_var() {
-  local var_name="$1"
-  local var_value="$2"
+  local env_file=""
+  local var_name=""
+  local var_value=""
   
-  if [[ -z "$var_name" ]] || [[ -z "$var_value" ]]; then
-    debug_log "update_env_var: missing arguments (var_name=$var_name, var_value=$var_value)"
-    return 1
+  # Check if first argument is a file path (contains / or is absolute path)
+  if [[ "$1" == */* ]] || [[ "$1" == /* ]] || [[ -f "$1" ]]; then
+    # Three-argument version: file, name, value
+    env_file="$1"
+    var_name="$2"
+    var_value="$3"
+  else
+    # Two-argument version: name, value (auto-determine file)
+    var_name="$1"
+    var_value="$2"
+    
+    # Get paths using same logic as initialize_environment
+    local paths=$(get_env_file_paths)
+    local global_config_file=$(echo "$paths" | cut -d'|' -f1)
+    local local_config_file=$(echo "$paths" | cut -d'|' -f2)
+    
+    # Determine which file to use for saving (local if exists, otherwise global)
+    # Same priority as loading: local overrides global
+    if [[ -f "$local_config_file" ]]; then
+      # Local file exists - save there (user explicitly created it to override)
+      env_file="$local_config_file"
+    else
+      # Local file doesn't exist - save to global
+      env_file="$global_config_file"
+    fi
   fi
   
-  # Get paths using same logic as initialize_environment
-  local paths=$(get_env_file_paths)
-  local global_config_file=$(echo "$paths" | cut -d'|' -f1)
-  local local_config_file=$(echo "$paths" | cut -d'|' -f2)
-  
-  # Determine which file to use for saving (local if exists, otherwise global)
-  # Same priority as loading: local overrides global
-  local env_file=""
-  if [[ -f "$local_config_file" ]]; then
-    # Local file exists - save there (user explicitly created it to override)
-    env_file="$local_config_file"
-  else
-    # Local file doesn't exist - save to global
-    env_file="$global_config_file"
+  if [[ -z "$env_file" ]] || [[ -z "$var_name" ]] || [[ -z "$var_value" ]]; then
+    debug_log "update_env_var: missing arguments (env_file=$env_file, var_name=$var_name, var_value=$var_value)"
+    return 1
   fi
   
   # Create file if it doesn't exist

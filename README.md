@@ -625,6 +625,7 @@ orodc install without demo       # Install without demo data
 
 # Environment management
 orodc init                       # Initialize environment
+orodc status                     # Show project status (initialization, CMS type, codebase)
 orodc list                       # List all environments (interactive)
 orodc list table                 # List environments as table (non-interactive)
 orodc list json                  # List environments as JSON (non-interactive)
@@ -644,6 +645,13 @@ orodc cache warmup               # Warm up cache
 
 # Platform operations
 orodc platform-update            # Update platform
+
+# AI Assistant Integration
+orodc codex                      # Launch Codex CLI with OroDC context
+                                # Auto-detects CMS type and provides documentation
+                                # Requires Codex CLI to be installed separately
+
+# Cleanup and maintenance
 orodc purge                      # Complete cleanup
 orodc config-refresh             # Refresh configuration
 
@@ -861,6 +869,74 @@ orodc proxy up -d                    # Start Traefik reverse proxy
 orodc proxy install-certs            # Install CA certificates to system
 orodc proxy down                     # Stop proxy (keeps volumes)
 orodc proxy purge                    # Remove proxy and volumes
+```
+
+### 🤖 Codex CLI Integration
+
+OroDC provides seamless integration with [Codex CLI](https://github.com/context7/codex-cli), an AI coding assistant that understands your OroDC project structure.
+
+**Installation:**
+
+Codex CLI must be installed separately:
+```bash
+# Install Codex CLI (check Codex CLI documentation for latest installation method)
+# Example: npm install -g @context7/codex-cli
+```
+
+**Usage:**
+
+```bash
+# Launch Codex CLI with OroDC context
+orodc codex
+
+# Codex CLI automatically receives:
+# - Detected CMS type (oro, magento, symfony, laravel, php-generic)
+# - OroDC documentation (README.md or help output)
+# - System prompt instructing Codex to use only OroDC commands
+```
+
+**CMS Type Detection:**
+
+The `orodc codex` command automatically detects your CMS type:
+- **Oro Platform**: Detects `oro/platform`, `oro/commerce`, `oro/crm`, etc. in `composer.json`
+- **Magento**: Detects `magento/product-*` packages or Magento-specific files
+- **Symfony**: Detects `symfony/symfony` or `symfony/framework-bundle`
+- **Laravel**: Detects `laravel/framework`
+- **PHP Generic**: Default for other PHP projects
+
+**Configuration:**
+
+You can explicitly set CMS type in `.env.orodc`:
+```bash
+# In .env.orodc or via orodc init wizard
+DC_ORO_CMS_TYPE=oro          # Force Oro Platform
+DC_ORO_CMS_TYPE=magento      # Force Magento
+DC_ORO_CMS_TYPE=symfony      # Force Symfony
+DC_ORO_CMS_TYPE=laravel      # Force Laravel
+DC_ORO_CMS_TYPE=php-generic  # Force generic PHP
+```
+
+**Features:**
+
+- ✅ Auto-detects CMS type from project files
+- ✅ Provides OroDC documentation context to Codex
+- ✅ Constrains Codex to use only OroDC commands
+- ✅ CMS-aware system prompts for better assistance
+- ✅ Works with or without explicit CMS type configuration
+
+**Example:**
+
+```bash
+# In an OroCommerce project
+cd ~/orocommerce
+orodc codex
+# Codex CLI launches with:
+# - CMS type: oro
+# - OroDC documentation context
+# - Instructions to use orodc commands
+
+# Ask Codex questions about your OroDC project
+# Codex will suggest orodc commands instead of direct Docker commands
 ```
 
 ### 🔌 Reverse Proxy Management

@@ -12,7 +12,7 @@ validate_project() {
   
   # Skip validation for commands that don't require a project
   case "$command" in
-    help|man|version|proxy|image|docker-build|init|"")
+    help|man|version|proxy|image|docker-build|init|codex|status|"")
       return 0
       ;;
   esac
@@ -24,14 +24,21 @@ validate_project() {
     exit 1
   fi
   
-  # Check 2: DC_ORO_NAME must be set and not empty
+  # Check 2: DC_ORO_CONFIG_DIR must be set and not empty
+  if [[ -z "${DC_ORO_CONFIG_DIR:-}" ]]; then
+    msg_error "DC_ORO_CONFIG_DIR is not set - project not initialized"
+    msg_info "Please run 'orodc init' to initialize the project"
+    exit 1
+  fi
+  
+  # Check 3: DC_ORO_NAME must be set and not empty
   if [[ -z "${DC_ORO_NAME:-}" ]]; then
     msg_error "DC_ORO_NAME is not set - project not initialized"
     msg_info "Please run 'orodc init' to initialize the project"
     exit 1
   fi
   
-  # Check 3: DC_ORO_APPDIR must not be HOME or root (prevent dangerous operations)
+  # Check 4: DC_ORO_APPDIR must not be HOME or root (prevent dangerous operations)
   if [[ "${DC_ORO_APPDIR}" == "${HOME}" ]]; then
     msg_error "Cannot run orodc commands in home directory"
     msg_info "Please navigate to a project directory"
@@ -43,7 +50,7 @@ validate_project() {
     exit 1
   fi
   
-  # Check 4: Must have composer.json OR .env.orodc (local OR global)
+  # Check 5: Must have composer.json OR .env.orodc (local OR global)
   # This ensures we're in a real Oro project, not just a random directory
   local has_config=false
   

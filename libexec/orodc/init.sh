@@ -73,6 +73,7 @@ EXISTING_CACHE_VERSION=""
 EXISTING_CACHE_IMAGE=""
 EXISTING_RABBITMQ_VERSION=""
 EXISTING_RABBITMQ_IMAGE=""
+EXISTING_CMS_TYPE=""
 
 if [[ -f "$ENV_FILE" ]]; then
   msg_info "Found existing configuration, loading current values..."
@@ -105,6 +106,7 @@ if [[ -f "$ENV_FILE" ]]; then
       DC_ORO_CACHE_IMAGE) EXISTING_CACHE_IMAGE="$value" ;;
       DC_ORO_RABBITMQ_VERSION) EXISTING_RABBITMQ_VERSION="$value" ;;
       DC_ORO_RABBITMQ_IMAGE) EXISTING_RABBITMQ_IMAGE="$value" ;;
+      DC_ORO_CMS_TYPE) EXISTING_CMS_TYPE="$value" ;;
     esac
   done < "$ENV_FILE"
   
@@ -504,6 +506,69 @@ echo "RabbitMQ: $SELECTED_RABBITMQ_VERSION"
 echo "RabbitMQ Image: $SELECTED_RABBITMQ_IMAGE"
 echo ""
 
+# Optional: CMS Type Configuration (for Codex CLI and other tools)
+echo ""
+msg_header "Optional: CMS Type Configuration"
+msg_info "This helps tools like Codex CLI understand your project structure."
+msg_info "You can skip this step - CMS type will be auto-detected if not set."
+
+# Auto-detect current CMS type
+AUTO_DETECTED_CMS=""
+if [[ -f "${PROJECT_DIR}/composer.json" ]]; then
+  # Source common.sh to use detect_cms_type function
+  source "${SCRIPT_DIR}/lib/common.sh"
+  AUTO_DETECTED_CMS=$(detect_cms_type)
+  # Normalize base to php-generic for display
+  if [[ "$AUTO_DETECTED_CMS" == "base" ]]; then
+    AUTO_DETECTED_CMS="php-generic"
+  fi
+fi
+
+if prompt_yes_no "Set CMS type explicitly?" "$([ -n "$EXISTING_CMS_TYPE" ] && echo yes || echo no)"; then
+  CMS_TYPES=("php-generic" "symfony" "laravel" "magento" "oro")
+  DEFAULT_CMS=""
+  
+  # Determine default: existing > auto-detected > php-generic
+  if [[ -n "$EXISTING_CMS_TYPE" ]]; then
+    DEFAULT_CMS="$EXISTING_CMS_TYPE"
+  elif [[ -n "$AUTO_DETECTED_CMS" ]]; then
+    DEFAULT_CMS="$AUTO_DETECTED_CMS"
+  else
+    DEFAULT_CMS="php-generic"
+  fi
+  
+  # Normalize existing CMS type for display
+  if [[ "$DEFAULT_CMS" == "base" ]]; then
+    DEFAULT_CMS="php-generic"
+  fi
+  
+  SELECTED_CMS_TYPE=$(prompt_select "Select CMS/Framework type:" "$DEFAULT_CMS" "${CMS_TYPES[@]}")
+  
+  if [[ -n "${DEBUG:-}" ]]; then
+    >&2 echo "DEBUG: Selected CMS type: '$SELECTED_CMS_TYPE'"
+  fi
+  
+  # Normalize php-generic to base for storage (internal representation)
+  if [[ "$SELECTED_CMS_TYPE" == "php-generic" ]]; then
+    SELECTED_CMS_TYPE="base"
+  fi
+else
+  # User skipped - use auto-detected or empty (will auto-detect on use)
+  if [[ -n "$AUTO_DETECTED_CMS" ]]; then
+    msg_info "Using auto-detected CMS type: $AUTO_DETECTED_CMS"
+    SELECTED_CMS_TYPE="$AUTO_DETECTED_CMS"
+    # Normalize for storage
+    if [[ "$SELECTED_CMS_TYPE" == "php-generic" ]]; then
+      SELECTED_CMS_TYPE="base"
+    fi
+  else
+    msg_info "CMS type will be auto-detected when needed"
+    SELECTED_CMS_TYPE=""  # Empty means don't save, use auto-detection
+  fi
+fi
+
+echo ""
+
 # Ask where to save configuration
 # Show relative path for local file if we're in project directory
 LOCAL_ENV_DISPLAY=".env.orodc"
@@ -586,6 +651,14 @@ EOF
   # RabbitMQ Configuration
   update_env_var "$TARGET_ENV_FILE" "DC_ORO_RABBITMQ_VERSION" "$SELECTED_RABBITMQ_VERSION"
   update_env_var "$TARGET_ENV_FILE" "DC_ORO_RABBITMQ_IMAGE" "$SELECTED_RABBITMQ_IMAGE"
+  
+  # CMS Type Configuration (only save if explicitly set)
+  if [[ -n "$SELECTED_CMS_TYPE" ]]; then
+    update_env_var "$TARGET_ENV_FILE" "DC_ORO_CMS_TYPE" "$SELECTED_CMS_TYPE"
+  fi
+  
+  # Project Name Configuration (always save)
+  update_env_var "$TARGET_ENV_FILE" "DC_ORO_PROJECT_NAME" "$PROJECT_NAME"
   
   msg_ok "Configuration saved to $TARGET_ENV_FILE"
   msg_info "All other variables in the file were preserved"

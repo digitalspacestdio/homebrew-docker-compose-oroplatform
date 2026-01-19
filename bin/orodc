@@ -2165,10 +2165,17 @@ if [[ "$1" == "help" ]] || [[ "$1" == "man" ]]; then
 fi
 
 # Initialize environment for most commands
-# Skip for: help, version, proxy, image (these don't require project)
+# Skip for: help, version, proxy, image, init (these don't require project)
 case "$1" in
-  help|man|version|proxy|image|docker-build)
+  help|man|version|proxy|image|docker-build|init|status)
     # Skip initialization for these commands
+    # init: creates project, so doesn't need existing project
+    # status: read-only command, should not initialize or create files
+    ;;
+  codex)
+    # Codex needs project context but should work gracefully without project
+    # Allow initialization to fail gracefully if not in project (for CMS detection only)
+    initialize_environment 2>/dev/null || true
     ;;
   *)
     # Initialize environment for all other commands (including menu when no args)
@@ -3587,12 +3594,25 @@ elif [[ -z $DC_ORO_MODE ]]; then
 fi
 
 if [[ -z ${ORO_SSH_PUBLIC_KEY} ]]; then
-  if [[ ! -e "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" ]]; then
-    ssh-keygen -t ed25519 -f "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" -N "" -q
-    chmod 0600 "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519"
+  # DC_ORO_CONFIG_DIR must be set (validated by validate_project for non-excluded commands)
+  # For excluded commands (init, codex, etc.), skip SSH key creation if DC_ORO_CONFIG_DIR is not set
+  if [[ -z "${DC_ORO_CONFIG_DIR:-}" ]]; then
+    # Skip SSH key creation for commands that don't require project initialization
+    # These commands are excluded from validation and don't need SSH key
+    debug_log "Skipping SSH key creation - DC_ORO_CONFIG_DIR not set (command may not require project)"
+  else
+    # Create config directory if it doesn't exist
+    mkdir -p "${DC_ORO_CONFIG_DIR}"
+    
+    if [[ ! -e "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" ]]; then
+      ssh-keygen -t ed25519 -f "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" -N "" -q
+      chmod 0600 "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519"
+    fi
+    
+    if [[ -f "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519.pub" ]]; then
+      export ORO_SSH_PUBLIC_KEY=$(cat "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519.pub")
+    fi
   fi
-  
-  export ORO_SSH_PUBLIC_KEY=$(cat "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519.pub")
 fi
 
 if [[ "${DC_ORO_MODE}" == "default" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-default.yml" ]]; then
@@ -4286,7 +4306,7 @@ is_docker_compose_command() {
 is_special_orodc_command() {
   local cmd="$1"
   case "$cmd" in
-    ssh|cli|pgsql|psql|mysql|database-cli|install|purge|test|tests|bash|help|man|init)
+    ssh|cli|pgsql|psql|mysql|database-cli|install|purge|test|tests|bash|help|man|init|codex|status)
       return 0
       ;;
     *)
@@ -5093,6 +5113,15 @@ case "$1" in
     fi
     ;;
 
+  status)
+    shift
+    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+      execute_with_menu_return "${LIBEXEC_DIR}/status.sh" "$@"
+    else
+      exec "${LIBEXEC_DIR}/status.sh" "$@"
+    fi
+    ;;
+
   # Convenient aliases for common Docker Compose commands
   start)
     # Alias: orodc start -> orodc compose up -d
@@ -5139,6 +5168,15 @@ case "$1" in
     # Alias: orodc cli -> orodc database cli
     shift
     exec "${LIBEXEC_DIR}/database/cli.sh" "$@"
+    ;;
+
+  codex)
+    shift
+    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+      execute_with_menu_return "${LIBEXEC_DIR}/codex.sh" "$@"
+    else
+      exec "${LIBEXEC_DIR}/codex.sh" "$@"
+    fi
     ;;
 
   # ERROR: Old syntax for some Docker Compose commands

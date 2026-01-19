@@ -393,3 +393,104 @@ is_oro_project() {
   
   return 1
 }
+
+# Detect CMS type of current project
+# Returns: oro, magento, symfony, laravel, base (or php-generic for external tools)
+# Can be overridden with DC_ORO_CMS_TYPE env var
+detect_cms_type() {
+  # Check for explicit override first (highest priority)
+  if [[ -n "${DC_ORO_CMS_TYPE:-}" ]]; then
+    local cms_type="${DC_ORO_CMS_TYPE,,}"
+    # Normalize php-generic to base internally
+    if [[ "$cms_type" == "php-generic" ]]; then
+      echo "base"
+    else
+      # Validate allowed values
+      case "$cms_type" in
+        base|oro|magento|symfony|laravel)
+          echo "$cms_type"
+          ;;
+        *)
+          msg_warning "Invalid DC_ORO_CMS_TYPE value: $cms_type (expected: base, php-generic, symfony, laravel, magento, oro)"
+          echo "base"
+          ;;
+      esac
+    fi
+    return 0
+  fi
+  
+  # Auto-detect from composer.json (priority over file detection)
+  local composer_file="${DC_ORO_APPDIR:-$PWD}/composer.json"
+  if [[ -f "$composer_file" ]]; then
+    # Check for Oro ecosystem packages
+    if command -v jq >/dev/null 2>&1; then
+      local oro_packages
+      oro_packages=$(jq -r '.require // {} | keys[]' "$composer_file" 2>/dev/null | \
+        grep -E '^(oro/platform|oro/commerce|oro/crm|oro/customer-portal|marello/marello)$' | head -1)
+      if [[ -n "$oro_packages" ]]; then
+        echo "oro"
+        return 0
+      fi
+      
+      # Check for Magento packages
+      local magento_packages
+      magento_packages=$(jq -r '.require // {} | keys[]' "$composer_file" 2>/dev/null | \
+        grep -E '^(magento/product-community-edition|magento/product-enterprise-edition|magento/magento-cloud-metapackage|mage-os/mage-os)$' | head -1)
+      if [[ -n "$magento_packages" ]]; then
+        echo "magento"
+        return 0
+      fi
+      
+      # Check for Symfony
+      local symfony_packages
+      symfony_packages=$(jq -r '.require // {} | keys[]' "$composer_file" 2>/dev/null | \
+        grep -E '^(symfony/symfony|symfony/framework-bundle)$' | head -1)
+      if [[ -n "$symfony_packages" ]]; then
+        echo "symfony"
+        return 0
+      fi
+      
+      # Check for Laravel
+      local laravel_packages
+      laravel_packages=$(jq -r '.require // {} | keys[]' "$composer_file" 2>/dev/null | \
+        grep -E '^laravel/framework$' | head -1)
+      if [[ -n "$laravel_packages" ]]; then
+        echo "laravel"
+        return 0
+      fi
+    else
+      # Fallback: grep-based detection (less reliable but works without jq)
+      if grep -qE '"(oro/platform|oro/commerce|oro/crm|oro/customer-portal|marello/marello)"' "$composer_file" 2>/dev/null; then
+        echo "oro"
+        return 0
+      fi
+      
+      if grep -qE '"(magento/product-community-edition|magento/product-enterprise-edition|magento/magento-cloud-metapackage|mage-os/mage-os)"' "$composer_file" 2>/dev/null; then
+        echo "magento"
+        return 0
+      fi
+      
+      if grep -qE '"(symfony/symfony|symfony/framework-bundle)"' "$composer_file" 2>/dev/null; then
+        echo "symfony"
+        return 0
+      fi
+      
+      if grep -qE '"laravel/framework"' "$composer_file" 2>/dev/null; then
+        echo "laravel"
+        return 0
+      fi
+    fi
+  fi
+  
+  # File-based detection (fallback for Magento)
+  local project_dir="${DC_ORO_APPDIR:-$PWD}"
+  if [[ -f "${project_dir}/bin/magento" ]] || \
+     [[ -f "${project_dir}/app/etc/config.php" ]] || \
+     ([[ -f "${project_dir}/pub/index.php" ]] && grep -q "Magento" "${project_dir}/pub/index.php" 2>/dev/null); then
+    echo "magento"
+    return 0
+  fi
+  
+  # Default to base
+  echo "base"
+}
