@@ -200,20 +200,42 @@ main() {
     fi
   fi
   
+  # Get environment status if in a project
+  local env_status=""
+  local env_status_display=""
+  if [[ -n "$project_name" ]] && [[ "$project_name" != "default" ]]; then
+    env_status=$(get_environment_status "$project_name" "${project_dir}" 2>/dev/null || echo "uninitialized")
+    case "$env_status" in
+      running)
+        env_status_display="\033[32mrunning\033[0m"
+        ;;
+      stopped)
+        env_status_display="\033[31mstopped\033[0m"
+        ;;
+      *)
+        env_status_display="\033[33muninitialized\033[0m"
+        ;;
+    esac
+  fi
+  
   # Display status
   msg_header "OroDC Project Status"
-  # Project name first, then Application Kind, then other info
-  msg_ok "Project Name: ${project_name}"
+  # Project name first, then Current Environment, then Application Kind
+  msg_key_value "Project Name" "${project_name}"
+  # Current Environment (if in a project)
+  if [[ -n "$project_name" ]] && [[ "$project_name" != "default" ]] && [[ -n "$env_status_display" ]]; then
+    echo -e "\033[1;34m==> Current Environment:\033[0m \033[1m${project_name}\033[0m ($env_status_display)"
+  fi
   # CMS type (right after project name)
   if [[ "$cms_type" != "unknown" ]]; then
-    msg_ok "Application Kind: ${cms_type}"
+    msg_key_value "Application Kind" "${cms_type}"
   else
     msg_warning "Application Kind: Not detected"
     echo "  Set DC_ORO_CMS_TYPE in .env.orodc or ensure composer.json exists"
   fi
-  msg_ok "Project Directory: ${project_dir}"
+  msg_key_value "Project Directory" "${project_dir}"
   if [[ -n "$config_dir" ]]; then
-    msg_ok "Config Directory: ${config_dir}"
+    msg_key_value "Config Directory" "${config_dir}"
   fi
   # Initialization status
   # Don't show warning if project is detected and ready (has composer.json, CMS type detected)
@@ -223,7 +245,7 @@ main() {
   fi
   
   if [[ "$initialized" == "true" ]]; then
-    msg_ok "Environment initialized: Yes"
+    msg_key_value "Environment initialized" "Yes"
   elif [[ "$project_ready" != "true" ]]; then
     # Only show warning if project is not ready (not detected)
     msg_warning "Environment initialized: No"
@@ -239,7 +261,7 @@ main() {
     echo "  - Create project: orodc exec composer create-project <package> ."
     echo "  - Follow installation guide: AGENTS_INSTALLATION_${cms_type}.md"
   elif [[ "$project_exists" == "true" ]]; then
-    msg_ok "Project codebase: Exists"
+    msg_key_value "Project codebase" "Exists"
     
     # Detect CMS type first (to use for all Found messages)
     local detected_type=""
@@ -322,19 +344,19 @@ main() {
   # Summary
   # If project is ready (detected and CMS type known), consider it ready to work
   if [[ "$project_ready" == "true" ]]; then
-    msg_ok "Status: Ready to work"
+    msg_key_value "Status" "Ready to work"
   elif [[ "$initialized" == "true" ]] && [[ "$cms_type" != "unknown" ]] && [[ "$project_exists" == "true" ]]; then
-    msg_ok "Status: Ready to work"
+    msg_key_value "Status" "Ready to work"
   elif [[ "$directory_empty" == "true" ]] && [[ "$initialized" == "true" ]]; then
-    msg_info "Status: Environment ready, waiting for project code"
+    msg_key_value "Status" "Environment ready, waiting for project code"
   elif [[ "$directory_empty" == "true" ]]; then
-    msg_info "Status: Waiting for project code"
+    msg_key_value "Status" "Waiting for project code"
   elif [[ "$project_exists" != "true" ]]; then
     msg_warning "Status: Project codebase not found"
   elif [[ "$cms_type" == "unknown" ]]; then
     msg_warning "Status: CMS type not detected"
   else
-    msg_info "Status: Run 'orodc init' to configure environment"
+    msg_key_value "Status" "Run 'orodc init' to configure environment"
   fi
 }
 

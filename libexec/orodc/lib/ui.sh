@@ -50,6 +50,14 @@ msg_highlight() {
   >&2 echo -e "\033[1;37m$1\033[0m"
 }
 
+# Function to display key-value pair with different colors
+# Key is bright blue (same as header), value is white/bold
+msg_key_value() {
+  local key="$1"
+  local value="$2"
+  >&2 echo -e "\033[1;34m==> ${key}:\033[0m \033[1m${value}\033[0m"
+}
+
 # Backward compatibility aliases
 echo_info() { msg_info "$*"; }
 echo_ok() { msg_ok "$*"; }
