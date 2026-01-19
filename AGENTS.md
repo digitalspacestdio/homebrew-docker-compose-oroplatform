@@ -158,6 +158,61 @@ After modifying `libexec/` or `compose/` files.
 
 Always check `bin/orodc` first before analyzing individual scripts.
 
+## 11. Docker Image Building
+
+**CRITICAL:** Never manually build Docker images - use `orodc docker-build`!
+
+### Image Build Commands
+
+```bash
+# List available images
+orodc docker-build
+orodc docker-build list
+
+# Build specific images
+orodc docker-build nginx        # Nginx web server
+orodc docker-build mail         # Mailpit email catcher
+orodc docker-build pgsql        # All PostgreSQL versions (15.1, 16.6, 17.4)
+orodc docker-build pgsql 17.4   # Specific PostgreSQL version
+orodc docker-build all          # Build all images
+
+# Build options
+orodc docker-build nginx --no-cache   # Build without cache
+orodc docker-build nginx --push       # Push to GHCR after build
+```
+
+### PHP Images
+
+PHP images use different command: `orodc image build` (interactive multi-stage builder)
+
+```bash
+orodc image build              # Interactive builder for PHP images
+```
+
+### Image Locations
+
+| Image | Dockerfile | Build Context | Registry |
+|-------|-----------|---------------|----------|
+| Nginx | `compose/docker/nginx/Dockerfile` | `compose/docker/nginx/` | `ghcr.io/digitalspacestdio/orodc-nginx:latest` |
+| Mail | `compose/docker/mail/Dockerfile` | `compose/docker/mail/` | `ghcr.io/digitalspacestdio/orodc-mail:latest` |
+| PostgreSQL | `compose/docker/pgsql/Dockerfile` | `compose/docker/pgsql/` | `ghcr.io/digitalspacestdio/orodc-pgsql:VERSION` |
+| PHP Base | `compose/docker/php/Dockerfile.X.X.alpine` | `compose/docker/php/` | `ghcr.io/digitalspacestdio/orodc-php:X.X-alpine` |
+| PHP Final | `compose/docker/php-node-symfony/Dockerfile.X.X.alpine` | `compose/docker/php-node-symfony/` | `ghcr.io/digitalspacestdio/orodc-php-node-symfony:X.X-alpine` |
+
+### When to Rebuild
+
+**Rebuild required after modifying:**
+- Nginx: `compose/docker/nginx/nginx-universal.conf`, `nginx-legacy.conf`, `entrypoint.sh`
+- Mail: `compose/docker/mail/*`
+- PostgreSQL: `compose/docker/pgsql/*`
+- PHP: `compose/docker/php/**`, `compose/docker/php-node-symfony/**`
+
+### Documentation
+
+- **Detailed Docker docs**: `compose/docker/README.md` (multi-stage architecture, extensions, troubleshooting)
+- **Image builder**: `libexec/orodc/docker-build.sh`
+- **CI/CD workflows**: `.github/workflows/build-docker-*.yml`
+
 ---
 
 # OroDC Quick Reference
