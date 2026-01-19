@@ -266,7 +266,7 @@ get_environment_status() {
   fi
   
   # Check if config directory exists
-  local config_dir="${HOME}/.docker-compose-oroplatform/${env_name}"
+  local config_dir="${HOME}/.orodc/${env_name}"
   if [[ ! -f "${config_dir}/docker-compose.yml" ]]; then
     echo "uninitialized"
     return 0
@@ -570,7 +570,7 @@ initialize_environment() {
     # Also check for old format global config
     local old_global_config_file="${HOME}/.orodc/${project_name}.env.orodc"
     # Check for config directory (indicates project was initialized before)
-    local config_dir="${HOME}/.docker-compose-oroplatform/${project_name}"
+    local config_dir="${HOME}/.orodc/${project_name}"
     
     if [[ -f "$global_config_file" ]] || [[ -f "$old_global_config_file" ]]; then
       # Global config exists for this directory name, use current directory as project
@@ -684,7 +684,7 @@ initialize_environment() {
 
     # Set DC_ORO_CONFIG_DIR
     if [[ -z "${DC_ORO_CONFIG_DIR:-}" ]]; then
-      export DC_ORO_CONFIG_DIR="${HOME}/.docker-compose-oroplatform/${DC_ORO_NAME}"
+      export DC_ORO_CONFIG_DIR="${HOME}/.orodc/${DC_ORO_NAME}"
     fi
 
     # Set PHP user name defaults

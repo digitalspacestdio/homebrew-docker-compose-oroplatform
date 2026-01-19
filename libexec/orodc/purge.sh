@@ -97,21 +97,14 @@ if [[ -n "${DC_ORO_CONFIG_DIR:-}" ]] && [[ -d "${DC_ORO_CONFIG_DIR}" ]]; then
   config_dirs_to_remove+=("${config_dir_abs}")
 fi
 
-# Alternative locations (in case DC_ORO_CONFIG_DIR was not set correctly)
+# Alternative location (in case DC_ORO_CONFIG_DIR was not set correctly)
 if [[ -n "${DC_ORO_NAME:-}" ]]; then
-  alt_dir1="${HOME}/.docker-compose-oroplatform/${DC_ORO_NAME}"
-  alt_dir2="${HOME}/.orodc/${DC_ORO_NAME}"
+  alt_dir="${HOME}/.orodc/${DC_ORO_NAME}"
   
-  if [[ -d "${alt_dir1}" ]]; then
-    alt_dir1_abs=$(realpath "${alt_dir1}" 2>/dev/null || echo "${alt_dir1}")
-    if [[ "${alt_dir1_abs}" != "${config_dir_abs}" ]]; then
-      config_dirs_to_remove+=("${alt_dir1_abs}")
-    fi
-  fi
-  if [[ -d "${alt_dir2}" ]]; then
-    alt_dir2_abs=$(realpath "${alt_dir2}" 2>/dev/null || echo "${alt_dir2}")
-    if [[ "${alt_dir2_abs}" != "${config_dir_abs}" ]]; then
-      config_dirs_to_remove+=("${alt_dir2_abs}")
+  if [[ -d "${alt_dir}" ]]; then
+    alt_dir_abs=$(realpath "${alt_dir}" 2>/dev/null || echo "${alt_dir}")
+    if [[ "${alt_dir_abs}" != "${config_dir_abs}" ]]; then
+      config_dirs_to_remove+=("${alt_dir_abs}")
     fi
   fi
 fi
