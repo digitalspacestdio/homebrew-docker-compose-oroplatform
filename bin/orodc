@@ -2172,8 +2172,8 @@ case "$1" in
     # init: creates project, so doesn't need existing project
     # status: read-only command, should not initialize or create files
     ;;
-  codex)
-    # Codex needs project context but should work gracefully without project
+  codex|gemini)
+    # Codex/Gemini need project context but should work gracefully without project
     # Allow initialization to fail gracefully if not in project (for CMS detection only)
     initialize_environment 2>/dev/null || true
     ;;
@@ -4306,7 +4306,7 @@ is_docker_compose_command() {
 is_special_orodc_command() {
   local cmd="$1"
   case "$cmd" in
-    ssh|cli|pgsql|psql|mysql|database-cli|install|purge|test|tests|bash|help|man|init|codex|status)
+    ssh|cli|pgsql|psql|mysql|database-cli|install|purge|test|tests|bash|help|man|init|codex|gemini|status)
       return 0
       ;;
     *)
@@ -5176,6 +5176,15 @@ case "$1" in
       execute_with_menu_return "${LIBEXEC_DIR}/codex.sh" "$@"
     else
       exec "${LIBEXEC_DIR}/codex.sh" "$@"
+    fi
+    ;;
+
+  gemini)
+    shift
+    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+      execute_with_menu_return "${LIBEXEC_DIR}/gemini.sh" "$@"
+    else
+      exec "${LIBEXEC_DIR}/gemini.sh" "$@"
     fi
     ;;
 
