@@ -25,18 +25,23 @@ orodc exec ls -la
 
 ### Step 2: Create Magento Project
 
+**IMPORTANT**: Composer create-project installs **Community Edition (CE)** only.
+
 Choose one of the following:
 
 **Option A: Mage-OS (Open Source, Recommended)**
 ```bash
 orodc exec composer create-project --repository-url=https://repo.mage-os.org/ mage-os/project-community-edition .
 ```
+*Installs Community Edition (CE) - open source version*
 
-**Option B: Magento 2 Official**
+**Option B: Magento 2 Official Community Edition**
 ```bash
 orodc exec composer create-project --repository-url=https://repo.magento.com/ magento/project-community-edition .
 ```
-*Note: Requires Magento authentication keys for official repository*
+*Installs Community Edition (CE). Requires Magento authentication keys for official repository*
+
+**For Enterprise Edition**: Enterprise Edition requires access to private Magento Commerce repository (`magento/project-enterprise-edition`) and cannot be installed via public composer create-project. Use git clone from your Enterprise repository or contact Magento support for Enterprise installation instructions.
 
 ### Step 3: Get Environment Variables
 
@@ -139,6 +144,7 @@ orodc exec bin/magento cache:flush
 
 ## Important Notes
 
+- **CE vs Enterprise**: `composer create-project` installs Community Edition (CE) only. For Enterprise Edition, use git clone from Enterprise repository or contact Magento support
 - **All steps are required**: Installation, static content deployment, DI compilation, and cache clearing
 - **Use environment variables**: Always use variables from `orodc exec env | grep ORO_` for configuration (shows all OroDC service connection variables)
 - **Containers must be running**: Ensure `orodc ps` shows all containers running before installation

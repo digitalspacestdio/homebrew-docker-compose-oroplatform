@@ -17,9 +17,11 @@
 
 **Creating New Project (Empty Directory):**
 - **MUST follow installation guide**: See `AGENTS_INSTALLATION_magento.md` for complete step-by-step instructions
-- Mage-OS (open source): `orodc exec composer create-project --repository-url=https://repo.mage-os.org/ mage-os/project-community-edition .`
-- Magento 2 (official): `orodc exec composer create-project --repository-url=https://repo.magento.com/ magento/project-community-edition .`
-- Note: Requires Magento authentication keys for official repository (repo.magento.com)
+- **Community Edition (CE) via Composer**:
+  - Mage-OS (open source): `orodc exec composer create-project --repository-url=https://repo.mage-os.org/ mage-os/project-community-edition .`
+  - Magento 2 Official CE: `orodc exec composer create-project --repository-url=https://repo.magento.com/ magento/project-community-edition .`
+  - **Note**: `composer create-project` installs Community Edition (CE) only. Requires Magento authentication keys for official repository (repo.magento.com)
+- **Enterprise Edition**: Enterprise Edition requires access to private Magento Commerce repository (`magento/project-enterprise-edition`) and cannot be installed via public composer create-project. Use git clone from Enterprise repository or contact Magento support
 
 **After Creating Project:**
 - ALWAYS follow complete setup steps from `AGENTS_INSTALLATION_magento.md`

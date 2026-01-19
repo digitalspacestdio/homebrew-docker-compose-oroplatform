@@ -23,9 +23,13 @@ orodc exec ls -la
 
 **IMPORTANT**: Project creation commands MUST be run in an empty directory.
 
-### Step 2: Clone Oro Project Repository
+### Step 2: Create Oro Project
 
-Oro projects are cloned from GitHub repositories, not created via composer.
+Choose one of the following methods:
+
+#### Method 1: Clone from GitHub (Recommended)
+
+Oro projects can be cloned from GitHub repositories:
 
 **Option A: OroCommerce**
 ```bash
@@ -42,6 +46,22 @@ orodc exec git clone --single-branch --branch 6.1 https://github.com/oroinc/plat
 # Clone from Marello repository (check latest branch)
 orodc exec git clone --single-branch --branch <version> <marello-repo-url> .
 ```
+
+#### Method 2: Create via Composer (CE Edition Only)
+
+**IMPORTANT**: Composer create-project installs **Community Edition (CE)** only.
+
+**OroCommerce CE:**
+```bash
+orodc exec composer create-project oro/commerce-application .
+```
+
+**OroPlatform CE:**
+```bash
+orodc exec composer create-project oro/platform-application .
+```
+
+**For Enterprise Edition**: Enterprise versions require access to private Oro repositories and cannot be installed via public composer create-project. Use git clone from your Enterprise repository or contact Oro support for Enterprise installation instructions.
 
 ### Step 3: Install Dependencies
 
@@ -94,7 +114,8 @@ orodc exec bin/console cache:warmup
 
 ## Important Notes
 
-- **Use git clone**: Oro projects are cloned, not created via composer
+- **Installation methods**: Oro projects can be cloned from GitHub or created via composer (CE only)
+- **CE vs Enterprise**: `composer create-project` installs Community Edition (CE) only. For Enterprise Edition, use git clone from Enterprise repository or contact Oro support
 - **orodc install**: This is a special OroDC command that handles full installation
 - **Assets building**: Always build assets after installation
 - **See full guide**: Reference `docs/ORO.md` for complete setup guide and troubleshooting

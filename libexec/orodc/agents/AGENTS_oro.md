@@ -8,10 +8,14 @@
 
 **Creating New Project (Empty Directory):**
 - **MUST follow installation guide**: See `AGENTS_INSTALLATION_oro.md` for complete step-by-step instructions
-- OroCommerce: `orodc exec git clone --single-branch --branch 6.1.4 https://github.com/oroinc/orocommerce-application.git .`
-- OroPlatform: `orodc exec git clone --single-branch --branch 6.1 https://github.com/oroinc/platform-application.git .`
-- MarelloCommerce: Clone from Marello repository
-- Note: Oro projects are typically cloned from GitHub repositories, not created via composer
+- **Git clone (Recommended)**: 
+  - OroCommerce: `orodc exec git clone --single-branch --branch 6.1.4 https://github.com/oroinc/orocommerce-application.git .`
+  - OroPlatform: `orodc exec git clone --single-branch --branch 6.1 https://github.com/oroinc/platform-application.git .`
+  - MarelloCommerce: Clone from Marello repository
+- **Composer create-project (CE Edition only)**:
+  - OroCommerce CE: `orodc exec composer create-project oro/commerce-application .`
+  - OroPlatform CE: `orodc exec composer create-project oro/platform-application .`
+  - **Note**: `composer create-project` installs Community Edition (CE) only. For Enterprise Edition, use git clone from Enterprise repository
 
 **Key Commands:**
 - Symfony console: `orodc exec bin/console <command>`

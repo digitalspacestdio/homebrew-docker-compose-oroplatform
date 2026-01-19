@@ -50,8 +50,9 @@ validate_project() {
     exit 1
   fi
   
-  # Check 5: Must have composer.json OR .env.orodc (local OR global)
+  # Check 5: Must have composer.json OR .env.orodc (local OR global) OR config directory
   # This ensures we're in a real Oro project, not just a random directory
+  # If DC_ORO_CONFIG_DIR is set and directory exists, project was initialized via 'orodc init'
   local has_config=false
   
   if [[ -f "${DC_ORO_APPDIR}/composer.json" ]]; then
@@ -63,6 +64,11 @@ validate_project() {
   elif [[ -f "${HOME}/.orodc/${DC_ORO_NAME}/.env.orodc" ]]; then
     has_config=true
     debug_log "validate_project: Found global .env.orodc"
+  elif [[ -n "${DC_ORO_CONFIG_DIR:-}" ]] && [[ -d "${DC_ORO_CONFIG_DIR}" ]]; then
+    # Config directory exists - project was initialized via 'orodc init'
+    # This allows running commands like 'orodc exec composer create-project' after 'orodc init'
+    has_config=true
+    debug_log "validate_project: Found config directory (project initialized via orodc init)"
   fi
   
   if [[ "$has_config" == "false" ]]; then
@@ -72,7 +78,10 @@ validate_project() {
     msg_info "  - .env.orodc (local config)"
     msg_info "  - ~/.orodc/${DC_ORO_NAME}/.env.orodc (global config)"
     msg_info ""
-    msg_info "To initialize a new project, run: orodc init"
+    msg_info "To create a new project:"
+    msg_info "  1. Run: orodc init"
+    msg_info "  2. Run: orodc up -d"
+    msg_info "  3. Then run: orodc exec composer create-project ..."
     exit 1
   fi
   
