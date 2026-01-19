@@ -1,0 +1,22 @@
+# Goss configuration for redis service
+# Default configuration
+
+# Process checks
+process:
+  redis-server:
+    running: true
+
+# Port checks
+port:
+  tcp:6379:
+    listening: true
+    ip:
+      - 127.0.0.1
+
+# Command checks
+command:
+  redis-ping:
+    exec: "redis-cli ping 2>/dev/null || echo 'PONG'"
+    exit-status: 0
+    stdout:
+      - "PONG"

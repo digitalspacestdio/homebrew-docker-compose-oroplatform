@@ -1,0 +1,93 @@
+# Oro Platform Consumer Service
+# This file is conditionally included only for Oro Platform projects
+# Consumer runs oro:message-queue:consume for background job processing
+services:
+  consumer:
+    container_name: "${DC_ORO_NAME:-unnamed}_consumer_${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}"
+    hostname: consumer.${DC_ORO_NAME:-unnamed}.docker.local
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    build:
+      dockerfile: Dockerfile.project
+      context: "${DC_ORO_CONFIG_DIR:-.}/docker/project-php-node-symfony"
+      args:
+        BASE_IMAGE: "ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.4}-node${DC_ORO_NODE_VERSION:-22}-composer${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}"
+        APP_DIR: "${DC_ORO_APPDIR:-/var/www}"
+        PHP_VERSION: "${DC_ORO_PHP_VERSION:-8.4}"
+        NODE_VERSION: "${DC_ORO_NODE_VERSION:-22}"
+        PHP_USER_NAME: "${DC_ORO_PHP_USER_NAME:-developer}"
+        PHP_USER_GROUP: "${DC_ORO_PHP_USER_GROUP:-developer}"
+        PHP_UID: "${DC_ORO_PHP_UID:-1000}"
+        PHP_GID: "${DC_ORO_PHP_GID:-1000}"
+        COMPOSER_VERSION: "${DC_ORO_COMPOSER_VERSION:-2}"
+    user: "${DC_ORO_USER_NAME:-developer}"
+    command: sh -c 'until php bin/console oro:message-queue:consume -vv; do echo "Consumer crashed, restarting in 15s..."; sleep 15; done'
+    volumes:
+      - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
+      - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
+      - "home-root:/root"
+      - "mail-certs:/certs:ro"
+    working_dir: "${DC_ORO_APPDIR:-/var/www}"
+    restart: always
+    environment:
+      - 'DC_ORO_DATABASE_HOST=${DC_ORO_DATABASE_HOST:-database}'
+      - 'DC_ORO_DATABASE_PORT=${DC_ORO_DATABASE_PORT:-3306}'
+      - 'DC_ORO_DATABASE_USER=${DC_ORO_DATABASE_USER:-app}'
+      - 'DC_ORO_DATABASE_PASSWORD=${DC_ORO_DATABASE_PASSWORD:-app}'
+      - 'DC_ORO_DATABASE_DBNAME=${DC_ORO_DATABASE_DBNAME:-app}'
+      - 'ORO_DB_URL=${DC_ORO_DATABASE_URI:-"postgres://${DC_ORO_DATABASE_USER:-app}:${DC_ORO_DATABASE_PASSWORD:-app}@${DC_ORO_DATABASE_HOST:-database}:${DC_ORO_DATABASE_PORT:-5432}/${DC_ORO_DATABASE_DBNAME:-app}"}'
+      - 'ORO_DB_DSN=${DC_ORO_DATABASE_URI:-"postgres://${DC_ORO_DATABASE_USER:-app}:${DC_ORO_DATABASE_PASSWORD:-app}@${DC_ORO_DATABASE_HOST:-database}:${DC_ORO_DATABASE_PORT:-5432}/${DC_ORO_DATABASE_DBNAME:-app}"}'
+      - 'ORO_DB_HOST=${DC_ORO_DATABASE_HOST:-database}'
+      - 'ORO_DB_PORT=${DC_ORO_DATABASE_PORT:-5432}'
+      - 'ORO_DB_NAME=${DC_ORO_DATABASE_DBNAME:-app}'
+      - 'ORO_DB_USER=${DC_ORO_DATABASE_USER:-app}'
+      - 'ORO_DB_PASSWORD=${DC_ORO_DATABASE_PASSWORD:-app}'
+      - 'ORO_SEARCH_URL=${DC_ORO_SEARCH_URI:-elastic-search://search:9200}'
+      - 'ORO_SEARCH_DSN=${DC_ORO_SEARCH_URI:-elastic-search://search:9200}'
+      - 'ORO_SEARCH_ENGINE_DSN=${DC_ORO_SEARCH_URI:-elastic-search://search:9200}?prefix=oro_search'
+      - 'ORO_WEBSITE_SEARCH_ENGINE_DSN=${DC_ORO_SEARCH_URI:-elastic-search://search:9200}?prefix=oro_website_search'
+      - 'ORO_MQ_DSN=${DC_ORO_MQ_URI:-""}'
+      - 'ORO_REDIS_URL=${DC_ORO_REDIS_URI:-""}'
+      - 'ORO_SESSION_DSN=${DC_ORO_REDIS_URI:-""}/0'
+      - 'ORO_REDIS_CACHE_DSN=${DC_ORO_REDIS_URI:-""}/1'
+      - 'ORO_REDIS_DOCTRINE_DSN=${DC_ORO_REDIS_URI:-""}/2'
+      - 'ORO_REDIS_LAYOUT_DSN=${DC_ORO_REDIS_URI:-""}/3'
+      - 'ORO_MAILER_DRIVER=${ORO_MAILER_DRIVER:-smtp}'
+      - 'ORO_MAILER_HOST=${ORO_MAILER_HOST:-mail}'
+      - 'ORO_MAILER_PORT=${ORO_MAILER_PORT:-1025}'
+      - 'ORO_MAILER_ENCRYPTION=${ORO_MAILER_ENCRYPTION:-tls}'
+      - 'ORO_MAILER_USER=${ORO_MAILER_USER:-}'
+      - 'ORO_MAILER_PASSWORD=${ORO_MAILER_PASSWORD:-}'
+      - 'ORO_SECRET=${ORO_SECRET-ThisTokenIsNotSoSecretChangeIt}'
+      - 'ORO_ENABLE_PRICE_SHARDING=${ORO_ENABLE_PRICE_SHARDING:-0}'
+      - 'ORO_WEBSOCKET_SERVER_DSN=${DC_ORO_WEBSOCKET_SERVER_DSN:-//0.0.0.0:8080}'
+      - 'ORO_WEBSOCKET_FRONTEND_DSN=${DC_ORO_WEBSOCKET_FRONTEND_DSN:-//${DC_ORO_NAME:-unnamed}.docker.local/ws}'
+      - 'ORO_WEBSOCKET_BACKEND_DSN=${DC_ORO_WEBSOCKET_BACKEND_DSN:-tcp://websocket:8080}'
+      - 'XHGUI_MONGO_HOSTNAME=mongodb'
+      - 'XHGUI_MONGO_DATABASE=xhprof'
+      - 'COMPOSER_AUTH=${DC_ORO_COMPOSER_AUTH:-""}'
+      - 'NODE_OPTIONS="--max-old-space-size=1024"'
+      - 'SYMFONY_ENV=${SYMFONY_ENV:-dev}'
+      - 'XDEBUG_MODE=${XDEBUG_MODE_CONSUMER:-off}'
+    depends_on:
+      database:
+        condition: service_healthy
+      search:
+        condition: service_healthy
+      mq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mail:
+        condition: service_healthy
+      fpm:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 7G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"

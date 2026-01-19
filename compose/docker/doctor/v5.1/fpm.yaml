@@ -1,0 +1,48 @@
+# Goss configuration for fpm service
+# Version-specific configuration for OroPlatform 5.1
+
+# Process checks
+process:
+  php-fpm:
+    running: true
+  php:
+    running: true
+
+# Command checks
+command:
+  php-version:
+    exec: "php -v"
+    exit-status: 0
+  php-extension-pdo:
+    exec: "php -m | grep -i pdo"
+    exit-status: 0
+  php-extension-intl:
+    exec: "php -m | grep -i intl"
+    exit-status: 0
+  php-extension-gd:
+    exec: "php -m | grep -i gd"
+    exit-status: 0
+  php-extension-zip:
+    exec: "php -m | grep -i zip"
+    exit-status: 0
+  php-extension-mbstring:
+    exec: "php -m | grep -i mbstring"
+    exit-status: 0
+  php-extension-xml:
+    exec: "php -m | grep -i xml"
+    exit-status: 0
+  php-extension-curl:
+    exec: "php -m | grep -i curl"
+    exit-status: 0
+  php-extension-bcmath:
+    exec: "php -m | grep -i bcmath"
+    exit-status: 0
+  php-extension-opcache:
+    exec: "php -v"
+    exit-status: 0
+    stdout:
+      - "Zend OPcache"
+  composer-version:
+    exec: "composer -V 2>/dev/null || echo 'not found'"
+    exit-status: 0
+  # OroPlatform 5.1 specific checks can be added here

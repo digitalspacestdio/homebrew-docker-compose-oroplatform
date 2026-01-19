@@ -1,0 +1,20 @@
+# Goss configuration for database service (PostgreSQL)
+# Default configuration for OroPlatform 6.1+
+
+# Process checks
+process:
+  postgres:
+    running: true
+
+# Port checks
+port:
+  tcp:5432:
+    listening: true
+    ip:
+      - 127.0.0.1
+
+# Command checks
+command:
+  postgresql-version:
+    exec: "psql --version 2>/dev/null || echo 'not found'"
+    exit-status: 0

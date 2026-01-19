@@ -40,22 +40,23 @@ update_hosts() {
             
             container_name=$(docker inspect -f "{{.Name}}" "$container_id" 2>/dev/null | sed 's/^\///' || echo "")
             
-            # Skip self (proxy container)
-            if [[ "$container_name" == "proxy" ]]; then
-                continue
-            fi
-            
             # Get IP from dc_shared_net network (preferred) or first available network
             container_ip=$(docker inspect -f "{{.NetworkSettings.Networks.dc_shared_net.IPAddress}}" "$container_id" 2>/dev/null || echo "")
             if [[ -z "$container_ip" ]] || [[ "$container_ip" == "<no value>" ]]; then
                 container_ip=$(docker inspect -f "{{range .NetworkSettings.Networks}}{{.IPAddress}}{{break}}{{end}}" "$container_id" 2>/dev/null || echo "")
             fi
             
-            if [[ -z "$container_name" ]] || [[ -z "$container_ip" ]]; then
+            # For proxy container, use 127.0.0.1 (Traefik listens on localhost)
+            if [[ "$container_name" == "proxy" ]]; then
+                container_ip="127.0.0.1"
+            fi
+            
+            if [[ -z "$container_name" ]]; then
                 continue
             fi
             
             # Method 1: Check custom orodc.dns.hostname label
+            # This works for proxy container too (needed for proxy.docker.local and traefik.docker.local)
             custom_hostname=$(docker inspect -f "{{index .Config.Labels \"$LABEL_NAME\"}}" "$container_id" 2>/dev/null || echo "")
             
             if [[ -n "$custom_hostname" ]]; then
@@ -71,22 +72,25 @@ update_hosts() {
             fi
             
             # Method 2: Extract from Traefik router rules
-            # Get all traefik.http.routers.*.rule labels
-            all_labels=$(docker inspect -f '{{range $k, $v := .Config.Labels}}{{$k}}={{$v}}{{"\n"}}{{end}}' "$container_id" 2>/dev/null || echo "")
-            
-            while IFS= read -r label_line; do
-                if [[ "$label_line" =~ traefik\.http\.routers\..*\.rule=(.+)$ ]]; then
-                    rule_value="${BASH_REMATCH[1]}"
-                    
-                    # Extract all Host() entries from the rule
-                    while IFS= read -r hostname; do
-                        if [[ -n "$hostname" ]]; then
-                            host_map["$hostname"]="$container_ip"
-                            log "Found (traefik): ${hostname} -> ${container_ip} (${container_name})"
-                        fi
-                    done < <(extract_hosts_from_rule "$rule_value")
-                fi
-            done <<< "$all_labels"
+            # Skip Traefik rules for proxy container (to avoid duplicates from custom label)
+            if [[ "$container_name" != "proxy" ]]; then
+                # Get all traefik.http.routers.*.rule labels
+                all_labels=$(docker inspect -f '{{range $k, $v := .Config.Labels}}{{$k}}={{$v}}{{"\n"}}{{end}}' "$container_id" 2>/dev/null || echo "")
+                
+                while IFS= read -r label_line; do
+                    if [[ "$label_line" =~ traefik\.http\.routers\..*\.rule=(.+)$ ]]; then
+                        rule_value="${BASH_REMATCH[1]}"
+                        
+                        # Extract all Host() entries from the rule
+                        while IFS= read -r hostname; do
+                            if [[ -n "$hostname" ]]; then
+                                host_map["$hostname"]="$container_ip"
+                                log "Found (traefik): ${hostname} -> ${container_ip} (${container_name})"
+                            fi
+                        done < <(extract_hosts_from_rule "$rule_value")
+                    fi
+                done <<< "$all_labels"
+            fi
             
         done < <(docker ps --filter "label=traefik.enable=true" --format "{{.ID}}" 2>/dev/null || echo "")
     fi

@@ -1,6 +1,14 @@
 #!/bin/bash
 set -e
 
+# Remove .orodc.marker file if it exists (created on host to preserve ownership of empty directories)
+# This marker file is created on the host before container startup to prevent Docker
+# from showing empty directories as root-owned inside the container
+# NOTE: Marker removal is now handled by orodc on the host after containers start
+# if [[ -f "${APP_DIR:-/var/www}/.orodc.marker" ]]; then
+#   rm -f "${APP_DIR:-/var/www}/.orodc.marker" 2>/dev/null || true
+# fi
+
 #OWNER_UID=$(stat -c '%u' ${APP_DIR:-/var/www})
 #OWNER_GID=$(stat -c '%g' ${APP_DIR:-/var/www})
 

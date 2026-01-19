@@ -109,72 +109,21 @@ bindkey "^[[A" up-line-or-history   # Up arrow
 bindkey "^[[B" down-line-or-history # Down arrow
 
 mkdir -p ~/.config
+starship preset plain-text-symbols -o ~/.config/starship.toml
 
-cat > ~/.config/starship.toml << 'STARSHIP_EOF'
-format = """
-$username\
-$hostname\
-$directory\
-$git_branch\
-$git_status\
-$php\
-$nodejs\
-$cmd_duration\
-$line_break\
-$container\
-$character"""
+# Modify the existing [hostname] section instead of appending a duplicate
+sed -i '/\[hostname\]/,/^$/c\
+[hostname]\
+ssh_only = false\
+trim_at = ""\
+format = "[$hostname]($style) in "\
+style = "bold bright-yellow"\
+' ~/.config/starship.toml
 
-[username]
-format = "[$user]($style) in "
-show_always = true
-style_user = "bold blue"
-
-[hostname]
-ssh_only = false
-trim_at = "."
-format = "[$hostname]($style) in "
-style = "bold bright-red"
-
-[directory]
-format = "[$path]($style)[$read_only]($read_only_style) "
-style = "bold yellow"
-truncation_length = 3
-truncate_to_repo = true
-read_only = " [RO]"
-
-[git_branch]
-symbol = ""
-
-[nodejs]
-symbol = ""
-detect_extensions = ["js", "mjs", "cjs", "ts"]
-detect_files = ["package.json", ".node-version", ".nvmrc"]
-detect_folders = ["node_modules"]
-
-[php]
-symbol = ""
-detect_extensions = ["php"]
-detect_files = ["composer.json", "composer.lock", ".php-version"]
-detect_folders = ["vendor"]
-
-[character]
-success_symbol = "[❯](bold green)"
-error_symbol = "[❯](bold red)"
-
-[container]
-symbol = ""
-format = "[$symbol \\[$name\\]]($style) "
-
+# Append vagrant config (doesn't conflict)
+echo '
 [vagrant]
 disabled = true
-
-[cmd_duration]
-min_time = 1000
-format = "took [$duration]($style) "
-show_milliseconds = false
-
-STARSHIP_EOF
+' >> ~/.config/starship.toml
 
 eval "$(starship init zsh)"
-
-cd ${APP_DIR:-/var/www}

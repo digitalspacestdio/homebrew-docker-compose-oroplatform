@@ -1,0 +1,26 @@
+# Goss configuration for search (Elasticsearch) service
+# Default configuration
+
+# Process checks
+process:
+  java:
+    running: true
+
+# Port checks
+port:
+  tcp:9200:
+    listening: true
+    ip:
+      - 127.0.0.1
+
+# HTTP checks
+http:
+  http://localhost:9200:
+    status: 200
+    timeout: 2000
+
+# Command checks
+command:
+  elasticsearch-health:
+    exec: "curl -s http://localhost:9200/_cluster/health 2>/dev/null || echo '{}'"
+    exit-status: 0

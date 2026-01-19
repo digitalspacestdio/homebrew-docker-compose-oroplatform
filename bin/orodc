@@ -2,18 +2,6 @@
 set -e
 if [ "$DEBUG" ]; then set -x; fi
 
-# Debug logging to file (always enabled for debugging menu issues)
-DEBUG_LOG="/tmp/orodc-debug.log"
-debug_log() {
-  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$DEBUG_LOG"
-}
-
-# Clear log on new session
-if [[ "${ORODC_LOG_CLEARED:-}" != "1" ]]; then
-  echo "=== New orodc session $(date '+%Y-%m-%d %H:%M:%S') ===" > "$DEBUG_LOG"
-  export ORODC_LOG_CLEARED=1
-fi
-
 # Restore cursor visibility on exit
 trap 'tput cnorm 2>/dev/null || true' EXIT
 
@@ -67,6 +55,12 @@ echo_ok() { msg_ok "$*"; }
 echo_warn() { msg_warning "$*"; }
 echo_error() { msg_error "$*"; }
 echo_header() { msg_header "$*"; }
+
+# Debug logging stub (will be overridden by common.sh library)
+DEBUG_LOG="/tmp/orodc-debug.log"
+debug_log() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*" >> "$DEBUG_LOG"
+}
 
 # Spinner animation for long-running commands
 show_spinner() {
@@ -1452,6 +1446,12 @@ show_interactive_menu() {
     fi
   fi
   
+  # Check if current project is Oro Platform based
+  local is_oro=false
+  if is_oro_project; then
+    is_oro=true
+  fi
+  
   clear
   echo -e "\033[1;34m========================================\033[0m" >&2
   echo -e "\033[1;34m    OroDC Interactive Menu\033[0m" >&2
@@ -1482,13 +1482,24 @@ show_interactive_menu() {
     echo "" >&2
     printf "  \033[1;35m%-30s\033[0m  \033[1;32m%-30s\033[0m\n" "Database:" "Maintenance:" >&2
     printf "  %-30s  %-30s\n" "  9)  Export database" "  11) Clear cache" >&2
-    printf "  %-30s  %-30s\n" "  10) Import database" "  12) Platform update" >&2
+    if [[ "$is_oro" == "true" ]]; then
+      printf "  %-30s  %-30s\n" "  10) Import database" "  12) Platform update" >&2
+    else
+      printf "  %-30s  %-30s\n" "  10) Import database" "" >&2
+    fi
     printf "  %-30s  %-30s\n" "" "  13) Run doctor" >&2
     echo "" >&2
-    printf "  \033[1;37m%-30s\033[0m  \033[1;31m%-30s\033[0m\n" "Other:" "Installation:" >&2
-    printf "  %-30s  %-30s\n" "  14) Image build" "  17) Install with demo" >&2
-    printf "  %-30s  %-30s\n" "  15) Start proxy" "  18) Install without demo" >&2
-    printf "  %-30s  %-30s\n" "  16) Stop proxy" "" >&2
+    if [[ "$is_oro" == "true" ]]; then
+      printf "  \033[1;37m%-30s\033[0m  \033[1;31m%-30s\033[0m\n" "Other:" "Installation (Oro):" >&2
+      printf "  %-30s  %-30s\n" "  14) Image build" "  17) Install with demo" >&2
+      printf "  %-30s  %-30s\n" "  15) Start proxy" "  18) Install without demo" >&2
+      printf "  %-30s  %-30s\n" "  16) Stop proxy" "" >&2
+    else
+      printf "  \033[1;37m%-30s\033[0m\n" "Other:" >&2
+      printf "  %-30s\n" "  14) Image build" >&2
+      printf "  %-30s\n" "  15) Start proxy" >&2
+      printf "  %-30s\n" "  16) Stop proxy" >&2
+    fi
   else
     # Single column layout (original)
     echo -e "\033[1;36mEnvironment Management:\033[0m" >&2
@@ -1509,17 +1520,21 @@ show_interactive_menu() {
     echo "" >&2
     echo -e "\033[1;32mMaintenance:\033[0m" >&2
     echo "  11) Clear cache" >&2
-    echo "  12) Platform update" >&2
+    if [[ "$is_oro" == "true" ]]; then
+      echo "  12) Platform update" >&2
+    fi
     echo "  13) Run doctor (show ps)" >&2
     echo "" >&2
     echo -e "\033[1;37mOther:\033[0m" >&2
     echo "  14) Image build" >&2
     echo "  15) Start proxy" >&2
     echo "  16) Stop proxy" >&2
-    echo "" >&2
-    echo -e "\033[1;31mInstallation:\033[0m" >&2
-    echo "  17) Install with demo data" >&2
-    echo "  18) Install without demo data" >&2
+    if [[ "$is_oro" == "true" ]]; then
+      echo "" >&2
+      echo -e "\033[1;31mInstallation (Oro):\033[0m" >&2
+      echo "  17) Install with demo data" >&2
+      echo "  18) Install without demo data" >&2
+    fi
   fi
   
   echo "" >&2
@@ -1547,8 +1562,17 @@ show_interactive_menu() {
   else
     echo -e "Current Directory: $display_dir" >&2
   fi
+  if [[ "$is_oro" == "true" ]]; then
+    echo -e "Project Type: \033[1;32mOro Platform\033[0m" >&2
+  else
+    echo -e "Project Type: \033[1;33mGeneric PHP/Symfony\033[0m" >&2
+  fi
   echo "" >&2
-  echo -n "Enter option [1-18] or 'q' to quit: " >&2
+  if [[ "$is_oro" == "true" ]]; then
+    echo -n "Enter option [1-18] or 'q' to quit: " >&2
+  else
+    echo -n "Enter option [1-16] or 'q' to quit: " >&2
+  fi
   read -r choice
   
   case "$choice" in
@@ -1706,6 +1730,14 @@ show_interactive_menu() {
         show_interactive_menu
         exit
       fi
+      if ! is_oro_project; then
+        msg_warning "Platform update is only available for Oro Platform projects"
+        echo "" >&2
+        echo -n "Press Enter to continue..." >&2
+        read -r
+        show_interactive_menu
+        exit
+      fi
       platform_update_interactive
       echo "" >&2
       if confirm_yes_no "Return to menu?" "yes"; then
@@ -1799,6 +1831,14 @@ show_interactive_menu() {
       ;;
     17)
       echo "" >&2
+      if ! is_oro_project; then
+        msg_warning "Oro installation is only available for Oro Platform projects"
+        echo "" >&2
+        echo -n "Press Enter to continue..." >&2
+        read -r
+        show_interactive_menu
+        exit
+      fi
       msg_warning "WARNING: This will PURGE all existing data (database, cache, volumes) and reinstall!"
       echo "" >&2
       if confirm_yes_no "Install Application WITH demo data? (purge + install)" "no"; then
@@ -1816,6 +1856,14 @@ show_interactive_menu() {
       ;;
     18)
       echo "" >&2
+      if ! is_oro_project; then
+        msg_warning "Oro installation is only available for Oro Platform projects"
+        echo "" >&2
+        echo -n "Press Enter to continue..." >&2
+        read -r
+        show_interactive_menu
+        exit
+      fi
       msg_warning "WARNING: This will PURGE all existing data (database, cache, volumes) and reinstall!"
       echo "" >&2
       if confirm_yes_no "Install Application WITHOUT demo data? (purge + install)" "no"; then
@@ -1999,58 +2047,51 @@ if [[ -n "${ORODC_SELECTED_ENV_NAME:-}" ]] && [[ -n "${ORODC_SELECTED_ENV_PATH:-
     fi
   fi
 else
-  # Always recalculate DC_ORO_NAME from current directory to ensure it's correct after switching
-  export DC_ORO_NAME=$(basename $(pwd))
-  # Allow override of config directory via environment variable
-  if [[ -z "${DC_ORO_CONFIG_DIR}" ]]; then
-    export DC_ORO_CONFIG_DIR="$HOME/.$(basename $0)/${DC_ORO_NAME}"
+  # Homebrew installation - resolve symlink to find actual script location
+  # BASH_SOURCE may be a symlink (e.g. bin/orodc -> libexec/orodc-main)
+  REAL_SCRIPT="$(realpath "${BASH_SOURCE[0]}" 2>/dev/null || readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+  SCRIPT_DIR="$(cd "$(dirname "$REAL_SCRIPT")" && pwd)"
+  LIBEXEC_DIR="${SCRIPT_DIR}/orodc"
+fi
+# Export SCRIPT_DIR so sourced libraries can use it to find orodc-find_free_port
+export SCRIPT_DIR
+
+# Source all library files
+source "${LIBEXEC_DIR}/lib/ui.sh"
+source "${LIBEXEC_DIR}/lib/common.sh"
+source "${LIBEXEC_DIR}/lib/port-manager.sh"
+source "${LIBEXEC_DIR}/lib/docker-utils.sh"
+source "${LIBEXEC_DIR}/lib/environment.sh"
+
+# Early detection of first non-flag argument for special commands
+# This is needed before full argument parsing for docker-build and image commands
+temp_first_non_flag_arg=""
+for arg in "$@"; do
+  if [[ "$arg" != -* ]]; then
+    temp_first_non_flag_arg="$arg"
+    break
   fi
-fi
-# CRITICAL: Set Docker Compose project name to match OroDC project name
-# This ensures volumes and networks use consistent naming with DC_ORO_NAME
-export COMPOSE_PROJECT_NAME="$DC_ORO_NAME"
-
-if [[ ! -d "${DC_ORO_CONFIG_DIR}" ]]; then
-    mkdir -p "${DC_ORO_CONFIG_DIR}"
-fi
-
-XDEBUG_ENV_FILE="${DC_ORO_CONFIG_DIR}/.xdebug_env"
-
-# Save XDEBUG_MODE* variables if they exist in environment
-if [[ -n "${XDEBUG_MODE:-}" ]] || [[ -n "${XDEBUG_MODE_CLI:-}" ]] || [[ -n "${XDEBUG_MODE_FPM:-}" ]] || [[ -n "${XDEBUG_MODE_CONSUMER:-}" ]]; then
-  {
-    [[ -n "${XDEBUG_MODE:-}" ]] && echo "export XDEBUG_MODE=\"${XDEBUG_MODE}\""
-    [[ -n "${XDEBUG_MODE_CLI:-}" ]] && echo "export XDEBUG_MODE_CLI=\"${XDEBUG_MODE_CLI}\""
-    [[ -n "${XDEBUG_MODE_FPM:-}" ]] && echo "export XDEBUG_MODE_FPM=\"${XDEBUG_MODE_FPM}\""
-    [[ -n "${XDEBUG_MODE_CONSUMER:-}" ]] && echo "export XDEBUG_MODE_CONSUMER=\"${XDEBUG_MODE_CONSUMER}\""
-  } > "${XDEBUG_ENV_FILE}"
-fi
-
-# Load XDEBUG_MODE* variables from file if they don't exist in environment
-if [[ -f "${XDEBUG_ENV_FILE}" ]]; then
-  source "${XDEBUG_ENV_FILE}"
-fi
-
-# Set default value for XDEBUG_MODE if not set
-[[ -z "${XDEBUG_MODE:-}" ]] && export XDEBUG_MODE="off"
-
-# Set fallback values for XDEBUG_MODE_* variables if not set but XDEBUG_MODE exists
-if [[ -n "${XDEBUG_MODE:-}" ]]; then
-  [[ -z "${XDEBUG_MODE_CLI:-}" ]] && export XDEBUG_MODE_CLI="${XDEBUG_MODE}"
-  [[ -z "${XDEBUG_MODE_FPM:-}" ]] && export XDEBUG_MODE_FPM="${XDEBUG_MODE}"
-  [[ -z "${XDEBUG_MODE_CONSUMER:-}" ]] && export XDEBUG_MODE_CONSUMER="${XDEBUG_MODE}"
-fi
+done
 
 # Handle version command (only "version", not --version)
 if [[ "$1" == "version" ]]; then
   # Try to find and read version from Formula file
   FORMULA_VERSION=""
   FORMULA_FILE=""
-  
+
   # Use find to locate Formula file, starting from script directory and going up
-  SCRIPT_DIR="$(dirname "$0")"
+  # First try relative to script directory (for development)
   FORMULA_FILE=$(find "$SCRIPT_DIR" -name "docker-compose-oroplatform.rb" -type f 2>/dev/null | head -1)
-  
+
+  # If not found, try going up from script directory (for tap development)
+  if [[ -z "$FORMULA_FILE" ]]; then
+    SEARCH_DIR="$SCRIPT_DIR"
+    while [[ "$SEARCH_DIR" != "/" ]] && [[ -z "$FORMULA_FILE" ]]; do
+      FORMULA_FILE=$(find "$SEARCH_DIR" -maxdepth 2 -name "docker-compose-oroplatform.rb" -type f 2>/dev/null | head -1)
+      SEARCH_DIR=$(dirname "$SEARCH_DIR")
+    done
+  fi
+
   # If not found relative to script, try brew repository
   if [[ -z "$FORMULA_FILE" ]] && command -v brew >/dev/null 2>&1; then
     BREW_REPO=$(brew --repository 2>/dev/null)
@@ -2058,17 +2099,17 @@ if [[ "$1" == "version" ]]; then
       FORMULA_FILE=$(find "$BREW_REPO" -name "docker-compose-oroplatform.rb" -type f 2>/dev/null | head -1)
     fi
   fi
-  
+
   # Extract version from Formula file
   if [[ -n "$FORMULA_FILE" && -f "$FORMULA_FILE" ]]; then
     FORMULA_VERSION=$(grep -o 'version "[^"]*"' "$FORMULA_FILE" 2>/dev/null | sed 's/version "\(.*\)"/\1/')
   fi
-  
+
   # Output version or fallback
   if [[ -n "$FORMULA_VERSION" ]]; then
     echo "orodc version $FORMULA_VERSION"
   else
-    echo "orodc version 0.8.3 (fallback)"
+    echo "orodc version unknown (formula file not found)"
   fi
   exit 0
 fi
@@ -2077,8 +2118,7 @@ fi
 if [[ "$1" == "help" ]] || [[ "$1" == "man" ]]; then
   # Try to find README.md file
   README_FILE=""
-  SCRIPT_DIR="$(dirname "$0")"
-  
+
   # Look for README.md in various locations
   # 1. Relative to script directory (development)
   if [[ -f "$SCRIPT_DIR/../README.md" ]]; then
@@ -2088,7 +2128,7 @@ if [[ "$1" == "help" ]] || [[ "$1" == "man" ]]; then
   elif [[ -f "$SCRIPT_DIR/../../README.md" ]]; then
     README_FILE="$SCRIPT_DIR/../../README.md"
   fi
-  
+
   # 2. Try to find in Homebrew tap directory
   if [[ -z "$README_FILE" ]] && command -v brew >/dev/null 2>&1; then
     BREW_REPO=$(brew --repository 2>/dev/null)
@@ -2099,7 +2139,7 @@ if [[ "$1" == "help" ]] || [[ "$1" == "man" ]]; then
       fi
     fi
   fi
-  
+
   # If README found, display it without pager (always use cat)
   if [[ -n "$README_FILE" && -f "$README_FILE" ]]; then
     echo "==> OroDC Documentation"
@@ -2124,84 +2164,170 @@ if [[ "$1" == "help" ]] || [[ "$1" == "man" ]]; then
   exit 0
 fi
 
-# Show interactive menu when no arguments provided and in interactive terminal
-# This must be checked VERY EARLY, before any argument parsing
-if [[ $# -eq 0 ]] && [[ -t 0 ]] && [[ -z "${ORODC_NO_MENU:-}" ]]; then
-  # Check if current directory is an OroPlatform project
-  if ! is_oroplatform_project "$PWD"; then
-    # Try to switch to last used environment
-    last_env=$(get_last_used_environment 2>/dev/null)
-    if [[ -n "$last_env" ]] && [[ -d "$last_env" ]] && [[ "$last_env" != "$PWD" ]]; then
-      msg_info "No project found in current directory."
-      msg_info "Switching to last used environment: $(basename "$last_env")"
-      cd "$last_env" || {
-        show_interactive_menu
-        exit $?
-      }
-      # Restart script in new directory
-      unset DC_ORO_NAME
-      unset DC_ORO_CONFIG_DIR
-      unset COMPOSE_PROJECT_NAME
-      exec "$0"
+# Initialize environment for most commands
+# Skip for: help, version, proxy, image (these don't require project)
+case "$1" in
+  help|man|version|proxy|image|docker-build)
+    # Skip initialization for these commands
+    ;;
+  *)
+    # Initialize environment for all other commands (including menu when no args)
+    # For menu, allow initialization to fail gracefully if not in project
+    if [[ $# -eq 0 ]]; then
+      # Menu case - try to initialize but don't fail if not in project
+      initialize_environment 2>/dev/null || true
+    else
+      # Regular command - require initialization
+      initialize_environment
     fi
+    ;;
+esac
+
+# ============================================================================
+# GLOBAL PROJECT VALIDATION
+# Load validation library and run project validation
+# ============================================================================
+if [[ -f "${SCRIPT_DIR}/../libexec/orodc/lib/validation.sh" ]]; then
+  source "${SCRIPT_DIR}/../libexec/orodc/lib/validation.sh"
+  validate_project "$1"
+fi
+
+# Handle VERBOSE toggle command
+if [[ "$1" == "v" ]] || [[ "$1" == "verbose" ]]; then
+  if [[ -n "${VERBOSE:-}" ]]; then
+    unset VERBOSE
+    echo "VERBOSE mode disabled"
+  else
+    export VERBOSE=1
+    echo "VERBOSE mode enabled"
   fi
-  show_interactive_menu
-  exit $?
+  exit 0
 fi
 
-# Function to get first non-flag argument
-get_first_non_flag_arg() {
-  local args=("$@")
-  for arg in "${args[@]}"; do
-    if [[ "$arg" != -* ]]; then
-      echo "$arg"
-      return 0
-    fi
-  done
-  echo "php"
-  return 0
+# Show interactive menu when no arguments provided
+if [[ $# -eq 0 ]]; then
+  exec "${LIBEXEC_DIR}/menu.sh"
+fi
+
+# Store original command for menu return
+ORIGINAL_CMD="$1"
+
+# Helper function to execute command and return to menu if needed
+# This ensures menu reflects 1:1 command line behavior - commands execute
+# exactly as they would from command line, only difference is return to menu
+execute_with_menu_return() {
+  local script="$1"
+  shift
+  
+  # Temporarily disable set -e to capture exit code
+  set +e
+  
+  # Execute the script exactly as it would be executed from command line
+  "$script" "$@"
+  local exit_code=$?
+  
+  # Re-enable set -e
+  set -e
+  
+  # Always add empty line after command execution
+  echo "" >&2
+  
+  # If ORODC_IS_INTERACTIVE_MENU is set, return to menu after command
+  # No additional output or processing - just return to menu
+  if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+    echo -n "Press Enter to continue..." >&2
+    read -r
+    exec "${LIBEXEC_DIR}/menu.sh"
+  fi
+  
+  exit $exit_code
 }
 
-# Check if first argument is a docker compose command
-# Only docker compose commands need left/right argument parsing
-is_compose_command() {
-  local cmd="$1"
-  local compose_commands="build|config|cp|create|down|events|exec|export|images|kill|logs|ls|pause|port|ps|pull|push|restart|rm|run|scale|start|stats|stop|top|unpause|up|version|volumes|wait|watch"
-  echo "$cmd" | grep -qE "^($compose_commands)$"
-}
-
-# Find first non-flag argument to determine parsing needs
-temp_first_non_flag_arg=""
-if [[ $# -gt 0 ]]; then
-  for arg in "$@"; do
-    if [[ "$arg" != -* ]]; then
-      temp_first_non_flag_arg="$arg"
-      break
+# Route commands to appropriate modules
+case "$1" in
+  # Docker Compose commands - route to compose.sh module
+  compose)
+    shift
+    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+      execute_with_menu_return "${LIBEXEC_DIR}/compose.sh" "$@"
+    else
+      exec "${LIBEXEC_DIR}/compose.sh" "$@"
     fi
-  done
-fi
+    ;;
 
-# If no command found (only flags), treat as PHP command
-if [[ -z "$temp_first_non_flag_arg" && $# -gt 0 ]]; then
-  temp_first_non_flag_arg="php"
-fi
-
-# Handle proxy commands early - they don't require project initialization
-if [[ "$temp_first_non_flag_arg" == "proxy" ]]; then
-  # Initialize minimal dependencies for proxy commands
-  DOCKER_BIN=$(resolve_bin "docker" "Docker is required. Install from https://docs.docker.com/get-docker/")
-  DOCKER_COMPOSE_BIN="$DOCKER_BIN compose"
+  # Database commands - route to database/*.sh modules
+  database|db)
+    shift
+    case "$1" in
+      mysql)
+        shift
+        if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+          execute_with_menu_return "${LIBEXEC_DIR}/database/mysql.sh" "$@"
+        else
+          exec "${LIBEXEC_DIR}/database/mysql.sh" "$@"
+        fi
+        ;;
+      psql)
+        shift
+        if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+          execute_with_menu_return "${LIBEXEC_DIR}/database/psql.sh" "$@"
+        else
+          exec "${LIBEXEC_DIR}/database/psql.sh" "$@"
+        fi
+        ;;
+      import)
+        shift
+        if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+          execute_with_menu_return "${LIBEXEC_DIR}/database/import.sh" "$@"
+        else
+          exec "${LIBEXEC_DIR}/database/import.sh" "$@"
+        fi
+        ;;
+      export)
+        shift
+        if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+          execute_with_menu_return "${LIBEXEC_DIR}/database/export.sh" "$@"
+        else
+          exec "${LIBEXEC_DIR}/database/export.sh" "$@"
+        fi
+        ;;
+      cli)
+        shift
+        if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+          execute_with_menu_return "${LIBEXEC_DIR}/database/cli.sh" "$@"
+        else
+          exec "${LIBEXEC_DIR}/database/cli.sh" "$@"
+        fi
+        ;;
+      purge)
+        shift
+        if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+          execute_with_menu_return "${LIBEXEC_DIR}/database/purge.sh" "$@"
+        else
+          exec "${LIBEXEC_DIR}/database/purge.sh" "$@"
+        fi
+        ;;
+      *)
+        msg_error "Unknown database command: ${1:-<none>}"
+        msg_info "Available: mysql, psql, import, export, cli, purge"
+        exit 1
+        ;;
+    esac
+    exit 0
+    ;;
+    
+  # Handle docker-build commands early - they don't require project initialization
+  docker-build)
+    # Initialize minimal dependencies
+    DOCKER_BIN=$(resolve_bin "docker" "Docker is required. Install from https://docs.docker.com/get-docker/")
   
   # Get OroDC install directory
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
   
-  # Get Homebrew prefix dynamically (works on macOS and Linux)
+  # Get Homebrew prefix dynamically
   BREW_PREFIX="$(brew --prefix 2>/dev/null || echo "/home/linuxbrew/.linuxbrew")"
   
-  # Try multiple paths in order:
-  # 1. Development path (tap directory)
-  # 2. Homebrew installed path (pkgshare)
-  # 3. Relative to script location
+  # Find compose directory
   if [[ -d "${BREW_PREFIX}/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform/compose" ]]; then
     DC_ORO_COMPOSE_DIR="${BREW_PREFIX}/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform/compose"
   elif [[ -d "${BREW_PREFIX}/share/docker-compose-oroplatform/compose" ]]; then
@@ -2215,389 +2341,233 @@ if [[ "$temp_first_non_flag_arg" == "proxy" ]]; then
     exit 1
   fi
   
-  PROXY_COMPOSE_FILE="${DC_ORO_COMPOSE_DIR}/docker-compose-proxy.yml"
+  DOCKER_DIR="${DC_ORO_COMPOSE_DIR}/docker"
   
-  if [[ ! -f "$PROXY_COMPOSE_FILE" ]]; then
-    msg_error "Proxy compose file not found: $PROXY_COMPOSE_FILE"
-    exit 1
-  fi
+  # Get subcommand
+  BUILD_TARGET="${2:-}"
   
-  # Get proxy subcommand
-  PROXY_CMD="${2:-}"
-  shift 2 2>/dev/null || shift 1 2>/dev/null || true
+  # Parse global flags
+  NO_CACHE_FLAG=""
+  PUSH_IMAGES=false
+  PG_VERSION=""
   
-  # Function to install CA certificates
-  install_proxy_certs() {
-    msg_info "Installing CA certificate to system trust store..."
+  shift_count=2
+  for arg in "${@:3}"; do
+    case "$arg" in
+      --no-cache) NO_CACHE_FLAG="--no-cache" ;;
+      --push) PUSH_IMAGES=true ;;
+      --version=*) PG_VERSION="${arg#*=}" ;;
+      *) 
+        # Could be pg version without flag
+        if [[ -z "$PG_VERSION" && "$arg" =~ ^[0-9]+\.[0-9]+ ]]; then
+          PG_VERSION="$arg"
+        fi
+        ;;
+    esac
+  done
+  
+  # Helper function to build single image
+  build_image() {
+    local dockerfile="$1"
+    local context="$2"
+    local tag="$3"
+    local name="$4"
+    shift 4
+    local build_args=("$@")
     
-    # Check if proxy container is running
-    if ! ${DOCKER_BIN} ps --filter "name=proxy" --format "{{.Names}}" | grep -q "^proxy$"; then
-      msg_error "Proxy container is not running. Start it first with: orodc proxy up -d"
-      exit 1
+    if [[ ! -f "$dockerfile" ]]; then
+      msg_error "Dockerfile not found: $dockerfile"
+      return 1
     fi
     
-    # Wait for container to be healthy
-    msg_info "Waiting for proxy container to be healthy..."
-    for i in {1..30}; do
-      if ${DOCKER_BIN} ps --filter "name=proxy" --filter "health=healthy" --format "{{.Names}}" | grep -q "^proxy$"; then
-        break
-      fi
-      sleep 1
+    msg_info "Building ${name}..."
+    msg_info "  Tag: ${tag}"
+    
+    local build_cmd="${DOCKER_BIN} build ${NO_CACHE_FLAG}"
+    for arg in "${build_args[@]}"; do
+      build_cmd+=" --build-arg ${arg}"
     done
+    build_cmd+=" -f ${dockerfile} -t ${tag} ${context}"
     
-    INSTALL_DATE=$(date +%Y%m%d_%H%M%S)
-    CERT_OUTPUT_PATH="${HOME}/root_ca_docker_local_${INSTALL_DATE}.crt"
-    
-    # Export certificate content (not symlink)
-    ${DOCKER_BIN} exec proxy cat /certs/ca.crt > "${CERT_OUTPUT_PATH}" 2>/dev/null
-    
-    if [[ ! -f "${CERT_OUTPUT_PATH}" ]] || [[ ! -s "${CERT_OUTPUT_PATH}" ]]; then
-      msg_error "Failed to export certificate from proxy container"
-      exit 1
-    fi
-    
-    msg_info "CA certificate exported to: ${CERT_OUTPUT_PATH}"
-    
-    # Detect OS
-    IS_WSL=false
-    if grep -qi microsoft /proc/version 2>/dev/null || grep -qi wsl /proc/version 2>/dev/null; then
-      IS_WSL=true
-    fi
-    
-    # Install certificate based on OS
-    if [[ "$OSTYPE" == "darwin"* ]]; then
-      # macOS
-      msg_info "Installing certificate to macOS System Keychain..."
-      if sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "${CERT_OUTPUT_PATH}" 2>/dev/null; then
-        msg_ok "Certificate installed to macOS System Keychain"
-        rm -f "${CERT_OUTPUT_PATH}"
-      else
-        msg_warning "Failed to install certificate automatically. Manual installation required:"
-        msg_info "  sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ${CERT_OUTPUT_PATH}"
+    BUILD_START=$(date +%s)
+    if eval "$build_cmd"; then
+      BUILD_END=$(date +%s)
+      BUILD_DURATION=$((BUILD_END - BUILD_START))
+      msg_ok "${name} built in ${BUILD_DURATION}s"
+      
+      if [[ "$PUSH_IMAGES" == "true" ]]; then
+        msg_info "Pushing ${tag}..."
+        if ${DOCKER_BIN} push "${tag}"; then
+          msg_ok "Pushed ${tag}"
+        else
+          msg_warning "Failed to push ${tag}"
+        fi
       fi
-      
-    elif [[ "$IS_WSL" == "true" ]]; then
-      # WSL2 - install to Linux and show Windows instructions
-      msg_info "Installing certificate to Linux (WSL)..."
-      
-      if [[ -f "/etc/debian_version" ]]; then
-        # Debian/Ubuntu
-        sudo cp "${CERT_OUTPUT_PATH}" /usr/local/share/ca-certificates/ 2>/dev/null && \
-        sudo update-ca-certificates 2>/dev/null && \
-        msg_ok "Certificate installed to Linux trust store"
-      fi
-      
-      # NSS database for Chrome/Node.js
-      if command -v certutil >/dev/null 2>&1; then
-        msg_info "Installing certificate to NSS database (Chrome/Node.js)..."
-        mkdir -p "${HOME}/.pki/nssdb" 2>/dev/null
-        certutil -d sql:"${HOME}/.pki/nssdb" -A -t "C,," -n "OroDC Docker Local CA" -i "${CERT_OUTPUT_PATH}" 2>/dev/null && \
-        msg_ok "Certificate installed to NSS database"
-      else
-        msg_info "For Chrome/Node.js support, install libnss3-tools:"
-        msg_info "  sudo apt install libnss3-tools"
-        msg_info "  mkdir -p \$HOME/.pki/nssdb"
-        msg_info "  certutil -d sql:\$HOME/.pki/nssdb -N"
-        msg_info "  certutil -d sql:\$HOME/.pki/nssdb -A -t \"C,,\" -n \"OroDC Docker Local CA\" -i ${CERT_OUTPUT_PATH}"
-      fi
-      
-      msg_warning "WSL2 detected. Certificate saved to: ${CERT_OUTPUT_PATH}"
-      msg_info ""
-      msg_info "To trust HTTPS in Windows host:"
-      msg_info "  1. Copy certificate to Windows: ${CERT_OUTPUT_PATH}"
-      msg_info "  2. Double-click the .crt file in Windows Explorer"
-      msg_info "  3. Click 'Install Certificate'"
-      msg_info "  4. Select 'Local Machine' and click Next"
-      msg_info "  5. Select 'Place all certificates in the following store'"
-      msg_info "  6. Click 'Browse' and select 'Trusted Root Certification Authorities'"
-      msg_info "  7. Click Next and Finish"
-      msg_info ""
-      
+      return 0
     else
-      # Linux (non-WSL)
-      msg_info "Installing certificate to Linux trust store..."
-      
-      if [[ -f "/etc/debian_version" ]]; then
-        # Debian/Ubuntu
-        if sudo cp "${CERT_OUTPUT_PATH}" /usr/local/share/ca-certificates/ 2>/dev/null && \
-           sudo update-ca-certificates 2>/dev/null; then
-          msg_ok "Certificate installed to system trust store"
-          rm -f "${CERT_OUTPUT_PATH}"
-        else
-          msg_warning "Failed to install certificate automatically. Manual installation required:"
-          msg_info "  sudo cp ${CERT_OUTPUT_PATH} /usr/local/share/ca-certificates/"
-          msg_info "  sudo update-ca-certificates"
-        fi
-      elif [[ -f "/etc/redhat-release" ]]; then
-        # RHEL/CentOS/Fedora
-        if sudo cp "${CERT_OUTPUT_PATH}" /etc/pki/ca-trust/source/anchors/ 2>/dev/null && \
-           sudo update-ca-trust 2>/dev/null; then
-          msg_ok "Certificate installed to system trust store"
-          rm -f "${CERT_OUTPUT_PATH}"
-        else
-          msg_warning "Failed to install certificate automatically. Manual installation required:"
-          msg_info "  sudo cp ${CERT_OUTPUT_PATH} /etc/pki/ca-trust/source/anchors/"
-          msg_info "  sudo update-ca-trust"
-        fi
-      fi
-      
-      # NSS database for Chrome/Node.js
-      if command -v certutil >/dev/null 2>&1; then
-        msg_info "Installing certificate to NSS database (Chrome/Node.js)..."
-        mkdir -p "${HOME}/.pki/nssdb" 2>/dev/null
-        
-        # Initialize NSS DB if it doesn't exist
-        if [[ ! -f "${HOME}/.pki/nssdb/cert9.db" ]]; then
-          certutil -d sql:"${HOME}/.pki/nssdb" -N --empty-password 2>/dev/null
-        fi
-        
-        if certutil -d sql:"${HOME}/.pki/nssdb" -A -t "C,," -n "OroDC Docker Local CA" -i "${CERT_OUTPUT_PATH}" 2>/dev/null; then
-          msg_ok "Certificate installed to NSS database"
-          rm -f "${CERT_OUTPUT_PATH}"
-        fi
-      else
-        msg_info "For Chrome/Node.js support, install libnss3-tools:"
-        msg_info "  sudo apt install libnss3-tools"
-        msg_info "  mkdir -p \$HOME/.pki/nssdb"
-        msg_info "  certutil -d sql:\$HOME/.pki/nssdb -N"
-        msg_info "  certutil -d sql:\$HOME/.pki/nssdb -A -t \"C,,\" -n \"OroDC Docker Local CA\" -i ${CERT_OUTPUT_PATH}"
-      fi
+      msg_error "Failed to build ${name}"
+      return 1
     fi
-    
-    msg_ok "Certificate installation complete!"
   }
   
-  # Handle proxy subcommands
-  case "$PROXY_CMD" in
-    up)
-      msg_info "Starting proxy services..."
-      
-      # Create shared network if it doesn't exist
-      if ! ${DOCKER_BIN} network inspect dc_shared_net >/dev/null 2>&1; then
-        msg_info "Creating dc_shared_net network..."
-        ${DOCKER_BIN} network create dc_shared_net || {
-          msg_error "Failed to create dc_shared_net network"
-          exit 1
-        }
-      fi
-      
-      # Configure Traefik bind address if not set
-      if [[ -z "${TRAEFIK_BIND_ADDRESS:-}" ]]; then
-        # Auto-detect environment and suggest default
-        IS_WSL=false
-        IS_LIMA=false
-        DETECTED_ENV=""
-        
-        # Check WSL
-        if grep -qi microsoft /proc/version 2>/dev/null || grep -qi wsl /proc/version 2>/dev/null; then
-          IS_WSL=true
-          DETECTED_ENV="Windows WSL2"
-        fi
-        
-        # Check Lima VM
-        if [[ -d "/lima" ]] || [[ -n "${LIMA_INSTANCE:-}" ]]; then
-          IS_LIMA=true
-          DETECTED_ENV="Lima VM"
-        fi
-        
-        # Determine default based on environment
-        if [[ "$IS_WSL" == "true" ]] || [[ "$IS_LIMA" == "true" ]]; then
-          # WSL or Lima VM - need to bind to all interfaces for host access
-          SUGGESTED_BIND="0.0.0.0"
-          SUGGESTED_REASON="VM/WSL detected - bind to all interfaces for host access"
-        else
-          # Native Docker (macOS or Linux) or unknown - bind to localhost only
-          SUGGESTED_BIND="127.0.0.1"
-          SUGGESTED_REASON="Native Docker - bind to localhost only (secure)"
-        fi
-        
-        # Check if running in non-interactive mode (CI/CD or piped)
-        if [[ ! -t 0 ]]; then
-          # Non-interactive: use suggested default
-          export TRAEFIK_BIND_ADDRESS="$SUGGESTED_BIND"
-          msg_info "Non-interactive mode: using default bind address: ${SUGGESTED_BIND}"
-        else
-          # Interactive mode: show prompts
-          msg_info ""
-          msg_info "Proxy Network Configuration"
-          msg_info "============================"
-          msg_info ""
-          
-          msg_info "Choose proxy bind address (affects HTTP, HTTPS, SOCKS5):"
-          msg_info ""
-          msg_info "  1) 127.0.0.1 (localhost only)"
-          msg_info "     - Most secure: Only accessible from this machine"
-          msg_info "     - Use for: Native Docker on macOS/Linux"
-          msg_info ""
-          msg_info "  2) 0.0.0.0 (all interfaces)"
-          msg_info "     - Allows access from: VM host + network"
-          msg_info "     - Use for: WSL2, Lima VM, remote access"
-          msg_info ""
-          
-          if [[ -n "$DETECTED_ENV" ]]; then
-            msg_info "Detected: ${DETECTED_ENV}"
-            msg_info "Suggested: ${SUGGESTED_BIND} (${SUGGESTED_REASON})"
-          else
-            msg_info "Could not detect environment"
-            msg_info "Suggested: ${SUGGESTED_BIND} (safe default)"
-          fi
-          
-          msg_info ""
-          
-          # Interactive prompt with validation
-          BIND_CHOICE=$(prompt_selector "Enter choice [1-2], IP address, or press Enter for suggested (${SUGGESTED_BIND}): " "$SUGGESTED_BIND" "1:127.0.0.1" "2:0.0.0.0")
-          
-          export TRAEFIK_BIND_ADDRESS="$BIND_CHOICE"
-          
-          case "$BIND_CHOICE" in
-            "127.0.0.1")
-              msg_ok "Using 127.0.0.1 (localhost only)"
-              ;;
-            "0.0.0.0")
-              msg_ok "Using 0.0.0.0 (all interfaces)"
-              msg_warning "Make sure your firewall is properly configured!"
-              ;;
-            "$SUGGESTED_BIND")
-              msg_ok "Using suggested: ${SUGGESTED_BIND}"
-              ;;
-            *)
-              msg_ok "Using custom bind address: ${BIND_CHOICE}"
-              ;;
-          esac
-          
-          msg_info ""
-          msg_info "To skip this prompt next time, set:"
-          msg_info "  export TRAEFIK_BIND_ADDRESS=${TRAEFIK_BIND_ADDRESS}"
-          msg_info "Or add to .env.orodc:"
-          msg_info "  echo 'TRAEFIK_BIND_ADDRESS=${TRAEFIK_BIND_ADDRESS}' >> .env.orodc"
-          msg_info ""
-        fi
-      else
-        msg_info "Using bind address: ${TRAEFIK_BIND_ADDRESS} (from environment)"
-      fi
-      
-      # Configure SOCKS5 port if not set
-      if [[ -z "${DC_PROXY_SOCKS5_PORT:-}" ]]; then
-        # Check if running in non-interactive mode (CI/CD or piped)
-        if [[ ! -t 0 ]]; then
-          # Non-interactive: use default port
-          export DC_PROXY_SOCKS5_PORT="1080"
-          msg_info "Non-interactive mode: using default SOCKS5 port: 1080"
-        else
-          # Interactive mode: show prompts
-          msg_info ""
-          msg_info "SOCKS5 Proxy Port Configuration"
-          msg_info "================================"
-          msg_info ""
-          msg_info "Choose SOCKS5 proxy port:"
-          msg_info "  - Default: 1080 (standard SOCKS5 port)"
-          msg_info "  - Custom: any available port (e.g., 9999)"
-          msg_info ""
-          
-          # Interactive prompt with validation
-          PORT_CHOICE=$(prompt_port "Enter SOCKS5 port (press Enter for default: 1080): " "1080")
-          
-          export DC_PROXY_SOCKS5_PORT="$PORT_CHOICE"
-          
-          if [[ "$PORT_CHOICE" == "1080" ]]; then
-            msg_ok "Using default port: 1080"
-          else
-            msg_ok "Using custom port: ${PORT_CHOICE}"
-          fi
-          
-          msg_info ""
-          msg_info "To skip this prompt next time, set:"
-          msg_info "  export DC_PROXY_SOCKS5_PORT=${DC_PROXY_SOCKS5_PORT}"
-          msg_info "Or add to .env.orodc:"
-          msg_info "  echo 'DC_PROXY_SOCKS5_PORT=${DC_PROXY_SOCKS5_PORT}' >> .env.orodc"
-          msg_info ""
-        fi
-      else
-        msg_info "Using SOCKS5 port: ${DC_PROXY_SOCKS5_PORT} (from environment)"
-      fi
-      
-      # Set log level based on DEBUG environment variable
-      if [[ "${DEBUG:-}" == "1" ]]; then
-        export TRAEFIK_LOG_LEVEL="DEBUG"
-      else
-        export TRAEFIK_LOG_LEVEL="WARNING"
-      fi
-      
-      # Pass all remaining arguments to docker compose up
-      proxy_cmd="${DOCKER_COMPOSE_BIN} -p proxy -f \"$PROXY_COMPOSE_FILE\" up $*"
-      
-      # Use spinner for detached mode
-      if [[ "$*" == *"-d"* ]]; then
-        run_with_spinner "Starting proxy services" "$proxy_cmd" || {
-          msg_error "Failed to start proxy services"
-          exit 1
-        }
-        
-        msg_info ""
-        msg_info "Bind address: ${TRAEFIK_BIND_ADDRESS:-127.0.0.1}"
-        msg_info "Dashboard:    http://${TRAEFIK_BIND_ADDRESS:-127.0.0.1}:8880/traefik/dashboard/"
-        msg_info "Proxy HTTP:   http://${TRAEFIK_BIND_ADDRESS:-127.0.0.1}:8880"
-        msg_info "Proxy HTTPS:  https://${TRAEFIK_BIND_ADDRESS:-127.0.0.1}:8443"
-        msg_info "SOCKS5:       ${TRAEFIK_BIND_ADDRESS:-127.0.0.1}:${DC_PROXY_SOCKS5_PORT:-1080}"
-        msg_info ""
-        msg_warning "To enable HTTPS for *.docker.local domains, install CA certificate:"
-        msg_info ""
-        msg_info "  orodc proxy install-certs"
-        msg_info ""
-      else
-        # Foreground mode - show full output
-        ${DOCKER_COMPOSE_BIN} -p proxy -f "$PROXY_COMPOSE_FILE" up "$@" || {
-          msg_error "Failed to start proxy services"
-          exit 1
-        }
-      fi
-      
+  case "$BUILD_TARGET" in
+    list|"")
+      msg_header "OroDC Docker Images"
+      msg_info ""
+      msg_info "Available images to build:"
+      msg_info ""
+      msg_info "  nginx     - Nginx web server (orodc-nginx:latest)"
+      msg_info "  mail      - Mailpit mail catcher (orodc-mail:latest)"
+      msg_info "  pgsql     - PostgreSQL database (orodc-pgsql:VERSION)"
+      msg_info "              Versions: 15.1, 16.6, 17.4"
+      msg_info "  all       - Build all images above"
+      msg_info ""
+      msg_info "Usage:"
+      msg_info "  orodc docker-build <image> [options]"
+      msg_info ""
+      msg_info "Options:"
+      msg_info "  --no-cache    Build without cache"
+      msg_info "  --push        Push to GHCR after build"
+      msg_info "  --version=X   PostgreSQL version (for pgsql)"
+      msg_info ""
+      msg_info "Examples:"
+      msg_info "  orodc docker-build nginx"
+      msg_info "  orodc docker-build pgsql 17.4"
+      msg_info "  orodc docker-build pgsql --version=16.6"
+      msg_info "  orodc docker-build all --no-cache"
+      msg_info "  orodc docker-build mail --push"
+      msg_info ""
+      msg_info "Note: PHP images use 'orodc image build' (multi-stage interactive)"
+      msg_info ""
       exit 0
       ;;
     
-    down)
-      proxy_down_cmd="${DOCKER_COMPOSE_BIN} -p proxy -f \"$PROXY_COMPOSE_FILE\" down $*"
+    nginx)
+      msg_header "Building Nginx Image"
+      build_image \
+        "${DOCKER_DIR}/nginx/Dockerfile" \
+        "${DOCKER_DIR}/nginx/" \
+        "ghcr.io/digitalspacestdio/orodc-nginx:latest" \
+        "Nginx"
+      exit $?
+      ;;
+    
+    mail)
+      msg_header "Building Mailpit Image"
+      build_image \
+        "${DOCKER_DIR}/mail/Dockerfile" \
+        "${DOCKER_DIR}/mail/" \
+        "ghcr.io/digitalspacestdio/orodc-mail:latest" \
+        "Mailpit"
+      exit $?
+      ;;
+    
+    pgsql)
+      msg_header "Building PostgreSQL Image"
       
-      run_with_spinner "Stopping proxy services" "$proxy_down_cmd" || {
-        msg_error "Failed to stop proxy services"
+      # Default versions if not specified
+      if [[ -z "$PG_VERSION" ]]; then
+        PG_VERSIONS=("15.1" "16.6" "17.4")
+        msg_info "Building all PostgreSQL versions: ${PG_VERSIONS[*]}"
+      else
+        PG_VERSIONS=("$PG_VERSION")
+      fi
+      
+      FAILED=0
+      for ver in "${PG_VERSIONS[@]}"; do
+        msg_info ""
+        build_image \
+          "${DOCKER_DIR}/pgsql/Dockerfile" \
+          "${DOCKER_DIR}/pgsql/" \
+          "ghcr.io/digitalspacestdio/orodc-pgsql:${ver}" \
+          "PostgreSQL ${ver}" \
+          "PG_VERSION=${ver}" || FAILED=1
+      done
+      
+      exit $FAILED
+      ;;
+    
+    all)
+      msg_header "Building All OroDC Images"
+      msg_info ""
+      
+      BUILT=()
+      FAILED=()
+      
+      # Nginx
+      msg_info "=== Nginx ==="
+      if build_image \
+        "${DOCKER_DIR}/nginx/Dockerfile" \
+        "${DOCKER_DIR}/nginx/" \
+        "ghcr.io/digitalspacestdio/orodc-nginx:latest" \
+        "Nginx"; then
+        BUILT+=("nginx")
+      else
+        FAILED+=("nginx")
+      fi
+      
+      msg_info ""
+      
+      # Mail
+      msg_info "=== Mailpit ==="
+      if build_image \
+        "${DOCKER_DIR}/mail/Dockerfile" \
+        "${DOCKER_DIR}/mail/" \
+        "ghcr.io/digitalspacestdio/orodc-mail:latest" \
+        "Mailpit"; then
+        BUILT+=("mail")
+      else
+        FAILED+=("mail")
+      fi
+      
+      msg_info ""
+      
+      # PostgreSQL (all versions)
+      msg_info "=== PostgreSQL ==="
+      for ver in 15.1 16.6 17.4; do
+        if build_image \
+          "${DOCKER_DIR}/pgsql/Dockerfile" \
+          "${DOCKER_DIR}/pgsql/" \
+          "ghcr.io/digitalspacestdio/orodc-pgsql:${ver}" \
+          "PostgreSQL ${ver}" \
+          "PG_VERSION=${ver}"; then
+          BUILT+=("pgsql:${ver}")
+        else
+          FAILED+=("pgsql:${ver}")
+        fi
+      done
+      
+      # Summary
+      msg_info ""
+      msg_header "Build Summary"
+      
+      if [[ ${#BUILT[@]} -gt 0 ]]; then
+        msg_ok "Built: ${BUILT[*]}"
+      fi
+      
+      if [[ ${#FAILED[@]} -gt 0 ]]; then
+        msg_error "Failed: ${FAILED[*]}"
         exit 1
-      }
-      exit 0
-      ;;
-    
-    purge)
-      proxy_purge_cmd="${DOCKER_COMPOSE_BIN} -p proxy -f \"$PROXY_COMPOSE_FILE\" down -v $*"
+      fi
       
-      run_with_spinner "Removing proxy services and volumes" "$proxy_purge_cmd" || {
-        msg_error "Failed to remove proxy services"
-        exit 1
-      }
-      exit 0
-      ;;
-    
-    install-certs)
-      install_proxy_certs
+      msg_ok "All images built successfully!"
       exit 0
       ;;
     
     *)
-      msg_error "Unknown proxy command: ${PROXY_CMD}"
+      msg_error "Unknown image type: ${BUILD_TARGET}"
       msg_info ""
-      msg_info "Available proxy commands:"
-      msg_info "  orodc proxy up [-d]       - Start proxy (use -d for detached mode)"
-      msg_info "  orodc proxy down          - Stop proxy (keeps volumes)"
-      msg_info "  orodc proxy purge         - Remove proxy and volumes"
-      msg_info "  orodc proxy install-certs - Install CA certificates to system"
+      msg_info "Run 'orodc docker-build list' to see available images"
       msg_info ""
       exit 1
       ;;
-  esac
-fi
+    esac
+    ;;
 
-# Handle image commands early - they don't require project initialization
-if [[ "$temp_first_non_flag_arg" == "image" ]]; then
-  # Initialize minimal dependencies for image commands
-  DOCKER_BIN=$(resolve_bin "docker" "Docker is required. Install from https://docs.docker.com/get-docker/")
+  # Handle image commands early - they don't require project initialization
+  image)
+    # Initialize minimal dependencies for image commands
+    DOCKER_BIN=$(resolve_bin "docker" "Docker is required. Install from https://docs.docker.com/get-docker/")
   
   # Get OroDC install directory
   SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -3004,8 +2974,22 @@ if [[ "$temp_first_non_flag_arg" == "image" ]]; then
       msg_info ""
       exit 1
       ;;
+    esac
+    ;;
+esac
+
+# Check if a command is a docker compose command
+is_compose_command() {
+  local cmd="$1"
+  case "$cmd" in
+    up|down|start|stop|restart|exec|run|build|pull|push|logs|ps|top|config|kill|rm|create|pause|unpause|port|images|events|wait|ls|scale|version)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
   esac
-fi
+}
 
 # Check if we need argument parsing
 # Parse for docker compose commands OR commands with docker compose flags
@@ -3133,14 +3117,9 @@ DOCKER_COMPOSE_BIN="$DOCKER_BIN compose"
 # This variable is reused throughout the script and in the test merging logic
 DOCKER_COMPOSE_BIN_CMD="$DOCKER_COMPOSE_BIN"
 DOCKER_COMPOSE_VERSION=$($DOCKER_COMPOSE_BIN_CMD version | grep -E '[0-9]+\.[0-9]+\.[0-9]+' -o | head -1 |awk -F. '{ print $1 }')
-# Sync compose files with --delete to remove outdated cached configs
-# Exclude SSH keys, cached profiles, and generated compose.yml
-${RSYNC_BIN} -r --delete \
-  --exclude='ssh_id_*' \
-  --exclude='.cached_*' \
-  --exclude='compose.yml' \
-  --exclude='.xdebug_env' \
-  "${DIR}/compose/" "${DC_ORO_CONFIG_DIR}/"
+
+# Note: Compose files sync moved to initialize_environment (libexec/orodc/lib/environment.sh)
+# This ensures DC_ORO_CONFIG_DIR is properly set before rsync runs
 
 # Setup certificates synchronization
 setup_project_certificates() {
@@ -3627,6 +3606,11 @@ elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "mariadb" ]] || [[ "${DC_ORO_DATABASE_SCH
   export DC_ORO_DATABASE_PORT=${DC_ORO_DATABASE_PORT:-3306}
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-mysql.yml"
 fi
+
+# Include consumer service only for Oro Platform projects
+if is_oro_project && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-consumer.yml" ]]; then
+  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-consumer.yml"
+fi
 if ${DOCKER_COMPOSE_BIN_CMD} ps --services 2>/dev/null | grep database > /dev/null; then
   SERVICE_DATABASE_ID=$(${DOCKER_COMPOSE_BIN_CMD} ps -q database)
   if [[ "" != $SERVICE_DATABASE_ID ]] && ${DOCKER_BIN} inspect -f '{{ .Config.Image }}' "$SERVICE_DATABASE_ID" | grep -q 'busybox'; then
@@ -3639,6 +3623,48 @@ if [[ -f "$DC_ORO_APPDIR/.docker-compose.user.yml" ]]; then
   msg_info "Additional ${DOCKER_BIN} compose config will be used: $DC_ORO_APPDIR/.docker-compose.user.yml"
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f $DC_ORO_APPDIR/.docker-compose.user.yml"
 fi
+
+# Detect if project is an Oro Platform-based project
+# Checks composer.json for Oro ecosystem packages
+# Returns 0 (true) if Oro project, 1 (false) otherwise
+# Override with DC_ORO_IS_ORO_PROJECT environment variable (1/true or 0/false)
+is_oro_project() {
+  # Check for explicit override first
+  if [[ -n "${DC_ORO_IS_ORO_PROJECT:-}" ]]; then
+    case "${DC_ORO_IS_ORO_PROJECT,,}" in
+      1|true|yes)
+        return 0
+        ;;
+      0|false|no)
+        return 1
+        ;;
+    esac
+  fi
+  
+  # Auto-detect from composer.json
+  local composer_file="${DC_ORO_APPDIR:-$PWD}/composer.json"
+  if [[ ! -f "$composer_file" ]]; then
+    return 1
+  fi
+  
+  # Check for Oro ecosystem packages in require section
+  # Uses jq if available for reliable JSON parsing
+  if command -v jq >/dev/null 2>&1; then
+    local oro_packages
+    oro_packages=$(jq -r '.require // {} | keys[]' "$composer_file" 2>/dev/null | \
+      grep -E '^(oro/platform|oro/commerce|oro/crm|oro/customer-portal|marello/marello)$' | head -1)
+    if [[ -n "$oro_packages" ]]; then
+      return 0
+    fi
+  else
+    # Fallback: grep-based detection (less reliable but works without jq)
+    if grep -qE '"(oro/platform|oro/commerce|oro/crm|oro/customer-portal|marello/marello)"' "$composer_file" 2>/dev/null; then
+      return 0
+    fi
+  fi
+  
+  return 1
+}
 
 # Auto-detect PHP version from composer.json
 detect_php_version_from_composer() {
@@ -3751,26 +3777,45 @@ if [[ -z $DC_ORO_NODE_VERSION ]]; then
   fi
 fi
 
+# Only sync if we're in a valid Oro project
+# This prevents accidentally syncing non-project directories (like home directory)
+# Valid project MUST have one of: composer.json OR .env.orodc (local OR global)
 if [[ "${DC_ORO_MODE}" == "mutagen" ]] || [[ "${DC_ORO_MODE}" == "ssh" ]]; then
-  if [[ ${args[0]} != "down" ]] && [[ ${args[0]} != "purge" ]]; then
-    ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
-      ${DOCKER_BIN} volume create "${DC_ORO_NAME}_appcode"  > /dev/null
-      msg_info "Copying source code to the '${DC_ORO_NAME}_appcode' docker volume"
-      bash -c "${DOCKER_COMPOSE_BIN_CMD} up -d ssh"
-      SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
-      SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
-      if [[ 0 -eq $(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o 'ForwardAgent no' -o IdentitiesOnly=yes -i "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" -p ${SSH_PORT} ${ORO_DC_SSH_ARGS} ${DC_ORO_USER_NAME}@${SSH_HOST} sh -c 'ls "'${DC_ORO_APPDIR}'/"' | wc -l) ]]; then
-        until ${RSYNC_BIN} --exclude var/cache --exclude vendor --exclude node_modules --links -e "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o 'ForwardAgent no' -o IdentitiesOnly=yes -i ${DC_ORO_CONFIG_DIR}/ssh_id_ed25519 -p ${SSH_PORT} ${ORO_DC_SSH_ARGS}" --timeout=3 --info=progress2 -r "${DC_ORO_APPDIR}/" ${DC_ORO_USER_NAME}@${SSH_HOST}:"${DC_ORO_APPDIR}/" 2> /dev/null; do
-          echo -n ".";
-          sleep 3
-        done
-        echo "";
-      fi
-    }
+  # Check if we're in valid project:
+  # 1. DC_ORO_APPDIR is set AND DC_ORO_NAME is set (project was initialized)
+  # 2. DC_ORO_APPDIR is NOT the home directory or root (prevent accidental sync)
+  # 3. Has composer.json OR .env.orodc (local) OR .env.orodc (global) - REQUIRED!
+  if [[ -n "${DC_ORO_APPDIR:-}" ]] && [[ -n "${DC_ORO_NAME:-}" ]] && \
+     [[ "${DC_ORO_APPDIR}" != "${HOME}" ]] && [[ "${DC_ORO_APPDIR}" != "/" ]] && \
+     ( [[ -f "${DC_ORO_APPDIR}/composer.json" ]] || \
+       [[ -f "${DC_ORO_APPDIR}/.env.orodc" ]] || \
+       [[ -f "${HOME}/.orodc/${DC_ORO_NAME}/.env.orodc" ]] ); then
+    if [[ ${args[0]} != "down" ]] && [[ ${args[0]} != "purge" ]]; then
+      ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
+        ${DOCKER_BIN} volume create "${DC_ORO_NAME}_appcode"  > /dev/null
+        msg_info "Copying source code to the '${DC_ORO_NAME}_appcode' docker volume"
+        bash -c "${DOCKER_COMPOSE_BIN_CMD} up -d ssh"
+        SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
+        SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
+        if [[ 0 -eq $(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o 'ForwardAgent no' -o IdentitiesOnly=yes -i "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" -p ${SSH_PORT} ${ORO_DC_SSH_ARGS} ${DC_ORO_USER_NAME}@${SSH_HOST} sh -c 'ls "'${DC_ORO_APPDIR}'/"' | wc -l) ]]; then
+          until ${RSYNC_BIN} --exclude var/cache --exclude vendor --exclude node_modules --links -e "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o 'ForwardAgent no' -o IdentitiesOnly=yes -i ${DC_ORO_CONFIG_DIR}/ssh_id_ed25519 -p ${SSH_PORT} ${ORO_DC_SSH_ARGS}" --timeout=3 --info=progress2 -r "${DC_ORO_APPDIR}/" ${DC_ORO_USER_NAME}@${SSH_HOST}:"${DC_ORO_APPDIR}/" 2> /dev/null; do
+            echo -n ".";
+            sleep 3
+          done
+          echo "";
+        fi
+      }
+    fi
   fi
 fi
 
-if [[ "${DC_ORO_MODE}" == "mutagen" ]]; then
+# Only setup mutagen if we're in a valid Oro project
+# Valid project MUST have one of: composer.json OR .env.orodc (local OR global)
+if [[ "${DC_ORO_MODE}" == "mutagen" ]] && [[ -n "${DC_ORO_APPDIR:-}" ]] && [[ -n "${DC_ORO_NAME:-}" ]] && \
+   [[ "${DC_ORO_APPDIR}" != "${HOME}" ]] && [[ "${DC_ORO_APPDIR}" != "/" ]] && \
+   ( [[ -f "${DC_ORO_APPDIR}/composer.json" ]] || \
+     [[ -f "${DC_ORO_APPDIR}/.env.orodc" ]] || \
+     [[ -f "${HOME}/.orodc/${DC_ORO_NAME}/.env.orodc" ]] ); then
   MUTAGEN_SESSION_NAME=$(echo ${DC_ORO_NAME}-appcode | awk '{print tolower($0)}' | sed 's/[^0-9a-z]/-/g')
   WAIT_SYNC="1"
 
@@ -4102,7 +4147,7 @@ fi
 is_orodc_special_command() {
   local cmd="$1"
   case "$cmd" in
-    psql|mysql|database-cli|ssh|cli|install|purge|help|man|tests|test|bash|config-refresh|refresh-config|init)
+    psql|mysql|database-cli|ssh|cli|install|purge|help|man|tests|test|bash|config-refresh|refresh-config)
       return 0
       ;;
     # Database import/export commands
@@ -4758,564 +4803,6 @@ if [[ -n "${DEBUG:-}" ]]; then
   echo "DEBUG: Checking purge condition: first_non_flag_arg='$first_non_flag_arg'" >&2
 fi
 
-# Handle init command (interactive service configuration)
-if [[ "$first_non_flag_arg" == "init" ]]; then
-  msg_header "OroDC Interactive Configuration"
-  msg_info "This will help you configure services for your project"
-  echo ""
-  
-  ENV_FILE=".env.orodc"
-  
-  # Load existing configuration if available
-  EXISTING_PHP_VERSION=""
-  EXISTING_NODE_VERSION=""
-  EXISTING_COMPOSER_VERSION=""
-  EXISTING_PHP_IMAGE=""
-  EXISTING_DB_SCHEMA=""
-  EXISTING_DB_VERSION=""
-  EXISTING_DB_IMAGE=""
-  EXISTING_SEARCH_ENGINE=""
-  EXISTING_SEARCH_VERSION=""
-  EXISTING_SEARCH_IMAGE=""
-  EXISTING_CACHE_ENGINE=""
-  EXISTING_CACHE_VERSION=""
-  EXISTING_CACHE_IMAGE=""
-  EXISTING_RABBITMQ_VERSION=""
-  EXISTING_RABBITMQ_IMAGE=""
-  
-  if [[ -f "$ENV_FILE" ]]; then
-    msg_info "Found existing configuration, loading current values..."
-    
-    # Source the file to load variables
-    while IFS='=' read -r key value; do
-      # Skip comments and empty lines
-      [[ "$key" =~ ^#.*$ ]] && continue
-      [[ -z "$key" ]] && continue
-      
-      # Remove quotes if present
-      value="${value%\"}"
-      value="${value#\"}"
-      value="${value%\'}"
-      value="${value#\'}"
-      
-      case "$key" in
-        DC_ORO_PHP_VERSION) EXISTING_PHP_VERSION="$value" ;;
-        DC_ORO_NODE_VERSION) EXISTING_NODE_VERSION="$value" ;;
-        DC_ORO_COMPOSER_VERSION) EXISTING_COMPOSER_VERSION="$value" ;;
-        DC_ORO_PHP_IMAGE) EXISTING_PHP_IMAGE="$value" ;;
-        DC_ORO_DATABASE_SCHEMA) EXISTING_DB_SCHEMA="$value" ;;
-        DC_ORO_DATABASE_VERSION) EXISTING_DB_VERSION="$value" ;;
-        DC_ORO_DATABASE_IMAGE) EXISTING_DB_IMAGE="$value" ;;
-        DC_ORO_SEARCH_ENGINE) EXISTING_SEARCH_ENGINE="$value" ;;
-        DC_ORO_SEARCH_VERSION) EXISTING_SEARCH_VERSION="$value" ;;
-        DC_ORO_SEARCH_IMAGE) EXISTING_SEARCH_IMAGE="$value" ;;
-        DC_ORO_CACHE_ENGINE) EXISTING_CACHE_ENGINE="$value" ;;
-        DC_ORO_CACHE_VERSION) EXISTING_CACHE_VERSION="$value" ;;
-        DC_ORO_CACHE_IMAGE) EXISTING_CACHE_IMAGE="$value" ;;
-        DC_ORO_RABBITMQ_VERSION) EXISTING_RABBITMQ_VERSION="$value" ;;
-        DC_ORO_RABBITMQ_IMAGE) EXISTING_RABBITMQ_IMAGE="$value" ;;
-      esac
-    done < "$ENV_FILE"
-    
-    echo ""
-  fi
-  
-  # Function to get compatible Node.js versions based on PHP version (sorted newest to oldest)
-  get_compatible_node_versions() {
-    local php_ver="$1"
-    case "$php_ver" in
-      7.3) echo "16" ;;
-      7.4) echo "18 16" ;;
-      8.1) echo "22 20 18 16" ;;
-      8.2|8.3|8.4) echo "22 20 18" ;;
-      8.5) echo "24 22" ;;
-      *) echo "22 20 18" ;;
-    esac
-  }
-  
-  # Function to prompt for selection with validation and retry
-  prompt_select() {
-    local prompt="$1"
-    local default="$2"
-    shift 2
-    local options=("$@")
-    local result=""
-    
-    # Debug: show what we received
-    if [[ -n "${DEBUG:-}" ]]; then
-      >&2 echo "DEBUG: prompt='$prompt', default='$default', options count=${#options[@]}"
-      >&2 echo "DEBUG: options=(${options[*]})"
-    fi
-    
-    # Check if we have options
-    if [[ ${#options[@]} -eq 0 ]]; then
-      >&2 echo "ERROR: No options provided!"
-      echo "$default"
-      return
-    fi
-    
-    while true; do
-      # Output to stderr to avoid interfering with return value
-      >&2 echo -e "\033[36m==> $prompt\033[0m"
-      
-      local i=1
-      for opt in "${options[@]}"; do
-        if [[ "$opt" == "$default" ]]; then
-          >&2 echo "  $i) $opt [default]"
-        else
-          >&2 echo "  $i) $opt"
-        fi
-        ((i++))
-      done
-      
-      # Read from terminal
-      local selection
-      >&2 echo -n "Select [1-${#options[@]}] (default: $default): "
-      read selection </dev/tty
-      
-      # Empty input - use default
-      if [[ -z "$selection" ]]; then
-        result="$default"
-        break
-      fi
-      
-      # Check if input is a valid number
-      if [[ ! "$selection" =~ ^[0-9]+$ ]]; then
-        >&2 echo -e "\033[31mInvalid input: '$selection'. Please enter a number between 1 and ${#options[@]}.\033[0m"
-        continue
-      fi
-      
-      # Check if number is in valid range
-      local idx=$((selection - 1))
-      if [[ $idx -ge 0 && $idx -lt ${#options[@]} ]]; then
-        result="${options[$idx]}"
-        break
-      else
-        >&2 echo -e "\033[31mInvalid choice: '$selection'. Please enter a number between 1 and ${#options[@]}.\033[0m"
-      fi
-    done
-    
-    # Debug output if needed
-    if [[ -n "${DEBUG:-}" ]]; then
-      >&2 echo "DEBUG: prompt_select returned: '$result'"
-    fi
-    
-    # Return selected value to stdout
-    echo "$result"
-  }
-  
-  # Function to prompt yes/no with default and validation
-  prompt_yes_no() {
-    local prompt="$1"
-    local default="${2:-yes}"
-    local answer
-    
-    while true; do
-      if [[ "$default" == "yes" ]]; then
-        >&2 echo -n "$prompt [Y/n]: "
-        read answer </dev/tty
-        answer="${answer:-y}"
-      else
-        >&2 echo -n "$prompt [y/N]: "
-        read answer </dev/tty
-        answer="${answer:-n}"
-      fi
-      
-      # Accept: y, yes, Y, YES, n, no, N, NO
-      case "${answer,,}" in  # Convert to lowercase
-        y|yes) return 0 ;;
-        n|no) return 1 ;;
-        *)
-          >&2 echo "Invalid input: '$answer'. Please enter 'y' (yes) or 'n' (no)."
-          ;;
-      esac
-    done
-  }
-  
-  # 1. PHP Configuration
-  echo ""
-  msg_header "1. PHP Configuration"
-  
-  # Determine if using custom image
-  USE_CUSTOM_PHP=false
-  if [[ -n "$EXISTING_PHP_IMAGE" ]] && [[ ! "$EXISTING_PHP_IMAGE" =~ ^ghcr\.io/digitalspacestdio/orodc-php-node-symfony: ]]; then
-    USE_CUSTOM_PHP=true
-  fi
-  
-  if prompt_yes_no "Use custom PHP image?" "$([ "$USE_CUSTOM_PHP" = true ] && echo yes || echo no)"; then
-    >&2 echo -n "Enter custom PHP image$([ -n "$EXISTING_PHP_IMAGE" ] && echo " [current: $EXISTING_PHP_IMAGE]" || echo ""): "
-    read SELECTED_PHP_IMAGE </dev/tty
-    # If empty, keep existing
-    if [[ -z "$SELECTED_PHP_IMAGE" ]] && [[ -n "$EXISTING_PHP_IMAGE" ]]; then
-      SELECTED_PHP_IMAGE="$EXISTING_PHP_IMAGE"
-    fi
-    # Extract versions from custom image if possible (or use defaults/existing)
-    SELECTED_PHP="${EXISTING_PHP_VERSION:-8.4}"
-    SELECTED_NODE="${EXISTING_NODE_VERSION:-22}"
-    SELECTED_COMPOSER="${EXISTING_COMPOSER_VERSION:-2}"
-  else
-    # Select PHP version (sorted newest to oldest)
-    PHP_VERSIONS=("8.5" "8.4" "8.3" "8.2" "8.1" "7.4" "7.3")
-    DEFAULT_PHP="${EXISTING_PHP_VERSION:-8.4}"
-    SELECTED_PHP=$(prompt_select "Select PHP version:" "$DEFAULT_PHP" "${PHP_VERSIONS[@]}")
-    
-    if [[ -n "${DEBUG:-}" ]]; then
-      >&2 echo "DEBUG: Selected PHP: '$SELECTED_PHP'"
-    fi
-    
-    # Select Node.js version (based on PHP compatibility)
-    read -ra COMPATIBLE_NODE_VERSIONS <<< "$(get_compatible_node_versions "$SELECTED_PHP")"
-    
-    # Determine default Node.js version based on PHP or existing config
-    if [[ -n "$EXISTING_NODE_VERSION" ]] && [[ " ${COMPATIBLE_NODE_VERSIONS[*]} " =~ " ${EXISTING_NODE_VERSION} " ]]; then
-      DEFAULT_NODE="$EXISTING_NODE_VERSION"
-    else
-      case "$SELECTED_PHP" in
-        8.5) DEFAULT_NODE="24" ;;
-        8.4) DEFAULT_NODE="22" ;;
-        8.1|8.2|8.3) DEFAULT_NODE="20" ;;
-        7.3|7.4) DEFAULT_NODE="16" ;;
-        *) DEFAULT_NODE="22" ;;
-      esac
-      
-      # Ensure default is in compatible versions list
-      if [[ ! " ${COMPATIBLE_NODE_VERSIONS[*]} " =~ " ${DEFAULT_NODE} " ]]; then
-        DEFAULT_NODE="${COMPATIBLE_NODE_VERSIONS[0]}"
-      fi
-    fi
-    
-    SELECTED_NODE=$(prompt_select "Select Node.js version (compatible with PHP $SELECTED_PHP):" "$DEFAULT_NODE" "${COMPATIBLE_NODE_VERSIONS[@]}")
-    
-    if [[ -n "${DEBUG:-}" ]]; then
-      >&2 echo "DEBUG: Selected Node.js: '$SELECTED_NODE'"
-    fi
-    
-    # Select Composer version (only for PHP 7.3, others use Composer 2 automatically)
-    if [[ "$SELECTED_PHP" == "7.3" ]]; then
-      COMPOSER_VERSIONS=("1" "2")
-      # Default Composer version for PHP 7.3
-      if [[ -n "$EXISTING_COMPOSER_VERSION" ]]; then
-        DEFAULT_COMPOSER="$EXISTING_COMPOSER_VERSION"
-      else
-        DEFAULT_COMPOSER="1"
-      fi
-      
-      SELECTED_COMPOSER=$(prompt_select "Select Composer version:" "$DEFAULT_COMPOSER" "${COMPOSER_VERSIONS[@]}")
-      
-      if [[ -n "${DEBUG:-}" ]]; then
-        >&2 echo "DEBUG: Selected Composer: '$SELECTED_COMPOSER'"
-      fi
-    else
-      # PHP 7.4+ always uses Composer 2
-      SELECTED_COMPOSER="2"
-      if [[ -n "${DEBUG:-}" ]]; then
-        >&2 echo "DEBUG: Using Composer 2 (automatic for PHP $SELECTED_PHP)"
-      fi
-    fi
-    
-    # Build default image name
-    SELECTED_PHP_IMAGE="ghcr.io/digitalspacestdio/orodc-php-node-symfony:${SELECTED_PHP}-node${SELECTED_NODE}-composer${SELECTED_COMPOSER}-alpine"
-  fi
-  
-  msg_info "PHP Image: $SELECTED_PHP_IMAGE"
-  
-  # 2. Database Configuration
-  echo ""
-  msg_header "2. Database Configuration"
-  
-  # Determine if using custom database image
-  USE_CUSTOM_DB=false
-  if [[ -n "$EXISTING_DB_IMAGE" ]] && [[ ! "$EXISTING_DB_IMAGE" =~ ^(ghcr\.io/digitalspacestdio/orodc-pgsql:|mysql:) ]]; then
-    USE_CUSTOM_DB=true
-  fi
-  
-  if prompt_yes_no "Use custom database image?" "$([ "$USE_CUSTOM_DB" = true ] && echo yes || echo no)"; then
-    >&2 echo -n "Enter custom database image$([ -n "$EXISTING_DB_IMAGE" ] && echo " [current: $EXISTING_DB_IMAGE]" || echo ""): "
-    read SELECTED_DB_IMAGE </dev/tty
-    # If empty, keep existing
-    if [[ -z "$SELECTED_DB_IMAGE" ]] && [[ -n "$EXISTING_DB_IMAGE" ]]; then
-      SELECTED_DB_IMAGE="$EXISTING_DB_IMAGE"
-    fi
-    SELECTED_DB_SCHEMA="${EXISTING_DB_SCHEMA:-pgsql}"
-    SELECTED_DB_VERSION="${EXISTING_DB_VERSION:-custom}"
-  else
-    # Select database type based on existing or default
-    DB_TYPES=("PostgreSQL" "MySQL")
-    if [[ "$EXISTING_DB_SCHEMA" == "mysql" ]]; then
-      DEFAULT_DB_TYPE="MySQL"
-    else
-      DEFAULT_DB_TYPE="PostgreSQL"
-    fi
-    SELECTED_DB_TYPE=$(prompt_select "Select database type:" "$DEFAULT_DB_TYPE" "${DB_TYPES[@]}")
-    
-    if [[ -n "${DEBUG:-}" ]]; then
-      >&2 echo "DEBUG: Selected DB type: '$SELECTED_DB_TYPE'"
-    fi
-    
-    # Select version based on type (sorted newest to oldest)
-    if [[ "$SELECTED_DB_TYPE" == "PostgreSQL" ]]; then
-      PGSQL_VERSIONS=("17.4" "16.6" "15.1")
-      # Only use existing version if it's valid for PostgreSQL and schema hasn't changed
-      if [[ "$EXISTING_DB_SCHEMA" == "pgsql" ]] && [[ " ${PGSQL_VERSIONS[*]} " =~ " ${EXISTING_DB_VERSION} " ]]; then
-        DEFAULT_PGSQL_VERSION="$EXISTING_DB_VERSION"
-      else
-        DEFAULT_PGSQL_VERSION="16.6"
-      fi
-      SELECTED_DB_VERSION=$(prompt_select "Select PostgreSQL version:" "$DEFAULT_PGSQL_VERSION" "${PGSQL_VERSIONS[@]}")
-      SELECTED_DB_SCHEMA="pgsql"
-      SELECTED_DB_IMAGE="ghcr.io/digitalspacestdio/orodc-pgsql:${SELECTED_DB_VERSION}"
-    else
-      MYSQL_VERSIONS=("9.0" "8.4" "8.0" "5.7")
-      # Only use existing version if it's valid for MySQL and schema hasn't changed
-      if [[ "$EXISTING_DB_SCHEMA" == "mysql" ]] && [[ " ${MYSQL_VERSIONS[*]} " =~ " ${EXISTING_DB_VERSION} " ]]; then
-        DEFAULT_MYSQL_VERSION="$EXISTING_DB_VERSION"
-      else
-        DEFAULT_MYSQL_VERSION="8.4"
-      fi
-      SELECTED_DB_VERSION=$(prompt_select "Select MySQL version:" "$DEFAULT_MYSQL_VERSION" "${MYSQL_VERSIONS[@]}")
-      SELECTED_DB_SCHEMA="mysql"
-      SELECTED_DB_IMAGE="mysql:${SELECTED_DB_VERSION}"
-    fi
-  fi
-  
-  msg_info "Database Image: $SELECTED_DB_IMAGE"
-  
-  # 3. Search Engine Configuration
-  echo ""
-  msg_header "3. Search Engine Configuration"
-  
-  # Determine if using custom search image
-  USE_CUSTOM_SEARCH=false
-  if [[ -n "$EXISTING_SEARCH_IMAGE" ]] && [[ ! "$EXISTING_SEARCH_IMAGE" =~ ^(docker\.elastic\.co/elasticsearch/elasticsearch:|opensearchproject/opensearch:) ]]; then
-    USE_CUSTOM_SEARCH=true
-  fi
-  
-  if prompt_yes_no "Use custom search engine image?" "$([ "$USE_CUSTOM_SEARCH" = true ] && echo yes || echo no)"; then
-    >&2 echo -n "Enter custom search image$([ -n "$EXISTING_SEARCH_IMAGE" ] && echo " [current: $EXISTING_SEARCH_IMAGE]" || echo ""): "
-    read SELECTED_SEARCH_IMAGE </dev/tty
-    # If empty, keep existing
-    if [[ -z "$SELECTED_SEARCH_IMAGE" ]] && [[ -n "$EXISTING_SEARCH_IMAGE" ]]; then
-      SELECTED_SEARCH_IMAGE="$EXISTING_SEARCH_IMAGE"
-    fi
-    SELECTED_SEARCH_TYPE="${EXISTING_SEARCH_ENGINE:-Custom}"
-    SELECTED_SEARCH_VERSION="${EXISTING_SEARCH_VERSION:-custom}"
-  else
-    # Select search engine type based on existing or default
-    SEARCH_TYPES=("Elasticsearch" "OpenSearch")
-    DEFAULT_SEARCH_TYPE="${EXISTING_SEARCH_ENGINE:-Elasticsearch}"
-    SELECTED_SEARCH_TYPE=$(prompt_select "Select search engine:" "$DEFAULT_SEARCH_TYPE" "${SEARCH_TYPES[@]}")
-    
-    # Select version based on type (sorted newest to oldest)
-    if [[ "$SELECTED_SEARCH_TYPE" == "Elasticsearch" ]]; then
-      ELASTIC_VERSIONS=("8.15.0" "8.10.3" "7.17.0")
-      # Only use existing version if it's valid for Elasticsearch and type hasn't changed
-      if [[ "$EXISTING_SEARCH_ENGINE" == "Elasticsearch" ]] && [[ " ${ELASTIC_VERSIONS[*]} " =~ " ${EXISTING_SEARCH_VERSION} " ]]; then
-        DEFAULT_ELASTIC_VERSION="$EXISTING_SEARCH_VERSION"
-      else
-        DEFAULT_ELASTIC_VERSION="8.15.0"
-      fi
-      SELECTED_SEARCH_VERSION=$(prompt_select "Select Elasticsearch version:" "$DEFAULT_ELASTIC_VERSION" "${ELASTIC_VERSIONS[@]}")
-      SELECTED_SEARCH_IMAGE="docker.elastic.co/elasticsearch/elasticsearch:${SELECTED_SEARCH_VERSION}"
-    else
-      OPENSEARCH_VERSIONS=("2.15.0" "2.11.0" "1.3.0")
-      # Only use existing version if it's valid for OpenSearch and type hasn't changed
-      if [[ "$EXISTING_SEARCH_ENGINE" == "OpenSearch" ]] && [[ " ${OPENSEARCH_VERSIONS[*]} " =~ " ${EXISTING_SEARCH_VERSION} " ]]; then
-        DEFAULT_OPENSEARCH_VERSION="$EXISTING_SEARCH_VERSION"
-      else
-        DEFAULT_OPENSEARCH_VERSION="2.15.0"
-      fi
-      SELECTED_SEARCH_VERSION=$(prompt_select "Select OpenSearch version:" "$DEFAULT_OPENSEARCH_VERSION" "${OPENSEARCH_VERSIONS[@]}")
-      SELECTED_SEARCH_IMAGE="opensearchproject/opensearch:${SELECTED_SEARCH_VERSION}"
-    fi
-  fi
-  
-  msg_info "Search Image: $SELECTED_SEARCH_IMAGE"
-  
-  # 4. Cache Configuration
-  echo ""
-  msg_header "4. Cache Configuration"
-  
-  # Determine if using custom cache image
-  USE_CUSTOM_CACHE=false
-  if [[ -n "$EXISTING_CACHE_IMAGE" ]] && [[ ! "$EXISTING_CACHE_IMAGE" =~ ^(redis:|eqalpha/keydb:) ]]; then
-    USE_CUSTOM_CACHE=true
-  fi
-  
-  if prompt_yes_no "Use custom cache image?" "$([ "$USE_CUSTOM_CACHE" = true ] && echo yes || echo no)"; then
-    >&2 echo -n "Enter custom cache image$([ -n "$EXISTING_CACHE_IMAGE" ] && echo " [current: $EXISTING_CACHE_IMAGE]" || echo ""): "
-    read SELECTED_CACHE_IMAGE </dev/tty
-    # If empty, keep existing
-    if [[ -z "$SELECTED_CACHE_IMAGE" ]] && [[ -n "$EXISTING_CACHE_IMAGE" ]]; then
-      SELECTED_CACHE_IMAGE="$EXISTING_CACHE_IMAGE"
-    fi
-    SELECTED_CACHE_TYPE="${EXISTING_CACHE_ENGINE:-Custom}"
-    SELECTED_CACHE_VERSION="${EXISTING_CACHE_VERSION:-custom}"
-  else
-    # Select cache engine type based on existing or default
-    CACHE_TYPES=("Redis" "KeyDB")
-    DEFAULT_CACHE_TYPE="${EXISTING_CACHE_ENGINE:-Redis}"
-    SELECTED_CACHE_TYPE=$(prompt_select "Select cache engine:" "$DEFAULT_CACHE_TYPE" "${CACHE_TYPES[@]}")
-    
-    # Select version based on type (sorted newest to oldest)
-    if [[ "$SELECTED_CACHE_TYPE" == "Redis" ]]; then
-      REDIS_VERSIONS=("7.4" "7.2" "6.2")
-      # Only use existing version if it's valid for Redis and type hasn't changed
-      if [[ "$EXISTING_CACHE_ENGINE" == "Redis" ]] && [[ " ${REDIS_VERSIONS[*]} " =~ " ${EXISTING_CACHE_VERSION} " ]]; then
-        DEFAULT_REDIS_VERSION="$EXISTING_CACHE_VERSION"
-      else
-        DEFAULT_REDIS_VERSION="7.4"
-      fi
-      SELECTED_CACHE_VERSION=$(prompt_select "Select Redis version:" "$DEFAULT_REDIS_VERSION" "${REDIS_VERSIONS[@]}")
-      SELECTED_CACHE_IMAGE="redis:${SELECTED_CACHE_VERSION}-alpine"
-    else
-      KEYDB_VERSIONS=("6.3.4" "6.3.3")
-      # Only use existing version if it's valid for KeyDB and type hasn't changed
-      if [[ "$EXISTING_CACHE_ENGINE" == "KeyDB" ]] && [[ " ${KEYDB_VERSIONS[*]} " =~ " ${EXISTING_CACHE_VERSION} " ]]; then
-        DEFAULT_KEYDB_VERSION="$EXISTING_CACHE_VERSION"
-      else
-        DEFAULT_KEYDB_VERSION="6.3.4"
-      fi
-      SELECTED_CACHE_VERSION=$(prompt_select "Select KeyDB version:" "$DEFAULT_KEYDB_VERSION" "${KEYDB_VERSIONS[@]}")
-      SELECTED_CACHE_IMAGE="eqalpha/keydb:alpine_x86_64_v${SELECTED_CACHE_VERSION}"
-    fi
-  fi
-  
-  msg_info "Cache Image: $SELECTED_CACHE_IMAGE"
-  
-  # 5. RabbitMQ Configuration
-  echo ""
-  msg_header "5. RabbitMQ Configuration"
-  
-  # Determine if using custom RabbitMQ image
-  USE_CUSTOM_RABBITMQ=false
-  if [[ -n "$EXISTING_RABBITMQ_IMAGE" ]] && [[ ! "$EXISTING_RABBITMQ_IMAGE" =~ ^rabbitmq: ]]; then
-    USE_CUSTOM_RABBITMQ=true
-  fi
-  
-  if prompt_yes_no "Use custom RabbitMQ image?" "$([ "$USE_CUSTOM_RABBITMQ" = true ] && echo yes || echo no)"; then
-    >&2 echo -n "Enter custom RabbitMQ image$([ -n "$EXISTING_RABBITMQ_IMAGE" ] && echo " [current: $EXISTING_RABBITMQ_IMAGE]" || echo ""): "
-    read SELECTED_RABBITMQ_IMAGE </dev/tty
-    # If empty, keep existing
-    if [[ -z "$SELECTED_RABBITMQ_IMAGE" ]] && [[ -n "$EXISTING_RABBITMQ_IMAGE" ]]; then
-      SELECTED_RABBITMQ_IMAGE="$EXISTING_RABBITMQ_IMAGE"
-    fi
-    SELECTED_RABBITMQ_VERSION="${EXISTING_RABBITMQ_VERSION:-custom}"
-  else
-    # Select RabbitMQ version based on existing or default
-    RABBITMQ_VERSIONS=("3.13" "3.12" "3.11")
-    DEFAULT_RABBITMQ_VERSION="${EXISTING_RABBITMQ_VERSION:-3.13}"
-    SELECTED_RABBITMQ_VERSION=$(prompt_select "Select RabbitMQ version:" "$DEFAULT_RABBITMQ_VERSION" "${RABBITMQ_VERSIONS[@]}")
-    SELECTED_RABBITMQ_IMAGE="rabbitmq:${SELECTED_RABBITMQ_VERSION}-management-alpine"
-  fi
-  
-  msg_info "RabbitMQ Image: $SELECTED_RABBITMQ_IMAGE"
-  
-  # Summary
-  echo ""
-  msg_header "Configuration Summary"
-  echo "PHP Version: $SELECTED_PHP"
-  echo "Node.js Version: $SELECTED_NODE"
-  echo "Composer Version: $SELECTED_COMPOSER"
-  echo "PHP Image: $SELECTED_PHP_IMAGE"
-  echo "Database: $SELECTED_DB_TYPE $SELECTED_DB_VERSION"
-  echo "Database Image: $SELECTED_DB_IMAGE"
-  echo "Search Engine: $SELECTED_SEARCH_TYPE $SELECTED_SEARCH_VERSION"
-  echo "Search Image: $SELECTED_SEARCH_IMAGE"
-  echo "Cache: $SELECTED_CACHE_TYPE $SELECTED_CACHE_VERSION"
-  echo "Cache Image: $SELECTED_CACHE_IMAGE"
-  echo "RabbitMQ: $SELECTED_RABBITMQ_VERSION"
-  echo "RabbitMQ Image: $SELECTED_RABBITMQ_IMAGE"
-  echo ""
-  
-  if prompt_yes_no "Save configuration to $ENV_FILE?" "yes"; then
-    # Function to update or add env variable
-    update_env_var() {
-      local file="$1"
-      local key="$2"
-      local value="$3"
-      
-      if [[ -f "$file" ]]; then
-        # Check if key exists
-        if grep -q "^${key}=" "$file"; then
-          # Update existing key (preserve surrounding content)
-          sed -i.tmp "s|^${key}=.*|${key}=${value}|" "$file"
-          rm -f "${file}.tmp"
-        else
-          # Add new key
-          echo "${key}=${value}" >> "$file"
-        fi
-      else
-        # Create new file with key
-        echo "${key}=${value}" >> "$file"
-      fi
-    }
-    
-    # Create backup if file exists
-    if [[ -f "$ENV_FILE" ]]; then
-      cp "$ENV_FILE" "${ENV_FILE}.backup.$(date +%Y%m%d_%H%M%S)"
-      msg_info "Backup created: ${ENV_FILE}.backup.$(date +%Y%m%d_%H%M%S)"
-    else
-      # Create new file with header
-      cat > "$ENV_FILE" << EOF
-# OroDC Configuration
-# Generated by 'orodc init' on $(date)
-
-EOF
-    fi
-    
-    # Update configuration variables (preserves other variables)
-    msg_info "Updating configuration..."
-    
-    # Update header comment if this is a new init
-    if ! grep -q "# Last updated:" "$ENV_FILE" 2>/dev/null; then
-      sed -i.tmp "1i# Last updated: $(date)" "$ENV_FILE"
-      rm -f "${ENV_FILE}.tmp"
-    else
-      sed -i.tmp "s|^# Last updated:.*|# Last updated: $(date)|" "$ENV_FILE"
-      rm -f "${ENV_FILE}.tmp"
-    fi
-    
-    # PHP Configuration
-    update_env_var "$ENV_FILE" "DC_ORO_PHP_VERSION" "$SELECTED_PHP"
-    update_env_var "$ENV_FILE" "DC_ORO_NODE_VERSION" "$SELECTED_NODE"
-    update_env_var "$ENV_FILE" "DC_ORO_COMPOSER_VERSION" "$SELECTED_COMPOSER"
-    update_env_var "$ENV_FILE" "DC_ORO_PHP_IMAGE" "$SELECTED_PHP_IMAGE"
-    
-    # Database Configuration
-    update_env_var "$ENV_FILE" "DC_ORO_DATABASE_SCHEMA" "$SELECTED_DB_SCHEMA"
-    update_env_var "$ENV_FILE" "DC_ORO_DATABASE_VERSION" "$SELECTED_DB_VERSION"
-    update_env_var "$ENV_FILE" "DC_ORO_DATABASE_IMAGE" "$SELECTED_DB_IMAGE"
-    
-    # Search Engine Configuration
-    update_env_var "$ENV_FILE" "DC_ORO_SEARCH_ENGINE" "$SELECTED_SEARCH_TYPE"
-    update_env_var "$ENV_FILE" "DC_ORO_SEARCH_VERSION" "$SELECTED_SEARCH_VERSION"
-    update_env_var "$ENV_FILE" "DC_ORO_SEARCH_IMAGE" "$SELECTED_SEARCH_IMAGE"
-    
-    # Cache Configuration
-    update_env_var "$ENV_FILE" "DC_ORO_CACHE_ENGINE" "$SELECTED_CACHE_TYPE"
-    update_env_var "$ENV_FILE" "DC_ORO_CACHE_VERSION" "$SELECTED_CACHE_VERSION"
-    update_env_var "$ENV_FILE" "DC_ORO_CACHE_IMAGE" "$SELECTED_CACHE_IMAGE"
-    
-    # RabbitMQ Configuration
-    update_env_var "$ENV_FILE" "DC_ORO_RABBITMQ_VERSION" "$SELECTED_RABBITMQ_VERSION"
-    update_env_var "$ENV_FILE" "DC_ORO_RABBITMQ_IMAGE" "$SELECTED_RABBITMQ_IMAGE"
-    
-    msg_ok "Configuration saved to $ENV_FILE"
-    msg_info "All other variables in the file were preserved"
-    msg_info "You can now run 'orodc install' to set up your environment"
-
-    # Register environment in registry after successful init
-    if [[ -n "${DC_ORO_NAME:-}" ]] && [[ -n "${DC_ORO_CONFIG_DIR:-}" ]]; then
-      debug_log "init: Registering environment name='${DC_ORO_NAME}' path='$PWD' config='${DC_ORO_CONFIG_DIR}'"
-      register_environment "${DC_ORO_NAME}" "$PWD" "${DC_ORO_CONFIG_DIR}"
-    fi
-  else
-    msg_info "Configuration not saved"
-  fi
-
-  exit 0
-fi
-
 # Handle config-refresh command (clear cached compose files and force resync)
 if [[ "$first_non_flag_arg" == "config-refresh" ]] || [[ "$first_non_flag_arg" == "refresh-config" ]]; then
   msg_info "Clearing cached compose files from ${DC_ORO_CONFIG_DIR}..."
@@ -5353,225 +4840,325 @@ if [[ "$first_non_flag_arg" == "config-refresh" ]] || [[ "$first_non_flag_arg" =
   exit 0
 fi
 
-if [[ "$first_non_flag_arg" == "purge" ]]; then
-  # Handle purge command with proper flag processing
-  if [[ -n "${DEBUG:-}" ]]; then
-    echo "DEBUG: Processing purge command with flags: ${left_flags[@]} ${left_options[@]}" >&2
-  fi
-  
-  # Show warning and ask for confirmation
-  msg_warning "This will permanently delete ALL project data:"
-  msg_info "  - All Docker containers for project: ${DC_ORO_NAME}"
-  msg_info "  - All Docker volumes (database, uploads, cache)"
-  msg_info "  - All project-specific Docker images"
-  msg_info "  - Configuration directory: ${DC_ORO_CONFIG_DIR}"
-  echo "" >&2
-  
-  # Check if running in non-interactive mode (CI/CD or piped)
-  if [[ ! -t 0 ]] || [[ -n "${ORODC_PURGE_FORCE:-}" ]]; then
-    msg_warning "Running in non-interactive mode or ORODC_PURGE_FORCE is set, proceeding without confirmation"
-  else
-    # Ask for confirmation with validation
-    if ! confirm_yes_no "Are you sure you want to continue?" "no"; then
-      msg_info "Purge cancelled"
-      exit 0
-    fi
-  fi
-  
-  echo "" >&2
-  
-  if [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
-    down_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} -f ${DC_ORO_CONFIG_DIR}/compose.yml down -v"
-  else
-    down_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} down -v"
-  fi
-  
-  # Use spinner for down command
-  run_with_spinner "Stopping and removing containers, volumes" "$down_cmd"
+# Function to get compatible Node.js versions based on PHP version (sorted newest to oldest)
+get_compatible_node_versions() {
+  local php_ver="$1"
+  case "$php_ver" in
+    7.3) echo "16" ;;
+    7.4) echo "18 16" ;;
+    8.1) echo "22 20 18 16" ;;
+    8.2|8.3|8.4) echo "22 20 18" ;;
+    8.5) echo "24 22" ;;
+    *) echo "22 20 18" ;;
+  esac
+}
 
-  ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null && {
-    msg_info "Removing appcode volume"
-    ${DOCKER_BIN} volume rm ${DC_ORO_NAME}'_appcode' >/dev/null 2>&1
-    msg_ok "Appcode volume removed"
-  }
-  
-  # Remove project-specific Docker images
-  PROJECT_IMAGES=$(${DOCKER_BIN} images --format "{{.Repository}}:{{.Tag}}" | grep "^${DC_ORO_NAME}-")
-  if [[ -n "$PROJECT_IMAGES" ]]; then
-    IMAGE_COUNT=$(echo "$PROJECT_IMAGES" | wc -l)
-    msg_info "Removing ${IMAGE_COUNT} project image(s)"
-    echo "$PROJECT_IMAGES" | while read -r image; do
-      if [[ -n "$image" ]]; then
-        ${DOCKER_BIN} rmi "$image" >/dev/null 2>&1 || true
-      fi
-    done
-    msg_ok "Project images removed"
-  fi
+# Additional command routing case
+case "$1" in
+  # Tests commands - route to tests/*.sh modules
+  tests)
+    shift
+    case "$1" in
+      install)
+        shift
+        exec "${LIBEXEC_DIR}/tests/install.sh" "$@"
+        ;;
+      run)
+        shift
+        exec "${LIBEXEC_DIR}/tests/run.sh" "$@"
+        ;;
+      behat)
+        shift
+        exec "${LIBEXEC_DIR}/tests/behat.sh" "$@"
+        ;;
+      phpunit)
+        shift
+        exec "${LIBEXEC_DIR}/tests/phpunit.sh" "$@"
+        ;;
+      shell)
+        shift
+        exec "${LIBEXEC_DIR}/tests/shell.sh" "$@"
+        ;;
+      *)
+        msg_error "Unknown tests command: ${1:-<none>}"
+        msg_info "Available: install, run, behat, phpunit, shell"
+        exit 1
+        ;;
+    esac
+    ;;
 
-  if [[ -d "${DC_ORO_CONFIG_DIR}" ]]; then
-    msg_info "Removing configuration directory"
-    rm -rf "${DC_ORO_CONFIG_DIR}"
-    msg_ok "Configuration directory removed"
-  fi
-  
-  echo "" >&2
-  msg_ok "Project ${DC_ORO_NAME} purged successfully"
-  exit 0
-fi
-
-if [[ "$first_non_flag_arg" == "down" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]] && [[ -s "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
-  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN} -f ${DC_ORO_CONFIG_DIR}/compose.yml"
-  # Combine all arguments into a single string for proper execution
-  full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${args[*]} ${right_flags[*]} ${right_options[*]}"
-  
-  run_with_spinner "Stopping services" "$full_cmd"
-  exit $?
-fi
-
-# Handle docker compose commands with all variables set
-if [[ "$is_docker_compose_cmd" == "true" ]]; then
-  # Generate config file only if it doesn't exist or if it's a management command (up, down, purge, etc.)
-  if [[ ! -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]] || [[ "${args[0]}" =~ ^(up|down|purge|build|pull|push|restart|start|stop|kill|rm|create)$ ]]; then
-    DC_ORO_NAME="$DC_ORO_NAME" bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} config" > "${DC_ORO_CONFIG_DIR}/compose.yml" 2>/dev/null || true
-
-    # Register environment after creating compose.yml
-    if [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]] && [[ -n "${DC_ORO_NAME:-}" ]] && [[ -n "${DC_ORO_CONFIG_DIR:-}" ]]; then
-      debug_log "compose.yml created: Registering environment name='${DC_ORO_NAME}' path='$PWD' config='${DC_ORO_CONFIG_DIR}'"
-      register_environment "${DC_ORO_NAME}" "$PWD" "${DC_ORO_CONFIG_DIR}"
-    fi
-  fi
-  # For docker compose commands, proper order is: command flags services
-  # Extract command (first element) and services (rest of elements)
-  docker_cmd="${args[0]}"
-  docker_services="${args[*]:1}"
-
-  # Check if we're in a project for commands that require it
-  if [[ "$docker_cmd" =~ ^(up|down|start|stop|restart|ps|logs|exec|run)$ ]]; then
-    if ! check_in_project; then
-      exit 1
-    fi
-  fi
-
-  # Handle 'up' command with separate build and start phases
-  if [[ "$docker_cmd" == "up" ]]; then
-    # Get previous timing for statistics only
-    prev_timing=$(get_previous_timing "up")
-    
-    # Check if we should skip build phase
-    skip_build=false
-    if [[ " ${right_flags[*]} " =~ " --no-build " ]]; then
-      skip_build=true
-    fi
-    
-    # If DEBUG or VERBOSE, run without timing wrapper
-    if [[ -n "${DEBUG:-}" ]] || [[ -n "${VERBOSE:-}" ]]; then
-      # Phase 1: Build images (unless --no-build is specified)
-      if [[ "$skip_build" == "false" ]]; then
-        build_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} build ${docker_services}"
-        DC_ORO_NAME="$DC_ORO_NAME" bash -c "$build_cmd" || exit $?
-      fi
-      
-      # Phase 2: Start services
-      up_flags=()
-      for flag in "${right_flags[@]}"; do
-        if [[ "$flag" != "--build" ]]; then
-          up_flags+=("$flag")
+  # Proxy commands - route to proxy/*.sh modules
+  proxy)
+    shift
+    case "$1" in
+      up)
+        shift
+        if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+          execute_with_menu_return "${LIBEXEC_DIR}/proxy/up.sh" "$@"
+        else
+          exec "${LIBEXEC_DIR}/proxy/up.sh" "$@"
         fi
-      done
-      
-      up_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} up ${up_flags[*]} ${right_options[*]} ${docker_services}"
-      DC_ORO_NAME="$DC_ORO_NAME" bash -c "$up_cmd" || exit $?
-      show_service_urls
-      exit 0
-    fi
-    
-    # Record start time for entire up operation
-    up_start_time=$(date +%s)
-    
-    # Phase 1: Build images (unless --no-build is specified)
-    if [[ "$skip_build" == "false" ]]; then
-      build_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} build ${docker_services}"
-      DC_ORO_NAME="$DC_ORO_NAME" run_with_spinner "Building services" "$build_cmd" || exit $?
-    fi
-    
-    # Phase 2: Start services
-    up_flags=()
-    has_wait_flag=false
-    for flag in "${right_flags[@]}"; do
-      if [[ "$flag" != "--build" ]]; then
-        up_flags+=("$flag")
-        if [[ "$flag" == "--wait" ]]; then
-          has_wait_flag=true
+        ;;
+      down)
+        shift
+        if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+          execute_with_menu_return "${LIBEXEC_DIR}/proxy/down.sh" "$@"
+        else
+          exec "${LIBEXEC_DIR}/proxy/down.sh" "$@"
         fi
-      fi
-    done
-    
-    # Add --wait flag if -d is present and --wait is not already there
-    # This ensures we wait for health checks before returning
-    if [[ " ${up_flags[*]} " =~ " -d " ]] && [[ "$has_wait_flag" == "false" ]]; then
-      up_flags+=("--wait")
+        ;;
+      install-certs)
+        shift
+        if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+          execute_with_menu_return "${LIBEXEC_DIR}/proxy/install-certs.sh" "$@"
+        else
+          exec "${LIBEXEC_DIR}/proxy/install-certs.sh" "$@"
+        fi
+        ;;
+      restart)
+        shift
+        if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+          execute_with_menu_return "${LIBEXEC_DIR}/proxy/restart.sh" "$@"
+        else
+          exec "${LIBEXEC_DIR}/proxy/restart.sh" "$@"
+        fi
+        ;;
+      *)
+        msg_error "Unknown proxy command: ${1:-<none>}"
+        msg_info "Available: up, down, restart, install-certs"
+        exit 1
+        ;;
+    esac
+    ;;
+
+  # Image commands - route to image/*.sh modules
+  image)
+    shift
+    case "$1" in
+      build)
+        shift
+        if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+          execute_with_menu_return "${LIBEXEC_DIR}/image/build.sh" "$@"
+        else
+          exec "${LIBEXEC_DIR}/image/build.sh" "$@"
+        fi
+        ;;
+      *)
+        msg_error "Unknown image command: ${1:-<none>}"
+        msg_info "Available: build"
+        exit 1
+        ;;
+    esac
+    ;;
+
+  # Docker build command - non-interactive image builder (not in menu)
+  docker-build)
+    shift
+    exec "${LIBEXEC_DIR}/docker-build.sh" "$@"
+    ;;
+
+  # Single-file commands
+  init)
+    shift
+    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+      execute_with_menu_return "${LIBEXEC_DIR}/init.sh" "$@"
+    else
+      exec "${LIBEXEC_DIR}/init.sh" "$@"
     fi
-    
-    up_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} up ${up_flags[*]} ${right_options[*]} ${docker_services}"
-    DC_ORO_NAME="$DC_ORO_NAME" run_with_spinner "Starting services" "$up_cmd" || exit $?
-    
-    # Calculate total up time and save
-    up_end_time=$(date +%s)
-    up_duration=$((up_end_time - up_start_time))
-    
-    # Save timing
-    save_timing "up" "$up_duration"
-    
-    msg_ok "Services started in ${up_duration}s"
-    
-    show_service_urls
-    exit 0
-  fi
-  
-  # Handle 'build' command
-  if [[ "$docker_cmd" == "build" ]]; then
-    full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${docker_cmd} ${right_flags[*]} ${right_options[*]} ${docker_services}"
-    DC_ORO_NAME="$DC_ORO_NAME" run_with_spinner "Building services" "$full_cmd"
-    exit $?
-  fi
-  
-  # Handle all other docker compose commands
-  full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${docker_cmd} ${right_flags[*]} ${right_options[*]} ${docker_services}"
-  DC_ORO_NAME="$DC_ORO_NAME" bash -c "$full_cmd"
-  exit $?
-fi
+    ;;
 
-# Handle bash commands by running them in CLI container
-if [[ "$first_non_flag_arg" == "bash" ]]; then
-  # Generate config file only if it doesn't exist
-  if [[ ! -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]]; then
-    DC_ORO_NAME="$DC_ORO_NAME" bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} config" > "${DC_ORO_CONFIG_DIR}/compose.yml" 2>/dev/null || true
-  fi
-  
-  # For bash commands, use docker compose run with cli container
-  # Pass all arguments after "bash" to the bash command in the container
-  bash_args=("${args[@]:1}")
-  
-  # Build the run command with proper argument handling
-  if [[ ${#bash_args[@]} -gt 0 ]]; then
-    # If there are arguments after bash, pass them through
-    full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} run --rm cli bash ${bash_args[*]} ${right_flags[*]} ${right_options[*]}"
-  else
-    # If no arguments after bash, just run interactive bash
-    full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} run --rm cli bash ${right_flags[*]} ${right_options[*]}"
-  fi
-  
-  DC_ORO_NAME="$DC_ORO_NAME" bash -c "$full_cmd"
-  exit $?
-fi
+  list)
+    shift
+    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+      execute_with_menu_return "${LIBEXEC_DIR}/list.sh" "$@"
+    else
+      exec "${LIBEXEC_DIR}/list.sh" "$@"
+    fi
+    ;;
 
-# Generate config file only if it doesn't exist or if it's a management command (up, down, purge, etc.)
-if [[ ! -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]] || [[ "${args[0]}" =~ ^(up|down|purge|build|pull|push|restart|start|stop|kill|rm|create)$ ]]; then
-  DC_ORO_NAME="$DC_ORO_NAME" bash -c "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} config" > "${DC_ORO_CONFIG_DIR}/compose.yml" 2>/dev/null || true
-fi
-# Combine all arguments into a single string for proper execution  
-full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${args[*]} ${right_flags[*]} ${right_options[*]}"
+  conf)
+    shift
+    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+      execute_with_menu_return "${LIBEXEC_DIR}/conf.sh" "$@"
+    else
+      exec "${LIBEXEC_DIR}/conf.sh" "$@"
+    fi
+    ;;
 
+  purge)
+    shift
+    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+      execute_with_menu_return "${LIBEXEC_DIR}/purge.sh" "$@"
+    else
+      exec "${LIBEXEC_DIR}/purge.sh" "$@"
+    fi
+    ;;
 
-DC_ORO_NAME="$DC_ORO_NAME" bash -c "$full_cmd"
-exit $?
+  config-refresh)
+    shift
+    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+      execute_with_menu_return "${LIBEXEC_DIR}/config-refresh.sh" "$@"
+    else
+      exec "${LIBEXEC_DIR}/config-refresh.sh" "$@"
+    fi
+    ;;
+
+  ssh)
+    shift
+    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+      execute_with_menu_return "${LIBEXEC_DIR}/ssh.sh" "$@"
+    else
+      exec "${LIBEXEC_DIR}/ssh.sh" "$@"
+    fi
+    ;;
+
+  install)
+    shift
+    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+      execute_with_menu_return "${LIBEXEC_DIR}/install.sh" "$@"
+    else
+      exec "${LIBEXEC_DIR}/install.sh" "$@"
+    fi
+    ;;
+
+  cache)
+    shift
+    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+      execute_with_menu_return "${LIBEXEC_DIR}/cache.sh" "$@"
+    else
+      exec "${LIBEXEC_DIR}/cache.sh" "$@"
+    fi
+    ;;
+
+  search)
+    shift
+    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+      execute_with_menu_return "${LIBEXEC_DIR}/search.sh" "$@"
+    else
+      exec "${LIBEXEC_DIR}/search.sh" "$@"
+    fi
+    ;;
+
+  php)
+    shift
+    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+      execute_with_menu_return "${LIBEXEC_DIR}/php.sh" "$@"
+    else
+      exec "${LIBEXEC_DIR}/php.sh" "$@"
+    fi
+    ;;
+
+  composer)
+    shift
+    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+      execute_with_menu_return "${LIBEXEC_DIR}/composer.sh" "$@"
+    else
+      exec "${LIBEXEC_DIR}/composer.sh" "$@"
+    fi
+    ;;
+
+  exec)
+    shift
+    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+      execute_with_menu_return "${LIBEXEC_DIR}/exec.sh" "$@"
+    else
+      exec "${LIBEXEC_DIR}/exec.sh" "$@"
+    fi
+    ;;
+
+  platform-update)
+    shift
+    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+      execute_with_menu_return "${LIBEXEC_DIR}/platform-update.sh" "$@"
+    else
+      exec "${LIBEXEC_DIR}/platform-update.sh" "$@"
+    fi
+    ;;
+
+  doctor)
+    shift
+    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+      execute_with_menu_return "${LIBEXEC_DIR}/doctor.sh" "$@"
+    else
+      exec "${LIBEXEC_DIR}/doctor.sh" "$@"
+    fi
+    ;;
+
+  env)
+    shift
+    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+      execute_with_menu_return "${LIBEXEC_DIR}/env.sh" "$@"
+    else
+      exec "${LIBEXEC_DIR}/env.sh" "$@"
+    fi
+    ;;
+
+  # Convenient aliases for common Docker Compose commands
+  start)
+    # Alias: orodc start -> orodc compose up -d
+    exec "${LIBEXEC_DIR}/compose.sh" up -d "$@"
+    ;;
+
+  stop)
+    # Alias: orodc stop -> orodc compose stop
+    shift
+    exec "${LIBEXEC_DIR}/compose.sh" stop "$@"
+    ;;
+
+  restart)
+    # Alias: orodc restart -> orodc compose restart
+    shift
+    exec "${LIBEXEC_DIR}/compose.sh" restart "$@"
+    ;;
+
+  up|down|logs|ps)
+    # Aliases: orodc up/down/logs/ps -> orodc compose up/down/logs/ps
+    cmd="$1"
+    shift
+    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+      execute_with_menu_return "${LIBEXEC_DIR}/compose.sh" "$cmd" "$@"
+    else
+      exec "${LIBEXEC_DIR}/compose.sh" "$cmd" "$@"
+    fi
+    ;;
+
+  # Convenient aliases for database commands
+  mysql)
+    # Alias: orodc mysql -> orodc database mysql
+    shift
+    exec "${LIBEXEC_DIR}/database/mysql.sh" "$@"
+    ;;
+
+  psql)
+    # Alias: orodc psql -> orodc database psql
+    shift
+    exec "${LIBEXEC_DIR}/database/psql.sh" "$@"
+    ;;
+
+  cli)
+    # Alias: orodc cli -> orodc database cli
+    shift
+    exec "${LIBEXEC_DIR}/database/cli.sh" "$@"
+    ;;
+
+  # ERROR: Old syntax for some Docker Compose commands
+  # Show helpful error message with new syntax for less common commands
+  # Note: 'exec' is now a separate command for CLI container, not Docker Compose exec
+  build|config|cp|create|events|export|images|kill|ls|pause|port|pull|push|rm|run|scale|stats|top|unpause|volumes|wait|watch)
+    msg_error "Docker Compose commands must use 'compose' prefix"
+    echo ""
+    msg_info "Old syntax: orodc $1 ${*:2}"
+    msg_info "New syntax: orodc compose $1 ${*:2}"
+    echo ""
+    msg_info "Run 'orodc help' for more information"
+    exit 1
+    ;;
+
+  # Unknown command
+  *)
+    msg_error "Unknown command: $1"
+    echo ""
+    msg_info "Run 'orodc help' to see available commands"
+    exit 1
+    ;;
+esac

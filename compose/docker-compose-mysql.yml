@@ -1,24 +1,24 @@
 services:
   database:
-    image: '${DC_ORO_MYSQL_IMAGE:-mysql:8.0-oracle}'
+    image: '${DC_ORO_MYSQL_IMAGE:-mysql:8.4}'
     container_name: ${DC_ORO_NAME:-unnamed}_database
     hostname: database.${DC_ORO_NAME:-unnamed}.docker.local
     dns:
       - 1.1.1.1
       - 8.8.8.8
-    command: '--federated --default-authentication-plugin=mysql_native_password'
+    command: '--federated'
     cap_add:
       - SYS_NICE
     environment:
       LANG: 'C.UTF-8'
       MYSQL_ROOT_PASSWORD: 'root'
-      MYSQL_USER: '${DC_ORO_DATABASE_USER:-app}'
-      MYSQL_PASSWORD: '${DC_ORO_DATABASE_PASSWORD:-app}'
-      MYSQL_DATABASE: '${DC_ORO_DATABASE_DBNAME:-app}'
+      MYSQL_USER: '${DC_ORO_DATABASE_USER:-oro_db_user}'
+      MYSQL_PASSWORD: '${DC_ORO_DATABASE_PASSWORD:-oro_db_pass}'
+      MYSQL_DATABASE: '${DC_ORO_DATABASE_DBNAME:-oro_db}'
       MYSQL_ROOT_HOST: '%'
     volumes:
-      - '${DC_ORO_CONFIG_DIR:-.}/docker/mysql/initdb.d:/docker-entrypoint-initdb.d:ro'
-      - '${DC_ORO_CONFIG_DIR:-.}/docker/mysql/my.cnf:/etc/mysql/conf.d/oro.cnf:ro'
+      - '${DC_ORO_CONFIG_DIR}/docker/mysql/initdb.d:/docker-entrypoint-initdb.d:ro'
+      - '${DC_ORO_CONFIG_DIR}/docker/mysql/my.cnf:/etc/mysql/conf.d/oro.cnf:ro'
       - 'mysql-data:/var/lib/mysql:delegated'
     ports:
       - '${DC_ORO_DATABASE_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_MYSQL:-3306}:3306'
@@ -38,7 +38,8 @@ services:
         max-size: "10m"
 
   database-cli:
-    image: '${DC_ORO_MYSQL_IMAGE:-mysql:8.0-oracle}'
+    profiles: ["run-only"]
+    image: '${DC_ORO_MYSQL_IMAGE:-mysql:8.4}'
     container_name: ${DC_ORO_NAME:-unnamed}_database_cli
     hostname: database-cli.${DC_ORO_NAME:-unnamed}.docker.local
     dns:
@@ -52,14 +53,14 @@ services:
       LANG: 'C.UTF-8'
       DC_ORO_DATABASE_HOST: '${DC_ORO_DATABASE_HOST:-database}'
       DC_ORO_DATABASE_PORT: '${DC_ORO_DATABASE_PORT:-3306}'
-      DC_ORO_DATABASE_USER: '${DC_ORO_DATABASE_USER:-app}'
-      DC_ORO_DATABASE_PASSWORD: '${DC_ORO_DATABASE_PASSWORD:-app}'
-      DC_ORO_DATABASE_DBNAME: '${DC_ORO_DATABASE_DBNAME:-app}'
+      DC_ORO_DATABASE_USER: '${DC_ORO_DATABASE_USER:-oro_db_user}'
+      DC_ORO_DATABASE_PASSWORD: '${DC_ORO_DATABASE_PASSWORD:-oro_db_pass}'
+      DC_ORO_DATABASE_DBNAME: '${DC_ORO_DATABASE_DBNAME:-oro_db}'
       DATABASE_HOST: '${DC_ORO_DATABASE_HOST:-database}'
       DATABASE_PORT: '${DC_ORO_DATABASE_PORT:-3306}'
-      DATABASE_USER: '${DC_ORO_DATABASE_USER:-app}'
-      DATABASE_PASSWORD: '${DC_ORO_DATABASE_PASSWORD:-app}'
-      DATABASE_NAME: '${DC_ORO_DATABASE_DBNAME:-app}'
+      DATABASE_USER: '${DC_ORO_DATABASE_USER:-oro_db_user}'
+      DATABASE_PASSWORD: '${DC_ORO_DATABASE_PASSWORD:-oro_db_pass}'
+      DATABASE_NAME: '${DC_ORO_DATABASE_DBNAME:-oro_db}'
     depends_on:
       database:
         condition: service_healthy

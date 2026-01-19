@@ -157,23 +157,44 @@ find_free_ports_batch() {
     fi
     
     # Find free port for this service
+    # CRITICAL: Always start from DEFAULT_PORT (with prefix), not from SELECTED_PORT
+    # SELECTED_PORT from compose.yml is only used to check if it matches our default
     local port_found=""
-    if [[ -n "$SELECTED_PORT" ]]; then
-      # Check if the port from compose.yml is available or occupied by our project
+    
+    # First, check if SELECTED_PORT matches DEFAULT_PORT and is available
+    if [[ -n "$SELECTED_PORT" ]] && [[ "$SELECTED_PORT" == "$DEFAULT_PORT" ]]; then
       if ! is_port_used_batch "$SELECTED_PORT" "$PROJECT_NAME" "$SERVICE_NAME" "$USED_PORTS"; then
-        # Port is free or used by our project - use it
+        # Port matches default and is free - use it
         port_found="$SELECTED_PORT"
       else
-        # Port is occupied by another project - find a new one
+        # Port matches default but is occupied - find alternative starting from default
         local usage_info
         usage_info=$(get_port_usage_info "$SELECTED_PORT" "$PROJECT_NAME")
-        echo -e "\033[33m==> Warning: Port $SELECTED_PORT from compose.yml is occupied by $usage_info, searching for alternative\033[0m" >&2
+        echo -e "\033[33m==> Warning: Port $SELECTED_PORT (default) is occupied by $usage_info, searching for alternative\033[0m" >&2
+      fi
+    elif [[ -n "$SELECTED_PORT" ]] && [[ "$SELECTED_PORT" != "$DEFAULT_PORT" ]]; then
+      # SELECTED_PORT exists but doesn't match default - check if it's used by our project
+      # If port is used by our project container, use it (even if it doesn't match default)
+      if ! is_port_used_batch "$SELECTED_PORT" "$PROJECT_NAME" "$SERVICE_NAME" "$USED_PORTS"; then
+        # Port is free - use it even though it doesn't match default
+        port_found="$SELECTED_PORT"
+      else
+        # Port is occupied - check if it's used by our project
+        local usage_info
+        usage_info=$(get_port_usage_info "$SELECTED_PORT" "$PROJECT_NAME")
+        if [[ "$usage_info" == *"$PROJECT_NAME"* ]]; then
+          # Port is used by our project - use it
+          port_found="$SELECTED_PORT"
+        else
+          # Port is occupied by another project - warn and use default instead
+          echo -e "\033[33m==> Warning: Port $SELECTED_PORT in compose.yml is occupied by $usage_info, searching for alternative\033[0m" >&2
+        fi
       fi
     fi
     
     if [[ -z "$port_found" ]]; then
-      # Find a free port starting from default (or from compose port if it was occupied)
-      local PORT="${SELECTED_PORT:-$DEFAULT_PORT}"
+      # Find a free port starting from DEFAULT_PORT (always use default, not selected)
+      local PORT="$DEFAULT_PORT"
       while [[ "$PORT" -le 65535 ]]; do
         if ! is_port_used_batch "$PORT" "$PROJECT_NAME" "$SERVICE_NAME" "$USED_PORTS"; then
           port_found="$PORT"
@@ -253,16 +274,84 @@ is_port_used_batch() {
     fi
   done <<< "$__DOCKER_CONTAINERS_CACHE"
   
-  # If port is used by our project, consider it available for reuse
+  # Check if port is listening on host (using multiple methods for reliability)
+  # Docker bind will fail if port is already allocated, even by our own containers
+  local port_in_use=false
+  
+  # Method 1: ss (most reliable for Docker ports, check first)
+  if command -v ss >/dev/null 2>&1; then
+    if ss -tln 2>/dev/null | grep -q ":${p} "; then
+      port_in_use=true
+    fi
+  # Method 2: netstat (fallback if ss not available)
+  elif command -v netstat >/dev/null 2>&1; then
+    if netstat -tln 2>/dev/null | grep -q ":${p} "; then
+      port_in_use=true
+    fi
+  fi
+  
+  # Method 3: lsof (additional check, but less reliable for Docker ports)
+  if [[ "$port_in_use" == "false" ]] && command -v lsof >/dev/null 2>&1; then
+    if lsof -t -i tcp:$p -sTCP:LISTEN > /dev/null 2>&1; then
+      port_in_use=true
+    fi
+  fi
+  
+  # If port is used by our project, it's available for reuse
   if [[ "$used_by_our_project" == "true" ]]; then
-    [[ "$DEBUG" == "1" ]] && echo "DEBUG: Port $p is used by our project ($PROJECT_NAME), allowing reuse" >&2
+    [[ "$DEBUG" == "1" ]] && echo "DEBUG: Port $p is used by our project, allowing reuse" >&2
     return 1
   fi
   
-  # Check local processes only if not used by our project (only LISTEN state)
-  if lsof -t -i tcp:$p -sTCP:LISTEN > /dev/null 2>&1; then
-    [[ "$DEBUG" == "1" ]] && echo "DEBUG: Port $p is used by local process (lsof)" >&2
+  if [[ "$port_in_use" == "true" ]]; then
+    [[ "$DEBUG" == "1" ]] && echo "DEBUG: Port $p is listening on host (lsof/ss/netstat)" >&2
     return 0
+  fi
+  
+  # If port is used by our project but not by local process, check if container is running
+  # If container is stopped/exited, we can reuse the port
+  if [[ "$used_by_our_project" == "true" ]]; then
+    # Check if the container using this port is actually running
+    local container_running=false
+    while read -r name ports; do
+      [[ -z "$name" ]] && continue
+      
+      local container_project
+      local container_service
+      get_container_labels "$name" container_project container_service
+      
+      if [[ "$container_project" == "$PROJECT_NAME" ]]; then
+        # Check if this container uses the port and is running
+        for part in ${ports//,/ }; do
+          part="${part// /}"
+          if [[ "$part" == *"->"* ]]; then
+            local host_port_part="${part%->*}"
+            if [[ "$host_port_part" == *":"* ]]; then
+              local host_port="${host_port_part##*:}"
+            else
+              local host_port="$host_port_part"
+            fi
+            if [[ "$host_port" != *"-"* ]] && [[ "$host_port" == "$p" ]]; then
+              # Check if container is running (not stopped/exited)
+              if docker ps --format '{{.Names}}' | grep -q "^${name}$"; then
+                container_running=true
+                break 2
+              fi
+            fi
+          fi
+        done
+      fi
+    done <<< "$__DOCKER_CONTAINERS_CACHE"
+    
+    # If container is running, port is in use
+    if [[ "$container_running" == "true" ]]; then
+      [[ "$DEBUG" == "1" ]] && echo "DEBUG: Port $p is used by running container from our project ($PROJECT_NAME)" >&2
+      return 0
+    else
+      # Container is stopped/exited, port can be reused
+      [[ "$DEBUG" == "1" ]] && echo "DEBUG: Port $p was used by stopped container from our project ($PROJECT_NAME), allowing reuse" >&2
+      return 1
+    fi
   fi
   
   # Check Docker containers from other projects
@@ -330,10 +419,30 @@ find_free_port() {
   fi
 
   # Check if the port is used by a local process (only LISTEN state)
+  # Uses multiple methods for reliability (lsof, ss, netstat)
   is_port_used_by_local() {
     local p=$1
-    # Only check for processes listening on the port, not client connections
-    lsof -t -i tcp:$p -sTCP:LISTEN > /dev/null 2>&1
+    
+    # Method 1: lsof (works for most processes)
+    if lsof -t -i tcp:$p -sTCP:LISTEN > /dev/null 2>&1; then
+      return 0
+    fi
+    
+    # Method 2: ss (more reliable for Docker ports)
+    if command -v ss >/dev/null 2>&1; then
+      if ss -tlnp 2>/dev/null | grep -q ":${p} "; then
+        return 0
+      fi
+    fi
+    
+    # Method 3: netstat (fallback)
+    if command -v netstat >/dev/null 2>&1; then
+      if netstat -tlnp 2>/dev/null | grep -q ":${p} "; then
+        return 0
+      fi
+    fi
+    
+    return 1
   }
 
   # Check if the port is used by another Docker container

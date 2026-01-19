@@ -89,10 +89,196 @@ The tool is distributed as a Homebrew formula and manages multi-container Docker
 ├── Formula/                # Homebrew formula definition
 ├── docs/                   # Documentation and assets
 ├── openspec/              # Change proposals and specifications
+├── libexec/orodc/         # CLI command modules (modular architecture)
+│   ├── lib/              # Shared libraries
+│   ├── database/        # Database command modules
+│   ├── tests/           # Testing command modules
+│   ├── proxy/           # Proxy management modules
+│   ├── image/           # Image building modules
+│   └── *.sh             # Single-file command modules
 └── .github/workflows/     # CI/CD pipeline definitions
 ```
 
 ### Architecture Patterns
+
+#### CLI Modular Architecture
+
+OroDC follows a modular architecture pattern where the main `bin/orodc` script acts as a lightweight command router, delegating execution to specialized modules in `libexec/orodc/`. This design enables maintainability, testability, and clear separation of concerns.
+
+**Main Entry Point:**
+- `bin/orodc` - Main CLI router (handles version, help, environment initialization, and command routing)
+
+**Module Structure:**
+
+```
+libexec/orodc/
+├── lib/                    # Shared libraries
+│   ├── common.sh          # Common utilities (logging, timing, binary resolution)
+│   ├── ui.sh              # UI functions (messages, spinners, prompts)
+│   ├── environment.sh     # Environment initialization and registry
+│   ├── docker-utils.sh    # Docker Compose utilities
+│   └── port-manager.sh    # Port management and allocation
+│
+├── database/              # Database command modules
+│   ├── mysql.sh           # MySQL client access
+│   ├── psql.sh            # PostgreSQL client access
+│   ├── import.sh          # Database import operations
+│   ├── export.sh          # Database export operations
+│   ├── cli.sh             # CLI container access
+│   ├── purge.sh           # Database purge operations
+│   └── recreate.sh        # Database recreation
+│
+├── tests/                 # Testing command modules
+│   ├── install.sh         # Test environment installation
+│   ├── run.sh             # Test runner
+│   ├── behat.sh           # Behat test execution
+│   ├── phpunit.sh         # PHPUnit test execution
+│   └── shell.sh           # Test shell access
+│
+├── proxy/                 # Proxy management modules
+│   ├── up.sh              # Start Traefik proxy
+│   ├── down.sh            # Stop proxy
+│   └── install-certs.sh   # Install CA certificates
+│
+├── image/                 # Image building modules
+│   └── build.sh           # Build Docker images
+│
+├── compose.sh             # Docker Compose operations
+├── init.sh                # Environment initialization
+├── purge.sh               # Environment cleanup
+├── config-refresh.sh       # Configuration refresh
+├── ssh.sh                 # SSH connection to containers
+├── install.sh             # Platform installation
+├── cache.sh               # Cache management
+├── php.sh                 # PHP command execution
+├── composer.sh            # Composer command execution
+├── platform-update.sh      # Platform update operations
+├── doctor.sh              # Health check and diagnostics
+├── exec.sh                # Container execution
+├── conf.sh                # Configuration management
+├── list.sh                # List environments
+└── menu.sh                # Interactive menu system
+```
+
+**Command Routing Patterns:**
+
+1. **Command Groups** - Commands organized into groups with subcommands:
+   ```bash
+   orodc database mysql      → libexec/orodc/database/mysql.sh
+   orodc database psql       → libexec/orodc/database/psql.sh
+   orodc tests phpunit       → libexec/orodc/tests/phpunit.sh
+   orodc proxy up            → libexec/orodc/proxy/up.sh
+   orodc image build         → libexec/orodc/image/build.sh
+   ```
+
+2. **Single-File Commands** - Simple commands route directly to single modules:
+   ```bash
+   orodc init                → libexec/orodc/init.sh
+   orodc ssh                 → libexec/orodc/ssh.sh
+   orodc install             → libexec/orodc/install.sh
+   ```
+
+3. **Command Aliases** - Convenient aliases for common operations:
+   ```bash
+   orodc start               → orodc compose up -d
+   orodc stop                → orodc compose stop
+   orodc mysql               → orodc database mysql
+   orodc psql                → orodc database psql
+   ```
+
+**Module Execution Pattern:**
+
+All modules follow a consistent pattern:
+
+```bash
+#!/bin/bash
+set -e
+if [ "$DEBUG" ]; then set -x; fi
+
+# Determine script directory and source libraries
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "${SCRIPT_DIR}/../lib/common.sh"
+source "${SCRIPT_DIR}/../lib/ui.sh"
+source "${SCRIPT_DIR}/../lib/environment.sh"
+
+# Module-specific logic here
+# ...
+
+# Execute command (often with exec for process replacement)
+exec "${COMMAND}" "$@"
+```
+
+**Library Architecture:**
+
+- **`common.sh`**: Binary resolution, timing functions, environment variable management, flag parsing utilities
+- **`ui.sh`**: Message functions (msg_info, msg_error, msg_warning, msg_ok), spinner display, user prompts
+- **`environment.sh`**: Environment initialization, project detection, environment registry, status detection
+- **`docker-utils.sh`**: Compose config generation, compose command execution, certificate setup, service URL display
+- **`port-manager.sh`**: Port allocation, port conflict detection, batch port resolution
+
+**Benefits:**
+- **Maintainability**: Each command is isolated and easy to modify
+- **Testability**: Modules can be tested independently
+- **Extensibility**: New commands can be added without modifying the main router
+- **Separation of Concerns**: Clear boundaries between routing, initialization, and command logic
+
+**Implementation Reference:**
+- Main router: `bin/orodc` (command routing logic)
+- Module examples: `libexec/orodc/database/mysql.sh`, `libexec/orodc/tests/phpunit.sh`
+- Shared libraries: `libexec/orodc/lib/*.sh`
+- Architecture specification: `openspec/specs/cli-architecture/spec.md`
+
+#### UI/UX: Spinner Mechanism for Long-Running Commands
+
+OroDC uses a consistent spinner mechanism for all long-running operations to provide visual feedback and clean output.
+
+**Core Function: `run_with_spinner`**
+
+All long-running commands MUST use `run_with_spinner` from `libexec/orodc/lib/ui.sh`:
+
+```bash
+# Standard usage (like in start containers)
+run_with_spinner "Operation message" "$command" || exit $?
+
+# For non-critical operations (errors as warnings)
+if ! run_with_spinner "Operation message" "$command"; then
+  msg_warning "Operation completed with warnings (see log above for details)"
+fi
+```
+
+**Key Features:**
+
+1. **Automatic Spinner Display:**
+   - Shows animated spinner (`|/-\`) during command execution
+   - Writes spinner animation to stderr (doesn't interfere with command output)
+   - Automatically hides when `DEBUG=1` or `VERBOSE=1` is set
+
+2. **Output Redirection:**
+   - Command stdout/stderr redirected to temporary log file (`/tmp/orodc-output.XXXXXX`)
+   - Spinner animation displayed on stderr separately
+   - Keeps terminal output clean and readable
+
+3. **Error Handling:**
+   - On success: Log file is removed, success message displayed
+   - On failure: Log file preserved, error message shown with log location
+   - Last 20 lines of log displayed automatically (full log available at path)
+
+4. **Consistent Usage Pattern:**
+   - **Critical operations**: `run_with_spinner "Message" "$cmd" || exit $?`
+   - **Non-critical operations**: Check exit code, show warning instead of error
+   - **Always use**: Same pattern as `docker-utils.sh` for "Starting services"
+
+**Implementation Reference:**
+- Core function: `libexec/orodc/lib/ui.sh` (`run_with_spinner` function, lines 123-190)
+- Example usage: `libexec/orodc/lib/docker-utils.sh` (start containers, line 144)
+- Example with warnings: `libexec/orodc/cache.sh` (cache clear, lines 26-30)
+
+**Rules:**
+- ✅ ALWAYS use `run_with_spinner` for long-running operations
+- ✅ NEVER redirect stderr when using `run_with_spinner` (breaks spinner display)
+- ✅ Use same pattern as start containers everywhere
+- ❌ NEVER use `show_spinner` directly (use `run_with_spinner` wrapper)
+- ❌ NEVER capture stderr from `run_with_spinner` (spinner writes to stderr)
 
 #### Smart Command Detection
 OroDC automatically detects PHP commands and redirects them to the CLI container:
@@ -225,95 +411,6 @@ This shows:
 - Compose file inclusion: `bin/orodc:1259-1269`
 - Busybox cleanup: `bin/orodc:1270-1276`
 
-#### Configuration Caching and Updates
-
-OroDC caches compose files locally for performance and automatically keeps them synchronized with the latest Homebrew package versions.
-
-**Cache Directory Structure:**
-
-```
-${DC_ORO_CONFIG_DIR}/    # Default: ~/.orodc/{project_name}
-├── compose/             # Cached compose files (synced from Homebrew)
-├── docker/              # Cached Dockerfiles and build contexts
-├── compose.yml          # Generated merged configuration
-├── ssh_id_ed25519*      # SSH keys for remote mode
-├── .cached_profiles     # Cached Docker Compose profiles
-├── .cached_cli_profiles # Cached CLI-specific profiles
-└── .xdebug_env         # XDebug environment cache
-```
-
-**Automatic Sync Mechanism:**
-
-Every time `orodc` runs, it automatically synchronizes compose files from Homebrew:
-
-```bash
-# bin/orodc:787
-${RSYNC_BIN} -r --delete \
-  --exclude='ssh_id_*' \
-  --exclude='.cached_*' \
-  --exclude='compose.yml' \
-  --exclude='.xdebug_env' \
-  "${DIR}/compose/" "${DC_ORO_CONFIG_DIR}/"
-```
-
-**Key Features:**
-- `--delete`: Removes outdated cached files that no longer exist in source
-- **Protects**: SSH keys, cached profiles, generated compose.yml, XDebug environment
-- **Ensures**: Every run uses latest compose files from Homebrew package
-- **Automatic**: No manual intervention required for updates
-
-**Configuration Generation Chain:**
-
-1. **Sync** (line 787): `rsync --delete` copies fresh files from Homebrew to cache
-2. **Build** (line 1273): `DOCKER_COMPOSE_BIN_CMD` constructed from cached files
-3. **Generate** (line 2334): `docker compose config` merges files into `compose.yml`
-
-```bash
-# Example: PostgreSQL application
-rsync ${HOMEBREW}/compose/ → ~/.orodc/myproject/
-
-DOCKER_COMPOSE_BIN_CMD="docker compose \
-  -f ~/.orodc/myproject/docker-compose.yml \
-  -f ~/.orodc/myproject/docker-compose-pgsql.yml"
-
-docker compose config > ~/.orodc/myproject/compose.yml
-```
-
-**Manual Cache Refresh:**
-
-Force cache clear and resynchronization:
-
-```bash
-orodc config-refresh
-```
-
-This command:
-- Removes `compose/` and `docker/` directories from cache
-- Deletes generated `compose.yml`
-- Clears cached profiles (`.cached_profiles`, `.cached_cli_profiles`)
-- Forces fresh sync on next `orodc` command
-
-**Use Cases for config-refresh:**
-- After Homebrew package reinstall/upgrade
-- When compose files not updating as expected
-- Troubleshooting stale configuration issues
-- After manual edits to cached files (not recommended)
-
-**Common Scenarios:**
-
-**Problem**: Old database config with `build:` section persists after Homebrew update
-**Cause**: Cached `docker-compose-pgsql.yml` not removed by old rsync (no --delete flag)
-**Solution**: Automatic with rsync --delete; manual with `orodc config-refresh`
-
-**Problem**: Changes in Homebrew compose files not reflected
-**Cause**: Cache not regenerated between runs
-**Solution**: Automatic sync on every `orodc` run; force with `orodc config-refresh`
-
-**Implementation Reference:**
-- Rsync sync: `bin/orodc:787-792`
-- Config refresh command: `bin/orodc:2254-2288`
-- Compose generation: `bin/orodc:2326-2327`
-
 #### Multi-Stage Configuration
 Configuration hierarchy (lowest to highest priority):
 1. Hardcoded defaults in `bin/orodc`
@@ -433,10 +530,13 @@ When user says "я смерджил" (I merged) or "merged":
 - **Volume Persistence**: Named volumes for data, code sync varies by mode
 
 ### Configuration Files
-- `.env.orodc`: Project-specific OroDC settings
+- `.env.orodc`: Project-specific OroDC settings (optional, user-created)
 - `app/.env.local`: ORO application environment variables
 - `docker-compose.yml`: Generated from templates (never edit directly)
 - `DC_ORO_CONFIG_DIR`: Custom config location (default: `~/.orodc/{project_name}`)
+- `~/.orodc/{project_name}/.env.orodc`: Global project configuration (auto-created, stores domain replacement preferences)
+
+**Important:** OroDC never creates files in project directory without user permission. Configuration is stored globally in `~/.orodc/{project_name}/.env.orodc` unless user explicitly creates `.env.orodc` in project root.
 
 ## Important Constraints
 

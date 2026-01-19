@@ -1,0 +1,18 @@
+# Goss configuration for nginx service
+# Default configuration
+
+# Process checks
+process:
+  nginx:
+    running: true
+
+# Port checks
+port:
+  tcp:80:
+    listening: true
+
+# Command checks
+command:
+  nginx-config-test:
+    exec: "nginx -t 2>&1"
+    exit-status: 0

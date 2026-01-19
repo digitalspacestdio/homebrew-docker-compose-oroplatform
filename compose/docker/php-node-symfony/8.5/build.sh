@@ -55,7 +55,8 @@ echo "http://dl-2.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositorie
 apk add --no-cache \
     shadow \
     htop \
-    btop
+    btop \
+    su-exec
 
 # Install sudo and configure permissions
 apk add --no-cache sudo

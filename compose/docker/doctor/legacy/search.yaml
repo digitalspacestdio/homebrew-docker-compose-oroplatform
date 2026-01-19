@@ -1,0 +1,9 @@
+# Goss configuration for search (Elasticsearch) service
+# Legacy mode: port-only checks for OroPlatform < 6.1
+
+# Port checks
+port:
+  tcp:9200:
+    listening: true
+    ip:
+      - 127.0.0.1

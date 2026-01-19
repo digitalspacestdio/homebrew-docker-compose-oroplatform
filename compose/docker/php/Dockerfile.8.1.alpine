@@ -10,6 +10,7 @@ ARG EXT_REDIS_VERSION=6.2.0
 ARG EXT_IGBINARY_VERSION=3.2.15
 ARG EXT_MONGODB_VERSION=1.21.0
 ARG EXT_XDEBUG_VERSION=3.4.5
+ARG EXT_RDKAFKA_VERSION=6.0.3
 
 # persistent / runtime deps
 RUN apk add --no-cache \
@@ -73,6 +74,7 @@ RUN set -eux; \
     musl-dev \ 
     gcc \
     make \
+    librdkafka-dev \
   ; \
   \
   wget -O redis.tar.gz "$REDIS_DOWNLOAD_URL"; \
@@ -113,6 +115,12 @@ RUN set -eux; \
   docker-php-ext-install -j$(printf "2\n$(nproc)" | sort -g | head -n1) xdebug; \
   rm -rf /usr/src/php/ext/xdebug; \
   \
+  mkdir -p /usr/src/php/ext/rdkafka; \
+  curl -fsSL https://pecl.php.net/get/rdkafka-$EXT_RDKAFKA_VERSION.tgz | tar xvz -C /usr/src/php/ext/rdkafka --strip 1; \
+  docker-php-ext-configure rdkafka; \
+  docker-php-ext-install -j$(printf "2\n$(nproc)" | sort -g | head -n1) rdkafka; \
+  rm -rf /usr/src/php/ext/rdkafka; \
+  \
   docker-php-ext-install -j$(printf "2\n$(nproc)" | sort -g | head -n1) \
     pdo_pgsql \
     pdo_mysql \
@@ -127,6 +135,7 @@ RUN set -eux; \
     pcntl \
     imap \
     sockets \
+    ftp \
     bcmath \
     mbstring \
     opcache \

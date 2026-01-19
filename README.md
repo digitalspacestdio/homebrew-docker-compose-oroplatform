@@ -1,8 +1,8 @@
-# 🚀 OroCommerce / OroCrm / OroPlatform / MarelloCommerce - Docker Compose Environment (OroDC)
+# 🚀 OroCommerce / OroCrm / OroPlatform / MarelloCommerce / Magento / Any PHP CMS - Docker Compose Environment (OroDC)
 
 ![Docker architecture](docs/docker-architecture-small.png)
 
-**Modern CLI tool to run ORO applications locally or on a server.** Designed specifically for local development environments with enterprise-grade performance and developer experience.
+**Modern CLI tool to run PHP applications locally or on a server.** Designed specifically for local development environments with enterprise-grade performance and developer experience. Supports ORO Platform applications (OroCommerce, OroCRM, OroPlatform, MarelloCommerce), Magento, and any PHP-based CMS or framework.
 
 [![Version](https://img.shields.io/badge/Version-0.12.5-brightgreen.svg)](https://github.com/digitalspacestdio/homebrew-docker-compose-oroplatform/releases)
 [![Homebrew](https://img.shields.io/badge/Homebrew-Available-orange.svg)](https://brew.sh/)
@@ -31,6 +31,10 @@
   - [Verification](#verification)
   - [Troubleshooting Infrastructure](#troubleshooting-infrastructure)
 - [📖 Usage](#-usage)
+  - [🚀 Basic Commands](#-basic-commands)
+  - [📦 Command Structure](#-command-structure)
+  - [🎮 Interactive Menu](#-interactive-menu)
+  - [🎯 Smart PHP Commands & Flags](#-smart-php-commands--flags)
 - [🧪 Testing](#-testing)
   - [Test Environment Setup](#test-environment-setup)
   - [Running Tests](#running-tests)
@@ -38,6 +42,8 @@
 - [🔧 Development Commands](#-development-commands)
 - [🔌 Reverse Proxy Management](#-reverse-proxy-management)
 - [🌐 Multiple Hosts Configuration](#-multiple-hosts-configuration)
+  - [📝 Configuration Methods](#-configuration-methods)
+  - [🔗 Application URL Configuration](#-application-url-configuration)
 - [🌐 Dynamic Multisite Support via URL Paths](#-dynamic-multisite-support-via-url-paths)
 - [⚙️ Environment Variables](#️-environment-variables)
 - [🐳 Custom Docker Images](#-custom-docker-images)
@@ -48,6 +54,10 @@
 ---
 
 ## 📚 Documentation
+
+**Application-specific guides:**
+- **[docs/ORO.md](docs/ORO.md)** - Complete setup guide for OroCommerce, OroCRM, OroPlatform, MarelloCommerce
+- **[docs/MAGENTO.md](docs/MAGENTO.md)** - Complete setup guide for Magento 2 (Mage-OS)
 
 **For developers and contributors:**
 - **[DEVELOPMENT.md](DEVELOPMENT.md)** - Development guide with workflows, commands, and troubleshooting
@@ -102,6 +112,70 @@ orodc psql -c "SELECT version();"  # Execute SQL commands
 orodc tests bin/phpunit --testsuite=unit # Run PHPUnit tests
 orodc tests bin/behat --available-suites # Run Behat behavior tests
 ```
+
+## 🎯 Supported Applications
+
+OroDC supports **any PHP-based application**, including:
+
+- **ORO Platform**: OroCommerce, OroCRM, OroPlatform, MarelloCommerce - [📖 Complete Guide](docs/ORO.md)
+- **Magento**: Magento 2.x (Open Source, Commerce) - [📖 Complete Guide](docs/MAGENTO.md)
+- **Symfony**: Any Symfony-based application
+- **Laravel**: Laravel applications
+- **WordPress**: WordPress sites
+- **Drupal**: Drupal CMS
+- **Any PHP CMS**: Generic PHP applications
+
+### 📦 Magento 2 Quick Start
+
+```bash
+# 1. Install OroDC
+brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform
+
+# 2. Create empty project directory
+mkdir ~/mageos && cd ~/mageos
+
+# 3. Initialize and start
+orodc init && orodc up -d
+
+# 4. Create Magento project (Mage-OS)
+orodc exec composer create-project --repository-url=https://repo.mage-os.org/ mage-os/project-community-edition .
+
+# 5. Install Magento
+orodc exec bin/magento setup:install \
+  --base-url="${DOCKER_BASE_URL}" \
+  --base-url-secure="${DOCKER_BASE_URL}" \
+  --db-host="${ORO_DB_HOST:-database}" \
+  --db-name="${ORO_DB_NAME:-app_db}" \
+  --db-user="${ORO_DB_USER:-app_db_user}" \
+  --db-password="${ORO_DB_PASSWORD:-app_db_pass}" \
+  --admin-user=admin --admin-password=Admin123456 \
+  --admin-email=admin@example.com --admin-firstname=Admin --admin-lastname=User \
+  --backend-frontname=admin --language=en_US --currency=USD --timezone=America/New_York \
+  --use-rewrites=1 --use-secure=1 --use-secure-admin=1 \
+  --search-engine=opensearch --opensearch-host=search --opensearch-port=9200
+
+# Access: https://mageos.docker.local/admin (admin / Admin123456)
+```
+
+📖 **For complete Magento setup guide, see [docs/MAGENTO.md](docs/MAGENTO.md)**
+
+### 🚀 OroCommerce / OroPlatform Quick Start
+
+```bash
+# 1. Install OroDC
+brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform
+
+# 2. Clone and setup OroCommerce
+git clone --single-branch --branch 6.1.4 https://github.com/oroinc/orocommerce-application.git ~/orocommerce
+cd ~/orocommerce
+
+# 3. Install and start
+orodc install && orodc up -d
+
+# Access: https://orocommerce.docker.local/admin (admin / 12345678)
+```
+
+📖 **For complete ORO Platform setup guide, see [docs/ORO.md](docs/ORO.md)**
 
 ## ⚠️ Critical Testing Requirements
 
@@ -161,6 +235,44 @@ orodc mysql -e "USE oro_db; SHOW TABLES;"  # Multiple commands
 # All database credentials are automatically configured!
 # No need to specify host, port, username, or password
 ```
+
+### Database Import with Domain Replacement
+
+The `orodc database import` command supports automatic domain replacement in SQL dumps:
+
+**Interactive Import Process:**
+
+1. **Confirmation**: You'll be warned about database deletion and asked to confirm
+2. **Domain Replacement**: Optionally replace domain names in the dump:
+   - Source domain (e.g., `www.example.com`)
+   - Target domain (defaults to `{project-name}.docker.local`)
+   - Domains are automatically saved for future imports
+
+**Domain Memory:**
+
+- Previously used domains are saved to `~/.orodc/{project-name}/.env.orodc`
+- On subsequent imports, saved domains are suggested as defaults
+- Simply press Enter to use the saved values
+- Settings are stored globally (never in project directory)
+
+**Command-Line Options:**
+
+```bash
+# Import with domain replacement via flags
+orodc database import dump.sql.gz --from-domain=www.example.com --to-domain=myproject.docker.local
+
+# Interactive import (prompts for domains)
+orodc database import dump.sql.gz
+
+# Import from var/backup/ folder (interactive selection)
+orodc database import
+```
+
+**Progress Display:**
+
+- For PostgreSQL: Shows progress bar using `pv` (pipe viewer) if available
+- For MySQL or custom containers: Uses spinner for progress indication
+- To enable `pv` progress: rebuild PostgreSQL image with `orodc docker-build pgsql`
 
 ## 💻 Supported Systems
 
@@ -440,17 +552,176 @@ orodc help                   # Show full documentation (README)
 orodc man                    # Alternative help command
 orodc version                # Show OroDC version
 
+# Interactive menu (runs automatically when no arguments)
+orodc                        # Launch interactive menu
+
+# Environment management
+orodc init                   # Initialize new environment
+orodc list                   # List and switch between environments
+
 # Start the environment
 orodc up -d
 
 # Install application (only once)
 orodc install
 
+# Configuration
+orodc conf domains           # Manage domains interactively
+orodc conf url               # Configure application URL interactively
+
 # Connect via SSH
 orodc ssh
 
 # Stop the environment
 orodc down
+```
+
+### 📦 Command Structure
+
+OroDC uses a modular command structure with convenient aliases:
+
+#### Docker Compose Commands
+
+```bash
+# Full syntax (explicit)
+orodc compose up -d              # Start services
+orodc compose down               # Stop services
+orodc compose ps                 # List services
+orodc compose logs -f            # Follow logs
+orodc compose build              # Build images
+
+# Convenient aliases (recommended)
+orodc start                      # Same as: orodc compose up -d
+orodc up                         # Same as: orodc compose up
+orodc down                       # Same as: orodc compose down
+orodc ps                         # Same as: orodc compose ps
+orodc logs                       # Same as: orodc compose logs
+orodc stop                       # Same as: orodc compose stop
+orodc restart                    # Same as: orodc compose restart
+```
+
+#### Database Commands
+
+```bash
+# Full syntax
+orodc database mysql             # MySQL CLI
+orodc database psql              # PostgreSQL CLI
+orodc database import            # Import database (with domain replacement)
+orodc database export            # Export database
+orodc database cli               # Database CLI bash
+
+# Convenient aliases (recommended)
+orodc mysql                      # Same as: orodc database mysql
+orodc psql                       # Same as: orodc database psql
+orodc cli                        # Same as: orodc database cli
+```
+
+#### Other Command Groups
+
+```bash
+# Installation
+orodc install                    # Install with demo data
+orodc install without demo       # Install without demo data
+
+# Environment management
+orodc init                       # Initialize environment
+orodc list                       # List all environments (interactive)
+orodc list table                 # List environments as table (non-interactive)
+orodc list json                  # List environments as JSON (non-interactive)
+
+# Configuration
+orodc conf domains               # Manage domains (interactive)
+orodc conf domains list          # List domains (non-interactive)
+orodc conf domains add <domain>  # Add domain (non-interactive)
+orodc conf domains remove <domain> # Remove domain (non-interactive)
+orodc conf domains set <list>    # Set domains list (non-interactive)
+orodc conf url                   # Configure URL (interactive)
+orodc conf url <url>             # Set URL (non-interactive)
+
+# Cache management
+orodc cache clear                # Clear cache
+orodc cache warmup               # Warm up cache
+
+# Platform operations
+orodc platform-update            # Update platform
+orodc purge                      # Complete cleanup
+orodc config-refresh             # Refresh configuration
+
+# Development tools
+orodc ssh                        # SSH into container
+orodc php <args>                 # Run PHP commands
+orodc composer <cmd>             # Run Composer
+```
+
+### 🎮 Interactive Menu
+
+OroDC provides an interactive menu for easy access to all commands:
+
+```bash
+# Launch interactive menu (runs automatically when no arguments provided)
+orodc
+
+# Or explicitly
+orodc menu
+```
+
+**Menu Options:**
+- **Environment Management:**
+  - List all environments
+  - Initialize environment
+  - Start/Stop/Delete environment
+  - Image build
+
+- **Configuration:**
+  - Add/Manage domains
+  - Configure application URL
+
+- **Database:**
+  - Export database
+  - Import database
+
+- **Maintenance:**
+  - Clear cache
+  - Platform update
+  - Run doctor (show ps)
+  - Connect via SSH/CLI
+
+- **Proxy:**
+  - Start/Stop proxy
+
+- **Installation:**
+  - Install with/without demo data
+
+**Universal Commands:**
+All menu options correspond to CLI commands, working in both interactive and non-interactive modes:
+
+```bash
+# Interactive mode (shows prompts)
+orodc list                       # Interactive environment selection
+orodc conf domains               # Interactive domain management
+orodc conf url                   # Interactive URL configuration
+
+# Non-interactive mode (for scripts)
+orodc list table                 # Table output
+orodc list json                  # JSON output
+orodc conf domains add api       # Add domain directly
+orodc conf domains remove api    # Remove domain directly
+orodc conf url https://example.com # Set URL directly
+```
+
+**Exit Codes:**
+All commands return proper exit codes:
+- `0` - Success
+- `1` - Error
+- `2` - Special case (e.g., environment switch in `list` command)
+
+Exit codes are displayed in interactive menu and can be used in scripts:
+```bash
+if orodc conf domains add api; then
+  echo "Domain added successfully"
+else
+  echo "Failed to add domain (exit code: $?)"
+fi
 ```
 
 ### 🎯 Smart PHP Commands & Flags
@@ -572,7 +843,7 @@ orodc composer update
 orodc composer require package/name
 
 # Database operations
-orodc importdb database.sql.gz       # Import database
+orodc importdb database.sql.gz       # Import database (with domain replacement)
 orodc exportdb                       # Export database
 orodc platformupdate                 # Update platform
 orodc updateurl                      # Update URLs
@@ -706,19 +977,49 @@ OroDC automatically processes hostnames for maximum convenience:
 
 ### 📝 Configuration Methods
 
-#### Method 1: Environment Variable
+#### Method 1: Interactive Command (Recommended)
+```bash
+# Interactive mode - shows current domains and allows adding/removing
+orodc conf domains
+
+# Or use the interactive menu
+orodc
+# Select: 7) Add/Manage domains
+```
+
+#### Method 2: Non-Interactive Commands
+```bash
+# List current domains
+orodc conf domains list
+
+# Add domain
+orodc conf domains add api
+orodc conf domains add admin
+orodc conf domains add shop
+
+# Remove domain
+orodc conf domains remove api
+
+# Set multiple domains at once
+orodc conf domains set "api,admin,shop"
+
+# Then restart environment
+orodc up -d
+```
+
+#### Method 3: Environment Variable
 ```bash
 export DC_ORO_EXTRA_HOSTS="api,admin,shop"
 orodc up -d
 ```
 
-#### Method 2: .env.orodc File
+#### Method 4: .env.orodc File
 ```bash
 echo 'DC_ORO_EXTRA_HOSTS=api,admin,shop' >> .env.orodc
 orodc up -d
 ```
 
-#### Method 3: Project-specific Configuration
+#### Method 5: Project-specific Configuration
 ```bash
 # In your project directory
 echo 'DC_ORO_EXTRA_HOSTS=api,admin,shop.local' > .env.orodc
@@ -780,6 +1081,49 @@ unset DC_ORO_EXTRA_HOSTS
 orodc down && orodc up -d
 ```
 
+### 🔗 Application URL Configuration
+
+OroDC allows you to configure the application URL for proper routing and access:
+
+```bash
+# Interactive mode (recommended)
+orodc conf url
+
+# Or use the interactive menu
+orodc
+# Select: 8) Configure application URL
+```
+
+**Non-Interactive Mode:**
+```bash
+# Show current URL
+orodc conf url
+
+# Set new URL
+orodc conf url https://myproject.local
+orodc conf url http://localhost:30280
+
+# URL must start with http:// or https://
+```
+
+**Configuration Methods:**
+```bash
+# Method 1: Interactive command
+orodc conf url
+
+# Method 2: Environment variable
+export DC_ORO_URL=https://myproject.local
+orodc up -d
+
+# Method 3: .env.orodc file
+echo 'DC_ORO_URL=https://myproject.local' >> .env.orodc
+orodc up -d
+```
+
+**Default URL:**
+- If not configured, defaults to: `https://${DC_ORO_NAME}.docker.local`
+- Example: If `DC_ORO_NAME=myproject`, default URL is `https://myproject.docker.local`
+
 ## ⚙️ Environment Variables
 
 ### 🔧 Complete Environment Variables Reference
@@ -789,6 +1133,9 @@ orodc down && orodc up -d
 # Project identity
 DC_ORO_NAME=unnamed                # Project name (default: unnamed)
 DC_ORO_PORT_PREFIX=302             # Port prefix (302 → 30280, 30243, etc.)
+
+# Application URL
+DC_ORO_URL=https://myproject.docker.local  # Application URL (default: https://${DC_ORO_NAME}.docker.local)
 
 # Multiple hosts configuration
 DC_ORO_EXTRA_HOSTS=api,admin,shop  # Additional hostnames (comma-separated)
@@ -818,13 +1165,13 @@ DC_ORO_USER_NAME=developer         # Runtime user name
 # PostgreSQL settings (default database)
 DC_ORO_DATABASE_HOST=database      # Database host
 DC_ORO_DATABASE_PORT=5432          # Database port
-DC_ORO_DATABASE_USER=app           # Database user
-DC_ORO_DATABASE_PASSWORD=app       # Database password  
-DC_ORO_DATABASE_DBNAME=app         # Database name
+DC_ORO_DATABASE_USER=app_db_user   # Database user
+DC_ORO_DATABASE_PASSWORD=app_db_pass # Database password  
+DC_ORO_DATABASE_DBNAME=app_db      # Database name
 DC_ORO_DATABASE_SCHEMA=postgres    # Database type (postgres/mysql)
 
 # Connection URI (auto-generated)
-DC_ORO_DATABASE_URI=postgres://app:app@database:5432/app
+DC_ORO_DATABASE_URI=postgres://app_db_user:app_db_pass@database:5432/app_db
 ```
 
 #### 🔍 Search & Cache Configuration
@@ -1315,6 +1662,13 @@ orodc up -d
 
 # 2. Import your database
 orodc importdb database.sql.gz
+
+# During import, you'll be prompted to:
+# - Confirm database deletion (WARNING: This will DELETE ALL DATA)
+# - Optionally replace domain names in the dump
+#   - Source domain (e.g., www.example.com)
+#   - Target domain (defaults to {project-name}.docker.local)
+#   - Domains are saved to ~/.orodc/{project-name}/.env.orodc for future imports
 
 # 3. Update URLs for local development
 orodc updateurl
