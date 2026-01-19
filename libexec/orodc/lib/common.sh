@@ -407,11 +407,11 @@ detect_cms_type() {
     else
       # Validate allowed values
       case "$cms_type" in
-        base|oro|magento|symfony|laravel)
+        base|oro|magento|symfony|laravel|wintercms)
           echo "$cms_type"
           ;;
         *)
-          msg_warning "Invalid DC_ORO_CMS_TYPE value: $cms_type (expected: base, php-generic, symfony, laravel, magento, oro)"
+          msg_warning "Invalid DC_ORO_CMS_TYPE value: $cms_type (expected: base, php-generic, symfony, laravel, magento, oro, wintercms)"
           echo "base"
           ;;
       esac
@@ -450,6 +450,16 @@ detect_cms_type() {
         return 0
       fi
       
+      # Check for WinterCMS (before Laravel, as WinterCMS is Laravel-based)
+      # Note: WinterCMS is the community fork of OctoberCMS, they are compatible
+      local wintercms_packages
+      wintercms_packages=$(jq -r '.require // {} | keys[]' "$composer_file" 2>/dev/null | \
+        grep -E '^(wintercms/winter|october/october)$' | head -1)
+      if [[ -n "$wintercms_packages" ]]; then
+        echo "wintercms"
+        return 0
+      fi
+      
       # Check for Laravel
       local laravel_packages
       laravel_packages=$(jq -r '.require // {} | keys[]' "$composer_file" 2>/dev/null | \
@@ -475,6 +485,13 @@ detect_cms_type() {
         return 0
       fi
       
+      # Check for WinterCMS (before Laravel, as WinterCMS is Laravel-based)
+      # Note: WinterCMS is the community fork of OctoberCMS, they are compatible
+      if grep -qE '"(wintercms/winter|october/october)"' "$composer_file" 2>/dev/null; then
+        echo "wintercms"
+        return 0
+      fi
+      
       if grep -qE '"laravel/framework"' "$composer_file" 2>/dev/null; then
         echo "laravel"
         return 0
@@ -497,14 +514,101 @@ detect_cms_type() {
     return 0
   fi
   
-  # Check for Laravel via artisan
+  # Check for Laravel/WinterCMS via artisan
+  # WinterCMS also uses artisan, but we check composer.json first
+  # Note: WinterCMS is the community fork of OctoberCMS, they are compatible
   if [[ -f "${project_dir}/artisan" ]]; then
+    # Check if it's WinterCMS/OctoberCMS (has wintercms/winter or october/october but not laravel/framework)
+    if [[ -f "$composer_file" ]]; then
+      if grep -qE '"(wintercms/winter|october/october)"' "$composer_file" 2>/dev/null; then
+        echo "wintercms"
+        return 0
+      fi
+    fi
+    # Default to Laravel if artisan exists
     echo "laravel"
     return 0
   fi
   
   # Default to base
   echo "base"
+}
+
+# Check if project is Marello (Oro-based ERP/OMS)
+# Returns: 0 if Marello, 1 otherwise
+# Can be overridden with DC_ORO_IS_MARELLO env var
+is_marello_project() {
+  # Check for explicit override first
+  if [[ -n "${DC_ORO_IS_MARELLO:-}" ]]; then
+    case "${DC_ORO_IS_MARELLO,,}" in
+      1|true|yes)
+        return 0
+        ;;
+      0|false|no)
+        return 1
+        ;;
+    esac
+  fi
+  
+  # Auto-detect from composer.json
+  local composer_file="${DC_ORO_APPDIR:-$PWD}/composer.json"
+  if [[ ! -f "$composer_file" ]]; then
+    return 1
+  fi
+  
+  # Check for Marello packages
+  if command -v jq >/dev/null 2>&1; then
+    local marello_packages
+    marello_packages=$(jq -r '.require // {} | keys[]' "$composer_file" 2>/dev/null | \
+      grep -E '^(marello/marello|marellocommerce/marello)$' | head -1)
+    if [[ -n "$marello_packages" ]]; then
+      return 0
+    fi
+  else
+    # Fallback: grep-based detection
+    if grep -qE '"(marello/marello|marellocommerce/marello)"' "$composer_file" 2>/dev/null; then
+      return 0
+    fi
+  fi
+  
+  return 1
+}
+
+# Detect detailed application kind (includes marello as separate type)
+# Returns: marello, oro, magento, symfony, laravel, wintercms, base
+# This is a more detailed version of detect_cms_type() that distinguishes marello from oro
+# Note: wintercms type also covers OctoberCMS (they are compatible, OctoberCMS is the original, WinterCMS is the community fork)
+# Can be overridden with DC_ORO_APPLICATION_KIND env var
+detect_application_kind() {
+  # Check for explicit override first (highest priority)
+  if [[ -n "${DC_ORO_APPLICATION_KIND:-}" ]]; then
+    local app_kind="${DC_ORO_APPLICATION_KIND,,}"
+    # Validate allowed values
+    case "$app_kind" in
+      marello|oro|magento|symfony|laravel|wintercms|base)
+        echo "$app_kind"
+        ;;
+      *)
+        msg_warning "Invalid DC_ORO_APPLICATION_KIND value: $app_kind (expected: marello, oro, magento, symfony, laravel, wintercms, base)"
+        echo "base"
+        ;;
+    esac
+    return 0
+  fi
+  
+  # Check for Marello first (before general Oro detection)
+  if is_marello_project; then
+    echo "marello"
+    return 0
+  fi
+  
+  # Use detect_cms_type for other types
+  local cms_type
+  cms_type=$(detect_cms_type)
+  
+  # detect_cms_type returns "oro" for both Oro and Marello, but we already handled Marello above
+  # So if it's "oro", it's regular Oro (not Marello)
+  echo "$cms_type"
 }
 
 # Detect specific Oro type (Commerce, CRM, or Platform)

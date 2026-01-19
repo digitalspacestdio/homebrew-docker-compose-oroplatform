@@ -79,6 +79,7 @@ ls -la
 - Oro: See `AGENTS_INSTALLATION_oro.md` - uses `orodc exec git clone`
 - Symfony: See `AGENTS_INSTALLATION_symfony.md` - uses `orodc exec composer create-project`
 - Laravel: See `AGENTS_INSTALLATION_laravel.md` - uses `orodc exec composer create-project`
+- WinterCMS: See `AGENTS_INSTALLATION_wintercms.md` - uses `orodc exec composer create-project`
 - Generic PHP: See `AGENTS_INSTALLATION_php-generic.md` - uses `orodc exec` commands
 
 **IMPORTANT**: 

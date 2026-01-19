@@ -55,8 +55,8 @@ get_cms_type_for_codex() {
   if [[ -n "${DC_ORO_CMS_TYPE:-}" ]]; then
     cms_type="${DC_ORO_CMS_TYPE,,}"
   else
-    # Auto-detect using detect_cms_type function
-    cms_type=$(detect_cms_type)
+    # Auto-detect using detect_application_kind function (includes marello)
+    cms_type=$(detect_application_kind)
   fi
   
   # Normalize: base -> php-generic for Codex
@@ -346,6 +346,10 @@ $(if [[ -n "${DC_ORO_NAME:-}" ]]; then
     oro|magento)
       echo "- Frontend: https://${DC_ORO_NAME}.docker.local"
       echo "- Admin Panel: https://${DC_ORO_NAME}.docker.local/admin"
+      ;;
+    wintercms)
+      echo "- Frontend: https://${DC_ORO_NAME}.docker.local"
+      echo "- Admin Panel: https://${DC_ORO_NAME}.docker.local/backend"
       ;;
     *)
       echo "- Application: https://${DC_ORO_NAME}.docker.local"

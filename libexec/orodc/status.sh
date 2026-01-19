@@ -79,7 +79,7 @@ check_initialized() {
   echo "$initialized"
 }
 
-# Function to detect CMS type
+# Function to detect CMS type (uses detect_application_kind for detailed detection)
 get_cms_type() {
   local cms_type=""
   
@@ -91,8 +91,8 @@ get_cms_type() {
       cms_type="base"
     fi
   else
-    # Try to detect from project
-    cms_type=$(detect_cms_type 2>/dev/null || echo "")
+    # Use detect_application_kind for detailed detection (includes marello)
+    cms_type=$(detect_application_kind 2>/dev/null || echo "")
   fi
   
   if [[ -z "$cms_type" ]]; then

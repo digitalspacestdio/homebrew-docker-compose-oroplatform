@@ -113,8 +113,90 @@ if [[ -f "$ENV_FILE" ]]; then
   echo ""
 fi
 
+# Detect CMS type early (for use throughout init process)
+DETECTED_CMS_TYPE=""
+if [[ -f "${PROJECT_DIR}/composer.json" ]]; then
+  # detect_application_kind is already available from common.sh loaded at the top
+  DETECTED_CMS_TYPE=$(detect_application_kind 2>/dev/null || echo "")
+  
+  if [[ -n "${DEBUG:-}" ]] && [[ -n "$DETECTED_CMS_TYPE" ]]; then
+    >&2 echo "DEBUG: Detected CMS type: '$DETECTED_CMS_TYPE'"
+  fi
+fi
+
+# Normalize detected CMS type for display (base -> php-generic)
+DETECTED_CMS_TYPE_DISPLAY="$DETECTED_CMS_TYPE"
+if [[ "$DETECTED_CMS_TYPE_DISPLAY" == "base" ]]; then
+  DETECTED_CMS_TYPE_DISPLAY="php-generic"
+fi
+
 # Initialize wizard
 wizard_init "OroDC Interactive Configuration"
+
+# 0. CMS Type Configuration (first question)
+echo ""
+msg_header "0. CMS Type Configuration"
+msg_info "This helps tools like Codex CLI understand your project structure."
+msg_info "CMS type will be auto-detected if not set."
+
+# Use detected CMS type (determined at the beginning)
+# Normalize for display (base -> php-generic)
+AUTO_DETECTED_CMS="$DETECTED_CMS_TYPE_DISPLAY"
+
+if prompt_yes_no "Set CMS type explicitly?" "$([ -n "$EXISTING_CMS_TYPE" ] && echo yes || echo no)"; then
+  CMS_TYPES=("php-generic" "symfony" "laravel" "wintercms" "magento" "oro")
+  DEFAULT_CMS=""
+  
+  # Determine default: existing > auto-detected > php-generic
+  if [[ -n "$EXISTING_CMS_TYPE" ]]; then
+    DEFAULT_CMS="$EXISTING_CMS_TYPE"
+  elif [[ -n "$AUTO_DETECTED_CMS" ]]; then
+    DEFAULT_CMS="$AUTO_DETECTED_CMS"
+  else
+    DEFAULT_CMS="php-generic"
+  fi
+  
+  # Normalize existing CMS type for display
+  if [[ "$DEFAULT_CMS" == "base" ]]; then
+    DEFAULT_CMS="php-generic"
+  fi
+  
+  SELECTED_CMS_TYPE=$(prompt_select "Select CMS/Framework type:" "$DEFAULT_CMS" "${CMS_TYPES[@]}")
+  
+  if [[ -n "${DEBUG:-}" ]]; then
+    >&2 echo "DEBUG: Selected CMS type: '$SELECTED_CMS_TYPE'"
+  fi
+  
+  # Normalize php-generic to base for storage (internal representation)
+  if [[ "$SELECTED_CMS_TYPE" == "php-generic" ]]; then
+    SELECTED_CMS_TYPE="base"
+  fi
+else
+  # User skipped - use auto-detected or empty (will auto-detect on use)
+  if [[ -n "$AUTO_DETECTED_CMS" ]]; then
+    msg_info "Using auto-detected CMS type: $AUTO_DETECTED_CMS"
+    SELECTED_CMS_TYPE="$AUTO_DETECTED_CMS"
+    # Normalize for storage
+    if [[ "$SELECTED_CMS_TYPE" == "php-generic" ]]; then
+      SELECTED_CMS_TYPE="base"
+    fi
+  else
+    msg_info "CMS type will be auto-detected when needed"
+    SELECTED_CMS_TYPE=""  # Empty means don't save, use auto-detection
+  fi
+fi
+
+# Update DETECTED_CMS_TYPE if user explicitly selected a different type
+if [[ -n "$SELECTED_CMS_TYPE" ]]; then
+  DETECTED_CMS_TYPE="$SELECTED_CMS_TYPE"
+  # Re-normalize for display
+  DETECTED_CMS_TYPE_DISPLAY="$DETECTED_CMS_TYPE"
+  if [[ "$DETECTED_CMS_TYPE_DISPLAY" == "base" ]]; then
+    DETECTED_CMS_TYPE_DISPLAY="php-generic"
+  fi
+fi
+
+echo ""
 
 # Page 1: PHP Configuration
 init_page_php() {
@@ -288,7 +370,7 @@ fi
 
 msg_info "PHP Image: $SELECTED_PHP_IMAGE"
 
-# 2. Database Configuration
+# 3. Database Configuration
 echo ""
 msg_header "2. Database Configuration"
 
@@ -310,11 +392,31 @@ if prompt_yes_no "Use custom database image?" "$([ "$USE_CUSTOM_DB" = true ] && 
 else
   # Select database type based on existing or default
   DB_TYPES=("PostgreSQL" "MySQL")
+  
+  # Determine default database based on application kind
   if [[ "$EXISTING_DB_SCHEMA" == "mysql" ]]; then
     DEFAULT_DB_TYPE="MySQL"
   else
-    DEFAULT_DB_TYPE="PostgreSQL"
+    # Use detected CMS type (determined at the beginning) to determine default database
+    if [[ -n "$DETECTED_CMS_TYPE" ]]; then
+      # Set MySQL as default for: marello, magento, base (php-generic), wintercms
+      if [[ "$DETECTED_CMS_TYPE" == "marello" ]] || [[ "$DETECTED_CMS_TYPE" == "magento" ]] || [[ "$DETECTED_CMS_TYPE" == "base" ]] || [[ "$DETECTED_CMS_TYPE" == "wintercms" ]]; then
+        DEFAULT_DB_TYPE="MySQL"
+        if [[ -n "${DEBUG:-}" ]]; then
+          >&2 echo "DEBUG: Using MySQL as default (CMS type: $DETECTED_CMS_TYPE)"
+        fi
+      else
+        DEFAULT_DB_TYPE="PostgreSQL"
+        if [[ -n "${DEBUG:-}" ]]; then
+          >&2 echo "DEBUG: Using PostgreSQL as default (CMS type: $DETECTED_CMS_TYPE)"
+        fi
+      fi
+    else
+      # No composer.json or detection failed, default to PostgreSQL
+      DEFAULT_DB_TYPE="PostgreSQL"
+    fi
   fi
+  
   SELECTED_DB_TYPE=$(prompt_select "Select database type:" "$DEFAULT_DB_TYPE" "${DB_TYPES[@]}")
   
   if [[ -n "${DEBUG:-}" ]]; then
@@ -349,7 +451,7 @@ fi
 
 msg_info "Database Image: $SELECTED_DB_IMAGE"
 
-# 3. Search Engine Configuration
+# 4. Search Engine Configuration
 echo ""
 msg_header "3. Search Engine Configuration"
 
@@ -400,7 +502,7 @@ fi
 
 msg_info "Search Image: $SELECTED_SEARCH_IMAGE"
 
-# 4. Cache Configuration
+# 5. Cache Configuration
 echo ""
 msg_header "4. Cache Configuration"
 
@@ -461,7 +563,7 @@ fi
 
 msg_info "Cache Image: $SELECTED_CACHE_IMAGE"
 
-# 5. RabbitMQ Configuration
+# 6. RabbitMQ Configuration
 echo ""
 msg_header "5. RabbitMQ Configuration"
 
@@ -506,69 +608,6 @@ echo "RabbitMQ: $SELECTED_RABBITMQ_VERSION"
 echo "RabbitMQ Image: $SELECTED_RABBITMQ_IMAGE"
 echo ""
 
-# Optional: CMS Type Configuration (for Codex CLI and other tools)
-echo ""
-msg_header "Optional: CMS Type Configuration"
-msg_info "This helps tools like Codex CLI understand your project structure."
-msg_info "You can skip this step - CMS type will be auto-detected if not set."
-
-# Auto-detect current CMS type
-AUTO_DETECTED_CMS=""
-if [[ -f "${PROJECT_DIR}/composer.json" ]]; then
-  # Source common.sh to use detect_cms_type function
-  source "${SCRIPT_DIR}/lib/common.sh"
-  AUTO_DETECTED_CMS=$(detect_cms_type)
-  # Normalize base to php-generic for display
-  if [[ "$AUTO_DETECTED_CMS" == "base" ]]; then
-    AUTO_DETECTED_CMS="php-generic"
-  fi
-fi
-
-if prompt_yes_no "Set CMS type explicitly?" "$([ -n "$EXISTING_CMS_TYPE" ] && echo yes || echo no)"; then
-  CMS_TYPES=("php-generic" "symfony" "laravel" "magento" "oro")
-  DEFAULT_CMS=""
-  
-  # Determine default: existing > auto-detected > php-generic
-  if [[ -n "$EXISTING_CMS_TYPE" ]]; then
-    DEFAULT_CMS="$EXISTING_CMS_TYPE"
-  elif [[ -n "$AUTO_DETECTED_CMS" ]]; then
-    DEFAULT_CMS="$AUTO_DETECTED_CMS"
-  else
-    DEFAULT_CMS="php-generic"
-  fi
-  
-  # Normalize existing CMS type for display
-  if [[ "$DEFAULT_CMS" == "base" ]]; then
-    DEFAULT_CMS="php-generic"
-  fi
-  
-  SELECTED_CMS_TYPE=$(prompt_select "Select CMS/Framework type:" "$DEFAULT_CMS" "${CMS_TYPES[@]}")
-  
-  if [[ -n "${DEBUG:-}" ]]; then
-    >&2 echo "DEBUG: Selected CMS type: '$SELECTED_CMS_TYPE'"
-  fi
-  
-  # Normalize php-generic to base for storage (internal representation)
-  if [[ "$SELECTED_CMS_TYPE" == "php-generic" ]]; then
-    SELECTED_CMS_TYPE="base"
-  fi
-else
-  # User skipped - use auto-detected or empty (will auto-detect on use)
-  if [[ -n "$AUTO_DETECTED_CMS" ]]; then
-    msg_info "Using auto-detected CMS type: $AUTO_DETECTED_CMS"
-    SELECTED_CMS_TYPE="$AUTO_DETECTED_CMS"
-    # Normalize for storage
-    if [[ "$SELECTED_CMS_TYPE" == "php-generic" ]]; then
-      SELECTED_CMS_TYPE="base"
-    fi
-  else
-    msg_info "CMS type will be auto-detected when needed"
-    SELECTED_CMS_TYPE=""  # Empty means don't save, use auto-detection
-  fi
-fi
-
-echo ""
-
 # Ask where to save configuration
 # Show relative path for local file if we're in project directory
 LOCAL_ENV_DISPLAY=".env.orodc"
@@ -579,6 +618,7 @@ fi
 # First ask: save to project directory (default: no)
 SAVE_TO_PROJECT=false
 TARGET_ENV_FILE=""
+msg_info "If you choose 'no', configuration will be saved to: ~/.orodc/${PROJECT_NAME}/.env.orodc"
 if prompt_yes_no "Save configuration to project directory ($LOCAL_ENV_DISPLAY)?" "no"; then
   SAVE_TO_PROJECT=true
   TARGET_ENV_FILE="$LOCAL_ENV_FILE"
