@@ -188,35 +188,48 @@ main() {
   local project_name
   project_name=$(get_project_name)
   
+  # Determine config directory
+  local config_dir=""
+  if [[ -n "${DC_ORO_CONFIG_DIR:-}" ]] && [[ -d "${DC_ORO_CONFIG_DIR}" ]]; then
+    config_dir="${DC_ORO_CONFIG_DIR}"
+  else
+    # Try to determine from project name
+    local config_dir_candidate="${HOME}/.orodc/${project_name}"
+    if [[ -d "$config_dir_candidate" ]]; then
+      config_dir="$config_dir_candidate"
+    fi
+  fi
+  
   # Display status
   msg_header "OroDC Project Status"
-  echo ""
-  
-  # Project directory
-  echo "Project Directory: ${project_dir}"
-  echo "Project Name: ${project_name}"
-  echo ""
-  
+  # Project name first, then Application Kind, then other info
+  msg_ok "Project Name: ${project_name}"
+  # CMS type (right after project name)
+  if [[ "$cms_type" != "unknown" ]]; then
+    msg_ok "Application Kind: ${cms_type}"
+  else
+    msg_warning "Application Kind: Not detected"
+    echo "  Set DC_ORO_CMS_TYPE in .env.orodc or ensure composer.json exists"
+  fi
+  msg_ok "Project Directory: ${project_dir}"
+  if [[ -n "$config_dir" ]]; then
+    msg_ok "Config Directory: ${config_dir}"
+  fi
   # Initialization status
+  # Don't show warning if project is detected and ready (has composer.json, CMS type detected)
+  local project_ready=false
+  if [[ "$project_exists" == "true" ]] && [[ "$cms_type" != "unknown" ]]; then
+    project_ready=true
+  fi
+  
   if [[ "$initialized" == "true" ]]; then
     msg_ok "Environment initialized: Yes"
-    if [[ -n "${DC_ORO_CONFIG_DIR:-}" ]]; then
-      echo "  Config directory: ${DC_ORO_CONFIG_DIR}"
-    fi
-  else
+  elif [[ "$project_ready" != "true" ]]; then
+    # Only show warning if project is not ready (not detected)
     msg_warning "Environment initialized: No"
     echo "  Run 'orodc init' to initialize the environment"
   fi
-  echo ""
-  
-  # CMS type
-  if [[ "$cms_type" != "unknown" ]]; then
-    msg_ok "CMS Type: ${cms_type}"
-  else
-    msg_warning "CMS Type: Not detected"
-    echo "  Set DC_ORO_CMS_TYPE in .env.orodc or ensure composer.json exists"
-  fi
-  echo ""
+  # If project is ready but not initialized, skip this section entirely
   
   # Project codebase
   if [[ "$directory_empty" == "true" ]]; then
@@ -227,11 +240,67 @@ main() {
     echo "  - Follow installation guide: AGENTS_INSTALLATION_${cms_type}.md"
   elif [[ "$project_exists" == "true" ]]; then
     msg_ok "Project codebase: Exists"
+    
+    # Detect CMS type first (to use for all Found messages)
+    local detected_type=""
+    local oro_type=""
+    if is_oro_project; then
+      oro_type=$(detect_oro_type)
+      if [[ -n "$oro_type" ]]; then
+        case "$oro_type" in
+          commerce)
+            detected_type="Oro Commerce"
+            ;;
+          crm)
+            detected_type="Oro CRM"
+            ;;
+          platform)
+            detected_type="Oro Platform"
+            ;;
+        esac
+      else
+        detected_type="Oro"
+      fi
+    else
+      local cms_type=$(detect_cms_type)
+      case "$cms_type" in
+        symfony)
+          detected_type="Symfony"
+          ;;
+        laravel)
+          detected_type="Laravel"
+          ;;
+        magento)
+          detected_type="Magento"
+          ;;
+      esac
+    fi
+    
+    # Output all Found messages first
     if [[ -f "${project_dir}/composer.json" ]]; then
       echo "  Found: composer.json"
     fi
     if [[ -f "${project_dir}/bin/console" ]]; then
-      echo "  Found: bin/console (Symfony/Oro)"
+      local console_type="${detected_type:-Symfony}"
+      if [[ -n "$oro_type" ]]; then
+        case "$oro_type" in
+          commerce)
+            console_type="Oro Commerce"
+            ;;
+          crm)
+            console_type="Oro CRM"
+            ;;
+          platform)
+            console_type="Oro Platform"
+            ;;
+          *)
+            console_type="Oro"
+            ;;
+        esac
+      elif [[ -z "$detected_type" ]]; then
+        console_type="Symfony"
+      fi
+      echo "  Found: bin/console ($console_type)"
     fi
     if [[ -f "${project_dir}/bin/magento" ]]; then
       echo "  Found: bin/magento (Magento)"
@@ -239,31 +308,33 @@ main() {
     if [[ -f "${project_dir}/artisan" ]]; then
       echo "  Found: artisan (Laravel)"
     fi
+    
+    # Output Detected message after all Found messages
+    if [[ -n "$detected_type" ]]; then
+      echo "  Detected: $detected_type"
+    fi
   else
     msg_warning "Project codebase: Not found"
     echo "  Directory contains files but no project detected"
     echo "  Follow installation guide to create a new project"
   fi
-  echo ""
   
   # Summary
-  local all_ok=true
-  if [[ "$initialized" != "true" ]]; then
-    all_ok=false
-  fi
-  if [[ "$cms_type" == "unknown" ]]; then
-    all_ok=false
-  fi
-  if [[ "$project_exists" != "true" ]]; then
-    all_ok=false
-  fi
-  
-  if [[ "$all_ok" == "true" ]]; then
+  # If project is ready (detected and CMS type known), consider it ready to work
+  if [[ "$project_ready" == "true" ]]; then
+    msg_ok "Status: Ready to work"
+  elif [[ "$initialized" == "true" ]] && [[ "$cms_type" != "unknown" ]] && [[ "$project_exists" == "true" ]]; then
     msg_ok "Status: Ready to work"
   elif [[ "$directory_empty" == "true" ]] && [[ "$initialized" == "true" ]]; then
     msg_info "Status: Environment ready, waiting for project code"
+  elif [[ "$directory_empty" == "true" ]]; then
+    msg_info "Status: Waiting for project code"
+  elif [[ "$project_exists" != "true" ]]; then
+    msg_warning "Status: Project codebase not found"
+  elif [[ "$cms_type" == "unknown" ]]; then
+    msg_warning "Status: CMS type not detected"
   else
-    msg_warning "Status: Configuration incomplete"
+    msg_info "Status: Run 'orodc init' to configure environment"
   fi
 }
 

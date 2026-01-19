@@ -3672,13 +3672,13 @@ is_oro_project() {
   if command -v jq >/dev/null 2>&1; then
     local oro_packages
     oro_packages=$(jq -r '.require // {} | keys[]' "$composer_file" 2>/dev/null | \
-      grep -E '^(oro/platform|oro/commerce|oro/crm|oro/customer-portal|marello/marello)$' | head -1)
+      grep -E '^(oro/platform|oro/commerce|oro/crm|oro/customer-portal|marello/marello|marellocommerce/marello)$' | head -1)
     if [[ -n "$oro_packages" ]]; then
       return 0
     fi
   else
     # Fallback: grep-based detection (less reliable but works without jq)
-    if grep -qE '"(oro/platform|oro/commerce|oro/crm|oro/customer-portal|marello/marello)"' "$composer_file" 2>/dev/null; then
+    if grep -qE '"(oro/platform|oro/commerce|oro/crm|oro/customer-portal|marello/marello|marellocommerce/marello)"' "$composer_file" 2>/dev/null; then
       return 0
     fi
   fi
@@ -3760,7 +3760,7 @@ if [[ -z $DC_ORO_PHP_VERSION ]]; then
   # Priority 1: .php-version file
   if [[ -f "$DC_ORO_APPDIR/.php-version" ]]; then
     export DC_ORO_PHP_VERSION=$(cat $DC_ORO_APPDIR/.php-version | head -n1)
-    msg_info "Found .php-version with following version: $DC_ORO_PHP_VERSION"
+    msg_debug "Found .php-version with following version: $DC_ORO_PHP_VERSION"
   # Priority 2: .phprc file
   elif [[ -f "$DC_ORO_APPDIR/.phprc" ]]; then
     export DC_ORO_PHP_VERSION=$(cat $DC_ORO_APPDIR/.phprc | head -n1)
@@ -3781,7 +3781,7 @@ if [[ -z $DC_ORO_NODE_VERSION ]]; then
   # Priority 1: .nvmrc file
   if [[ -f "$DC_ORO_APPDIR/.nvmrc" ]]; then
     export DC_ORO_NODE_VERSION=$(cat $DC_ORO_APPDIR/.nvmrc | head -n1)
-    msg_info "Found .nvmrc with following version: $DC_ORO_NODE_VERSION"
+    msg_debug "Found .nvmrc with following version: $DC_ORO_NODE_VERSION"
   # Priority 2: .node-version file (alternative to .nvmrc)
   elif [[ -f "$DC_ORO_APPDIR/.node-version" ]]; then
     export DC_ORO_NODE_VERSION=$(cat $DC_ORO_APPDIR/.node-version | head -n1)

@@ -380,13 +380,13 @@ is_oro_project() {
   if command -v jq >/dev/null 2>&1; then
     local oro_packages
     oro_packages=$(jq -r '.require // {} | keys[]' "$composer_file" 2>/dev/null | \
-      grep -E '^(oro/platform|oro/commerce|oro/crm|oro/customer-portal|marello/marello)$' | head -1)
+      grep -E '^(oro/platform|oro/commerce|oro/crm|oro/customer-portal|marello/marello|marellocommerce/marello)$' | head -1)
     if [[ -n "$oro_packages" ]]; then
       return 0
     fi
   else
     # Fallback: grep-based detection (less reliable but works without jq)
-    if grep -qE '"(oro/platform|oro/commerce|oro/crm|oro/customer-portal|marello/marello)"' "$composer_file" 2>/dev/null; then
+    if grep -qE '"(oro/platform|oro/commerce|oro/crm|oro/customer-portal|marello/marello|marellocommerce/marello)"' "$composer_file" 2>/dev/null; then
       return 0
     fi
   fi
@@ -426,7 +426,7 @@ detect_cms_type() {
     if command -v jq >/dev/null 2>&1; then
       local oro_packages
       oro_packages=$(jq -r '.require // {} | keys[]' "$composer_file" 2>/dev/null | \
-        grep -E '^(oro/platform|oro/commerce|oro/crm|oro/customer-portal|marello/marello)$' | head -1)
+        grep -E '^(oro/platform|oro/commerce|oro/crm|oro/customer-portal|marello/marello|marellocommerce/marello)$' | head -1)
       if [[ -n "$oro_packages" ]]; then
         echo "oro"
         return 0
@@ -444,7 +444,7 @@ detect_cms_type() {
       # Check for Symfony
       local symfony_packages
       symfony_packages=$(jq -r '.require // {} | keys[]' "$composer_file" 2>/dev/null | \
-        grep -E '^(symfony/symfony|symfony/framework-bundle)$' | head -1)
+        grep -E '^(symfony/symfony|symfony/framework-bundle|symfony/flex)$' | head -1)
       if [[ -n "$symfony_packages" ]]; then
         echo "symfony"
         return 0
@@ -460,7 +460,7 @@ detect_cms_type() {
       fi
     else
       # Fallback: grep-based detection (less reliable but works without jq)
-      if grep -qE '"(oro/platform|oro/commerce|oro/crm|oro/customer-portal|marello/marello)"' "$composer_file" 2>/dev/null; then
+      if grep -qE '"(oro/platform|oro/commerce|oro/crm|oro/customer-portal|marello/marello|marellocommerce/marello)"' "$composer_file" 2>/dev/null; then
         echo "oro"
         return 0
       fi
@@ -470,7 +470,7 @@ detect_cms_type() {
         return 0
       fi
       
-      if grep -qE '"(symfony/symfony|symfony/framework-bundle)"' "$composer_file" 2>/dev/null; then
+      if grep -qE '"(symfony/symfony|symfony/framework-bundle|symfony/flex)"' "$composer_file" 2>/dev/null; then
         echo "symfony"
         return 0
       fi
@@ -482,7 +482,7 @@ detect_cms_type() {
     fi
   fi
   
-  # File-based detection (fallback for Magento)
+  # File-based detection (fallback for Magento and Symfony)
   local project_dir="${DC_ORO_APPDIR:-$PWD}"
   if [[ -f "${project_dir}/bin/magento" ]] || \
      [[ -f "${project_dir}/app/etc/config.php" ]] || \
@@ -491,6 +491,66 @@ detect_cms_type() {
     return 0
   fi
   
+  # Check for Symfony via bin/console (only if not Oro project)
+  if [[ -f "${project_dir}/bin/console" ]] && ! is_oro_project; then
+    echo "symfony"
+    return 0
+  fi
+  
+  # Check for Laravel via artisan
+  if [[ -f "${project_dir}/artisan" ]]; then
+    echo "laravel"
+    return 0
+  fi
+  
   # Default to base
   echo "base"
+}
+
+# Detect specific Oro type (Commerce, CRM, or Platform)
+# Returns: commerce, crm, platform, or empty string if not Oro
+# Only works if detect_cms_type() returns "oro"
+detect_oro_type() {
+  local composer_file="${DC_ORO_APPDIR:-$PWD}/composer.json"
+  if [[ ! -f "$composer_file" ]]; then
+    return 1
+  fi
+  
+  # Check for Oro ecosystem packages with priority:
+  # 1. oro/commerce (highest priority)
+  # 2. oro/crm
+  # 3. oro/platform, oro/customer-portal, marello packages (Platform/ERP)
+  # Note: Marello is ERP/OMS platform (no frontend), similar to Platform, not Commerce
+  
+  if command -v jq >/dev/null 2>&1; then
+    local oro_packages
+    oro_packages=$(jq -r '.require // {} | keys[]' "$composer_file" 2>/dev/null | \
+      grep -E '^(oro/commerce|oro/crm|oro/platform|oro/customer-portal|marello/marello|marellocommerce/marello)$' || true)
+    
+    # Check packages in priority order: commerce > crm > platform
+    if echo "$oro_packages" | grep -qxE 'oro/commerce'; then
+      echo "commerce"
+      return 0
+    elif echo "$oro_packages" | grep -qxE 'oro/crm'; then
+      echo "crm"
+      return 0
+    elif echo "$oro_packages" | grep -qxE '(oro/platform|oro/customer-portal|marello/marello|marellocommerce/marello)'; then
+      echo "platform"
+      return 0
+    fi
+  else
+    # Fallback: grep-based detection
+    if grep -qE '"oro/commerce"' "$composer_file" 2>/dev/null; then
+      echo "commerce"
+      return 0
+    elif grep -qE '"oro/crm"' "$composer_file" 2>/dev/null; then
+      echo "crm"
+      return 0
+    elif grep -qE '"(oro/platform|oro/customer-portal|marello/marello|marellocommerce/marello)"' "$composer_file" 2>/dev/null; then
+      echo "platform"
+      return 0
+    fi
+  fi
+  
+  return 1
 }
