@@ -11,10 +11,31 @@ source "${SCRIPT_DIR}/lib/environment.sh"
 # Check that we're in a project
 check_in_project || exit 1
 
+# Check for --yes flag or ORODC_PURGE_FORCE environment variable
+SKIP_CONFIRMATION=false
+for arg in "$@"; do
+  case "$arg" in
+    --yes|-y|--force)
+      SKIP_CONFIRMATION=true
+      ;;
+  esac
+done
+
+if [[ "${ORODC_PURGE_FORCE:-}" == "1" ]] || [[ "${ORODC_PURGE_FORCE:-}" == "true" ]]; then
+  SKIP_CONFIRMATION=true
+fi
+
 msg_warning "This will remove all containers, volumes, networks, and images for this project"
-if ! confirm_yes_no "Are you sure you want to purge everything?"; then
-  msg_info "Purge cancelled"
-  exit 0
+if [[ "$SKIP_CONFIRMATION" != "true" ]]; then
+  if ! confirm_yes_no "Are you sure you want to purge everything?"; then
+    msg_info "Purge cancelled"
+    exit 0
+  fi
+  # Mark that purge was confirmed
+  export PURGE_CONFIRMED=true
+else
+  msg_info "Skipping confirmation (--yes flag or ORODC_PURGE_FORCE=1 detected)"
+  export PURGE_CONFIRMED=true
 fi
 
 # Stop and remove containers with spinner, also remove locally built images
@@ -109,18 +130,24 @@ if [[ -n "${DC_ORO_NAME:-}" ]]; then
   fi
 fi
 
-# Remove all found directories
-for dir in "${config_dirs_to_remove[@]}"; do
-  if [[ -d "${dir}" ]]; then
-    run_with_spinner "Removing configuration directory" "rm -rf \"${dir}\"" || exit $?
-    
-    # Verify deletion succeeded
+# Remove all found directories (only if confirmation was given or skipped)
+# Double-check: if SKIP_CONFIRMATION is false, we should have exited earlier if user said no
+if [[ "$SKIP_CONFIRMATION" == "true" ]] || [[ "${PURGE_CONFIRMED:-}" == "true" ]]; then
+  for dir in "${config_dirs_to_remove[@]}"; do
     if [[ -d "${dir}" ]]; then
-      msg_error "Failed to remove configuration directory: ${dir}"
-      exit 1
+      run_with_spinner "Removing configuration directory" "rm -rf \"${dir}\"" || exit $?
+      
+      # Verify deletion succeeded
+      if [[ -d "${dir}" ]]; then
+        msg_error "Failed to remove configuration directory: ${dir}"
+        exit 1
+      fi
     fi
-  fi
-done
+  done
+else
+  # This should never happen if logic is correct, but add safety check
+  msg_warning "Skipping config directory removal (confirmation check failed)"
+fi
 
 # Remove environment from registry
 if [[ -n "${DC_ORO_NAME:-}" ]]; then

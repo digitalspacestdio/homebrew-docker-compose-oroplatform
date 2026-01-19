@@ -99,12 +99,30 @@ git checkout -b fix/descriptive-task-name
 
 ## 6. Shellcheck is Mandatory
 
+**ALWAYS run shellcheck before committing ANY bash script changes:**
+
 ```bash
-shellcheck script.sh
+# 1. Check syntax first
 bash -n script.sh
+
+# 2. Run shellcheck (fix ALL warnings except SC1091)
+shellcheck script.sh
+
+# 3. Fix warnings and verify again
+shellcheck script.sh
+
+# 4. Only then commit
 ```
 
-No Bash changes without shellcheck.
+**MANDATORY workflow:**
+- ✅ **MUST** run `shellcheck` on ALL `.sh` files you modify
+- ✅ **MUST** run `bash -n script.sh` to check syntax
+- ✅ **MUST** fix ALL warnings (except SC1091 - source file not found)
+- ✅ **MUST NOT** commit without shellcheck passing
+
+**See detailed rules:** `openspec/agents/code-quality.md`
+
+No Bash changes without shellcheck!
 
 ## 7. Never Bloat bin/orodc - Use Modular Architecture
 

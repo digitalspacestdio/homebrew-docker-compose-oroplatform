@@ -3462,6 +3462,27 @@ cd "$DC_ORO_APPDIR"
 load_env_safe "$DC_ORO_APPDIR/.env"
 load_env_safe "$DC_ORO_APPDIR/.env-app"
 load_env_safe "$DC_ORO_APPDIR/.env-app.local"
+
+# Load global config before local config (global has lower priority)
+# Determine project name for global config lookup
+if [[ -n "${DC_ORO_NAME:-}" ]]; then
+  project_name="${DC_ORO_NAME}"
+elif [[ -n "${DC_ORO_APPDIR:-}" ]]; then
+  project_name=$(basename "$DC_ORO_APPDIR")
+  if [[ "$project_name" == "$HOME" ]] || [[ -z "$project_name" ]] || [[ "$project_name" == "/" ]]; then
+    project_name="default"
+  fi
+else
+  project_name="default"
+fi
+
+# Load global config first (lower priority)
+global_config_file="${HOME}/.orodc/${project_name}/.env.orodc"
+if [[ -f "$global_config_file" ]]; then
+  load_env_safe "$global_config_file"
+fi
+
+# Load local config last (higher priority, overrides global)
 load_env_safe "$DC_ORO_APPDIR/.env.orodc"
 
 # Build complete Traefik routing rule

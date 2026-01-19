@@ -618,10 +618,21 @@ fi
 # First ask: save to project directory (default: no)
 SAVE_TO_PROJECT=false
 TARGET_ENV_FILE=""
-msg_info "If you choose 'no', configuration will be saved to: ~/.orodc/${PROJECT_NAME}/.env.orodc"
+
+# Debug: show project name and paths
+if [[ -n "${DEBUG:-}" ]]; then
+  >&2 echo "DEBUG: PROJECT_NAME='$PROJECT_NAME'"
+  >&2 echo "DEBUG: PROJECT_DIR='$PROJECT_DIR'"
+  >&2 echo "DEBUG: GLOBAL_ENV_FILE='$GLOBAL_ENV_FILE'"
+  >&2 echo "DEBUG: LOCAL_ENV_FILE='$LOCAL_ENV_FILE'"
+fi
+
+msg_info "Configuration will be saved to global config: ~/.orodc/${PROJECT_NAME}/.env.orodc"
+msg_info "If you want to save to project directory instead, answer 'yes' to the next question"
 if prompt_yes_no "Save configuration to project directory ($LOCAL_ENV_DISPLAY)?" "no"; then
   SAVE_TO_PROJECT=true
   TARGET_ENV_FILE="$LOCAL_ENV_FILE"
+  msg_info "Configuration will be saved to: $TARGET_ENV_FILE"
 else
   # User declined project directory, save to global config automatically
   TARGET_ENV_FILE="$GLOBAL_ENV_FILE"
@@ -631,7 +642,19 @@ fi
 # Save configuration to selected file
 if [[ -n "$TARGET_ENV_FILE" ]]; then
   # Always ensure directory exists before saving
-  mkdir -p "$(dirname "$TARGET_ENV_FILE")"
+  target_dir="$(dirname "$TARGET_ENV_FILE")"
+  mkdir -p "$target_dir"
+  
+  # Verify directory was created successfully
+  if [[ ! -d "$target_dir" ]]; then
+    msg_error "Failed to create directory: $target_dir"
+    exit 1
+  fi
+  
+  if [[ -n "${DEBUG:-}" ]]; then
+    >&2 echo "DEBUG: Saving to: $TARGET_ENV_FILE"
+    >&2 echo "DEBUG: Directory exists: $target_dir"
+  fi
   
   # Create backup if file exists
   if [[ -f "$TARGET_ENV_FILE" ]]; then
@@ -699,6 +722,12 @@ EOF
   
   # Project Name Configuration (always save)
   update_env_var "$TARGET_ENV_FILE" "DC_ORO_PROJECT_NAME" "$PROJECT_NAME"
+  
+  # Verify file was created/updated successfully
+  if [[ ! -f "$TARGET_ENV_FILE" ]]; then
+    msg_error "Failed to save configuration to $TARGET_ENV_FILE"
+    exit 1
+  fi
   
   msg_ok "Configuration saved to $TARGET_ENV_FILE"
   msg_info "All other variables in the file were preserved"
