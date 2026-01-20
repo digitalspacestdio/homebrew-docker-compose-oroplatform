@@ -4327,7 +4327,7 @@ is_docker_compose_command() {
 is_special_orodc_command() {
   local cmd="$1"
   case "$cmd" in
-    ssh|cli|pgsql|psql|mysql|database-cli|install|purge|test|tests|bash|help|man|init|codex|gemini|status)
+    ssh|cli|pgsql|psql|mysql|database-cli|install|purge|test|tests|bash|help|man|init|codex|gemini|agents|status)
       return 0
       ;;
     *)
@@ -5095,6 +5095,15 @@ case "$1" in
       execute_with_menu_return "${LIBEXEC_DIR}/composer.sh" "$@"
     else
       exec "${LIBEXEC_DIR}/composer.sh" "$@"
+    fi
+    ;;
+
+  agents)
+    shift
+    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+      execute_with_menu_return "${LIBEXEC_DIR}/agents.sh" "$@"
+    else
+      exec "${LIBEXEC_DIR}/agents.sh" "$@"
     fi
     ;;
 

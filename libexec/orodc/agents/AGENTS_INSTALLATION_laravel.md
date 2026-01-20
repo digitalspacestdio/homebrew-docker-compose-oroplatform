@@ -4,7 +4,7 @@
 
 ## Prerequisites
 
-- Complete steps 1-4 from `AGENTS_INSTALLATION_common.md`:
+- Complete steps 1-4 from `orodc agents installation` (common part):
   - Navigate to empty project directory
   - Run `orodc init` manually in terminal (MUST be done by user BEFORE using agent)
   - Run `orodc up -d`

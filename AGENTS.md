@@ -282,4 +282,228 @@ orodc config
 
 ---
 
+# AI Agents and Proxy Integration
+
+## Overview
+
+OroDC provides integration with AI coding assistants (Codex, Gemini) through proxy commands (`orodc codex`, `orodc gemini`) and a dedicated command for accessing agent documentation (`orodc agents`).
+
+## Architecture
+
+### File Structure
+
+```
+libexec/orodc/
+├── agents.sh              # Command handler for `orodc agents`
+├── codex.sh               # Codex AI proxy integration
+├── gemini.sh              # Gemini AI proxy integration
+└── agents/                # Agent documentation files
+    ├── AGENTS_common.md                    # Common instructions for all projects
+    ├── AGENTS_oro.md                       # Oro Platform-specific instructions
+    ├── AGENTS_magento.md                   # Magento-specific instructions
+    ├── AGENTS_CODING_RULES_common.md       # Common coding rules
+    ├── AGENTS_CODING_RULES_oro.md          # Oro-specific coding rules
+    ├── AGENTS_INSTALLATION_common.md       # Common installation guide
+    └── AGENTS_INSTALLATION_oro.md          # Oro-specific installation guide
+```
+
+### System Prompt Generation
+
+When you run `orodc codex` or `orodc gemini`, the system:
+
+1. **Detects CMS type** - Automatically detects project CMS type (oro, magento, laravel, etc.)
+2. **Copies agent files** - Copies relevant agent documentation files to `~/.orodc/{project_name}/`
+3. **Generates system prompt** - Creates `~/.orodc/{project_name}/AGENTS.md` with:
+   - Common instructions (from `AGENTS_common.md`)
+   - References to CMS-specific instructions via `orodc agents` commands
+   - Project context (name, URL, directory)
+   - Environment information
+4. **Launches AI agent** - Starts Codex/Gemini with the generated system prompt
+
+**Important:** The system prompt does NOT include full content of CMS-specific files. Instead, it references them via `orodc agents` commands, allowing agents to access documentation on-demand without exceeding token limits.
+
+## Command: `orodc agents`
+
+The `orodc agents` command provides access to agent documentation files.
+
+### Usage
+
+```bash
+orodc agents <command> [cms-type]
+```
+
+### Commands
+
+#### `orodc agents installation [cms-type]`
+
+Shows installation guide combining common and CMS-specific steps.
+
+**Logic:**
+1. Checks if CMS-specific installation file exists
+2. **Smart Common Detection:** Scans CMS-specific file for references to common part:
+   - Looks for patterns like "common part", "orodc agents installation" (common), "complete steps...from...common"
+3. **Conditional Display:**
+   - If CMS file references common → Shows `AGENTS_INSTALLATION_common.md`, then separator `---`, then CMS-specific file
+   - If CMS file is self-contained (no common references) → Shows only CMS-specific file
+4. Auto-detects CMS type if not specified
+
+**Examples:**
+```bash
+orodc agents installation          # Shows guide for detected CMS (with common if referenced)
+orodc agents installation oro     # Shows Oro installation guide (with common if referenced)
+orodc agents installation magento # Shows Magento installation guide (with common if referenced)
+```
+
+#### `orodc agents rules [cms-type]`
+
+Shows coding rules combining common and CMS-specific guidelines.
+
+**Logic:**
+1. Checks if CMS-specific rules file exists
+2. **Smart Common Detection:** Scans CMS-specific file for references to common:
+   - Looks for patterns like "common", "see...common", "orodc agents rules...common"
+3. **Conditional Display:**
+   - If CMS file references common → Shows `AGENTS_CODING_RULES_common.md`, then separator `---`, then CMS-specific file
+   - If CMS file is self-contained → Shows only CMS-specific file
+
+**Examples:**
+```bash
+orodc agents rules                # Shows rules for detected CMS (with common if referenced)
+orodc agents rules oro            # Shows Oro coding rules (with common if referenced)
+```
+
+#### `orodc agents common`
+
+Shows common instructions applicable to all projects.
+
+```bash
+orodc agents common
+```
+
+#### `orodc agents <cms-type>`
+
+Shows CMS-specific instructions.
+
+**Available CMS types:** `oro`, `magento`, `laravel`, `symfony`, `wintercms`, `php-generic`
+
+**Examples:**
+```bash
+orodc agents oro      # Shows Oro Platform-specific instructions
+orodc agents magento   # Shows Magento-specific instructions
+```
+
+### Why Smart Common Detection?
+
+Some CMS-specific files are **self-contained** and include all necessary information. Others **reference** common steps (like "Complete steps 1-4 from common part"). 
+
+The smart detection ensures:
+- **Self-contained files** are shown without redundant common content
+- **Referencing files** get the common context they need
+- **No duplication** of information
+- **Flexible documentation** structure
+
+## Proxy Commands: `orodc codex` and `orodc gemini`
+
+### How They Work
+
+1. **Environment Detection:**
+   - Detects CMS type from project files or `.env.orodc`
+   - Loads project configuration
+
+2. **File Preparation:**
+   - Copies agent files to `~/.orodc/{project_name}/`
+   - Normalizes CMS type (e.g., `base` → `php-generic`)
+
+3. **System Prompt Generation:**
+   - Includes `AGENTS_common.md` content directly
+   - References CMS-specific files via `orodc agents` commands:
+     - `orodc agents {cms-type}` for CMS-specific instructions
+     - `orodc agents rules` for coding rules
+     - `orodc agents installation` for installation guides
+
+4. **AI Agent Launch:**
+   - Passes system prompt via `experimental_instructions_file` config
+   - Sets working directory to project directory
+   - Exports Docker and project context variables
+
+### System Prompt Structure
+
+The generated system prompt includes:
+
+```
+# COMMON INSTRUCTIONS
+[Full content of AGENTS_common.md]
+
+# CMS-SPECIFIC INSTRUCTIONS
+**CMS Type:** {cms-type}
+
+**For CMS-specific instructions, run:** `orodc agents {cms-type}`
+- This command shows detailed instructions, commands, and best practices specific to {cms-type} projects
+
+# CODING RULES
+**For coding rules, run:** `orodc agents rules`
+- This command shows general coding guidelines and CMS-specific coding rules
+
+# INSTALLATION GUIDES
+**For installation guides, run:** `orodc agents installation`
+- This command shows common installation steps and CMS-specific installation steps
+- It automatically combines AGENTS_INSTALLATION_common.md and AGENTS_INSTALLATION_{cms-type}.md
+```
+
+### Why References Instead of Full Content?
+
+1. **Token Limits** - AI models have token limits; including all files would exceed them
+2. **On-Demand Access** - Agents can access specific documentation when needed
+3. **Modularity** - Documentation can be updated independently
+4. **Flexibility** - Different agents can access different parts as needed
+
+## Adding New CMS Support
+
+To add support for a new CMS:
+
+1. **Create CMS-specific files:**
+   ```
+   libexec/orodc/agents/
+   ├── AGENTS_{cms-type}.md
+   ├── AGENTS_CODING_RULES_{cms-type}.md
+   └── AGENTS_INSTALLATION_{cms-type}.md
+   ```
+
+2. **Update `agents.sh`:**
+   - Add CMS type to available types list in help output
+   - Ensure CMS type normalization (if needed)
+
+3. **Update system prompt generation:**
+   - Files are automatically detected and included
+   - No changes needed if following naming convention
+
+4. **Test:**
+   ```bash
+   orodc agents {cms-type}
+   orodc agents installation {cms-type}
+   orodc agents rules {cms-type}
+   ```
+
+## Best Practices
+
+### For Documentation Authors
+
+1. **Self-contained files:** If your CMS-specific file includes all necessary information, don't reference common files
+2. **Referencing files:** If your file builds on common steps, clearly reference them:
+   - "Complete steps 1-4 from `orodc agents installation` (common part):"
+   - "See `orodc agents rules` for general guidelines"
+
+3. **Use commands, not file paths:** Always reference `orodc agents` commands, not file paths:
+   - ✅ `orodc agents installation`
+   - ❌ `AGENTS_INSTALLATION_common.md`
+
+### For AI Agents
+
+1. **Use `orodc agents` commands** to access documentation
+2. **Check CMS type** before accessing CMS-specific documentation
+3. **Follow installation guides** step-by-step when creating new projects
+4. **Reference coding rules** when writing code
+
+---
+
 **Remember: Commit locally, ask before push!**

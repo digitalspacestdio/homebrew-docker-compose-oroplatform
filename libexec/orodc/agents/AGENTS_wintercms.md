@@ -3,13 +3,13 @@
 **Note: WinterCMS is the community fork of OctoberCMS. They are compatible and use the same structure.**
 
 **This file contains WinterCMS-specific instructions.**
-**For common instructions, see: `AGENTS_common.md`**
-**For coding rules, see: `AGENTS_CODING_RULES_common.md`**
+**For common instructions, see: `orodc agents common`**
+**For coding rules, see: `orodc agents rules`**
 
 **WinterCMS Project (formerly OctoberCMS)**
 
 **Creating New Project (Empty Directory):**
-- **MUST follow installation guide**: See `AGENTS_INSTALLATION_wintercms.md` for complete step-by-step instructions
+- **MUST follow installation guide**: Run `orodc agents installation wintercms` to see complete step-by-step instructions
 - Use `orodc exec composer create-project wintercms/winter .` to create new WinterCMS project
 
 **Key Commands:**

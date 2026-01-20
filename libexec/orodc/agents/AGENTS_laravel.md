@@ -1,13 +1,13 @@
 # Laravel Project Instructions
 
 **This file contains Laravel-specific instructions.**
-**For common instructions, see: `AGENTS_common.md`**
-**For coding rules, see: `AGENTS_CODING_RULES_common.md`**
+**For common instructions, see: `orodc agents common`**
+**For coding rules, see: `orodc agents rules`**
 
 **Laravel Project**
 
 **Creating New Project (Empty Directory):**
-- **MUST follow installation guide**: See `AGENTS_INSTALLATION_laravel.md` for complete step-by-step instructions
+- **MUST follow installation guide**: Run `orodc agents installation laravel` to see complete step-by-step instructions
 - Use `orodc exec composer create-project laravel/laravel .` to create new Laravel project
 
 **Key Commands:**

@@ -48,7 +48,7 @@ orodc up -d
 
 **IMPORTANT**: 
 - Nothing starts automatically - you MUST run `orodc up -d` explicitly
-- See `AGENTS_common.md` for detailed explanation of environment workflow
+- Run `orodc agents common` for detailed explanation of environment workflow
 
 ### 4. Verify Containers Are Running
 
@@ -74,13 +74,13 @@ ls -la
 
 ### 6. Create Project Codebase
 
-**This step is CMS-specific** - see `AGENTS_INSTALLATION_{cms_type}.md` for detailed instructions:
-- Magento: See `AGENTS_INSTALLATION_magento.md` - uses `orodc exec composer create-project`
-- Oro: See `AGENTS_INSTALLATION_oro.md` - uses `orodc exec git clone`
-- Symfony: See `AGENTS_INSTALLATION_symfony.md` - uses `orodc exec composer create-project`
-- Laravel: See `AGENTS_INSTALLATION_laravel.md` - uses `orodc exec composer create-project`
-- WinterCMS: See `AGENTS_INSTALLATION_wintercms.md` - uses `orodc exec composer create-project`
-- Generic PHP: See `AGENTS_INSTALLATION_php-generic.md` - uses `orodc exec` commands
+**This step is CMS-specific** - run `orodc agents installation` to see detailed instructions for your CMS type:
+- Magento: Run `orodc agents installation magento` - uses `orodc exec composer create-project`
+- Oro: Run `orodc agents installation oro` - uses `orodc exec git clone`
+- Symfony: Run `orodc agents installation symfony` - uses `orodc exec composer create-project`
+- Laravel: Run `orodc agents installation laravel` - uses `orodc exec composer create-project`
+- WinterCMS: Run `orodc agents installation wintercms` - uses `orodc exec composer create-project`
+- Generic PHP: Run `orodc agents installation php-generic` - uses `orodc exec` commands
 
 **IMPORTANT**: 
 - Always use `orodc exec` prefix for all commands that create project files

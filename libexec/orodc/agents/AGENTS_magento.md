@@ -1,8 +1,8 @@
 # Magento 2 Project Instructions
 
 **This file contains Magento 2-specific instructions.**
-**For common instructions, see: `AGENTS_common.md`**
-**For Magento coding rules, see: `AGENTS_CODING_RULES_magento.md`**
+**For common instructions, see: `orodc agents common`**
+**For Magento coding rules, see: `orodc agents rules`**
 
 **Magento 2 Project**
 
@@ -16,7 +16,7 @@
   - Two-Factor Authentication setup
 
 **Creating New Project (Empty Directory):**
-- **MUST follow installation guide**: See `AGENTS_INSTALLATION_magento.md` for complete step-by-step instructions
+- **MUST follow installation guide**: Run `orodc agents installation magento` to see complete step-by-step instructions
 - **Community Edition (CE) via Composer**:
   - Mage-OS (open source): `orodc exec composer create-project --repository-url=https://repo.mage-os.org/ mage-os/project-community-edition .`
   - Magento 2 Official CE: `orodc exec composer create-project --repository-url=https://repo.magento.com/ magento/project-community-edition .`
@@ -24,7 +24,7 @@
 - **Enterprise Edition**: Enterprise Edition requires access to private Magento Commerce repository (`magento/project-enterprise-edition`) and cannot be installed via public composer create-project. Use git clone from Enterprise repository or contact Magento support
 
 **After Creating Project:**
-- ALWAYS follow complete setup steps from `AGENTS_INSTALLATION_magento.md`
+- ALWAYS follow complete setup steps from `orodc agents installation magento` (run the command to see full guide)
 - Required steps include: installation, static content deployment, DI compilation, cache clearing, 2FA disabling
 - Use environment variables from `orodc exec env | grep ORO_` for database and service configuration (shows all OroDC service connection variables)
 

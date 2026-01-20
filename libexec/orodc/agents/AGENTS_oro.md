@@ -1,13 +1,13 @@
 # Oro Platform Project Instructions
 
 **This file contains Oro Platform-specific instructions.**
-**For common instructions, see: `AGENTS_common.md`**
-**For Oro coding rules, see: `AGENTS_CODING_RULES_oro.md`**
+**For common instructions, see: `orodc agents common`**
+**For Oro coding rules, see: `orodc agents rules`**
 
 **Oro Platform Project (OroCommerce, OroCRM, etc.)**
 
 **Creating New Project (Empty Directory):**
-- **MUST follow installation guide**: See `AGENTS_INSTALLATION_oro.md` for complete step-by-step instructions
+- **MUST follow installation guide**: Run `orodc agents installation` to see complete step-by-step instructions
 - **Git clone (Recommended)**: 
   - OroCommerce: `orodc exec git clone --single-branch --branch 6.1.4 https://github.com/oroinc/orocommerce-application.git .`
   - OroPlatform: `orodc exec git clone --single-branch --branch 6.1 https://github.com/oroinc/platform-application.git .`

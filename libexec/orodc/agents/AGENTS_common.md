@@ -66,12 +66,10 @@
 - **DO NOT** run `orodc up -d` before understanding project status - first run `orodc status` and check files
 
 **Coding Rules:**
-- See `AGENTS_CODING_RULES_common.md` for general coding guidelines
-- See `AGENTS_CODING_RULES_{cms_type}.md` for CMS-specific coding rules
+- Run `orodc agents rules` to see general coding guidelines and CMS-specific coding rules
 
 **Installation Guides:**
-- See `AGENTS_INSTALLATION_common.md` for common installation steps (orodc init, orodc up -d)
-- See `AGENTS_INSTALLATION_{cms_type}.md` for CMS-specific installation steps
+- Run `orodc agents installation` to see common installation steps (orodc init, orodc up -d) and CMS-specific installation steps
 - **IMPORTANT**: If project directory is empty, ALWAYS follow installation guides to create project from scratch
 
 **Temporary Files:**

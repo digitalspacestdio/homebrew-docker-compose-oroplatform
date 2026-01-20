@@ -1,13 +1,13 @@
 # Symfony Project Instructions
 
 **This file contains Symfony-specific instructions.**
-**For common instructions, see: `AGENTS_common.md`**
-**For coding rules, see: `AGENTS_CODING_RULES_common.md`**
+**For common instructions, see: `orodc agents common`**
+**For coding rules, see: `orodc agents rules`**
 
 **Symfony Project**
 
 **Creating New Project (Empty Directory):**
-- **MUST follow installation guide**: See `AGENTS_INSTALLATION_symfony.md` for complete step-by-step instructions
+- **MUST follow installation guide**: Run `orodc agents installation symfony` to see complete step-by-step instructions
 - Use `orodc exec composer create-project` to create new Symfony project
 
 **Key Commands:**

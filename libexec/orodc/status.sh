@@ -259,7 +259,7 @@ main() {
     echo "  Project is waiting for code delivery:"
     echo "  - Clone repository: orodc exec git clone <repo-url> ."
     echo "  - Create project: orodc exec composer create-project <package> ."
-    echo "  - Follow installation guide: AGENTS_INSTALLATION_${cms_type}.md"
+    echo "  - Follow installation guide: orodc agents installation"
   elif [[ "$project_exists" == "true" ]]; then
     msg_key_value "Project codebase" "Exists"
     

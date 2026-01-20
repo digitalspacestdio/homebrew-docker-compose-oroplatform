@@ -116,7 +116,7 @@ get_documentation_context() {
 generate_system_prompt() {
   local cms_type="$1"
   local doc_context="$2"
-  local agents_dir="$3"
+  local agents_source_dir="$3"
   
   # Get project information if available
   local project_name="${DC_ORO_NAME:-${DC_ORO_PROJECT_NAME:-}}"
@@ -144,13 +144,32 @@ generate_system_prompt() {
   fi
   
   # Read common agents file content (for inclusion in main prompt)
+  # Other files are accessed via orodc agents commands, not included directly
+  # Read directly from source directory (passed as parameter) - no need to copy files
   local common_content=""
-  if [[ -f "${agents_dir}/AGENTS_common.md" ]]; then
-    common_content=$(cat "${agents_dir}/AGENTS_common.md")
+  if [[ -f "${agents_source_dir}/AGENTS_common.md" ]]; then
+    common_content=$(cat "${agents_source_dir}/AGENTS_common.md")
   fi
   
   cat <<EOF
 You are an AI coding assistant specialized in helping developers work with OroDC projects.
+
+# ACCESSING DOCUMENTATION
+
+**IMPORTANT:** All project documentation, installation guides, coding rules, and CMS-specific instructions are available via the \`orodc agents\` command.
+
+**To access documentation, use these commands:**
+- \`orodc agents installation\` - **For installation:** Complete installation guide (common + CMS-specific steps). Use this when creating new projects or following installation procedures.
+- \`orodc agents rules\` - **For coding rules:** Coding rules and best practices (common + CMS-specific). Use this when writing code or reviewing coding standards.
+- \`orodc agents ${cms_file_type}\` - **For CMS-specific info:** CMS-specific instructions for ${cms_type} projects. Use this for framework-specific commands and workflows.
+- \`orodc agents common\` - **For common info:** Common instructions applicable to all projects.
+
+**Examples:**
+- **Installing a new project?** → Run \`orodc agents installation\` first, then follow the steps
+- **Need coding guidelines?** → Run \`orodc agents rules\` for complete coding standards
+- **CMS-specific commands?** → Run \`orodc agents ${cms_file_type}\` for ${cms_type}-specific instructions
+
+**Always use \`orodc agents\` commands** to access detailed documentation when needed. The system prompt below provides general context, but specific instructions, installation steps, and coding rules should be retrieved using \`orodc agents\` commands.
 
 # CRITICAL SCOPE RESTRICTIONS
 
@@ -216,9 +235,10 @@ You are an AI coding assistant specialized in helping developers work with OroDC
   - Framework-specific files (\`bin/console\`, \`bin/magento\`, \`artisan\`, etc.)
   - Existing code structure
 - If project exists: work with existing codebase, help modify and improve it
-- If project doesn't exist (empty directory): **MUST follow installation guide from \`AGENTS_INSTALLATION_common.md\` and \`AGENTS_INSTALLATION_${cms_file_type}.md\`**
+- If project doesn't exist (empty directory): **MUST follow installation guide**
+  - **Run \`orodc agents installation\`** to get complete installation guide (common + CMS-specific steps)
   - Create project using \`orodc exec composer create-project\` or \`orodc exec git clone\` (depending on CMS type)
-  - Follow ALL steps from installation guide files
+  - Follow ALL steps from the guide shown by \`orodc agents installation\`
   - Never skip installation steps
 - **ONLY use \`orodc exec\`** when you need to run commands INSIDE containers (after containers are running)
 
@@ -328,17 +348,26 @@ ${common_content}
 
 **CMS Type:** ${cms_type}
 
-**For CMS-specific instructions, see:** \`${agents_dir}/AGENTS_${cms_file_type}.md\`
-- This file contains detailed instructions, commands, and best practices specific to ${cms_type} projects
-- Always refer to \`AGENTS_${cms_file_type}.md\` for CMS-specific guidance
+**MANDATORY:** To access CMS-specific instructions, **MUST run:** \`orodc agents ${cms_file_type}\`
+- This command shows detailed instructions, commands, and best practices specific to ${cms_type} projects
+- **Always use this command** when you need CMS-specific guidance
+- **Do NOT rely only on this system prompt** - run \`orodc agents ${cms_file_type}\` for complete information
 
-**For coding rules, see:**
-- \`${agents_dir}/AGENTS_CODING_RULES_common.md\` - General coding guidelines applicable to all projects
-- \`${agents_dir}/AGENTS_CODING_RULES_${cms_file_type}.md\` - CMS-specific coding rules and best practices
+# CODING RULES
 
-**For installation guides (creating new projects from scratch), see:**
-- \`${agents_dir}/AGENTS_INSTALLATION_common.md\` - Common installation steps (orodc init, orodc up -d)
-- \`${agents_dir}/AGENTS_INSTALLATION_${cms_file_type}.md\` - CMS-specific installation steps and commands
+**MANDATORY:** To access coding rules, **MUST run:** \`orodc agents rules\`
+- This command shows general coding guidelines and CMS-specific coding rules and best practices
+- It automatically combines common guidelines and ${cms_type}-specific rules
+- **Always use this command** when you need coding guidelines
+- Run \`orodc agents rules ${cms_file_type}\` to see only ${cms_type}-specific rules
+
+# INSTALLATION GUIDES
+
+**MANDATORY:** To access installation guides, **MUST run:** \`orodc agents installation\`
+- This command shows complete installation steps (orodc init, orodc up -d) and CMS-specific installation steps
+- It automatically combines common and ${cms_type}-specific installation instructions
+- **Always use this command** when creating new projects or following installation procedures
+- Run \`orodc agents installation ${cms_file_type}\` to see installation guide for ${cms_type}
 
 **Application URLs:**
 $(if [[ -n "${DC_ORO_NAME:-}" ]]; then
@@ -384,9 +413,10 @@ ${doc_context}
 
 3. **Deploy new project (if needed)** - Only if user explicitly requested:
    - If project does NOT exist (empty directory) AND user requested to create new project:
-     - Follow installation guide from \`AGENTS_INSTALLATION_common.md\` and \`AGENTS_INSTALLATION_${cms_file_type}.md\`
-     - Create project using \`orodc exec composer create-project\` or \`orodc exec git clone\` (depending on CMS type)
-     - Complete all installation steps from the guide
+     - **FIRST:** Run \`orodc agents installation\` to get complete installation guide
+     - Follow ALL steps from the guide shown by \`orodc agents installation\`
+     - Create project using \`orodc exec composer create-project\` or \`orodc exec git clone\` (depending on CMS type - see guide)
+     - Complete all installation steps exactly as shown in \`orodc agents installation\` output
    - If project exists OR user did NOT request to create new project: Skip this step
 
 4. **Start containers (ONLY if needed)** - Ensure environment is running:
@@ -467,32 +497,10 @@ main() {
     cms_file_type="php-generic"
   fi
   
-  # Copy all AGENTS files to ~/.orodc/{project_name}/ directory
+  # No need to copy agent files - orodc agents command reads directly from source directory
+  # Only generate system prompt file (AGENTS.md) which references orodc agents commands
   local agents_source_dir="${SCRIPT_DIR}/agents"
-  local files_to_copy=(
-    "AGENTS_common.md"
-    "AGENTS_CODING_RULES_common.md"
-    "AGENTS_INSTALLATION_common.md"
-    "AGENTS_${cms_file_type}.md"
-    "AGENTS_CODING_RULES_${cms_file_type}.md"
-    "AGENTS_INSTALLATION_${cms_file_type}.md"
-  )
-  
-  for file in "${files_to_copy[@]}"; do
-    local source_file="${agents_source_dir}/${file}"
-    local dest_file="${agents_dir}/${file}"
-    
-    if [[ -f "$source_file" ]]; then
-      cp "$source_file" "$dest_file"
-      msg_debug "Copied ${file} to ${agents_dir}"
-    else
-      debug_log "File not found (may be optional): $source_file"
-    fi
-  done
-  
-  # Generate system prompt and save to AGENTS.md
-  # Pass agents_dir so function can reference files there
-  generate_system_prompt "$cms_type" "$doc_context" "$agents_dir" > "$agents_file"
+  generate_system_prompt "$cms_type" "$doc_context" "$agents_source_dir" > "$agents_file"
   msg_info "Created system prompt file: $agents_file"
   
   # Track temp files for cleanup (only help output, not AGENTS.md - it should persist)
