@@ -310,7 +310,7 @@ services:
       - MP_SMTP_TLS_CERT=/certs/mail.crt
       - MP_SMTP_TLS_KEY=/certs/mail.key
       - MP_SMTP_AUTH_ACCEPT_ANY=1
-      - MP_WEBROOT=/mailbox
+      - MP_WEBROOT=/mailbox/
     restart: always
     networks:
       - default
@@ -318,17 +318,25 @@ services:
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=dc_shared_net"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-redirect.entrypoints=web"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-redirect.rule=${DC_ORO_TRAEFIK_RULE} && Path(`/mailbox`)"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-redirect.middlewares=${DC_ORO_NAME:-unnamed}-mail-redirect"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-redirect.priority=300"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-redirect-default.entrypoints=default"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-redirect-default.rule=${DC_ORO_TRAEFIK_RULE} && Path(`/mailbox`)"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-redirect-default.middlewares=${DC_ORO_NAME:-unnamed}-mail-redirect"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-redirect-default.priority=300"
+      - "traefik.http.middlewares.${DC_ORO_NAME:-unnamed}-mail-redirect.redirectregex.regex=^https?://[^/]+/mailbox$$"
+      - "traefik.http.middlewares.${DC_ORO_NAME:-unnamed}-mail-redirect.redirectregex.replacement=/mailbox/"
+      - "traefik.http.middlewares.${DC_ORO_NAME:-unnamed}-mail-redirect.redirectregex.permanent=true"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail.entrypoints=web"
-      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail.rule=${DC_ORO_TRAEFIK_RULE} && PathPrefix(`/mailbox`)"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail.rule=${DC_ORO_TRAEFIK_RULE} && PathPrefix(`/mailbox/`)"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail.service=${DC_ORO_NAME:-unnamed}-mail"
-      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail.middlewares=${DC_ORO_NAME:-unnamed}-mail-stripprefix"
-      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail.priority=200"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail.priority=250"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-default.entrypoints=default"
-      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-default.rule=${DC_ORO_TRAEFIK_RULE} && PathPrefix(`/mailbox`)"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-default.rule=${DC_ORO_TRAEFIK_RULE} && PathPrefix(`/mailbox/`)"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-default.service=${DC_ORO_NAME:-unnamed}-mail"
-      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-default.middlewares=${DC_ORO_NAME:-unnamed}-mail-stripprefix"
-      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-default.priority=200"
-      - "traefik.http.middlewares.${DC_ORO_NAME:-unnamed}-mail-stripprefix.stripprefix.prefixes=/mailbox"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-default.priority=250"
       - "traefik.http.services.${DC_ORO_NAME:-unnamed}-mail.loadbalancer.server.port=8025"
       - "traefik.http.services.${DC_ORO_NAME:-unnamed}-mail.loadbalancer.server.scheme=http"
     deploy:

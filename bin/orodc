@@ -3789,7 +3789,7 @@ if [[ -z $DC_ORO_PHP_VERSION ]]; then
   # Priority 3: composer.json
   elif DC_ORO_PHP_VERSION=$(detect_php_version_from_composer); then
     export DC_ORO_PHP_VERSION
-    msg_info "Detected PHP version from composer.json: $DC_ORO_PHP_VERSION"
+    msg_debug "Detected PHP version from composer.json: $DC_ORO_PHP_VERSION"
   # Priority 4: Default to latest available version (from GitHub Actions matrix)
   else
     export DC_ORO_PHP_VERSION="8.5"
