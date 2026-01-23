@@ -59,7 +59,7 @@ apk add --no-cache \
 
 # Install sudo and configure permissions
 apk add --no-cache sudo
-echo "developer ALL=(ALL) ALL" >> /etc/sudoers
+echo "developer ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
 # Install Python 2 for Node.js modules
 apk add --no-cache python2

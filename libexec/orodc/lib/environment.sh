@@ -53,9 +53,9 @@ load_env_safe() {
     done < "$env_file"
     
     # CRITICAL: Normalize ORO_MAILER_ENCRYPTION immediately after loading
-    # Handle "null" (string) and empty string - set to tls
+    # Handle "null" (string) and empty string - set to starttls
     if [[ -z "${ORO_MAILER_ENCRYPTION:-}" ]] || [[ "${ORO_MAILER_ENCRYPTION:-}" == "" ]] || [[ "${ORO_MAILER_ENCRYPTION:-}" == "null" ]]; then
-      export ORO_MAILER_ENCRYPTION="tls"
+      export ORO_MAILER_ENCRYPTION="starttls"
     fi
   fi
 }
@@ -670,11 +670,11 @@ initialize_environment() {
     fi
     # Don't unset DC_ORO_COMPOSER_AUTH if empty - Docker Compose needs it to pass to containers
     # Empty string will be handled by docker-compose.yml syntax: ${DC_ORO_COMPOSER_AUTH:-""}
-    # Normalize ORO_MAILER_ENCRYPTION: handle "null" (string) and empty string - set to tls
+    # Normalize ORO_MAILER_ENCRYPTION: handle "null" (string) and empty string - set to starttls
     # CRITICAL: This must happen AFTER loading all .env files to ensure orodc is source of truth
     if [[ -z "${ORO_MAILER_ENCRYPTION:-}" ]] || [[ "${ORO_MAILER_ENCRYPTION:-}" == "" ]] || [[ "${ORO_MAILER_ENCRYPTION:-}" == "null" ]]; then
-      export ORO_MAILER_ENCRYPTION="tls"
-      debug_log "initialize_environment: normalized ORO_MAILER_ENCRYPTION (set to tls)"
+      export ORO_MAILER_ENCRYPTION="starttls"
+      debug_log "initialize_environment: normalized ORO_MAILER_ENCRYPTION (set to starttls)"
     fi
 
     # Set DC_ORO_NAME from directory name if not set

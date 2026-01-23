@@ -40,10 +40,10 @@ generate_compose_config_if_needed() {
   local compose_cmd="$1"
 
   # CRITICAL: Normalize ORO_MAILER_ENCRYPTION before generating compose.yml
-  # orodc is the source of truth - normalize any "null" or empty values to tls
+  # orodc is the source of truth - normalize any "null" or empty values to starttls
   if [[ -z "${ORO_MAILER_ENCRYPTION:-}" ]] || [[ "${ORO_MAILER_ENCRYPTION:-}" == "" ]] || [[ "${ORO_MAILER_ENCRYPTION:-}" == "null" ]]; then
-    export ORO_MAILER_ENCRYPTION="tls"
-    debug_log "docker-utils: normalized ORO_MAILER_ENCRYPTION (set to tls)"
+    export ORO_MAILER_ENCRYPTION="starttls"
+    debug_log "docker-utils: normalized ORO_MAILER_ENCRYPTION (set to starttls)"
   fi
 
   # Generate config file only if it doesn't exist or if it's a management command

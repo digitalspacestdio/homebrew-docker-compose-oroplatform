@@ -60,7 +60,7 @@ apk add --no-cache \
 
 # Install sudo and configure permissions
 apk add --no-cache sudo
-echo "developer ALL=(ALL) ALL" >> /etc/sudoers
+echo "developer ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
 # Install and configure Zsh + Starship
 apk add --no-cache zsh

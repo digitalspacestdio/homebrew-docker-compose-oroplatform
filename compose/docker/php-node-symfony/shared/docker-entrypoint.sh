@@ -41,6 +41,40 @@ if [[ $XDEBUG_MODE = "off" ]]; then
 	rm -f "${PHP_INI_DIR}/conf.d/app.xdebug.ini" 2>/dev/null || true
 fi
 
+# Generate msmtprc configuration based on ORO_MAILER_ENCRYPTION
+# Default is starttls if not specified
+if [[ "${ORO_MAILER_ENCRYPTION:-}" == "none" ]]; then
+	template="/msmtprc-none.tmpl"
+elif [[ "${ORO_MAILER_ENCRYPTION:-}" == "tls" ]]; then
+	template="/msmtprc-tls.tmpl"
+elif [[ "${ORO_MAILER_ENCRYPTION:-}" == "starttls" ]] || [[ -z "${ORO_MAILER_ENCRYPTION:-}" ]] || [[ "${ORO_MAILER_ENCRYPTION:-}" == "" ]]; then
+	template="/msmtprc-starttls.tmpl"
+else
+	# Default to starttls if unknown value
+	template="/msmtprc-starttls.tmpl"
+fi
+
+if [[ -f "$template" ]]; then
+	cp "$template" /.msmtprc
+	if [[ -n "${DEBUG:-}" ]]; then
+		echo "DEBUG: Generated /.msmtprc from $template (ORO_MAILER_ENCRYPTION=${ORO_MAILER_ENCRYPTION:-starttls})" >&2
+	fi
+else
+	echo "WARNING: msmtprc template $template not found, using default" >&2
+	# Fallback to starttls config
+	cat > /.msmtprc <<- EOM
+account default
+host mail
+port 1025
+tls on
+tls_starttls on
+tls_trust_file /certs/mail.crt
+tls_certcheck off
+auth off
+from www-data@localhost
+EOM
+fi
+
 chmod +x ${PHP_USER_HOME}/.profile
 
 export PHP_IDE_CONFIG="serverName=$(hostname | cut -d. -f2-)"
