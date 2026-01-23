@@ -3652,6 +3652,21 @@ fi
 if is_oro_project && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-consumer.yml" ]]; then
   DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-consumer.yml"
 fi
+
+# Include CMS-specific cron service (Ofelia)
+CMS_TYPE=$(detect_cms_type 2>/dev/null || echo "base")
+case "$CMS_TYPE" in
+  oro)
+    if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-cron-oro.yml" ]]; then
+      DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-cron-oro.yml"
+    fi
+    ;;
+  magento)
+    if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-cron-magento.yml" ]]; then
+      DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-cron-magento.yml"
+    fi
+    ;;
+esac
 if ${DOCKER_COMPOSE_BIN_CMD} ps --services 2>/dev/null | grep database > /dev/null; then
   SERVICE_DATABASE_ID=$(${DOCKER_COMPOSE_BIN_CMD} ps -q database)
   if [[ "" != $SERVICE_DATABASE_ID ]] && ${DOCKER_BIN} inspect -f '{{ .Config.Image }}' "$SERVICE_DATABASE_ID" | grep -q 'busybox'; then
@@ -3914,7 +3929,8 @@ build_docker_compose_run_cmd() {
   local cmd_args=("${@:2}")
   
   # Check if this is a composer command - use -T flag for non-interactive mode
-  local use_tty_flag="-i"
+  # For interactive commands, use -it (both stdin and TTY)
+  local use_tty_flag="-it"
   if [[ "$first_non_flag_arg" == "composer" ]]; then
     use_tty_flag="-T"
   fi
@@ -3999,7 +4015,7 @@ execute_in_container() {
         else
           if [ "$DEBUG" ]; then echo "DEBUG: Failed to copy $file to SSH container, falling back to CLI run" >&2; fi
           # Fall back to CLI run with volume mount
-          exec ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} run -i --rm -v "$(dirname "$file"):$(dirname "$file"):ro" "$service" "${cmd_args[@]}" "${right_flags[@]}" "${right_options[@]}"
+          exec ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} run -it --rm -v "$(dirname "$file"):$(dirname "$file"):ro" "$service" "${cmd_args[@]}" "${right_flags[@]}" "${right_options[@]}"
         fi
       done
     fi
@@ -4012,7 +4028,13 @@ execute_in_container() {
     exec ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} exec "$service" "${updated_cmd_args[@]}" "${right_flags[@]}" "${right_options[@]}"
   else
     # Container is not running, use docker compose run with volume mounts for external files
-    local run_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} run -i --rm"
+    # Use -it for interactive mode (both stdin and TTY)
+    # Check if stdin is a terminal to determine if we need TTY
+    if [[ -t 0 ]]; then
+      local run_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} run -it --rm"
+    else
+      local run_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} run -T --rm"
+    fi
     
     # Add volume mounts for external files
     if [[ ${#external_files[@]} -gt 0 ]]; then
@@ -4450,9 +4472,7 @@ if [[ ${#args[@]} -gt 0 ]] && [[ "$is_docker_compose_cmd" != "true" ]] && ! is_s
   fi
 fi
 
-if echo ${args[0]} | grep -i '^cli$' > /dev/null; then
-  exec bash -c "${DOCKER_COMPOSE_RUN_CMD} ${left_flags[@]} ${left_options[@]} cli"
-fi
+# Note: 'cli' command is handled by router (case statement) - don't process it here
 
 if echo ${args[0]} | grep -i '^install' | grep -i 'without' | grep -i 'demo' > /dev/null; then
   export XDEBUG_MODE=off

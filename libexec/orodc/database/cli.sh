@@ -32,7 +32,9 @@ fi
 # --no-deps prevents re-starting dependencies (already started above)
 if [[ -t 0 ]]; then
   # Interactive mode: stdin is a terminal - allow TTY allocation
-  exec ${DOCKER_COMPOSE_BIN_CMD} run --rm -q --no-deps cli "$@"
+  # -i keeps stdin open (for interactive input)
+  # -t allocates a pseudo-TTY (required for interactive shells)
+  exec ${DOCKER_COMPOSE_BIN_CMD} run --rm -q --no-deps -it cli "$@"
 else
   # Non-interactive mode: stdin is piped/redirected - disable TTY
   exec ${DOCKER_COMPOSE_BIN_CMD} run --rm -T -q --no-deps cli "$@"

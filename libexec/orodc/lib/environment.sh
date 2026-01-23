@@ -1003,6 +1003,31 @@ initialize_environment() {
     else
       debug_log "initialize_environment: skipping docker-compose-consumer.yml (not an Oro project)"
     fi
+    
+    # Include CMS-specific cron service (Ofelia)
+    local cms_type
+    cms_type=$(detect_cms_type 2>/dev/null || echo "base")
+    case "$cms_type" in
+      oro)
+        if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-cron-oro.yml" ]]; then
+          DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-cron-oro.yml"
+          debug_log "initialize_environment: added docker-compose-cron-oro.yml (Oro CMS detected)"
+        else
+          debug_log "initialize_environment: docker-compose-cron-oro.yml not found"
+        fi
+        ;;
+      magento)
+        if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-cron-magento.yml" ]]; then
+          DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-cron-magento.yml"
+          debug_log "initialize_environment: added docker-compose-cron-magento.yml (Magento CMS detected)"
+        else
+          debug_log "initialize_environment: docker-compose-cron-magento.yml not found"
+        fi
+        ;;
+      *)
+        debug_log "initialize_environment: skipping cron service (CMS type: $cms_type)"
+        ;;
+    esac
 
     # Add user custom compose file if exists
     if [[ -f "${DC_ORO_APPDIR}/.docker-compose.user.yml" ]]; then
