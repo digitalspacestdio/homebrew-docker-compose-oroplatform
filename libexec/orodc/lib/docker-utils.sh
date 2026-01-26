@@ -12,7 +12,8 @@ setup_project_certificates() {
 
   # Check if project has certificates
   if [[ -d "${project_crt_dir}" ]]; then
-    local cert_count=$(find "${project_crt_dir}" -type f \( -name "*.crt" -o -name "*.pem" \) 2>/dev/null | wc -l)
+    local cert_count
+    cert_count=$(find "${project_crt_dir}" -type f \( -name "*.crt" -o -name "*.pem" \) 2>/dev/null | wc -l)
 
     if [[ "${cert_count}" -gt 0 ]]; then
       msg_info "Found ${cert_count} certificate(s) in ${project_crt_dir}"
@@ -34,6 +35,47 @@ setup_project_certificates() {
   fi
 }
 
+# Remove ONLY locally built docker images that belong to the current project.
+# This is intentionally narrower than `orodc purge`:
+# - Does NOT remove volumes/networks/config dir
+# - Does NOT touch shared/base images (ghcr.io, docker.elastic.co, etc.)
+# Expects: DC_ORO_NAME is set (initialize_environment has been run)
+remove_project_images() {
+  if [[ -z "${DC_ORO_NAME:-}" ]]; then
+    msg_warning "Skipping project image cleanup: DC_ORO_NAME is not set"
+    return 1
+  fi
+
+  local docker_bin="${DOCKER_BIN:-docker}"
+
+  # Docker Compose may normalize the project name; keep both variants for matching.
+  local project_name_lower
+  project_name_lower=$(echo "${DC_ORO_NAME}" | tr '[:upper:]' '[:lower:]' | tr '-' '_' 2>/dev/null || echo "${DC_ORO_NAME}")
+
+  # Find images by repository prefix matching the project name.
+  # We then exclude known external/base image registries and common upstream images.
+  local project_images=""
+  project_images=$(${docker_bin} images --format "{{.Repository}}:{{.Tag}}" 2>/dev/null | \
+    grep -E "^(${project_name_lower}|${DC_ORO_NAME})" | \
+    grep -Ev '^(ghcr\.io|docker\.elastic\.co|opensearchproject|valkey|redis|mysql|rabbitmq|percona|xhgui|oroinc|busybox)(/|:)' || true)
+
+  if [[ -z "${project_images}" ]]; then
+    msg_info "No project images found to remove"
+    return 0
+  fi
+
+  local removed=0
+  while read -r image_name; do
+    if [[ -n "${image_name}" ]]; then
+      ${docker_bin} rmi -f "${image_name}" 2>/dev/null || true
+      removed=$((removed + 1))
+    fi
+  done <<< "${project_images}"
+
+  msg_ok "Project images removed (${removed})"
+  return 0
+}
+
 # Generate compose.yml config file if needed
 # Usage: generate_compose_config_if_needed "command"
 generate_compose_config_if_needed() {
@@ -49,6 +91,7 @@ generate_compose_config_if_needed() {
   # Generate config file only if it doesn't exist or if it's a management command
   if [[ ! -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]] || [[ "$compose_cmd" =~ ^(up|down|purge|build|pull|push|restart|start|stop|kill|rm|create|ps|doctor)$ ]]; then
     # Generate compose.yml with all environment variables (ports, etc.) available
+    # shellcheck disable=SC2154
     eval "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} config" > "${DC_ORO_CONFIG_DIR}/compose.yml" 2>/dev/null || true
 
     # Register environment after creating compose.yml
@@ -70,6 +113,7 @@ exec_compose_command() {
 
   # For build command, use spinner
   if [[ "$docker_cmd" == "build" ]]; then
+    # shellcheck disable=SC2154
     full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${docker_cmd} ${right_flags[*]} ${right_options[*]} ${docker_services}"
     run_with_spinner "Building services" "$full_cmd"
     return $?
@@ -77,12 +121,14 @@ exec_compose_command() {
 
   # For down command, use spinner
   if [[ "$docker_cmd" == "down" ]]; then
+    # shellcheck disable=SC2154
     full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${docker_cmd} ${right_flags[*]} ${right_options[*]} ${docker_services}"
     run_with_spinner "Stopping services" "$full_cmd"
     return $?
   fi
 
   # For all other commands, run directly (variables are already exported)
+  # shellcheck disable=SC2154
   full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${docker_cmd} ${right_flags[*]} ${right_options[*]} ${docker_services}"
   eval "$full_cmd"
   return $?
@@ -102,6 +148,7 @@ fix_empty_directory_ownership() {
 # Expects: docker_services, left_flags, left_options, right_flags, right_options
 handle_compose_up() {
   # Get previous timing for statistics only
+  # shellcheck disable=SC2034
   prev_timing=$(get_previous_timing "up")
 
   # Check if we should skip build phase
@@ -180,10 +227,10 @@ handle_compose_up() {
 exec_in_cli() {
   local cmd="$1"
   shift
-  local cmd_args="$*"
+  local -a cmd_args=("$@")
 
   # Run command in CLI container
-  ${DOCKER_COMPOSE_BIN_CMD} run --rm cli "$cmd" $cmd_args
+  ${DOCKER_COMPOSE_BIN_CMD} run --rm cli "$cmd" "${cmd_args[@]}"
 }
 
 # Show service URLs after successful 'up' command
@@ -198,22 +245,30 @@ show_service_urls() {
 
   # Show domain URL if proxy is running
   if [[ "$proxy_running" == "true" ]]; then
+    # shellcheck disable=SC2059
     printf "\033[1;32m[${DC_ORO_NAME}] Application: https://${DC_ORO_NAME}.docker.local\033[0m\n"
     echo "" >&2
   fi
 
   # Always show localhost URLs
+  # shellcheck disable=SC2059
   printf "\033[0;37m[${DC_ORO_NAME}] Application: http://localhost:${DC_ORO_PORT_NGINX}\033[0m\n"
+  # shellcheck disable=SC2059
   printf "\033[0;37m[${DC_ORO_NAME}] Mailhog: http://localhost:${DC_ORO_PORT_MAIL_WEBGUI}\033[0m\n"
+  # shellcheck disable=SC2059
   printf "\033[0;37m[${DC_ORO_NAME}] Elasticsearch: http://localhost:${DC_ORO_PORT_SEARCH}\033[0m\n"
+  # shellcheck disable=SC2059
   printf "\033[0;37m[${DC_ORO_NAME}] Mq: http://localhost:${DC_ORO_PORT_MQ}\033[0m\n"
 
   if [[ "${DC_ORO_DATABASE_SCHEMA}" == "pdo_pgsql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgresql" ]];then
+    # shellcheck disable=SC2059
     printf "\033[0;37m[${DC_ORO_NAME}] Database: 127.0.0.1:${DC_ORO_PORT_PGSQL}\033[0m\n"
   elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "pdo_mysql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]];then
+    # shellcheck disable=SC2059
     printf "\033[0;37m[${DC_ORO_NAME}] Database: 127.0.0.1:${DC_ORO_PORT_MYSQL}\033[0m\n"
   fi
 
+  # shellcheck disable=SC2059
   printf "\033[0;37m[${DC_ORO_NAME}] SSH: 127.0.0.1:${DC_ORO_PORT_SSH}\033[0m\n"
 
   # Show proxy hint if not running

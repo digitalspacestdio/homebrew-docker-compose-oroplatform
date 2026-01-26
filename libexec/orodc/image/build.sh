@@ -4,9 +4,13 @@ if [ "$DEBUG" ]; then set -x; fi
 
 # Determine script directory and source libraries
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck disable=SC1091
 source "${SCRIPT_DIR}/../lib/common.sh"
+# shellcheck disable=SC1091
 source "${SCRIPT_DIR}/../lib/ui.sh"
+# shellcheck disable=SC1091
 source "${SCRIPT_DIR}/../lib/environment.sh"
+# shellcheck disable=SC1091
 source "${SCRIPT_DIR}/../lib/docker-utils.sh"
 
 # Resolve Docker binary
@@ -37,7 +41,15 @@ msg_info ""
 
 # Check for --no-cache flag
 NO_CACHE_FLAG=""
-if [[ "${1:-}" == "--no-cache" ]] || [[ "${@}" =~ --no-cache ]]; then
+has_no_cache=false
+for arg in "$@"; do
+  if [[ "$arg" == "--no-cache" ]]; then
+    has_no_cache=true
+    break
+  fi
+done
+
+if [[ "$has_no_cache" == "true" ]]; then
   NO_CACHE_FLAG="--no-cache"
   msg_info "Build mode: No cache (full rebuild)"
 else
@@ -49,6 +61,7 @@ msg_info ""
 if [[ -f ".env.orodc" ]]; then
   msg_info "Loading configuration from .env.orodc"
   set -a
+  # shellcheck disable=SC1091
   source ".env.orodc"
   set +a
 fi
@@ -101,7 +114,7 @@ if [[ ! -f "$PHP_DOCKERFILE" ]]; then
   msg_error "PHP Dockerfile not found: $PHP_DOCKERFILE"
   msg_info ""
   msg_info "Available PHP versions:"
-  for dockerfile in "${DOCKER_DIR}"/php/Dockerfile.*.${DC_ORO_PHP_DIST}; do
+  for dockerfile in "${DOCKER_DIR}"/php/Dockerfile.*."${DC_ORO_PHP_DIST}"; do
     if [[ -f "$dockerfile" ]]; then
       version=$(basename "$dockerfile" | sed "s/Dockerfile\.\(.*\)\.${DC_ORO_PHP_DIST}/\1/")
       msg_info "  - PHP ${version}"
@@ -355,12 +368,43 @@ if [[ -f ".env.orodc" ]] && [[ -n "${DC_ORO_CONFIG_DIR:-}" ]] && [[ -d "${DC_ORO
   msg_info ""
 fi
 
+# Optional: stop current project and remove ONLY its locally built images
+# This is useful when project images are built at runtime (e.g. due to per-project certificates).
+PROJECT_IMAGES_REMOVED=false
+if [[ -t 0 ]]; then
+  # Ensure environment is initialized so we have DC_ORO_NAME and DOCKER_COMPOSE_BIN_CMD
+  initialize_environment 2>/dev/null || true
+
+  if check_in_project 2>/dev/null; then
+    msg_header "Optional cleanup"
+    msg_warning "This will stop the current project and remove ONLY its locally built images."
+    msg_info "Volumes, databases, and config will NOT be removed."
+    msg_info ""
+
+    if confirm_yes_no "Stop project and remove project images now?" "no"; then
+      if [[ -n "${DOCKER_COMPOSE_BIN_CMD:-}" ]]; then
+        down_cmd="${DOCKER_COMPOSE_BIN_CMD} down --remove-orphans"
+        run_with_spinner "Stopping and removing project containers" "$down_cmd" || true
+      else
+        msg_warning "Could not determine docker compose command; skipping container stop"
+      fi
+
+      remove_project_images || true
+      PROJECT_IMAGES_REMOVED=true
+      msg_info ""
+    fi
+  fi
+fi
+
 msg_header "Build Complete!"
 msg_ok "Built images:"
 msg_info "  - ${PHP_BASE_TAG}"
 msg_info "  - ${PHP_FINAL_TAG}"
 if [[ -f ".env.orodc" ]] && [[ -n "${DC_ORO_CONFIG_DIR:-}" ]]; then
   msg_info "  - Project images (fpm, cli, consumer, websocket, ssh)"
+fi
+if [[ "${PROJECT_IMAGES_REMOVED}" == "true" ]]; then
+  msg_info "  - (project images were removed after build; next run will rebuild them)"
 fi
 msg_info ""
 msg_header "Usage"
