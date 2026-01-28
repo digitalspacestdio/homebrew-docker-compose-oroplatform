@@ -270,9 +270,9 @@ orodc database import
 
 **Progress Display:**
 
-- For PostgreSQL: Shows progress bar using `pv` (pipe viewer) if available
-- For MySQL or custom containers: Uses spinner for progress indication
-- To enable `pv` progress: rebuild PostgreSQL image with `orodc docker-build pgsql`
+- For PostgreSQL and MySQL: Shows progress bar using `pv` (pipe viewer) if available
+- For custom containers without `pv`: Uses spinner for progress indication
+- To enable `pv` progress: rebuild the database image for your database type
 
 ## 💻 Supported Systems
 

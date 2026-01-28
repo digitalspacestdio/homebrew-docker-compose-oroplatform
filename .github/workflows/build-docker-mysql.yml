@@ -1,0 +1,131 @@
+name: Build & Publish MySQL multi-arch images to GHCR
+
+on:
+  push:
+    branches: [ master ]
+    paths:
+      - 'compose/docker/mysql/**'
+      - '.github/workflows/build-docker-mysql.yml'
+  workflow_dispatch:
+    inputs:
+      mysql_versions:
+        description: 'MySQL versions to build (comma-separated, e.g., "8.0,8.4")'
+        required: false
+        default: '8.0,8.4'
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  prepare-matrix:
+    name: Prepare build matrix
+    runs-on: ubuntu-latest
+    outputs:
+      versions: ${{ steps.set-matrix.outputs.versions }}
+    steps:
+      - name: Set version matrix
+        id: set-matrix
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSIONS="${{ github.event.inputs.mysql_versions }}"
+          else
+            VERSIONS="8.0,8.4"
+          fi
+          JSON_VERSIONS=$(echo "$VERSIONS" | jq -R -c 'split(",")')
+          echo "versions=$JSON_VERSIONS" >> $GITHUB_OUTPUT
+          echo "Building MySQL versions: $VERSIONS"
+
+  build-mysql-amd64:
+    name: Build MySQL ${{ matrix.version }} AMD64
+    needs: prepare-matrix
+    runs-on: [self-hosted, Linux, X64]
+    strategy:
+      matrix:
+        version: ${{ fromJson(needs.prepare-matrix.outputs.versions) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & Push AMD64 Image
+        uses: docker/build-push-action@v5
+        with:
+          context: compose/docker/mysql
+          file: compose/docker/mysql/Dockerfile
+          platforms: linux/amd64
+          push: true
+          build-args: |
+            MYSQL_VERSION=${{ matrix.version }}
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/orodc-mysql:${{ matrix.version }}-amd64
+          cache-from: type=gha,scope=mysql-${{ matrix.version }}-amd64
+          cache-to: type=gha,mode=max,scope=mysql-${{ matrix.version }}-amd64
+
+  build-mysql-arm64:
+    name: Build MySQL ${{ matrix.version }} ARM64
+    needs: prepare-matrix
+    runs-on: [self-hosted, Linux, ARM64]
+    strategy:
+      matrix:
+        version: ${{ fromJson(needs.prepare-matrix.outputs.versions) }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build & Push ARM64 Image
+        uses: docker/build-push-action@v5
+        with:
+          context: compose/docker/mysql
+          file: compose/docker/mysql/Dockerfile
+          platforms: linux/arm64
+          push: true
+          build-args: |
+            MYSQL_VERSION=${{ matrix.version }}
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/orodc-mysql:${{ matrix.version }}-arm64
+          cache-from: type=gha,scope=mysql-${{ matrix.version }}-arm64
+          cache-to: type=gha,mode=max,scope=mysql-${{ matrix.version }}-arm64
+
+  create-mysql-manifest:
+    name: Create multi-arch manifest for MySQL ${{ matrix.version }}
+    needs: [prepare-matrix, build-mysql-amd64, build-mysql-arm64]
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        version: ${{ fromJson(needs.prepare-matrix.outputs.versions) }}
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create and push multi-arch manifest
+        run: |
+          docker buildx imagetools create \
+            --tag ghcr.io/${{ github.repository_owner }}/orodc-mysql:${{ matrix.version }} \
+            ghcr.io/${{ github.repository_owner }}/orodc-mysql:${{ matrix.version }}-amd64 \
+            ghcr.io/${{ github.repository_owner }}/orodc-mysql:${{ matrix.version }}-arm64
+
+          echo "Created multi-arch manifest for MySQL ${{ matrix.version }}"

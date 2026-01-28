@@ -1,6 +1,6 @@
 services:
   database:
-    image: '${DC_ORO_MYSQL_IMAGE:-mysql:8.4}'
+    image: '${DC_ORO_MYSQL_IMAGE:-ghcr.io/digitalspacestdio/orodc-mysql:${DC_ORO_MYSQL_VERSION:-8.4}}'
     container_name: ${DC_ORO_NAME:-unnamed}_database
     hostname: database.${DC_ORO_NAME:-unnamed}.docker.local
     dns:
@@ -39,7 +39,7 @@ services:
 
   database-cli:
     profiles: ["run-only"]
-    image: '${DC_ORO_MYSQL_IMAGE:-mysql:8.4}'
+    image: '${DC_ORO_MYSQL_IMAGE:-ghcr.io/digitalspacestdio/orodc-mysql:${DC_ORO_MYSQL_VERSION:-8.4}}'
     container_name: ${DC_ORO_NAME:-unnamed}_database_cli
     hostname: database-cli.${DC_ORO_NAME:-unnamed}.docker.local
     dns:

@@ -35,16 +35,27 @@ BUILD_TARGET="${1:-}"
 NO_CACHE_FLAG=""
 PUSH_IMAGES=false
 PG_VERSION=""
+MYSQL_VERSION=""
 
 for arg in "${@:2}"; do
   case "$arg" in
     --no-cache) NO_CACHE_FLAG="--no-cache" ;;
     --push) PUSH_IMAGES=true ;;
-    --version=*) PG_VERSION="${arg#*=}" ;;
+    --version=*)
+      if [[ "$BUILD_TARGET" == "pgsql" ]]; then
+        PG_VERSION="${arg#*=}"
+      elif [[ "$BUILD_TARGET" == "mysql" ]]; then
+        MYSQL_VERSION="${arg#*=}"
+      fi
+      ;;
     *)
       # Could be pg version without flag
-      if [[ -z "$PG_VERSION" && "$arg" =~ ^[0-9]+\.[0-9]+ ]]; then
-        PG_VERSION="$arg"
+      if [[ "$arg" =~ ^[0-9]+\.[0-9]+ ]]; then
+        if [[ "$BUILD_TARGET" == "pgsql" && -z "$PG_VERSION" ]]; then
+          PG_VERSION="$arg"
+        elif [[ "$BUILD_TARGET" == "mysql" && -z "$MYSQL_VERSION" ]]; then
+          MYSQL_VERSION="$arg"
+        fi
       fi
       ;;
   esac
@@ -104,6 +115,8 @@ case "$BUILD_TARGET" in
     msg_info "  mail      - Mailpit mail catcher (orodc-mail:latest)"
     msg_info "  pgsql     - PostgreSQL database (orodc-pgsql:VERSION)"
     msg_info "              Versions: 15.1, 16.6, 17.4"
+    msg_info "  mysql     - MySQL database (orodc-mysql:VERSION)"
+    msg_info "              Versions: 8.0, 8.4"
     msg_info "  all       - Build all images above"
     msg_info ""
     msg_info "Usage:"
@@ -118,6 +131,8 @@ case "$BUILD_TARGET" in
     msg_info "  orodc docker-build nginx"
     msg_info "  orodc docker-build pgsql 17.4"
     msg_info "  orodc docker-build pgsql --version=16.6"
+    msg_info "  orodc docker-build mysql 8.4"
+    msg_info "  orodc docker-build mysql --version=8.0"
     msg_info "  orodc docker-build all --no-cache"
     msg_info "  orodc docker-build mail --push"
     msg_info ""
@@ -171,6 +186,30 @@ case "$BUILD_TARGET" in
     exit $FAILED
     ;;
 
+  mysql)
+    msg_header "Building MySQL Image"
+
+    if [[ -z "$MYSQL_VERSION" ]]; then
+      MYSQL_VERSIONS=("8.0" "8.4")
+      msg_info "Building all MySQL versions: ${MYSQL_VERSIONS[*]}"
+    else
+      MYSQL_VERSIONS=("$MYSQL_VERSION")
+    fi
+
+    FAILED=0
+    for ver in "${MYSQL_VERSIONS[@]}"; do
+      msg_info ""
+      build_image \
+        "${DOCKER_DIR}/mysql/Dockerfile" \
+        "${DOCKER_DIR}/mysql/" \
+        "ghcr.io/digitalspacestdio/orodc-mysql:${ver}" \
+        "MySQL ${ver}" \
+        "MYSQL_VERSION=${ver}" || FAILED=1
+    done
+
+    exit $FAILED
+    ;;
+
   all)
     msg_header "Building All OroDC Images"
     msg_info ""
@@ -218,6 +257,23 @@ case "$BUILD_TARGET" in
         BUILT+=("pgsql:${ver}")
       else
         FAILED+=("pgsql:${ver}")
+      fi
+    done
+
+    msg_info ""
+
+    # MySQL (all versions)
+    msg_info "=== MySQL ==="
+    for ver in 8.0 8.4; do
+      if build_image \
+        "${DOCKER_DIR}/mysql/Dockerfile" \
+        "${DOCKER_DIR}/mysql/" \
+        "ghcr.io/digitalspacestdio/orodc-mysql:${ver}" \
+        "MySQL ${ver}" \
+        "MYSQL_VERSION=${ver}"; then
+        BUILT+=("mysql:${ver}")
+      else
+        FAILED+=("mysql:${ver}")
       fi
     done
 
