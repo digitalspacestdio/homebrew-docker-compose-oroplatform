@@ -4,7 +4,7 @@
 
 **Modern CLI tool to run PHP applications locally or on a server.** Designed specifically for local development environments with enterprise-grade performance and developer experience. Supports ORO Platform applications (OroCommerce, OroCRM, OroPlatform, MarelloCommerce), Magento, and any PHP-based CMS or framework.
 
-[![Version](https://img.shields.io/badge/Version-0.12.5-brightgreen.svg)](https://github.com/digitalspacestdio/homebrew-docker-compose-oroplatform/releases)
+[![Version](https://img.shields.io/badge/Version-1.2.0-brightgreen.svg)](https://github.com/digitalspacestdio/homebrew-docker-compose-oroplatform/releases)
 [![Homebrew](https://img.shields.io/badge/Homebrew-Available-orange.svg)](https://brew.sh/)
 [![Docker](https://img.shields.io/badge/Docker-Required-blue.svg)](https://www.docker.com/)
 [![macOS](https://img.shields.io/badge/macOS-Supported-green.svg)](https://www.apple.com/macos/)
@@ -751,9 +751,10 @@ orodc -r 'var_dump(get_loaded_extensions());'
 orodc script.php
 orodc -l syntax-check.php
 
-# Symfony/Oro Console commands
-orodc bin/console cache:clear
-orodc bin/console oro:user:create
+# Console commands (Symfony/Oro/Laravel)
+orodc bin/console cache:clear        # Symfony/Oro
+orodc php artisan cache:clear        # Laravel
+orodc bin/magento cache:clean        # Magento
 ```
 
 ## 🧪 Testing
@@ -763,8 +764,8 @@ orodc bin/console oro:user:create
 **CRITICAL**: Test environment is completely separate from your main application:
 
 ```bash
-# Navigate to your Oro application directory
-cd ~/orocommerce
+# Navigate to your application directory
+cd ~/myproject
 
 # ⚠️ REQUIRED: Set up test environment (one-time setup)
 orodc tests install
@@ -778,7 +779,7 @@ orodc tests install
 ```bash
 orodc tests bin/phpunit --testsuite=unit
 orodc tests bin/phpunit --testsuite=unit --filter=UserTest
-orodc tests bin/phpunit src/Oro/Bundle/UserBundle/Tests/Unit/Entity/UserTest.php
+orodc tests bin/phpunit tests/Unit/Entity/UserTest.php
 ```
 
 #### Functional Tests
@@ -789,11 +790,12 @@ orodc tests bin/phpunit --testsuite=functional --filter=ApiTest
 
 #### Behat Tests
 ```bash
-orodc tests bin/behat --suite=OroUserBundle
-orodc tests bin/behat --suite=OroCustomerBundle
-orodc tests bin/behat features/user.feature
-orodc tests bin/behat --available-suites
+orodc tests bin/behat --available-suites        # List available suites
+orodc tests bin/behat --suite=default           # Run default suite
+orodc tests bin/behat features/user.feature     # Run specific feature
 ```
+
+> 📖 **CMS-specific test examples**: See [docs/ORO.md](docs/ORO.md) for Oro Platform testing (OroUserBundle, OroCustomerBundle, etc.)
 
 ### Available Test Commands
 
@@ -856,9 +858,10 @@ orodc exportdb                       # Export database
 orodc platformupdate                 # Update platform
 orodc updateurl                      # Update URLs
 
-# Asset management
-orodc bin/console oro:assets:build default -w  # Watch mode
-orodc bin/console cache:clear                  # Clear cache
+# Asset management & cache
+orodc bin/console cache:clear                  # Symfony/Oro
+orodc bin/magento cache:clean                  # Magento
+orodc npm run build                            # Generic frontend
 
 # Other tools
 orodc database-cli                   # Direct database access
@@ -1008,13 +1011,17 @@ This automatically:
 ### 🎯 Docker Compose Profiles
 
 ```bash
-# Start with specific profiles
-orodc --profile=consumer up -d
-orodc --profile=php-cli --profile=database-cli up -d
+# Enable XHProf profiling (xhgui + mongodb)
+orodc --profile=xhprof up -d
+```
 
-# Consumer/Worker examples
-orodc --profile=consumer bin/console oro:message-queue:consume
-orodc --profile=consumer platformupdate
+### 🔄 Consumer/Workers
+
+Consumer is **auto-started for Oro projects**. For other CMS, run manually:
+
+```bash
+orodc bin/console messenger:consume           # Symfony
+orodc bin/magento queue:consumers:start       # Magento
 ```
 
 ## 🌐 Multiple Hosts Configuration
@@ -1687,11 +1694,11 @@ For debugging both web requests and console commands:
 XDEBUG_MODE=debug orodc up -d
 ```
 
-#### 🎯 Enable XDEBUG with Profile-Specific Control
+#### 🎯 Enable XDEBUG with Service-Specific Control
 For debugging in CLI and FPM containers, but disable in consumer workers:
 
 ```bash
-XDEBUG_MODE=debug XDEBUG_MODE_CONSUMER=off orodc --profile=consumer up -d
+XDEBUG_MODE=debug XDEBUG_MODE_CONSUMER=off orodc up -d
 ```
 
 ### 💡 XDEBUG Usage Tips
@@ -1717,13 +1724,12 @@ orodc up -d
 
 ```bash
 # Navigate to your project
-cd ~/my-oro-project
+cd ~/myproject
 
 # Complete project recreation (single command)
-orodc --profile=consumer purge && \
+orodc purge && \
 orodc importdb ~/backup.sql.gz && \
 orodc platformupdate && \
-orodc bin/console oro:user:update --user-password=12345678 admin && \
 orodc updateurl
 
 # Access your application

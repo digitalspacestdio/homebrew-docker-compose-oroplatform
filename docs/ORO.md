@@ -102,20 +102,50 @@ orodc platform-update
 
 ### Setup Test Environment
 ```bash
+cd ~/orocommerce
 orodc tests install
 ```
 
-### Run Tests
+### Unit Tests
 ```bash
-# PHPUnit unit tests
 orodc tests bin/phpunit --testsuite=unit
+orodc tests bin/phpunit --testsuite=unit --filter=UserTest
+orodc tests bin/phpunit src/Oro/Bundle/UserBundle/Tests/Unit/Entity/UserTest.php
+```
 
-# PHPUnit functional tests
+### Functional Tests
+```bash
 orodc tests bin/phpunit --testsuite=functional
+orodc tests bin/phpunit --testsuite=functional --filter=ApiTest
+```
 
-# Behat behavior tests
+### Behat Tests
+```bash
 orodc tests bin/behat --available-suites
 orodc tests bin/behat --suite=OroUserBundle
+orodc tests bin/behat --suite=OroCustomerBundle
+orodc tests bin/behat features/user.feature
+```
+
+### Test Coverage
+```bash
+orodc tests bin/phpunit --testsuite=unit --coverage-html coverage/
+orodc tests bin/phpunit --coverage-text
+```
+
+### Test Environment Management
+```bash
+orodc tests ps                    # Check test environment status
+orodc tests logs                  # View test logs
+orodc tests up -d                 # Start test services
+orodc tests down                  # Stop test services
+orodc tests purge                 # Clean test environment
+```
+
+### Test Database
+```bash
+orodc tests psql                         # Access test database
+orodc tests psql -c "SELECT version();"  # Run SQL commands
 ```
 
 ## Access Information
