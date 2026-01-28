@@ -370,7 +370,7 @@ perform_database_import() {
   # pv is optional - if not available in container, fall back to spinner
   PV_CMD=""
   PV_AVAILABLE=false
-  if [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "pdo_pgsql" ]]; then
+  if [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "pdo_pgsql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "pdo_mysql" ]]; then
     # Check if pv is available in database-cli container (optional - user may have custom container)
     # Test by running a simple pv --version command in the container
     # Use --no-deps to avoid starting dependencies, and -T to disable TTY for non-interactive check
@@ -390,7 +390,11 @@ perform_database_import() {
     elif [[ -n "${DEBUG:-}" ]]; then
       # Show debug info if pv is not available
       msg_info "pv not available in database-cli container, using spinner instead" >&2
-      msg_info "To enable pv, rebuild PostgreSQL image: orodc docker-build pgsql" >&2
+      if [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "pdo_pgsql" ]]; then
+        msg_info "To enable pv, rebuild PostgreSQL image: orodc docker-build pgsql" >&2
+      else
+        msg_info "To enable pv, rebuild MySQL image: orodc docker-build mysql" >&2
+      fi
     fi
   fi
   
@@ -405,7 +409,7 @@ perform_database_import() {
   msg_info "File size: $(du -h "$DB_DUMP" | cut -f1)"
   msg_info "Database: $DC_ORO_DATABASE_HOST:$DC_ORO_DATABASE_PORT/$DC_ORO_DATABASE_DBNAME"
 
-  # Use pv for progress display if available (PostgreSQL only, optional)
+  # Use pv for progress display if available (optional)
   # pv writes progress to stderr, so we need to preserve stderr for progress display
   # Remove --quiet flag to allow pv output, but keep -i for interactive mode
   if [[ "$PV_AVAILABLE" == "true" ]] && [[ -n "$PV_CMD" ]]; then

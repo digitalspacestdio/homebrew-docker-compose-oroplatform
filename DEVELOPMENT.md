@@ -143,7 +143,7 @@ orodc databaseexport              # Export database
 
 - **Domain Replacement**: Automatically replace domain names in SQL dumps during import
 - **Domain Memory**: Previously used domains are saved to `~/.orodc/{project-name}/.env.orodc` and suggested on next import
-- **Progress Display**: Shows `pv` progress bar for PostgreSQL (if available) or spinner for MySQL
+- **Progress Display**: Shows `pv` progress bar for PostgreSQL/MySQL (if available) or spinner otherwise
 - **Interactive Prompts**: Confirms database deletion and optionally prompts for domain replacement
 
 ### Project Recreation from Database Dump
