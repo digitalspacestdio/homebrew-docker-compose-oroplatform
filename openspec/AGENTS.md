@@ -381,6 +381,12 @@ notifications/spec.md
 - Avoid frameworks without clear justification
 - Choose boring, proven patterns
 
+### Script Size Limits
+- Keep any script under 500 lines
+- If a script exceeds 500 lines, split it into multiple smaller scripts
+- Break down by logical functionality or responsibility
+- Maintain clear interfaces between split scripts
+
 ### Complexity Triggers
 Only add complexity with:
 - Performance data showing current solution too slow

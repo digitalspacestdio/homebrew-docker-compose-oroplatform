@@ -32,6 +32,9 @@ COPY shared/app.msmtp.ini /usr/local/etc/php/conf.d/
 COPY shared/app.xdebug.ini /usr/local/etc/php/conf.d/
 COPY shared/php-fpm.conf /usr/local/etc/php-fpm.conf
 
+# Copy msmtprc templates (single layer)
+COPY shared/msmtprc-*.tmpl /
+
 # Copy scripts from shared
 COPY --chmod=0755 shared/docker-healthcheck.sh /usr/local/bin/docker-healthcheck
 COPY --chmod=0755 shared/docker-entrypoint.sh /usr/local/bin/docker-entrypoint
@@ -65,6 +68,9 @@ COPY --chmod=0755 8.1/build.sh /tmp/build.sh
 ARG APP_DIR="/var/www"
 ENV APP_DIR=${APP_DIR}
 RUN /tmp/build.sh && rm /tmp/build.sh
+
+# Create msmtprc file with write permissions (before switching to developer user)
+RUN touch /.msmtprc && chmod 666 /.msmtprc
 
 # Copy additional configuration files from shared
 COPY shared/zshrc /.zshrc

@@ -1,0 +1,9 @@
+# Goss configuration for database service (MySQL/MariaDB)
+# Legacy mode: port-only checks for OroPlatform < 6.1
+
+# Port checks
+port:
+  tcp:3306:
+    listening: true
+    ip:
+      - 127.0.0.1

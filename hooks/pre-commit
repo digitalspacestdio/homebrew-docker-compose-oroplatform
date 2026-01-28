@@ -1,0 +1,75 @@
+#!/bin/bash
+# Pre-commit hook to check Bash scripts with shellcheck
+# Install: cp hooks/pre-commit .git/hooks/pre-commit && chmod +x .git/hooks/pre-commit
+
+set -e
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+NC='\033[0m' # No Color
+
+# Check if shellcheck is available
+if ! command -v shellcheck >/dev/null 2>&1; then
+  echo -e "${YELLOW}Warning: shellcheck not found. Skipping shell script checks.${NC}"
+  echo "Install shellcheck: brew install shellcheck"
+  exit 0
+fi
+
+# Get list of staged files
+staged_files=$(git diff --cached --name-only --diff-filter=ACM)
+
+# Track if any errors found
+errors_found=0
+
+# Check each staged file
+for file in $staged_files; do
+  # Skip if file doesn't exist (deleted)
+  if [[ ! -f "$file" ]]; then
+    continue
+  fi
+
+  # Check if file is a bash script
+  # Check by extension or shebang
+  is_bash_script=false
+  
+  if [[ "$file" == *.sh ]]; then
+    is_bash_script=true
+  elif [[ -r "$file" ]]; then
+    # Check shebang
+    first_line=$(head -n 1 "$file" 2>/dev/null || echo "")
+    if [[ "$first_line" =~ ^#!/.*bash ]] || [[ "$first_line" =~ ^#!/.*sh ]]; then
+      is_bash_script=true
+    fi
+  fi
+
+  # Skip if not a bash script
+  if [[ "$is_bash_script" != "true" ]]; then
+    continue
+  fi
+
+  # Check syntax first
+  if ! bash -n "$file" 2>/dev/null; then
+    echo -e "${RED}Error: Syntax error in $file${NC}"
+    bash -n "$file"
+    errors_found=1
+    continue
+  fi
+
+  # Run shellcheck
+  echo -e "Checking ${GREEN}$file${NC}..."
+  if ! shellcheck "$file"; then
+    errors_found=1
+  fi
+done
+
+# Exit with error if any issues found
+if [[ $errors_found -eq 1 ]]; then
+  echo ""
+  echo -e "${RED}Pre-commit hook failed: Shell script issues found${NC}"
+  echo "Fix the issues above or skip with: git commit --no-verify"
+  exit 1
+fi
+
+exit 0

@@ -1,0 +1,9 @@
+# Goss configuration for database service (PostgreSQL)
+# Legacy mode: port-only checks for OroPlatform < 6.1
+
+# Port checks
+port:
+  tcp:5432:
+    listening: true
+    ip:
+      - 127.0.0.1

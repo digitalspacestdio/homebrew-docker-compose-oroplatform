@@ -1,0 +1,7 @@
+# Goss configuration for nginx service
+# Legacy mode: port-only checks for OroPlatform < 6.1
+
+# Port checks
+port:
+  tcp:80:
+    listening: true

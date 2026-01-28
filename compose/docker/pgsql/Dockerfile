@@ -28,6 +28,8 @@ RUN set -eux; \
     else \
         echo "postgresql-${PG_MAJOR}-repack not available in repository, skipping..."; \
     fi; \
+    # Install pv (pipe viewer) for progress display during database import
+    apt-get install -yqq --no-install-recommends pv; \
     # Clean up
     apt-get clean; \
     rm -rf /var/lib/apt/lists/*

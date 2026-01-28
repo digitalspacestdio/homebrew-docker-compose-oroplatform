@@ -125,9 +125,16 @@ See [LOCAL-TESTING.md](LOCAL-TESTING.md) for comprehensive testing guide.
 ### Database Operations
 ```bash
 orodc psql                         # PostgreSQL access
-orodc databaseimport dump.sql      # Import database
+orodc databaseimport dump.sql      # Import database (with domain replacement)
 orodc databaseexport              # Export database
 ```
+
+**Database Import Features:**
+
+- **Domain Replacement**: Automatically replace domain names in SQL dumps during import
+- **Domain Memory**: Previously used domains are saved to `~/.orodc/{project-name}/.env.orodc` and suggested on next import
+- **Progress Display**: Shows `pv` progress bar for PostgreSQL (if available) or spinner for MySQL
+- **Interactive Prompts**: Confirms database deletion and optionally prompts for domain replacement
 
 ### Project Recreation from Database Dump
 ```bash
