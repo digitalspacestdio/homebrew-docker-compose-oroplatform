@@ -2,7 +2,7 @@
 
 ## Purpose
 
-**OroDC (Oro Docker Compose)** is a modern CLI tool that provides a complete Docker-based development environment for ORO Platform applications (OroPlatform, OroCRM, OroCommerce, MarelloCommerce). The project's goals are:
+**OroDC (Oro Docker Compose)** is a modern CLI tool that provides a complete Docker-based development environment for PHP applications. Originally designed for ORO Platform (OroPlatform, OroCRM, OroCommerce, MarelloCommerce), it now supports **any PHP-based application** including Magento 2, Symfony, Laravel, WordPress, Drupal, WinterCMS, and generic PHP projects. The project's goals are:
 
 - **Zero Configuration**: Work out of the box with sensible defaults
 - **Developer Experience**: Smart PHP command detection, direct database access, beautiful CLI output
@@ -506,13 +506,28 @@ When user says "я смерджил" (I merged) or "merged":
 
 ## Domain Context
 
+### Supported CMS/Frameworks
+
+OroDC auto-detects and supports the following platforms:
+
+| CMS Type | Detection | Examples |
+|----------|-----------|----------|
+| **Oro Platform** | `oro/platform`, `oro/commerce`, `oro/crm` in composer.json | OroCommerce, OroCRM, OroPlatform, MarelloCommerce |
+| **Magento** | `magento/product-*` packages or Magento-specific files | Magento 2 Open Source, Commerce, Mage-OS |
+| **Symfony** | `symfony/symfony` or `symfony/framework-bundle` | Symfony applications |
+| **Laravel** | `laravel/framework` | Laravel applications |
+| **WinterCMS** | `winter/*` packages | WinterCMS applications |
+| **PHP Generic** | Default fallback | Any PHP project |
+
+Set explicitly via `DC_ORO_CMS_TYPE` in `.env.orodc`: `oro`, `magento`, `symfony`, `laravel`, `wintercms`, `php-generic`.
+
 ### ORO Platform Ecosystem
 - **OroPlatform**: Base platform for business applications
 - **OroCRM**: Customer Relationship Management
 - **OroCommerce**: B2B E-commerce platform
 - **MarelloCommerce**: Omnichannel commerce solution
 
-### ORO Application Structure
+### PHP Application Structure (General)
 - **Symfony-based**: PHP framework (Symfony 5.x/6.x)
 - **Doctrine ORM**: Database abstraction
 - **Message Queue**: Background job processing
@@ -531,7 +546,7 @@ When user says "я смерджил" (I merged) or "merged":
 
 ### Configuration Files
 - `.env.orodc`: Project-specific OroDC settings (optional, user-created)
-- `app/.env.local`: ORO application environment variables
+- `app/.env.local` or `.env`: Application environment variables (location varies by CMS)
 - `docker-compose.yml`: Generated from templates (never edit directly)
 - `DC_ORO_CONFIG_DIR`: Custom config location (default: `~/.orodc/{project_name}`)
 - `~/.orodc/{project_name}/.env.orodc`: Global project configuration (auto-created, stores domain replacement preferences)
@@ -550,8 +565,9 @@ When user says "я смерджил" (I merged) or "merged":
 
 ### Business Constraints
 - **Homebrew Distribution**: Formula must follow Homebrew conventions
-- **Zero Application Changes**: Works without modifying ORO application code
+- **Zero Application Changes**: Works without modifying application code (Oro, Magento, Symfony, Laravel, etc.)
 - **Backward Compatibility**: Support multiple PHP/Node.js/Composer versions
+- **Multi-CMS Support**: Auto-detection and specialized configuration for different CMS/frameworks
 - **Enterprise Features**: Multisite, WebSockets, profiling, testing
 
 ### Platform Constraints

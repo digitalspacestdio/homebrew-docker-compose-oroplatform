@@ -235,12 +235,15 @@ orodc image build              # Interactive builder for PHP images
 
 # OroDC Quick Reference
 
+OroDC supports **multiple CMS/frameworks**: Oro Platform (OroCommerce, OroCRM, OroPlatform, MarelloCommerce), Magento 2, Symfony, Laravel, WinterCMS, and generic PHP projects. The CMS type is auto-detected from `composer.json` or can be set via `DC_ORO_CMS_TYPE` in `.env.orodc`.
+
 ## Commands Auto-Detection
 
 ```bash
 # ✅ CORRECT - auto-detects PHP
 orodc --version
-orodc bin/console cache:clear
+orodc bin/console cache:clear      # Oro/Symfony
+orodc bin/magento cache:clean      # Magento
 
 # ❌ WRONG - redundant cli
 orodc cli php --version

@@ -1,7 +1,7 @@
 # OroDC Development Guide
 
 ## Overview
-OroDC: CLI tool for ORO Platform (OroCRM, OroCommerce, OroPlatform) in Docker containers.
+OroDC: CLI tool for PHP applications in Docker containers. Supports ORO Platform (OroCRM, OroCommerce, OroPlatform, MarelloCommerce), Magento 2, Symfony, Laravel, WinterCMS, and generic PHP projects.
 
 ## Architecture
 
@@ -30,7 +30,8 @@ BREW_PREFIX="$(brew --prefix)"
 ```bash
 # ✅ CORRECT
 orodc --version                    # → cli php --version
-orodc bin/console cache:clear     # → cli bin/console cache:clear
+orodc bin/console cache:clear     # → cli bin/console cache:clear (Oro/Symfony)
+orodc bin/magento cache:clean     # → cli bin/magento cache:clean (Magento)
 orodc script.php                  # → cli php script.php
 
 # ❌ WRONG
@@ -40,7 +41,7 @@ orodc cli php --version           # Redundant
 **Detection Logic:**
 - PHP flags (`-v`, `--version`, `-r`, `-l`, `-m`, `-i`) → auto-redirect to PHP
 - `.php` files → auto-redirect to PHP
-- `bin/console` or `bin/phpunit` → auto-redirect to CLI container
+- `bin/console`, `bin/phpunit`, `bin/magento` → auto-redirect to CLI container
 
 **Composer Non-Interactive Mode:**
 - ALL composer commands automatically run with `--no-interaction`
@@ -87,11 +88,20 @@ DC_ORO_MODE=mutagen                # Sync mode
 ## Common Workflows
 
 ### Setup (New Project)
+
+**OroCommerce:**
 ```bash
 brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform
 git clone --single-branch --branch 6.1.4 https://github.com/oroinc/orocommerce-application.git ~/orocommerce
 cd ~/orocommerce
 orodc install && orodc up -d
+```
+
+**Magento 2 (Mage-OS):**
+```bash
+mkdir ~/mageos && cd ~/mageos
+orodc init && orodc up -d
+orodc exec composer create-project --repository-url=https://repo.mage-os.org/ mage-os/project-community-edition .
 ```
 
 ### Test Project Setup
@@ -139,10 +149,9 @@ orodc databaseexport              # Export database
 ### Project Recreation from Database Dump
 ```bash
 # Full project recreation
-orodc --profile=consumer purge && \
+orodc purge && \
 orodc importdb ~/backup.sql.gz && \
 orodc platformupdate && \
-orodc bin/console oro:user:update --user-password=12345678 admin && \
 orodc updateurl
 ```
 
