@@ -8,8 +8,8 @@ trap 'tput cnorm 2>/dev/null || true' EXIT
 # Setup logging only when OroDC is used as PHP binary
 setup_php_logging() {
   mkdir -p /tmp/.orodc
-  local log_file="/tmp/.orodc/$(basename $0).$(echo "$@" | md5sum - | awk '{ print $1 }').log"
-  local err_file="/tmp/.orodc/$(basename $0).$(echo "$@" | md5sum - | awk '{ print $1 }').err"
+  local log_file="/tmp/.orodc/$(basename "$0").$(echo "$@" | md5sum - | awk '{ print $1 }').log"
+  local err_file="/tmp/.orodc/$(basename "$0").$(echo "$@" | md5sum - | awk '{ print $1 }').err"
   touch "$log_file" "$err_file"
   exec 1> >(tee "$log_file")
   exec 2> >(tee "$err_file")
@@ -261,7 +261,7 @@ prompt_selector() {
   local choice=""
   
   while true; do
-    read -p "$prompt" choice
+    read -r -p "$prompt" choice
     
     # Empty input - use default
     if [[ -z "$choice" ]]; then
@@ -312,7 +312,7 @@ prompt_port() {
   local choice=""
   
   while true; do
-    read -p "$prompt" choice
+    read -r -p "$prompt" choice
     
     # Empty input - use default
     if [[ -z "$choice" ]]; then
@@ -355,7 +355,8 @@ confirm_yes_no() {
     fi
     
     # Accept: y, yes, Y, YES, n, no, N, NO
-    case "${answer,,}" in  # Convert to lowercase
+    answer_lower="$(echo "$answer" | tr '[:upper:]' '[:lower:]')"
+    case "$answer_lower" in  # Convert to lowercase
       y|yes) return 0 ;;
       n|no) return 1 ;;
       *)
@@ -3687,7 +3688,8 @@ fi
 is_oro_project() {
   # Check for explicit override first
   if [[ -n "${DC_ORO_IS_ORO_PROJECT:-}" ]]; then
-    case "${DC_ORO_IS_ORO_PROJECT,,}" in
+    local is_oro_lower="$(echo "${DC_ORO_IS_ORO_PROJECT}" | tr '[:upper:]' '[:lower:]')"
+    case "$is_oro_lower" in
       1|true|yes)
         return 0
         ;;

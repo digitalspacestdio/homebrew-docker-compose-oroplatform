@@ -45,7 +45,7 @@ get_cms_type() {
   local cms_type
   # Load from environment if available (from .env.orodc)
   if [[ -n "${DC_ORO_CMS_TYPE:-}" ]]; then
-    cms_type="${DC_ORO_CMS_TYPE,,}"
+    cms_type="$(echo "${DC_ORO_CMS_TYPE}" | tr '[:upper:]' '[:lower:]')"
   else
     # Auto-detect using detect_application_kind function (includes marello)
     cms_type=$(detect_application_kind)
@@ -151,7 +151,11 @@ main() {
       if [[ ! -f "$cms_file" ]]; then
         msg_warning "CMS-specific installation guide not found for: $cms_file_type"
         msg_info "Available installation guides:"
-        ls -1 "${agents_dir}"/AGENTS_INSTALLATION_*.md 2>/dev/null | sed 's|.*/AGENTS_INSTALLATION_||;s|\.md$||' | sed 's/^/  - /' || true
+        for file in "${agents_dir}"/AGENTS_INSTALLATION_*.md; do
+          [[ ! -f "$file" ]] && continue
+          basename_file=$(basename "$file")
+          echo "  - ${basename_file#AGENTS_INSTALLATION_}" | sed 's|\.md$||'
+        done
         exit 1
       fi
       
@@ -187,7 +191,11 @@ main() {
       if [[ ! -f "$cms_file" ]]; then
         msg_warning "CMS-specific coding rules not found for: $cms_file_type"
         msg_info "Available coding rules:"
-        ls -1 "${agents_dir}"/AGENTS_CODING_RULES_*.md 2>/dev/null | sed 's|.*/AGENTS_CODING_RULES_||;s|\.md$||' | sed 's/^/  - /' || true
+        for file in "${agents_dir}"/AGENTS_CODING_RULES_*.md; do
+          [[ ! -f "$file" ]] && continue
+          basename_file=$(basename "$file")
+          echo "  - ${basename_file#AGENTS_CODING_RULES_}" | sed 's|\.md$||'
+        done
         exit 1
       fi
       
@@ -227,7 +235,13 @@ main() {
       else
         msg_error "CMS-specific instructions not found for: $cms_file_type"
         msg_info "Available CMS types:"
-        ls -1 "${agents_dir}"/AGENTS_*.md 2>/dev/null | grep -v "CODING_RULES\|INSTALLATION\|common" | sed 's|.*/AGENTS_||;s|\.md$||' | sed 's/^/  - /' || true
+        for file in "${agents_dir}"/AGENTS_*.md; do
+          [[ ! -f "$file" ]] && continue
+          basename_file=$(basename "$file")
+          if [[ ! "$basename_file" =~ (CODING_RULES|INSTALLATION|common) ]]; then
+            echo "  - ${basename_file#AGENTS_}" | sed 's|\.md$||'
+          fi
+        done
         exit 1
       fi
       ;;

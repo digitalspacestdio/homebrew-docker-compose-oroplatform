@@ -137,7 +137,7 @@ find_and_export_ports() {
     [[ -z "$service" ]] && continue
     [[ -z "$port" ]] && continue
     
-    debug_log "find_and_export_ports: setting DC_ORO_PORT_${service^^}=$port"
+    debug_log "find_and_export_ports: setting DC_ORO_PORT_$(echo "$service" | tr '[:lower:]' '[:upper:]')=$port"
     
     case "$service" in
       nginx)

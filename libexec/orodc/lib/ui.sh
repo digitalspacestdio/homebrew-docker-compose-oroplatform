@@ -305,7 +305,7 @@ prompt_select() {
     # Read from terminal
     local selection
     >&2 echo -n "Select [1-${#options[@]}] (default: $default): "
-    read selection </dev/tty
+    read -r selection </dev/tty
     >&2 echo ""
     
     # Empty input - use default
@@ -431,7 +431,8 @@ confirm_yes_no() {
     echo "" >&2
 
     # Accept: y, yes, Y, YES, n, no, N, NO
-    case "${answer,,}" in  # Convert to lowercase
+    answer_lower="$(echo "$answer" | tr '[:upper:]' '[:lower:]')"
+    case "$answer_lower" in  # Convert to lowercase
       y|yes) return 0 ;;
       n|no) return 1 ;;
       *)
