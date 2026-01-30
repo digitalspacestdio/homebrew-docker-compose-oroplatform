@@ -3224,48 +3224,59 @@ if [[ -z ${ORO_SSH_PUBLIC_KEY} ]]; then
   fi
 fi
 
-if [[ "${DC_ORO_MODE}" == "default" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-default.yml" ]]; then
-  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-default.yml"
-fi
-
-if [[ "${DC_ORO_DATABASE_SCHEMA}" == "pgsql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgresql" ]];then
-  export DC_ORO_DATABASE_PORT=${DC_ORO_DATABASE_PORT:-5432}
-  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-pgsql.yml"
-elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "mariadb" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]];then
-  export DC_ORO_DATABASE_PORT=${DC_ORO_DATABASE_PORT:-3306}
-  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-mysql.yml"
-fi
-
-# Include consumer service only for Oro Platform projects
-if is_oro_project && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-consumer.yml" ]]; then
-  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-consumer.yml"
-fi
-
-# Include CMS-specific cron service (Ofelia)
-CMS_TYPE=$(detect_cms_type 2>/dev/null || echo "base")
-case "$CMS_TYPE" in
-  oro)
-    if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-cron-oro.yml" ]]; then
-      DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-cron-oro.yml"
-    fi
-    ;;
-  magento)
-    if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-cron-magento.yml" ]]; then
-      DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-cron-magento.yml"
-    fi
-    ;;
-esac
-if ${DOCKER_COMPOSE_BIN_CMD} ps --services 2>/dev/null | grep database > /dev/null; then
-  SERVICE_DATABASE_ID=$(${DOCKER_COMPOSE_BIN_CMD} ps -q database)
-  if [[ "" != $SERVICE_DATABASE_ID ]] && ${DOCKER_BIN} inspect -f '{{ .Config.Image }}' "$SERVICE_DATABASE_ID" | grep -q 'busybox'; then
-    ${DOCKER_COMPOSE_BIN_CMD} stop database
-    ${DOCKER_COMPOSE_BIN_CMD} rm -f database
+# Only add compose files if DC_ORO_CONFIG_DIR is set (proxy commands don't need project compose files)
+if [[ -n "${DC_ORO_CONFIG_DIR:-}" ]]; then
+  if [[ "${DC_ORO_MODE}" == "default" ]] && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-default.yml" ]]; then
+    DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-default.yml"
   fi
+
+  if [[ "${DC_ORO_DATABASE_SCHEMA}" == "pgsql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgresql" ]];then
+    export DC_ORO_DATABASE_PORT=${DC_ORO_DATABASE_PORT:-5432}
+    if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-pgsql.yml" ]]; then
+      DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-pgsql.yml"
+    fi
+  elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "mariadb" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]];then
+    export DC_ORO_DATABASE_PORT=${DC_ORO_DATABASE_PORT:-3306}
+    if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-mysql.yml" ]]; then
+      DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-mysql.yml"
+    fi
+  fi
+
+  # Include consumer service only for Oro Platform projects
+  if is_oro_project && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-consumer.yml" ]]; then
+    DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-consumer.yml"
+  fi
+
+  # Include CMS-specific cron service (Ofelia)
+  CMS_TYPE=$(detect_cms_type 2>/dev/null || echo "base")
+  case "$CMS_TYPE" in
+    oro)
+      if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-cron-oro.yml" ]]; then
+        DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-cron-oro.yml"
+      fi
+      ;;
+    magento)
+      if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-cron-magento.yml" ]]; then
+        DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-cron-magento.yml"
+      fi
+      ;;
+  esac
 fi
 
-if [[ -f "$DC_ORO_APPDIR/.docker-compose.user.yml" ]]; then
-  msg_info "Additional ${DOCKER_BIN} compose config will be used: $DC_ORO_APPDIR/.docker-compose.user.yml"
-  DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f $DC_ORO_APPDIR/.docker-compose.user.yml"
+# Only check for database service and user compose files if we have a project context
+if [[ -n "${DC_ORO_CONFIG_DIR:-}" ]] && [[ -n "${DC_ORO_APPDIR:-}" ]]; then
+  if ${DOCKER_COMPOSE_BIN_CMD} ps --services 2>/dev/null | grep database > /dev/null; then
+    SERVICE_DATABASE_ID=$(${DOCKER_COMPOSE_BIN_CMD} ps -q database)
+    if [[ "" != $SERVICE_DATABASE_ID ]] && ${DOCKER_BIN} inspect -f '{{ .Config.Image }}' "$SERVICE_DATABASE_ID" | grep -q 'busybox'; then
+      ${DOCKER_COMPOSE_BIN_CMD} stop database
+      ${DOCKER_COMPOSE_BIN_CMD} rm -f database
+    fi
+  fi
+
+  if [[ -f "$DC_ORO_APPDIR/.docker-compose.user.yml" ]]; then
+    msg_info "Additional ${DOCKER_BIN} compose config will be used: $DC_ORO_APPDIR/.docker-compose.user.yml"
+    DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f $DC_ORO_APPDIR/.docker-compose.user.yml"
+  fi
 fi
 
 # Detect if project is an Oro Platform-based project
@@ -3938,7 +3949,7 @@ is_docker_compose_command() {
 is_special_orodc_command() {
   local cmd="$1"
   case "$cmd" in
-    ssh|cli|pgsql|psql|mysql|database-cli|install|purge|test|tests|bash|help|man|init|codex|gemini|agents|status)
+    ssh|cli|pgsql|psql|mysql|database-cli|install|purge|test|tests|bash|help|man|init|codex|gemini|agents|status|proxy|image|docker-build|compose|database|db)
       return 0
       ;;
     *)
