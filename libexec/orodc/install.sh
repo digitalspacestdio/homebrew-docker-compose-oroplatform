@@ -189,5 +189,7 @@ msg_info "Default credentials:"
 msg_info "  Username: admin"
 msg_info "  Password: \$ecretPassw0rd"
 echo "" >&2
+msg_info "To start containers, run: orodc up -d"
+echo "" >&2
 
 exit 0
