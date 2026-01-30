@@ -274,6 +274,11 @@ prompt_select() {
   local options=("$@")
   local result=""
   
+  # CRITICAL: Restore terminal to normal mode at function start
+  # This ensures we're not in raw mode from previous commands
+  stty sane 2>/dev/null || true
+  stty echo icanon 2>/dev/null || true
+  
   # Debug: show what we received
   if [[ -n "${DEBUG:-}" ]]; then
     >&2 echo "DEBUG: prompt='$prompt', default='$default', options count=${#options[@]}"
@@ -303,6 +308,10 @@ prompt_select() {
     done
     
     # Read from terminal
+    # CRITICAL: Ensure terminal is in normal mode (wait for Enter)
+    # Restore normal mode before each read to handle any mode changes
+    stty sane 2>/dev/null || true
+    stty echo icanon 2>/dev/null || true
     local selection
     >&2 echo -n "Select [1-${#options[@]}] (default: $default): "
     read -r selection </dev/tty
@@ -440,4 +449,40 @@ confirm_yes_no() {
         ;;
     esac
   done
+}
+
+# Read numeric choice interactively
+# Usage: read_numeric_choice "prompt" "pattern" "default"
+# Returns: selected choice via echo (use: choice=$(read_numeric_choice ...))
+# Example: choice=$(read_numeric_choice "Your choice (1/2/3): " "^[1-3]$" "")
+read_numeric_choice() {
+  local prompt="$1"
+  local pattern="${2:-^[0-9]+$}"
+  local default="${3:-}"
+  local choice=""
+
+  printf "%s" "$prompt" >&2
+  
+  # Use regular read which waits for Enter key
+  # Read from /dev/tty explicitly for better Mac compatibility
+  IFS= read -r choice </dev/tty 2>/dev/null || IFS= read -r choice
+
+  # Use default if empty input and default provided
+  if [[ -z "$choice" ]] && [[ -n "$default" ]]; then
+    choice="$default"
+  fi
+
+  # Validate pattern if provided
+  if [[ -n "$choice" ]] && [[ "$choice" =~ $pattern ]]; then
+    echo "$choice"
+    return 0
+  elif [[ -z "$choice" ]]; then
+    # Empty choice is valid if no default
+    echo ""
+    return 0
+  else
+    # Invalid choice
+    echo ""
+    return 1
+  fi
 }

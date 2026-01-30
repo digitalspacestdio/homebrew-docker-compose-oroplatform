@@ -55,7 +55,7 @@ else
 fi
 
 if [[ -f "$template" ]]; then
-	cp -f "$template" /.msmtprc
+	cat "$template" > /.msmtprc
 	if [[ -n "${DEBUG:-}" ]]; then
 		echo "DEBUG: Generated /.msmtprc from $template (ORO_MAILER_ENCRYPTION=${ORO_MAILER_ENCRYPTION:-starttls})" >&2
 	fi

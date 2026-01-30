@@ -81,6 +81,19 @@ fi
 
 msg_info "Starting installation process..."
 
+# Build project images first (if needed) to avoid showing build output during run commands
+# This ensures images are built under spinner instead of showing raw Docker output
+services_to_build="fpm cli websocket ssh"
+
+# Check if consumer service exists and add it to build list
+if ${DOCKER_COMPOSE_BIN_CMD} config --services 2>/dev/null | grep -q "^consumer$"; then
+  services_to_build="${services_to_build} consumer"
+fi
+
+build_cmd="${DOCKER_COMPOSE_BIN_CMD} build ${services_to_build}"
+run_with_spinner "Building project images" "$build_cmd" || true
+msg_info ""
+
 # Recreate database container with volumes removal (with user confirmation)
 if [[ -n "${DC_ORO_DATABASE_SCHEMA:-}" ]]; then
   db_name="${DC_ORO_DATABASE_DBNAME:-oro_db}"

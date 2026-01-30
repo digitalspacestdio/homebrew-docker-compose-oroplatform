@@ -102,6 +102,39 @@ else
 fi
 msg_info ""
 
+# Stop stack and remove project images if we're in a project directory
+if [[ -f ".env.orodc" ]] && [[ -n "${DC_ORO_CONFIG_DIR:-}" ]] && [[ -d "${DC_ORO_CONFIG_DIR:-}" ]]; then
+  msg_header "Preparing project for rebuild"
+  msg_info ""
+  
+  # Initialize environment to get docker compose command and project name
+  initialize_environment 2>/dev/null || true
+  
+  if [[ -n "${DOCKER_COMPOSE_BIN_CMD:-}" ]] && [[ -n "${DC_ORO_NAME:-}" ]]; then
+    # Stop the stack
+    msg_info "Stopping project stack..."
+    down_cmd="${DOCKER_COMPOSE_BIN_CMD} down --remove-orphans"
+    if run_with_spinner "Stopping containers" "$down_cmd"; then
+      msg_ok "Stack stopped successfully"
+    else
+      msg_warning "Some containers may still be running"
+    fi
+    msg_info ""
+    
+    # Remove project images
+    msg_info "Removing project images..."
+    if remove_project_images; then
+      msg_ok "Project images removed"
+    else
+      msg_info "No project images found or removal skipped"
+    fi
+    msg_info ""
+  else
+    msg_warning "Could not determine docker compose command or project name, skipping stack stop"
+    msg_info ""
+  fi
+fi
+
 # Define image tags
 PHP_BASE_TAG="ghcr.io/digitalspacestdio/orodc-php:${DC_ORO_PHP_VERSION}-${DC_ORO_PHP_DIST}"
 PHP_FINAL_TAG="ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION}-node${DC_ORO_NODE_VERSION}-composer${DC_ORO_COMPOSER_VERSION}-${DC_ORO_PHP_DIST}"
@@ -160,12 +193,14 @@ SHOULD_PULL=false
 SHOULD_BUILD=false
 
 if [[ -t 0 ]]; then
+  # Ensure terminal is in normal mode (wait for Enter)
+  stty echo icanon 2>/dev/null || true
   msg_info "Choose action:"
   msg_info "  1) Pull from registry"
   msg_info "  2) Build locally"
   msg_info "  3) Skip"
   msg_info ""
-  read -p "Your choice (1/2/3): " -r
+  read -r -p "Your choice (1/2/3): " REPLY
   
   case $REPLY in
     1) SHOULD_PULL=true ;;
@@ -236,12 +271,14 @@ SHOULD_PULL_FINAL=false
 SHOULD_BUILD_FINAL=false
 
 if [[ -t 0 ]]; then
+  # Ensure terminal is in normal mode (wait for Enter)
+  stty echo icanon 2>/dev/null || true
   msg_info "Choose action:"
   msg_info "  1) Pull from registry"
   msg_info "  2) Build locally"
   msg_info "  3) Skip"
   msg_info ""
-  read -p "Your choice (1/2/3): " -r
+  read -r -p "Your choice (1/2/3): " REPLY
   
   case $REPLY in
     1) SHOULD_PULL_FINAL=true ;;
@@ -312,11 +349,13 @@ if [[ -f ".env.orodc" ]] && [[ -n "${DC_ORO_CONFIG_DIR:-}" ]] && [[ -d "${DC_ORO
     SHOULD_REBUILD_PROJECT=true
   elif [[ -t 0 ]]; then
     # Interactive mode: always ask user if they want to rebuild project images
+    # Ensure terminal is in normal mode (wait for Enter)
+    stty echo icanon 2>/dev/null || true
     msg_info "Project detected. Rebuild project images (fpm, cli, consumer, websocket, ssh)?"
     msg_info "  1) Yes, rebuild project images"
     msg_info "  2) Skip"
     msg_info ""
-    read -p "Your choice (1/2): " -r
+    read -r -p "Your choice (1/2): " REPLY
     case $REPLY in
       1) SHOULD_REBUILD_PROJECT=true ;;
       2) msg_info "Skipping project images rebuild" ;;
@@ -333,6 +372,13 @@ if [[ -f ".env.orodc" ]] && [[ -n "${DC_ORO_CONFIG_DIR:-}" ]] && [[ -d "${DC_ORO
     
     # Initialize environment to get docker compose command
     initialize_environment 2>/dev/null || true
+    
+    # Remove old project images before rebuilding if base images were updated
+    if [[ "$BASE_IMAGES_UPDATED" == "true" ]]; then
+      msg_info "Removing old project images before rebuild..."
+      remove_project_images || true
+      msg_info ""
+    fi
     
     # Setup certificates for project build
     setup_project_certificates
