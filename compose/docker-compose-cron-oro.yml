@@ -23,13 +23,12 @@ services:
         PHP_GID: "${DC_ORO_PHP_GID:-1000}"
         COMPOSER_VERSION: "${DC_ORO_COMPOSER_VERSION:-2}"
     user: "${DC_ORO_USER_NAME:-developer}"
-    command: /usr/bin/ofelia daemon --docker
+    command: /usr/bin/ofelia daemon
     volumes:
       - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
       - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
       - "home-root:/root"
       - "mail-certs:/certs:ro"
-      - /var/run/docker.sock:/var/run/docker.sock:ro
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     extra_hosts:
       - "host.docker.internal:host-gateway"

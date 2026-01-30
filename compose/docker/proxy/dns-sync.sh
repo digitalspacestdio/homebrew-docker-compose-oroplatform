@@ -27,8 +27,9 @@ extract_hosts_from_rule() {
 update_hosts() {
     log "Updating /etc/hosts inside container..."
     
-    # Use associative array to deduplicate hostnames
-    declare -A host_map
+    # Use temporary file to deduplicate hostnames (bash 3.2 compatible)
+    local temp_hosts_file
+    temp_hosts_file=$(mktemp)
     
     # Use docker CLI if available
     if command -v docker >/dev/null 2>&1; then
@@ -64,8 +65,8 @@ update_hosts() {
                 IFS=',' read -ra HOSTNAMES <<< "$custom_hostname"
                 for h in "${HOSTNAMES[@]}"; do
                     h=$(echo "$h" | xargs)  # Trim
-                    if [[ -n "$h" ]]; then
-                        host_map["$h"]="$container_ip"
+                    if [[ -n "$h" ]] && ! grep -q "^${h}$" "$temp_hosts_file" 2>/dev/null; then
+                        echo "$h" >> "$temp_hosts_file"
                         log "Found (custom): ${h} -> ${container_ip} (${container_name})"
                     fi
                 done
@@ -83,8 +84,8 @@ update_hosts() {
                         
                         # Extract all Host() entries from the rule
                         while IFS= read -r hostname; do
-                            if [[ -n "$hostname" ]]; then
-                                host_map["$hostname"]="$container_ip"
+                            if [[ -n "$hostname" ]] && ! grep -q "^${hostname}$" "$temp_hosts_file" 2>/dev/null; then
+                                echo "$hostname" >> "$temp_hosts_file"
                                 log "Found (traefik): ${hostname} -> ${container_ip} (${container_name})"
                             fi
                         done < <(extract_hosts_from_rule "$rule_value")
@@ -95,13 +96,16 @@ update_hosts() {
         done < <(docker ps --filter "label=traefik.enable=true" --format "{{.ID}}" 2>/dev/null || echo "")
     fi
     
-    # Build entries from deduplicated map
+    # Build entries from deduplicated hostnames
     # Inside proxy container, all hostnames should resolve to 127.0.0.1 (Traefik)
     # so both HTTP and HTTPS work through Traefik
     local entries=""
-    for hostname in "${!host_map[@]}"; do
-        entries+="127.0.0.1 ${hostname}"$'\n'
-    done
+    if [[ -f "$temp_hosts_file" ]]; then
+        while IFS= read -r hostname; do
+            [[ -n "$hostname" ]] && entries+="127.0.0.1 ${hostname}"$'\n'
+        done < "$temp_hosts_file"
+    fi
+    rm -f "$temp_hosts_file"
     
     # Update /etc/hosts
     local temp_file

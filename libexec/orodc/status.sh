@@ -85,7 +85,7 @@ get_cms_type() {
   
   # Check explicit override first
   if [[ -n "${DC_ORO_CMS_TYPE:-}" ]]; then
-    cms_type="${DC_ORO_CMS_TYPE,,}"
+    cms_type="$(echo "${DC_ORO_CMS_TYPE}" | tr '[:upper:]' '[:lower:]')"
     # Normalize php-generic to base internally
     if [[ "$cms_type" == "php-generic" ]]; then
       cms_type="base"

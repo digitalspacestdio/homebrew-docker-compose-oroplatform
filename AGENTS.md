@@ -160,11 +160,11 @@ libexec/orodc/
 - ❌ Add fallbacks that hide problems
 - ✅ Investigate WHY something doesn't work
 
-## 8. Version Update Required
+## 9. Version Update Required
 
 Update `Formula/docker-compose-oroplatform.rb` before committing changes to `compose/` or `bin/`.
 
-## 9. Reinstall After Changes
+## 10. Reinstall After Changes
 
 ```bash
 brew reinstall digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform
@@ -172,11 +172,37 @@ brew reinstall digitalspacestdio/docker-compose-oroplatform/docker-compose-oropl
 
 After modifying `libexec/` or `compose/` files.
 
-## 10. Start Analysis with Router
+## 11. Start Analysis with Router
 
 Always check `bin/orodc` first before analyzing individual scripts.
 
-## 11. Docker Image Building
+## 12. Do Not Show Initiative
+
+**CRITICAL:** Do not make changes beyond what the user explicitly asks for.
+
+- ❌ Making additional "improvements" or "fixes" not requested
+- ❌ Removing code "because it seems unnecessary" without user asking
+- ❌ Refactoring or optimizing beyond the specific request
+- ✅ Do exactly what is asked, nothing more
+- ✅ If you see potential issues, ask the user first before fixing
+
+**Example:** If user asks to fix a bug, fix ONLY that bug. Do not "also remove unused code" or "also optimize this function" unless explicitly requested.
+
+## 13. Questions Require Answers, Not Code Changes
+
+**CRITICAL:** If the user asks a question, they want an ANSWER, not code modifications.
+
+- ❌ Changing code when user asks "why does X happen?" or "where is Y?"
+- ❌ Making "fixes" when user asks "what is this?" or "how does this work?"
+- ✅ Answer the question with explanation, code references, or documentation
+- ✅ Only modify code if user explicitly asks to "fix", "change", "implement", etc.
+
+**Examples:**
+- User: "откуда у нас это?" → ✅ Explain where it comes from, ❌ Don't remove it
+- User: "почему это происходит?" → ✅ Explain the reason, ❌ Don't "fix" it
+- User: "где находится конфиг?" → ✅ Show the location, ❌ Don't move it
+
+## 14. Docker Image Building
 
 **CRITICAL:** Never manually build Docker images - use `orodc docker-build`!
 

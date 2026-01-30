@@ -17,8 +17,8 @@ fi
 # Setup logging only when OroDC is used as PHP binary
 setup_php_logging() {
   mkdir -p /tmp/.orodc
-  local log_file="/tmp/.orodc/$(basename $0).$(echo "$@" | md5sum - | awk '{ print $1 }').log"
-  local err_file="/tmp/.orodc/$(basename $0).$(echo "$@" | md5sum - | awk '{ print $1 }').err"
+  local log_file="/tmp/.orodc/$(basename "$0").$(echo "$@" | md5sum - | awk '{ print $1 }').log"
+  local err_file="/tmp/.orodc/$(basename "$0").$(echo "$@" | md5sum - | awk '{ print $1 }').err"
   touch "$log_file" "$err_file"
   exec 1> >(tee "$log_file")
   exec 2> >(tee "$err_file")
@@ -359,7 +359,8 @@ get_compatible_node_versions() {
 is_oro_project() {
   # Check for explicit override first
   if [[ -n "${DC_ORO_IS_ORO_PROJECT:-}" ]]; then
-    case "${DC_ORO_IS_ORO_PROJECT,,}" in
+    local is_oro_lower="$(echo "${DC_ORO_IS_ORO_PROJECT}" | tr '[:upper:]' '[:lower:]')"
+    case "$is_oro_lower" in
       1|true|yes)
         return 0
         ;;
@@ -400,7 +401,7 @@ is_oro_project() {
 detect_cms_type() {
   # Check for explicit override first (highest priority)
   if [[ -n "${DC_ORO_CMS_TYPE:-}" ]]; then
-    local cms_type="${DC_ORO_CMS_TYPE,,}"
+    local cms_type="$(echo "${DC_ORO_CMS_TYPE}" | tr '[:upper:]' '[:lower:]')"
     # Normalize php-generic to base internally
     if [[ "$cms_type" == "php-generic" ]]; then
       echo "base"
@@ -540,7 +541,8 @@ detect_cms_type() {
 is_marello_project() {
   # Check for explicit override first
   if [[ -n "${DC_ORO_IS_MARELLO:-}" ]]; then
-    case "${DC_ORO_IS_MARELLO,,}" in
+    local is_marello_lower="$(echo "${DC_ORO_IS_MARELLO}" | tr '[:upper:]' '[:lower:]')"
+    case "$is_marello_lower" in
       1|true|yes)
         return 0
         ;;
@@ -582,7 +584,7 @@ is_marello_project() {
 detect_application_kind() {
   # Check for explicit override first (highest priority)
   if [[ -n "${DC_ORO_APPLICATION_KIND:-}" ]]; then
-    local app_kind="${DC_ORO_APPLICATION_KIND,,}"
+    local app_kind="$(echo "${DC_ORO_APPLICATION_KIND}" | tr '[:upper:]' '[:lower:]')"
     # Validate allowed values
     case "$app_kind" in
       marello|oro|magento|symfony|laravel|wintercms|base)

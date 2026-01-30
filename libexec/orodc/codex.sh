@@ -53,7 +53,7 @@ get_cms_type_for_codex() {
   local cms_type
   # Load from environment if available (from .env.orodc)
   if [[ -n "${DC_ORO_CMS_TYPE:-}" ]]; then
-    cms_type="${DC_ORO_CMS_TYPE,,}"
+    cms_type="$(echo "${DC_ORO_CMS_TYPE}" | tr '[:upper:]' '[:lower:]')"
   else
     # Auto-detect using detect_application_kind function (includes marello)
     cms_type=$(detect_application_kind)
@@ -511,7 +511,10 @@ main() {
   
   # Cleanup temp files on exit (AGENTS.md is not in temp_files, so it will persist)
   if [[ ${#temp_files[@]} -gt 0 ]]; then
-    trap "rm -f ${temp_files[*]}" EXIT
+    cleanup_temp_files() {
+      rm -f "${temp_files[@]}"
+    }
+    trap cleanup_temp_files EXIT
   fi
   
   # Execute Codex CLI with all passed arguments
