@@ -123,28 +123,9 @@ show_interactive_menu() {
   msg_info "Welcome to OroDC Interactive Menu!"
   echo "" >&2
   
-  # Get terminal width and determine column layout
-  local term_width=${COLUMNS:-80}
-  if ! [[ "$term_width" =~ ^[0-9]+$ ]]; then
-    # Try to get actual terminal width
-    term_width=$(tput cols 2>/dev/null || echo "80")
-    if ! [[ "$term_width" =~ ^[0-9]+$ ]]; then
-      term_width=80
-    fi
-  fi
-  
-  # Determine column layout based on terminal width
-  # Each column needs ~36 chars (32 for text + 4 for padding)
-  # 3 columns: >= 150 chars (36*3 + margins)
-  # 2 columns: >= 100 chars (36*2 + margins)
-  # 1 column: < 100 chars
+  # Always use two-column layout
+  local use_two_columns=true
   local use_three_columns=false
-  local use_two_columns=false
-  if [[ $term_width -ge 150 ]]; then
-    use_three_columns=true
-  elif [[ $term_width -ge 100 ]]; then
-    use_two_columns=true
-  fi
   
   # Maximum text length per menu item (excluding "  X) " prefix)
   local max_text_length=32
@@ -432,51 +413,7 @@ show_interactive_menu() {
       esac
     }
     
-    if [[ "$use_three_cols" == "true" ]]; then
-      # Three column layout - each column renders its groups independently
-      # All groups align by height with empty lines
-      # Column 1: Environment Management (1-6) + Maintenance (7-9)
-      # Column 2: Database (10-12) + Configuration (13-14)
-      # Column 3: Oro Maintenance (15-20) + Proxy (21-22)
-      
-      local sel=$selected_option
-      printf "\033[0m" >&2
-      
-      # Section 1: Environment (6) vs Database (3) vs Oro (6)
-      # Max height: 6, so Database needs 3 empty lines
-      
-      # Headers
-      printf "  \033[1;36m%-32s\033[0m  \033[1;35m%-32s\033[0m  \033[1;31m%-32s\033[0m\n" "Environment Management:" "Database:" "Oro Maintenance:" >&2
-      printf "\033[0m" >&2
-      
-      # Rows 1-3: All three groups have items
-      get_group_item environment 0 $sel; get_group_item database 0 $sel; get_group_item oro 0 $sel; echo "" >&2
-      get_group_item environment 1 $sel; get_group_item database 1 $sel; get_group_item oro 1 $sel; echo "" >&2
-      get_group_item environment 2 $sel; get_group_item database 2 $sel; get_group_item oro 2 $sel; echo "" >&2
-      
-      # Rows 4-6: Environment + Oro continue, Database is empty
-      get_group_item environment 3 $sel; printf "  %-32s" "" >&2; get_group_item oro 3 $sel; echo "" >&2
-      get_group_item environment 4 $sel; printf "  %-32s" "" >&2; get_group_item oro 4 $sel; echo "" >&2
-      get_group_item environment 5 $sel; printf "  %-32s" "" >&2; get_group_item oro 5 $sel; echo "" >&2
-      
-      # Empty line between sections
-      echo "" >&2
-      
-      # Section 2: Maintenance (3) vs Configuration (3) vs Proxy (2)
-      # Max height: 3, so Proxy needs 1 empty line
-      
-      # Headers
-      printf "  \033[1;32m%-32s\033[0m  \033[1;33m%-32s\033[0m  \033[1;37m%-32s\033[0m\n" "Maintenance:" "Configuration:" "Proxy:" >&2
-      printf "\033[0m" >&2
-      
-      # Rows 1-2: All three groups have items
-      get_group_item maintenance 0 $sel; get_group_item configuration 0 $sel; get_group_item proxy 0 $sel; echo "" >&2
-      get_group_item maintenance 1 $sel; get_group_item configuration 1 $sel; get_group_item proxy 1 $sel; echo "" >&2
-      
-      # Row 3: Maintenance and Configuration have items, Proxy is empty
-      get_group_item maintenance 2 $sel; get_group_item configuration 2 $sel; printf "  %-32s" "" >&2; echo "" >&2
-      printf "\033[0m" >&2
-    elif [[ "$use_two_cols" == "true" ]]; then
+    if [[ "$use_two_cols" == "true" ]]; then
       # Two column layout using group functions
       # Pairs: Environment+Maintenance, Database+Configuration, Oro+Proxy
       
@@ -518,55 +455,6 @@ show_interactive_menu() {
       get_group_item oro 4 $sel; printf "  %-32s" "" >&2; echo "" >&2
       get_group_item oro 5 $sel; printf "  %-32s" "" >&2; echo "" >&2
       printf "\033[0m" >&2
-    else
-      # Single column layout
-      printf "\033[0m" >&2
-      echo -e "\033[1;36mEnvironment Management:\033[0m" >&2
-      printf "\033[0m" >&2
-      render_menu_option 1 $((selected_option == 1)) "List all environments"
-      render_menu_option 2 $((selected_option == 2)) "Initialize environment"
-      render_menu_option 3 $((selected_option == 3)) "Start environment"
-      render_menu_option 4 $((selected_option == 4)) "Stop environment"
-      render_menu_option 5 $((selected_option == 5)) "Delete environment"
-      render_menu_option 6 $((selected_option == 6)) "Re-build/Re-download Images"
-      echo "" >&2
-      printf "\033[0m" >&2
-      echo -e "\033[1;32mMaintenance:\033[0m" >&2
-      printf "\033[0m" >&2
-      render_menu_option 7 $((selected_option == 7)) "Run doctor"
-      render_menu_option 8 $((selected_option == 8)) "Connect via SSH"
-      render_menu_option 9 $((selected_option == 9)) "Connect via CLI"
-      echo "" >&2
-      printf "\033[0m" >&2
-      echo -e "\033[1;35mDatabase:\033[0m" >&2
-      printf "\033[0m" >&2
-      render_menu_option 10 $((selected_option == 10)) "Export database"
-      render_menu_option 11 $((selected_option == 11)) "Import database"
-      render_menu_option 12 $((selected_option == 12)) "Purge database"
-      echo "" >&2
-      printf "\033[0m" >&2
-      echo -e "\033[1;33mConfiguration:\033[0m" >&2
-      printf "\033[0m" >&2
-      render_menu_option 13 $((selected_option == 13)) "Add/Manage domains"
-      render_menu_option 14 $((selected_option == 14)) "Configure application URL"
-      render_menu_option 15 $((selected_option == 15)) "Show environment variables"
-      echo "" >&2
-      printf "\033[0m" >&2
-      echo -e "\033[1;31mOro Maintenance:\033[0m" >&2
-      printf "\033[0m" >&2
-      render_menu_option 16 $((selected_option == 16)) "Clear cache"
-      render_menu_option 17 $((selected_option == 17)) "Reindex search"
-      render_menu_option 18 $((selected_option == 18)) "Platform update"
-      render_menu_option 19 $((selected_option == 19)) "Install with demo"
-      render_menu_option 20 $((selected_option == 20)) "Install without demo"
-      render_menu_option 21 $((selected_option == 21)) "Install dependencies"
-      echo "" >&2
-      printf "\033[0m" >&2
-      echo -e "\033[1;37mProxy:\033[0m" >&2
-      printf "\033[0m" >&2
-      render_menu_option 22 $((selected_option == 22)) "Start proxy"
-      render_menu_option 23 $((selected_option == 23)) "Stop proxy"
-      printf "\033[0m" >&2
     fi
     
     # CRITICAL: Reset all attributes after drawing menu to prevent text highlighting
@@ -584,16 +472,25 @@ show_interactive_menu() {
   # Initial display with selection
   redraw_menu_screen $selected $use_two_columns "$input_buffer" "$use_three_columns" "$status_display" || true
   
-  # Enable raw input mode for arrow keys (without time 0 to make read blocking)
+  # Enable raw input mode for arrow keys
+  # Save current terminal settings
+  local saved_stty=""
+  saved_stty=$(stty -g 2>/dev/null || echo "")
+  # On Mac, don't use time 0 as it can cause issues with escape sequences
   stty -echo -icanon min 1 2>/dev/null || true
   
   # Read input with arrow key support
   while true; do
     local key=""
-    # Read single character (waits for input - blocking)
-    if ! read -rsn1 key 2>/dev/null; then
-      # If read fails (EOF or error), break loop
-      break
+    
+    # Read first character (waits for input - blocking)
+    # Use /dev/tty explicitly for better Mac compatibility
+    if ! IFS= read -rsn1 key </dev/tty 2>/dev/null; then
+      # Fallback to stdin if /dev/tty is not available
+      if ! IFS= read -rsn1 key 2>/dev/null; then
+        # If both reads fail (EOF or error), break loop
+        break
+      fi
     fi
     
     # Handle empty input as Enter (in raw mode, Enter may be empty)
@@ -603,26 +500,28 @@ show_interactive_menu() {
     fi
     
     # Handle escape sequences (arrow keys)
+    # On Mac, escape sequences come as ESC[A or ESC[B (3 characters total)
     if [[ "$key" == $'\033' ]]; then
-      read -rsn1 -t 0.1 tmp 2>/dev/null
-      if [[ "$tmp" == "[" ]]; then
-        read -rsn1 -t 0.1 tmp 2>/dev/null
-        case "$tmp" in
-          A) # Up arrow
-            if [[ $selected -gt 1 ]]; then
-              ((selected--)) || true
-              input_buffer=""  # Clear input buffer when using arrows
-              redraw_menu_screen $selected $use_two_columns "$input_buffer" "$use_three_columns" "$status_display" || true
-            fi
-            ;;
-          B) # Down arrow
-            if [[ $selected -lt $total_options ]]; then
-              ((selected++)) || true
-              input_buffer=""  # Clear input buffer when using arrows
-              redraw_menu_screen $selected $use_two_columns "$input_buffer" "$use_three_columns" "$status_display" || true
-            fi
-            ;;
-        esac
+      # Read remaining 2 characters of escape sequence with timeout
+      # Mac terminals may send escape sequences slower, so use longer timeout
+      local rest=""
+      if IFS= read -rsn2 -t 1 rest </dev/tty 2>/dev/null || IFS= read -rsn2 -t 1 rest 2>/dev/null; then
+        # Check if it's an arrow key sequence: [A (up) or [B (down)
+        if [[ "$rest" == "[A" ]]; then
+          # Up arrow
+          if [[ $selected -gt 1 ]]; then
+            ((selected--)) || true
+            input_buffer=""  # Clear input buffer when using arrows
+            redraw_menu_screen $selected $use_two_columns "$input_buffer" "$use_three_columns" "$status_display" || true
+          fi
+        elif [[ "$rest" == "[B" ]]; then
+          # Down arrow
+          if [[ $selected -lt $total_options ]]; then
+            ((selected++)) || true
+            input_buffer=""  # Clear input buffer when using arrows
+            redraw_menu_screen $selected $use_two_columns "$input_buffer" "$use_three_columns" "$status_display" || true
+          fi
+        fi
       fi
     # Handle Enter key
     elif [[ "$key" == $'\n' ]] || [[ "$key" == $'\r' ]]; then
@@ -649,15 +548,17 @@ show_interactive_menu() {
       # Try to read second digit if available (for 10-21)
       # Use timeout to check if user is typing two-digit number
       # But NEVER select immediately - always wait for explicit Enter
-      if read -rsn1 -t 0.6 second_digit 2>/dev/null; then
-        # Filter: only allow digits for second character (for two-digit numbers)
-        if [[ "$second_digit" =~ ^[0-9]$ ]]; then
-          # Second digit entered - add to buffer and combine them
-          input_buffer="${key}${second_digit}"
-          num_input="${key}${second_digit}"
-        # If non-digit character (including non-Latin), ignore silently and continue with single digit
-        # This ensures only valid digits are accepted for two-digit numbers
-        fi
+      local second_digit=""
+      # Try reading from /dev/tty first (better for Mac), then fallback to stdin
+      if ! IFS= read -rsn1 -t 0.6 second_digit </dev/tty 2>/dev/null; then
+        # If /dev/tty read failed, try stdin
+        IFS= read -rsn1 -t 0.6 second_digit 2>/dev/null || true
+      fi
+      # Filter: only allow digits for second character (for two-digit numbers)
+      if [[ -n "$second_digit" ]] && [[ "$second_digit" =~ ^[0-9]$ ]]; then
+        # Second digit entered - add to buffer and combine them
+        input_buffer="${key}${second_digit}"
+        num_input="${key}${second_digit}"
       fi
       # Validate number and update selection (always wait for Enter in next iteration)
       if [[ "$num_input" =~ ^[1-9]$ ]] || [[ "$num_input" =~ ^1[0-9]$ ]] || [[ "$num_input" == "20" ]] || [[ "$num_input" == "21" ]] || [[ "$num_input" == "22" ]] || [[ "$num_input" == "23" ]]; then
@@ -694,8 +595,12 @@ show_interactive_menu() {
   done
   
   # Restore terminal settings
-  stty echo icanon 2>/dev/null || true
-  stty sane 2>/dev/null || true
+  if [[ -n "$saved_stty" ]]; then
+    stty "$saved_stty" 2>/dev/null || true
+  else
+    stty echo icanon 2>/dev/null || true
+    stty sane 2>/dev/null || true
+  fi
   
   # CRITICAL: Reset all terminal attributes before continuing to prevent text highlighting
   tput sgr0 2>/dev/null || printf "\033[0m" >&2
