@@ -24,14 +24,15 @@
 - Install assets: `orodc exec bin/console oro:assets:install`
 
 **Admin Credentials:**
-- **CRITICAL**: ALWAYS ask the user for admin username and password before performing admin operations
-- NEVER assume or use default credentials
-- NEVER create admin users or change passwords without explicit user request
+- **CRITICAL**: ALWAYS ask the user for admin username and password before performing admin operations with EXISTING admin account
+- **NOTE**: For initial installation, see `orodc agents installation` - admin credentials should be auto-generated, not requested from user
+- NEVER assume or use default credentials for existing admin operations
+- NEVER create admin users or change passwords without explicit user request (except during initial installation)
 - Ask user for admin credentials before:
-  - Logging into admin panel
-  - Creating admin users via CLI
-  - Changing admin passwords
-  - Performing any admin operations
+  - Logging into admin panel (existing admin)
+  - Creating additional admin users via CLI (requires existing admin credentials)
+  - Changing admin passwords (requires existing admin credentials)
+  - Performing any admin operations with existing admin account
 
 **Common Tasks:**
 - Clear cache: `orodc exec bin/console cache:clear`

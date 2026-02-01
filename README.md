@@ -172,6 +172,21 @@ cd ~/orocommerce
 # 3. Install and start
 orodc install && orodc up -d
 
+# Alternative: Full installation command with custom parameters
+orodc exec bin/console oro:install \
+  --env=prod \
+  --timeout=1800 \
+  --language=en \
+  --formatting-code=en_US \
+  --organization-name="Acme Inc." \
+  --user-name="admin" \
+  --user-email="admin@orocommerce.local" \
+  --user-firstname="Admin" \
+  --user-lastname="User" \
+  --user-password="\$ecretPassw0rd" \
+  --application-url="https://orocommerce.docker.local/" \
+  --sample-data=y
+
 # Access: https://orocommerce.docker.local/admin (admin / 12345678)
 ```
 
@@ -622,6 +637,21 @@ orodc cli                        # Same as: orodc database cli
 # Installation
 orodc install                    # Install with demo data
 orodc install without demo       # Install without demo data
+
+# Alternative: Full installation command (Oro Platform)
+orodc exec bin/console oro:install \
+  --env=prod \
+  --timeout=1800 \
+  --language=en \
+  --formatting-code=en_US \
+  --organization-name="Acme Inc." \
+  --user-name="admin" \
+  --user-email="admin@{project_name}.local" \
+  --user-firstname="Admin" \
+  --user-lastname="User" \
+  --user-password="\$ecretPassw0rd" \
+  --application-url="https://{project_name}.docker.local/" \
+  --sample-data=y                # Use --sample-data=n for installation without demo data
 
 # Environment management
 orodc init                       # Initialize environment

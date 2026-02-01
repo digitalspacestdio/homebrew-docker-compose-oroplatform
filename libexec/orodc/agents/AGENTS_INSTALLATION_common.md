@@ -102,6 +102,19 @@ After project creation:
 - **Check status**: Use `orodc ps` to verify containers are running before executing commands
 - **Environment variables**: Use `orodc exec env | grep ORO_` to get all OroDC service connection variables (database, cache, search, message queue, etc.)
 
+## Admin Account Creation
+
+- **CRITICAL**: When installation requires admin account data (name, surname, email, username, password), NEVER ask user to provide this information
+- **ALWAYS** offer to generate admin credentials automatically instead of requesting them from user
+- Generate realistic but secure credentials:
+  - Name: "Admin" or "Administrator"
+  - Surname: "User" or "Account"
+  - Email: "admin@{project_name}.local" or "admin@example.com"
+  - Username: "admin" or "administrator"
+  - Password: Generate secure random password (12+ characters, mix of letters, numbers, symbols)
+- Present generated credentials to user BEFORE using them, allowing user to modify if needed
+- Example: "I can generate admin credentials for you. Would you like me to proceed with: Name: Admin, Surname: User, Email: admin@{project_name}.local, Username: admin, Password: [generated secure password]?"
+
 ## Troubleshooting
 
 - **Containers not starting**: Check Docker is running, check logs with `orodc compose logs`

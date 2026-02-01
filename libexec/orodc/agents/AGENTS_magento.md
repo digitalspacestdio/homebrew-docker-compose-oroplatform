@@ -42,14 +42,15 @@
 - Deploy static content: `orodc exec bin/magento setup:static-content:deploy -f`
 
 **Admin Credentials:**
-- **CRITICAL**: ALWAYS ask the user for admin username and password before performing admin operations
-- NEVER assume or use default credentials
-- NEVER create admin users or change passwords without explicit user request
+- **CRITICAL**: ALWAYS ask the user for admin username and password before performing admin operations with EXISTING admin account
+- **NOTE**: For initial installation, see `orodc agents installation` - admin credentials should be auto-generated, not requested from user
+- NEVER assume or use default credentials for existing admin operations
+- NEVER create admin users or change passwords without explicit user request (except during initial installation)
 - Ask user for admin credentials before:
-  - Logging into admin panel
-  - Creating admin users via CLI (`bin/magento admin:user:create`)
-  - Changing admin passwords (`bin/magento admin:user:unlock`)
-  - Performing any admin operations
+  - Logging into admin panel (existing admin)
+  - Creating additional admin users via CLI (`bin/magento admin:user:create` - requires existing admin credentials)
+  - Changing admin passwords (`bin/magento admin:user:unlock` - requires existing admin credentials)
+  - Performing any admin operations with existing admin account
 
 **Common Tasks:**
 - Clear cache: `orodc exec bin/magento cache:flush`
