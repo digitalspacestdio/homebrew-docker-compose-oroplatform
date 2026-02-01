@@ -540,4 +540,26 @@ To add support for a new CMS:
 
 ---
 
+# ⚠️ Known Issues
+
+## Docker Compose v5.0.0 + `--progress=plain` causes panic
+
+**Problem:** Docker Compose v5.0.0 has a bug where using `--progress=plain` flag with `docker compose build` or `docker compose up` causes a Go runtime panic:
+
+```
+panic: runtime error: slice bounds out of range [1:0]
+...
+github.com/docker/compose/v5/pkg/compose.(*composeService).doBuildBake
+```
+
+**Impact:** Build commands fail silently when run with spinner (output redirected), showing "completed" but containers are not created.
+
+**Workaround:** Do NOT use `--progress=plain` flag with Docker Compose v5.x. The flag was intended to disable TTY progress bars for proper spinner handling, but it triggers the bake panic.
+
+**Status:** Bug in Docker Compose. Avoid `--progress=plain` until fixed upstream.
+
+**Detection:** If `orodc up -d` shows "completed" but `orodc ps` shows no containers, run with `DEBUG=1 orodc up -d` to see the full error.
+
+---
+
 **Remember: Commit locally, ask before push!**
