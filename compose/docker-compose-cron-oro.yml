@@ -23,12 +23,14 @@ services:
         PHP_GID: "${DC_ORO_PHP_GID:-1000}"
         COMPOSER_VERSION: "${DC_ORO_COMPOSER_VERSION:-2}"
     user: "${DC_ORO_USER_NAME:-developer}"
-    command: /usr/bin/ofelia daemon
+    entrypoint: []
+    command: ["/usr/bin/ofelia", "daemon"]
     volumes:
       - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
       - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
       - "home-root:/root"
       - "mail-certs:/certs:ro"
+      - "./ofelia-oro.conf:/etc/ofelia.conf:ro"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     extra_hosts:
       - "host.docker.internal:host-gateway"
@@ -38,13 +40,7 @@ services:
       - 'DOCKER_BASE_URL=${DOCKER_BASE_URL:-https://${DC_ORO_NAME:-unnamed}.docker.local}'
       - 'DC_ORO_DATABASE_HOST=${DC_ORO_DATABASE_HOST:-database}'
       - 'SYMFONY_ENV=${SYMFONY_ENV:-dev}'
-    labels:
-      # Execute oro:cron every minute inside cron container (job-run mode)
-      # Cron container has PHP and project code, so commands run locally
-      ofelia.job-run.oro-cron.schedule: "* * * * *"
-      ofelia.job-run.oro-cron.command: "php bin/console oro:cron --env=${SYMFONY_ENV:-dev}"
-      ofelia.job-run.oro-cron.user: "${DC_ORO_USER_NAME:-developer}"
-      ofelia.job-run.oro-cron.no-overlap: "true"
+      - 'DC_ORO_USER_NAME=${DC_ORO_USER_NAME:-developer}'
     depends_on:
       fpm:
         condition: service_healthy
