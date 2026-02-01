@@ -473,7 +473,18 @@ if prompt_yes_no "Use custom search engine image?" "$([ "$USE_CUSTOM_SEARCH" = t
 else
   # Select search engine type based on existing or default
   SEARCH_TYPES=("Elasticsearch" "OpenSearch")
-  DEFAULT_SEARCH_TYPE="${EXISTING_SEARCH_ENGINE:-Elasticsearch}"
+  # Use existing if set, otherwise check CMS type for smart defaults
+  if [[ -n "$EXISTING_SEARCH_ENGINE" ]]; then
+    DEFAULT_SEARCH_TYPE="$EXISTING_SEARCH_ENGINE"
+  elif [[ "$DETECTED_CMS_TYPE" == "magento" ]]; then
+    # Magento 2.4+ officially supports OpenSearch as default
+    DEFAULT_SEARCH_TYPE="OpenSearch"
+    if [[ -n "${DEBUG:-}" ]]; then
+      >&2 echo "DEBUG: Using OpenSearch as default (CMS type: magento)"
+    fi
+  else
+    DEFAULT_SEARCH_TYPE="Elasticsearch"
+  fi
   SELECTED_SEARCH_TYPE=$(prompt_select "Select search engine:" "$DEFAULT_SEARCH_TYPE" "${SEARCH_TYPES[@]}")
   
   # Select version based on type (sorted newest to oldest)
