@@ -13,6 +13,8 @@ fi
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib/common.sh"
 source "${SCRIPT_DIR}/lib/ui.sh"
+source "${SCRIPT_DIR}/lib/port-manager.sh"
+source "${SCRIPT_DIR}/lib/docker-utils.sh"
 source "${SCRIPT_DIR}/lib/environment.sh"
 
 # Helper function to run command via orodc and return to menu
@@ -753,7 +755,8 @@ show_interactive_menu() {
         return
       fi
       echo "" >&2
-      msg_danger "This will DELETE ALL DATA including database, volumes, and configuration!"
+      msg_danger "This will DELETE ALL DATA for environment: ${DC_ORO_NAME:-unknown}"
+      msg_danger "Including database, volumes, and configuration!"
       if confirm_yes_no "Continue?"; then
         run_command_with_menu_return purge
       else
