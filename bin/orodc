@@ -2197,10 +2197,11 @@ fi
 # Initialize environment for most commands
 # Skip for: help, version, proxy, image, init (these don't require project)
 case "$1" in
-  help|man|version|proxy|image|docker-build|init|status)
+  help|man|version|proxy|image|docker-build|init|status|agents)
     # Skip initialization for these commands
     # init: creates project, so doesn't need existing project
     # status: read-only command, should not initialize or create files
+    # agents: documentation-only, has own project detection logic
     ;;
   codex|gemini|cursor)
     # Codex/Gemini/Cursor need project context but should work gracefully without project
