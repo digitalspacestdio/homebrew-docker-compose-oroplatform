@@ -755,6 +755,7 @@ initialize_environment() {
       --exclude='.cached_*' \
       --exclude='compose.yml' \
       --exclude='.xdebug_env' \
+      --exclude='.env.orodc' \
       "${DIR}/compose/" "${DC_ORO_CONFIG_DIR}/"
 
     # Setup certificates
