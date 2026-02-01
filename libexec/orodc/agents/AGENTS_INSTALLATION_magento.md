@@ -19,11 +19,12 @@
 - [ ] Step 2: Extract environment variables (REQUIRED before installation commands)
 - [ ] Step 3: Create Magento project (composer create-project)
 - [ ] Step 4: Install Magento via CLI (with auto-generated admin credentials)
-- [ ] Step 5: Deploy static content (build frontend) - **CRITICAL, DO NOT SKIP**
+- [ ] Step 5: Install Sample Data (demo data) - **OPTIONAL, only if user requests demo data**
 - [ ] Step 6: Compile Dependency Injection
-- [ ] Step 7: Clear cache
-- [ ] Step 8: Disable Two-Factor Authentication (development)
-- [ ] Step 9: Ensure containers are running (`orodc up -d` and `orodc ps`)
+- [ ] Step 7: Clear cache (warm up cache)
+- [ ] Step 8: Deploy static content (build frontend) - **CRITICAL, DO NOT SKIP**
+- [ ] Step 9: Disable Two-Factor Authentication (development)
+- [ ] Step 10: Ensure containers are running (`orodc up -d` and `orodc ps`)
 
 ### Final Verification Checklist
 
@@ -145,7 +146,72 @@ orodc exec bin/magento setup:install \
 
 **Note**: Replace `<USER_PROVIDED_*>` placeholders with actual values provided by user.
 
-### Step 5: Deploy Static Content (Build Frontend)
+### Step 5: Install Sample Data (Demo Data) - OPTIONAL
+
+**OPTIONAL**: Install sample data (demo data) if user requests it. This step adds sample products, categories, CMS pages, and other demo content to the store.
+
+**IMPORTANT**:
+- **ONLY install sample data if user explicitly requests it**
+- Sample data installation should be done AFTER Magento installation (Step 4) but BEFORE DI compilation (Step 6)
+- If user does NOT request demo data, skip this step and proceed to Step 6
+
+**To install sample data:**
+
+```bash
+# Step 5.1: Deploy sample data modules
+orodc exec bin/magento sampledata:deploy
+
+# Step 5.2: Install sample data (this will automatically run when upgrading)
+orodc exec bin/magento setup:upgrade
+
+# Step 5.3: Clear cache after sample data installation
+orodc exec bin/magento cache:flush
+```
+
+**What sample data includes:**
+- Sample products (catalog items)
+- Sample categories
+- Sample CMS pages and blocks
+- Sample sales data
+- Sample customer data (in some versions)
+
+**Alternative method (via Composer):**
+If `sampledata:deploy` command is not available, you can add sample data packages directly to `composer.json`:
+
+```bash
+# Add sample data packages to composer.json (requires manual editing)
+# Then run:
+orodc exec composer update
+orodc exec bin/magento setup:upgrade
+orodc exec bin/magento cache:flush
+```
+
+**Note**: Sample data packages include:
+- `magento/module-catalog-sample-data`
+- `magento/module-configurable-sample-data`
+- `magento/module-cms-sample-data`
+- `magento/module-sales-sample-data`
+- And other sample data modules
+
+### Step 6: Compile Dependency Injection
+
+**REQUIRED**: Compile DI after installation (and after sample data if installed):
+
+```bash
+orodc exec bin/magento setup:di:compile
+```
+
+### Step 7: Clear Cache (Warm Up Cache)
+
+**REQUIRED**: Clear and warm up cache after DI compilation:
+
+```bash
+orodc exec bin/magento cache:flush
+```
+
+**IMPORTANT**: Cache must be cleared after DI compilation and before static content deployment.
+
+### Step 8: Deploy Static Content (Build Frontend)
 
 **CRITICAL - REQUIRED**: Deploy static content (build frontend) after installation. **DO NOT SKIP THIS STEP** - frontend will not work without it:
 
@@ -187,23 +253,11 @@ orodc exec ls -la app/i18n/
 - The `-f` flag only forces regeneration but doesn't ensure CSS compilation without locale
 - Always specify at least one locale (e.g., `en_US`) to ensure styles are deployed correctly
 
-**IMPORTANT**: This step builds the frontend assets including CSS styles. Without proper locale specification, styles will not display correctly.
+**IMPORTANT**:
+- This step builds the frontend assets including CSS styles. Without proper locale specification, styles will not display correctly.
+- **CRITICAL**: Static content deployment MUST be done AFTER DI compilation and cache clearing (Steps 6-7), not before.
 
-### Step 6: Compile Dependency Injection
-
-**REQUIRED**: Compile DI after installation:
-
-```bash
-orodc exec bin/magento setup:di:compile
-```
-
-### Step 7: Clear Cache
-
-```bash
-orodc exec bin/magento cache:flush
-```
-
-### Step 8: Disable Two-Factor Authentication (Development)
+### Step 9: Disable Two-Factor Authentication (Development)
 
 **Recommended for development**: Disable 2FA to avoid login issues:
 
@@ -213,7 +267,7 @@ orodc exec bin/magento setup:upgrade
 orodc exec bin/magento cache:flush
 ```
 
-### Step 9: Ensure Containers Are Running
+### Step 10: Ensure Containers Are Running
 
 **REQUIRED**: Verify and ensure all containers are running:
 
@@ -239,9 +293,11 @@ orodc ps
 ## Important Notes
 
 - **CE vs Enterprise**: `composer create-project` installs Community Edition (CE) only. For Enterprise Edition, use git clone from Enterprise repository or contact Magento support
-- **All steps are required**: Installation, static content deployment (frontend build), DI compilation, cache clearing, and final container check
-- **Frontend build is critical**: Step 5 (static content deployment) MUST be executed - frontend will not work without it
-- **Final step required**: Always run `orodc up -d` at the end (Step 9) to ensure containers are running before accessing the application
+- **All steps are required**: Installation, DI compilation, cache clearing, static content deployment (frontend build), and final container check
+- **Sample data is optional**: Step 5 (sample data installation) should ONLY be executed if user explicitly requests demo data
+- **Correct order is critical**: DI compilation (Step 6) and cache clearing (Step 7) MUST be done BEFORE static content deployment (Step 8)
+- **Frontend build is critical**: Step 8 (static content deployment) MUST be executed - frontend will not work without it
+- **Final step required**: Always run `orodc up -d` at the end (Step 10) to ensure containers are running before accessing the application
 - **Use environment variables**: Always use variables from `orodc exec env | grep ORO_` for configuration (shows all OroDC service connection variables)
 - **Containers must be running**: Ensure `orodc ps` shows all containers running before installation and after final step
 - **See full guide**: Reference `docs/MAGENTO.md` for complete setup guide and troubleshooting
