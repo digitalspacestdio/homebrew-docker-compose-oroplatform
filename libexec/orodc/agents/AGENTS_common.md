@@ -69,8 +69,21 @@
 - Run `orodc agents rules` to see general coding guidelines and CMS-specific coding rules
 
 **Installation Guides:**
-- Run `orodc agents installation` to see common installation steps (orodc init, orodc up -d) and CMS-specific installation steps
-- **IMPORTANT**: If project directory is empty, ALWAYS follow installation guides to create project from scratch
+- **🔴 CRITICAL**: Before starting ANY new project installation, run the installation guide:
+  ```bash
+  orodc agents installation
+  ```
+- This command auto-detects CMS type and shows the appropriate installation guide
+- Or specify CMS type explicitly: `orodc agents installation <cms-type>`
+- **IMPORTANT**: If project directory is empty, ALWAYS read and follow ALL steps from installation guide
+- **🚨 DO NOT skip any steps marked as CRITICAL or REQUIRED in the installation guide**
+
+**Universal Installation Rules (apply to ALL CMS types):**
+1. **Demo/Sample Data**: If user requests "demo data", "sample data", or "test products" → you MUST install demo data using CMS-specific method
+2. **Frontend/Assets Build**: Most CMSes require a frontend build step (static content, assets, webpack, etc.) - this is usually CRITICAL and must NOT be skipped
+3. **Cache Operations**: Always clear/warm cache after installation
+4. **Step Order**: Follow the exact order specified in the installation guide
+5. **Never Skip CRITICAL Steps**: Steps marked as CRITICAL or REQUIRED must always be executed
 
 **Temporary Files:**
 - **CRITICAL**: All temporary files MUST be created ONLY in `/tmp/` directory

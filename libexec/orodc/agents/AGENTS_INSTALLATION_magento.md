@@ -2,6 +2,24 @@
 
 **Complete guide for creating a new Magento 2 project from scratch.**
 
+---
+
+## ⚠️ CRITICAL WARNINGS - READ BEFORE STARTING
+
+**🔴 ALL steps in this guide are REQUIRED unless explicitly marked optional.**
+
+**🚨 UNIVERSAL RULES APPLY** (see `orodc agents installation` common part):
+1. **Demo data**: If user requests demo data → execute Step 6 (Sample Data)
+2. **Frontend build**: Step 9 is MANDATORY (static content deployment)
+3. **Step order**: Steps MUST be executed in order (DI compile → cache → static content)
+4. **Never skip CRITICAL steps**: Steps marked 🔴 must always be executed
+
+**Magento-specific critical steps:**
+- **Step 6**: Sample Data → REQUIRED if user requests demo data
+- **Step 9**: Static Content Deploy → ALWAYS REQUIRED (frontend build)
+
+---
+
 ## Installation Checklist
 
 **Use this checklist to track installation progress. Check off each step as you complete it.**
@@ -20,10 +38,10 @@
 - [ ] Step 3: Create Magento project (composer create-project)
 - [ ] Step 4: Configure OpenSearch for Magento 2 (if using OpenSearch)
 - [ ] Step 5: Install Magento via CLI (with auto-generated admin credentials)
-- [ ] Step 6: Install Sample Data (demo data) - **OPTIONAL, only if user requests demo data**
+- [ ] **Step 6: Install Sample Data (demo data)** - **🔴 REQUIRED if user requests demo data**
 - [ ] Step 7: Compile Dependency Injection
 - [ ] Step 8: Clear cache (warm up cache)
-- [ ] Step 9: Deploy static content (build frontend) - **CRITICAL, DO NOT SKIP**
+- [ ] **Step 9: Deploy static content (build frontend)** - **🔴 CRITICAL, ALWAYS REQUIRED**
 - [ ] Step 10: Disable Two-Factor Authentication (development)
 - [ ] Step 11: Ensure containers are running (`orodc up -d` and `orodc ps`)
 
@@ -33,6 +51,7 @@
 - [ ] Frontend is accessible: `https://{project_name}.docker.local`
 - [ ] Admin panel is accessible: `https://{project_name}.docker.local/admin`
 - [ ] Admin credentials are saved (generated during installation)
+- [ ] **If demo data was requested**: Products and categories are visible in admin and frontend
 
 ---
 
@@ -194,14 +213,18 @@ orodc exec bin/magento setup:install \
 
 **Note**: Replace `<USER_PROVIDED_*>` placeholders with actual values provided by user.
 
-### Step 6: Install Sample Data (Demo Data) - OPTIONAL
+### Step 6: Install Sample Data (Demo Data)
 
-**OPTIONAL**: Install sample data (demo data) if user requests it. This step adds sample products, categories, CMS pages, and other demo content to the store.
+**🔴 REQUIRED IF USER REQUESTS DEMO DATA**
 
-**IMPORTANT**:
-- **ONLY install sample data if user explicitly requests it**
-- Sample data installation should be done AFTER Magento installation (Step 5) but BEFORE DI compilation (Step 7)
-- If user does NOT request demo data, skip this step and proceed to Step 7
+This step adds sample products, categories, CMS pages, and other demo content to the store.
+
+**CRITICAL RULES:**
+- **If user asks for "demo data", "sample data", "test products", "with demo"** → YOU MUST EXECUTE THIS STEP
+- **If user does NOT mention demo data** → Skip this step and proceed to Step 7
+- Sample data installation MUST be done AFTER Magento installation (Step 5) but BEFORE DI compilation (Step 7)
+
+**🚨 DO NOT FORGET THIS STEP WHEN USER REQUESTS DEMO DATA!**
 
 **To install sample data:**
 
@@ -261,7 +284,16 @@ orodc exec bin/magento cache:flush
 
 ### Step 9: Deploy Static Content (Build Frontend)
 
-**CRITICAL - REQUIRED**: Deploy static content (build frontend) after installation. **DO NOT SKIP THIS STEP** - frontend will not work without it:
+**🔴 CRITICAL - ALWAYS REQUIRED - DO NOT SKIP**
+
+Deploy static content (build frontend) after installation. **This step is MANDATORY** - frontend will not work without it!
+
+**🚨 WARNING: Skipping this step will result in:**
+- Broken frontend with no CSS styles
+- Missing JavaScript functionality
+- White pages or unstyled content
+
+**YOU MUST EXECUTE THIS STEP:**
 
 **CRITICAL**: You MUST specify locale(s) explicitly - using `setup:static-content:deploy -f` WITHOUT locale parameters will NOT deploy CSS styles correctly. Pages will appear without styles.
 
@@ -340,10 +372,19 @@ orodc ps
 
 ## Important Notes
 
+### 🔴 UNIVERSAL RULES Reminder (see `orodc agents installation` common part):
+
+1. **Demo data (Step 6)**: If user requests demo data → execute Step 6
+2. **Frontend build (Step 9)**: ALWAYS execute - frontend will not work without it
+3. **Step order**: Steps 7 → 8 → 9 MUST be in this exact order
+4. **Never skip CRITICAL**: Steps marked 🔴 must always be executed
+
+### Magento-Specific Notes:
+
 - **CE vs Enterprise**: `composer create-project` installs Community Edition (CE) only. For Enterprise Edition, use git clone from Enterprise repository or contact Magento support
 - **All steps are required**: Installation, DI compilation, cache clearing, static content deployment (frontend build), and final container check
 - **OpenSearch configuration**: Step 4 (OpenSearch configuration) is REQUIRED if using OpenSearch 2.0+ with Magento 2
-- **Sample data is optional**: Step 6 (sample data installation) should ONLY be executed if user explicitly requests demo data
+- **Sample data rule**: Step 6 should be executed when user explicitly requests demo data (phrases like "with demo", "sample data", "test products")
 - **Correct order is critical**: DI compilation (Step 7) and cache clearing (Step 8) MUST be done BEFORE static content deployment (Step 9)
 - **Frontend build is critical**: Step 9 (static content deployment) MUST be executed - frontend will not work without it
 - **Final step required**: Always run `orodc up -d` at the end (Step 11) to ensure containers are running before accessing the application

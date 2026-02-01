@@ -2,6 +2,40 @@
 
 **This guide describes how to create a new OroDC project from scratch (empty directory).**
 
+---
+
+## ⚠️ UNIVERSAL INSTALLATION RULES (Apply to ALL CMS Types)
+
+**🔴 These rules apply to EVERY CMS installation (Magento, Oro, Symfony, Laravel, etc.):**
+
+### 1. Demo/Sample Data Rule
+- **If user requests "demo data", "sample data", "test products", "with demo"** → YOU MUST install demo data
+- Each CMS has its own method for demo data installation - check CMS-specific guide
+- **DO NOT skip demo data when user explicitly requests it**
+
+### 2. Frontend/Assets Build Rule
+- **Most CMSes require a frontend build step** - this compiles CSS, JavaScript, and other assets
+- **This step is usually CRITICAL** - frontend will not work without it
+- Common names: "static content deployment" (Magento), "assets build" (Oro), "npm run build" (modern frameworks)
+- **DO NOT skip frontend build steps**
+
+### 3. Cache Operations Rule
+- **Always clear and warm up cache after installation**
+- Most CMSes have cache:clear or similar commands
+- Cache operations should be done AFTER installation and frontend build
+
+### 4. Step Order Rule
+- **Follow the EXACT order specified in the CMS-specific installation guide**
+- Wrong order can cause failures (e.g., building frontend before installing dependencies)
+- If unsure, read the full guide first, then execute in order
+
+### 5. Never Skip CRITICAL Steps Rule
+- **Steps marked as CRITICAL, REQUIRED, or 🔴 must ALWAYS be executed**
+- These steps are essential for the application to work
+- Skipping them will result in broken functionality
+
+---
+
 ## Prerequisites
 
 - OroDC must be installed: `brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform`
@@ -74,19 +108,27 @@ ls -la
 
 ### 6. Create Project Codebase
 
-**This step is CMS-specific** - run `orodc agents installation` to see detailed instructions for your CMS type:
-- Magento: Run `orodc agents installation magento` - uses `orodc exec composer create-project`
-- Oro: Run `orodc agents installation oro` - uses `orodc exec git clone`
-- Symfony: Run `orodc agents installation symfony` - uses `orodc exec composer create-project`
-- Laravel: Run `orodc agents installation laravel` - uses `orodc exec composer create-project`
-- WinterCMS: Run `orodc agents installation wintercms` - uses `orodc exec composer create-project`
-- Generic PHP: Run `orodc agents installation php-generic` - uses `orodc exec` commands
+**This step is CMS-specific** - run `orodc agents installation` to see detailed instructions for your CMS type.
+
+**To get CMS-specific installation guide:**
+```bash
+# Auto-detect CMS type and show appropriate guide
+orodc agents installation
+
+# Or specify CMS type explicitly
+orodc agents installation <cms-type>
+```
 
 **IMPORTANT**: 
 - Always use `orodc exec` prefix for all commands that create project files
 - For composer projects: use `orodc exec composer create-project`
 - For git clones: use `orodc exec git clone`
-- Follow ALL steps from the CMS-specific installation guide
+- **Follow ALL steps from the CMS-specific installation guide**
+- **Apply UNIVERSAL RULES** (see top of this document):
+  - Install demo data if user requested
+  - Complete frontend/assets build step
+  - Clear/warm cache after installation
+  - Follow exact step order from guide
 
 ### 7. Verify Installation
 
@@ -97,10 +139,22 @@ After project creation:
 
 ## Important Notes
 
+### 🔴 CRITICAL - Universal Rules Reminder:
+
+These rules apply to **ALL CMS installations** - always follow them:
+1. **Demo data**: Install if user requested ("demo", "sample data", "test products")
+2. **Frontend build**: Complete frontend/assets build step (CRITICAL for most CMSes)
+3. **Cache operations**: Clear/warm cache after installation
+4. **Step order**: Follow exact order from CMS-specific guide
+5. **Never skip CRITICAL steps**: Steps marked CRITICAL/REQUIRED must be executed
+
+### General Notes:
+
 - **Environment vs Project**: `orodc init` initializes the Docker environment, not the project codebase
 - **Containers must be running**: Always run `orodc up -d` before creating project codebase
 - **Check status**: Use `orodc ps` to verify containers are running before executing commands
 - **Environment variables**: Use `orodc exec env | grep ORO_` to get all OroDC service connection variables (database, cache, search, message queue, etc.)
+- **CMS-specific guide**: Always run `orodc agents installation` for complete CMS-specific instructions
 
 ## Admin Account Creation
 

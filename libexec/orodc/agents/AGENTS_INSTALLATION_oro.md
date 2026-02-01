@@ -2,6 +2,54 @@
 
 **Complete guide for creating a new Oro Platform project from scratch.**
 
+---
+
+## ⚠️ CRITICAL WARNINGS - READ BEFORE STARTING
+
+**🔴 ALL steps in this guide are REQUIRED unless explicitly marked optional.**
+
+**🚨 UNIVERSAL RULES APPLY** (see `orodc agents installation` common part):
+1. **Demo data**: If user requests demo data → use `--sample-data=y` in oro:install (Step 4)
+2. **Frontend build**: Step 5 is MANDATORY (assets build)
+3. **Step order**: Steps MUST be executed in order
+4. **Never skip CRITICAL steps**: Steps marked 🔴 must always be executed
+
+**Oro-specific critical steps:**
+- **Step 4**: oro:install with `--sample-data=y` → if user requests demo data
+- **Step 5**: Assets Build → ALWAYS REQUIRED (frontend build)
+
+---
+
+## Installation Checklist
+
+**Use this checklist to track installation progress. Check off each step as you complete it.**
+
+### Prerequisites Checklist
+
+- [ ] Navigate to empty project directory
+- [ ] Run `orodc init` manually in terminal (MUST be done by user BEFORE using agent)
+- [ ] Run `orodc up -d`
+- [ ] Verify containers are running with `orodc ps`
+
+### Installation Steps Checklist
+
+- [ ] Step 1: Verify directory is empty
+- [ ] Step 2: Create Oro project (git clone or composer create-project)
+- [ ] Step 3: Install dependencies (composer install)
+- [ ] **Step 4: Install Oro Platform** - **🔴 Use `--sample-data=y` if user requests demo data**
+- [ ] **Step 5: Build assets (frontend)** - **🔴 CRITICAL, ALWAYS REQUIRED**
+- [ ] Step 6: Clear and warm up cache
+
+### Final Verification Checklist
+
+- [ ] All containers are running (`orodc ps` shows "Running" status)
+- [ ] Frontend is accessible: `https://{project_name}.docker.local`
+- [ ] Admin panel is accessible: `https://{project_name}.docker.local/admin`
+- [ ] Admin credentials are saved (generated during installation)
+- [ ] **If demo data was requested**: Products and sample data are visible in admin
+
+---
+
 ## Prerequisites
 
 - Complete steps 1-4 from `orodc agents installation` (common part):
@@ -73,7 +121,12 @@ orodc exec composer install
 
 ### Step 4: Install Oro Platform
 
-**REQUIRED**: Run Oro installation command:
+**REQUIRED**: Run Oro installation command.
+
+**🔴 CRITICAL - DEMO DATA DECISION:**
+- **If user asks for "demo data", "sample data", "with demo"** → use `--sample-data=y`
+- **If user does NOT mention demo data** → use `--sample-data=n`
+- **🚨 DO NOT FORGET to set the correct --sample-data flag based on user request!**
 
 **IMPORTANT**: Before running installation:
 - **NEVER** ask user to provide admin credentials
@@ -87,6 +140,7 @@ orodc exec composer install
 
 Then run installation with generated credentials:
 
+**With demo data (if user requested):**
 ```bash
 orodc exec bin/console oro:install \
   --env=prod \
@@ -103,6 +157,23 @@ orodc exec bin/console oro:install \
   --sample-data=y
 ```
 
+**Without demo data (if user did NOT request demo):**
+```bash
+orodc exec bin/console oro:install \
+  --env=prod \
+  --timeout=1800 \
+  --language=en \
+  --formatting-code=en_US \
+  --organization-name="Acme Inc." \
+  --user-name="admin" \
+  --user-email="admin@{project_name}.local" \
+  --user-firstname="Admin" \
+  --user-lastname="User" \
+  --user-password="<GENERATED_SECURE_PASSWORD>" \
+  --application-url="https://{project_name}.docker.local/" \
+  --sample-data=n
+```
+
 **Parameters explanation:**
 - `--env=prod` - Production environment
 - `--timeout=1800` - Installation timeout (30 minutes)
@@ -115,20 +186,35 @@ orodc exec bin/console oro:install \
 - `--user-lastname` - Admin last name (generated: "User")
 - `--user-password` - Admin password (generated secure password)
 - `--application-url` - Application base URL
-- `--sample-data=y` - Install with sample data (use `--sample-data=n` for installation without demo data)
+- `--sample-data=y|n` - **🔴 CRITICAL**: `y` = install demo data (if user requested), `n` = no demo data
 
 This command will:
 - Set up database
 - Install application
 - Configure environment
 - Set up initial data with generated admin account
+- **Install demo data (if --sample-data=y)**
 
-### Step 5: Build Assets
+### Step 5: Build Assets (Frontend)
 
-**REQUIRED**: Build frontend assets:
+**🔴 CRITICAL - ALWAYS REQUIRED - DO NOT SKIP**
+
+Build frontend assets. **This step is MANDATORY** - frontend will not work without it!
+
+**🚨 WARNING: Skipping this step will result in:**
+- Broken frontend with no CSS styles
+- Missing JavaScript functionality
+- White pages or unstyled content
+
+**YOU MUST EXECUTE THIS STEP:**
 
 ```bash
 orodc exec bin/console oro:assets:build default -w
+```
+
+**Note**: The `-w` flag enables "watch" mode. For one-time build without watch mode, use:
+```bash
+orodc exec bin/console oro:assets:build
 ```
 
 ### Step 6: Clear and Warm Up Cache
@@ -146,8 +232,18 @@ orodc exec bin/console cache:warmup
 
 ## Important Notes
 
+### 🔴 UNIVERSAL RULES Reminder (see `orodc agents installation` common part):
+
+1. **Demo data (Step 4)**: If user requests demo data → use `--sample-data=y`
+2. **Frontend build (Step 5)**: ALWAYS execute - frontend will not work without it
+3. **Step order**: install → assets build → cache clear/warmup
+4. **Never skip CRITICAL**: Steps marked 🔴 must always be executed
+
+### Oro-Specific Notes:
+
 - **Installation methods**: Oro projects can be cloned from GitHub or created via composer (CE only)
 - **CE vs Enterprise**: `composer create-project` installs Community Edition (CE) only. For Enterprise Edition, use git clone from Enterprise repository or contact Oro support
 - **Installation command**: Use `orodc exec bin/console oro:install` with all required parameters (see Step 4 for full example)
-- **Assets building**: Always build assets after installation
+- **Demo data rule**: Use `--sample-data=y` when user explicitly requests demo data (phrases like "with demo", "sample data", "test products")
+- **Assets building**: ALWAYS build assets after installation - this is MANDATORY, not optional
 - **See full guide**: Reference `docs/ORO.md` for complete setup guide and troubleshooting

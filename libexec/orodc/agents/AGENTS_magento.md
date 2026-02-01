@@ -4,19 +4,42 @@
 **For common instructions, see: `orodc agents common`**
 **For Magento coding rules, see: `orodc agents rules`**
 
+---
+
+## ⚠️ CRITICAL: FOR NEW PROJECT INSTALLATION
+
+**🔴 BEFORE STARTING ANY MAGENTO INSTALLATION, RUN THIS COMMAND:**
+
+```bash
+orodc agents installation magento
+```
+
+**This is MANDATORY to get the complete step-by-step installation guide with:**
+- All required steps in correct order
+- Sample data (demo data) installation if requested
+- Frontend build (static content deployment) - REQUIRED
+- OpenSearch configuration
+- All critical steps that MUST NOT be skipped
+
+**🚨 DO NOT attempt installation without reading the installation guide first!**
+
+---
+
 **Magento 2 Project**
 
 **Documentation:**
+- **INSTALLATION GUIDE**: Run `orodc agents installation magento` (REQUIRED for new projects)
 - Full Magento setup guide: See `docs/MAGENTO.md` in OroDC repository
 - Reference the documentation for complete installation steps, including:
   - Project creation (Mage-OS or Magento 2)
   - Installation via CLI with all required parameters
-  - Static content deployment
+  - Sample data (demo data) installation when requested
+  - Static content deployment (frontend build)
   - DI compilation
   - Two-Factor Authentication setup
 
 **Creating New Project (Empty Directory):**
-- **MUST follow installation guide**: Run `orodc agents installation magento` to see complete step-by-step instructions
+- **🔴 MANDATORY**: Run `orodc agents installation magento` FIRST to see complete step-by-step instructions
 - **Community Edition (CE) via Composer**:
   - Mage-OS (open source): `orodc exec composer create-project --repository-url=https://repo.mage-os.org/ mage-os/project-community-edition .`
   - Magento 2 Official CE: `orodc exec composer create-project --repository-url=https://repo.magento.com/ magento/project-community-edition .`
@@ -24,16 +47,23 @@
 - **Enterprise Edition**: Enterprise Edition requires access to private Magento Commerce repository (`magento/project-enterprise-edition`) and cannot be installed via public composer create-project. Use git clone from Enterprise repository or contact Magento support
 
 **After Creating Project:**
-- ALWAYS follow complete setup steps from `orodc agents installation magento` (run the command to see full guide)
+- **🔴 ALWAYS follow complete setup steps from `orodc agents installation magento`** (run the command to see full guide)
 - **CRITICAL steps** (DO NOT SKIP):
   - **OpenSearch configuration** (if using OpenSearch) - REQUIRED before Magento installation
   - Installation via `bin/magento setup:install`
-  - **Static content deployment (frontend build)** - REQUIRED, frontend will not work without it
+  - **🔴 Sample data (demo data)** - MUST install if user requested demo data (see installation guide Step 6)
+  - **🔴 Static content deployment (frontend build)** - REQUIRED, frontend will not work without it
   - DI compilation
   - Cache clearing
   - 2FA disabling (for development)
   - **Final step: `orodc up -d`** - ensure containers are running before accessing application
 - Use environment variables from `orodc exec env | grep ORO_` for database and service configuration (shows all OroDC service connection variables)
+
+**🚨 IMPORTANT - When User Requests Demo Data:**
+- If user explicitly asks for demo data, sample data, or test products - YOU MUST execute Step 6 from installation guide
+- Demo data includes: sample products, categories, CMS pages, sales data
+- Command: `orodc exec bin/magento sampledata:deploy && orodc exec bin/magento setup:upgrade && orodc exec bin/magento cache:flush`
+- DO NOT skip this step when user requests demo data!
 
 **OpenSearch Configuration (Required for Magento 2 with OpenSearch):**
 - **CRITICAL**: If using OpenSearch 2.0+, you MUST configure `indices.id_field_data.enabled` setting before installing Magento
