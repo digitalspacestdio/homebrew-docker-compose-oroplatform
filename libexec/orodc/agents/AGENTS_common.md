@@ -77,3 +77,15 @@
 - NEVER create temporary files in the project directory
 - Temporary files include: logs, dumps, test outputs, intermediate files, etc.
 - Only create files in project directory if they are part of the actual project codebase
+
+**Admin Account Creation:**
+- **CRITICAL**: When installation requires admin account data (name, surname, email, username, password), NEVER ask user to provide this information
+- **ALWAYS** offer to generate admin credentials automatically instead of requesting them from user
+- Generate realistic but secure credentials:
+  - Name: "Admin" or "Administrator"
+  - Surname: "User" or "Account"
+  - Email: "admin@{project_name}.local" or "admin@example.com"
+  - Username: "admin" or "administrator"
+  - Password: Generate secure random password (12+ characters, mix of letters, numbers, symbols)
+- Present generated credentials to user BEFORE using them, allowing user to modify if needed
+- Example: "I can generate admin credentials for you. Would you like me to proceed with: Name: Admin, Surname: User, Email: admin@{project_name}.local, Username: admin, Password: [generated secure password]?"

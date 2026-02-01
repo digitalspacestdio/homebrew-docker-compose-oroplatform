@@ -17,6 +17,21 @@ cd ~/orocommerce
 # 3. Install and start (one command!)
 orodc install && orodc up -d
 
+# Alternative: Full installation command with custom parameters
+orodc exec bin/console oro:install \
+  --env=prod \
+  --timeout=1800 \
+  --language=en \
+  --formatting-code=en_US \
+  --organization-name="Acme Inc." \
+  --user-name="admin" \
+  --user-email="admin@orocommerce.local" \
+  --user-firstname="Admin" \
+  --user-lastname="User" \
+  --user-password="\$ecretPassw0rd" \
+  --application-url="https://orocommerce.docker.local/" \
+  --sample-data=y
+
 # 4. Verify installation
 curl -s -o /dev/null -w "HTTP Status: %{http_code}\n" http://localhost:30280
 # 2xx (200, 201, etc.) = OK, 3xx (301, 302, etc.) = Redirect (also OK)
@@ -39,6 +54,21 @@ cd ~/oroplatform
 
 # 3. Install and start
 orodc install && orodc up -d
+
+# Alternative: Full installation command with custom parameters
+orodc exec bin/console oro:install \
+  --env=prod \
+  --timeout=1800 \
+  --language=en \
+  --formatting-code=en_US \
+  --organization-name="Acme Inc." \
+  --user-name="admin" \
+  --user-email="admin@oroplatform.local" \
+  --user-firstname="Admin" \
+  --user-lastname="User" \
+  --user-password="\$ecretPassw0rd" \
+  --application-url="https://oroplatform.docker.local/" \
+  --sample-data=y
 
 # 4. Access your application
 # Admin: https://oroplatform.docker.local/admin

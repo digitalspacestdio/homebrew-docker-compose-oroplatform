@@ -18,7 +18,7 @@
 - [ ] Step 1: Verify directory is empty
 - [ ] Step 2: Extract environment variables (REQUIRED before installation commands)
 - [ ] Step 3: Create Magento project (composer create-project)
-- [ ] Step 4: Install Magento via CLI (with admin credentials from user)
+- [ ] Step 4: Install Magento via CLI (with auto-generated admin credentials)
 - [ ] Step 5: Deploy static content (build frontend) - **CRITICAL, DO NOT SKIP**
 - [ ] Step 6: Compile Dependency Injection
 - [ ] Step 7: Clear cache
@@ -30,7 +30,7 @@
 - [ ] All containers are running (`orodc ps` shows "Running" status)
 - [ ] Frontend is accessible: `https://{project_name}.docker.local`
 - [ ] Admin panel is accessible: `https://{project_name}.docker.local/admin`
-- [ ] Admin credentials are saved (ask user if needed)
+- [ ] Admin credentials are saved (generated during installation)
 
 ---
 
@@ -106,14 +106,17 @@ orodc exec composer create-project --repository-url=https://repo.magento.com/ ma
 
 **REQUIRED**: Install Magento using setup:install command:
 
-**IMPORTANT**: Before running installation, ask user for:
-- Admin first name
-- Admin last name
-- Admin email
-- Admin username
-- Admin password
+**IMPORTANT**: Before running installation:
+- **NEVER** ask user to provide admin credentials
+- **ALWAYS** offer to generate admin credentials automatically:
+  - Admin first name: "Admin"
+  - Admin last name: "User"
+  - Admin email: "admin@{project_name}.local"
+  - Admin username: "admin"
+  - Admin password: Generate secure random password (12+ characters)
+- Present generated credentials to user BEFORE using them, allowing user to modify if needed
 
-Then run installation with user-provided credentials:
+Then run installation with generated credentials:
 
 ```bash
 orodc exec bin/magento setup:install \
@@ -230,7 +233,7 @@ orodc ps
 
 - [ ] **Frontend**: `https://{project_name}.docker.local` - should display Magento storefront
 - [ ] **Admin Panel**: `https://{project_name}.docker.local/admin` - should display admin login page
-- [ ] **Admin Credentials**: Ask user for admin username and password (credentials were set during installation in Step 4)
+- [ ] **Admin Credentials**: Credentials were generated during installation in Step 4 (if user modified them, they should have been noted)
 - [ ] **Containers**: Run `orodc ps` - all containers should show "Running" status
 
 ## Important Notes
