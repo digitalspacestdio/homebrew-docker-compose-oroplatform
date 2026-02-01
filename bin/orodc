@@ -3259,7 +3259,8 @@ if [[ "${DC_ORO_MODE}" == "mutagen" ]] || [[ "${DC_ORO_MODE}" == "ssh" ]]; then
     if [[ ${args[0]} != "down" ]] && [[ ${args[0]} != "purge" ]] && [[ ${args[0]} != "init" ]]; then
       ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
         ${DOCKER_BIN} volume create "${DC_ORO_NAME}_appcode"  > /dev/null
-        bash -c "${DOCKER_COMPOSE_BIN_CMD} up -d ssh" >/dev/null 2>&1
+        # Start SSH container silently (dependencies will start automatically)
+        bash -c "${DOCKER_COMPOSE_BIN_CMD} up -d ssh" >/dev/null 2>&1 || true
         SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
         SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
         if [[ 0 -eq $(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o 'ForwardAgent no' -o IdentitiesOnly=yes -i "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" -p ${SSH_PORT} ${ORO_DC_SSH_ARGS} ${DC_ORO_USER_NAME}@${SSH_HOST} sh -c 'ls "'${DC_ORO_APPDIR}'/"' 2>/dev/null | wc -l) ]]; then
@@ -3298,7 +3299,8 @@ if [[ "${DC_ORO_MODE}" == "mutagen" ]] && [[ -n "${DC_ORO_APPDIR:-}" ]] && [[ -n
     WAIT_SYNC=""
   elif ! echo "$first_non_flag_arg" | grep -i '^\(build\|pull\|config\|init\)' > /dev/null 2>&1; then
     if [[ "0" -eq $(${DOCKER_COMPOSE_BIN_CMD} ps -q ssh  2> /dev/null | wc -l 2> /dev/null) ]]; then
-      bash -c "${DOCKER_COMPOSE_BIN_CMD} up -d ssh"
+      # Start SSH container silently (dependencies will start automatically)
+      bash -c "${DOCKER_COMPOSE_BIN_CMD} up -d ssh" >/dev/null 2>&1 || true
     fi
     DOCKER_CONTAINER_NAME_MUTAGEN=$(${DOCKER_BIN} inspect -f '{{.Name}}' $(bash -c "${DOCKER_COMPOSE_BIN_CMD} ps -q ssh") | cut -c2-)
     if ! mutagen sync list | grep -i "Name: ${MUTAGEN_SESSION_NAME}" > /dev/null 2>&1; then
