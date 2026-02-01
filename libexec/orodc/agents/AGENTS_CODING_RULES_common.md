@@ -1,5 +1,12 @@
 # Common Coding Rules
 
+**🚨 CRITICAL RULE - USE ONLY OFFICIAL COMMANDS:**
+- **NEVER invent your own ways to work with OroDC environment** - use ONLY commands described in `orodc help` and documentation
+- **ALWAYS check documentation first** - before suggesting any command, verify it exists in `orodc help` or installation guides
+- **DO NOT create workarounds** - if something seems difficult, check if there's an official OroDC command for it
+- **DO NOT use direct Docker/docker-compose commands** - use OroDC commands instead (e.g., `orodc exec` instead of `docker compose exec`)
+- **If command is not documented**: Ask user for guidance instead of inventing your own solution
+
 **General Coding Guidelines:**
 - Follow PSR-12 coding standards for PHP code
 - Use meaningful variable and function names

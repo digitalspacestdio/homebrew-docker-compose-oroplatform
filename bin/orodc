@@ -2205,8 +2205,10 @@ case "$1" in
     ;;
   codex|gemini|cursor)
     # Codex/Gemini/Cursor need project context but should work gracefully without project
-    # Allow initialization to fail gracefully if not in project (for CMS detection only)
-    initialize_environment 2>/dev/null || true
+    # These commands use prepare_project_environment from their own scripts
+    # which doesn't require full initialize_environment (avoids starting Docker Compose)
+    # All three agents (codex.sh, gemini.sh, cursor.sh) use prepare_project_environment
+    # which only loads config and detects CMS type, without starting Docker services
     ;;
   *)
     # Initialize environment for all other commands (including menu when no args)

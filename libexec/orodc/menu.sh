@@ -164,7 +164,7 @@ show_interactive_menu() {
   
   # Interactive selection with arrow keys
   local selected=1
-  local total_options=24
+  local total_options=27
   local choice=""
   
   # Function to truncate text to maximum length
@@ -291,7 +291,7 @@ show_interactive_menu() {
     printf "\033[0m\033[?25h" >&2
     tput sgr0 2>/dev/null || true
     stty sane 2>/dev/null || true
-    echo -n "Use ↑↓ arrows to navigate, or type number [1-24], 'v' for VERBOSE, 'q' to quit: " >&2
+    echo -n "Use ↑↓ arrows to navigate, or type number [1-27], 'v' for VERBOSE, 'q' to quit: " >&2
     # Display input buffer if user is typing a number
     if [[ -n "$input_buf" ]]; then
       printf "%s" "$input_buf" >&2
@@ -335,6 +335,9 @@ show_interactive_menu() {
       "Start proxy"
       "Stop proxy"
       "Install proxy certificates"
+      "Codex AI Agent"
+      "Gemini AI Agent"
+      "Cursor AI Agent"
     )
     
     # Helper function to render a single cell
@@ -400,6 +403,13 @@ show_interactive_menu() {
       render_cell 24 $((sel == 24))
     }
     
+    render_group_ai_agents() {
+      local sel=$1
+      render_cell 25 $((sel == 25))
+      render_cell 26 $((sel == 26))
+      render_cell 27 $((sel == 27))
+    }
+    
     # Helper to get item from group by index
     get_group_item() {
       local group=$1
@@ -413,6 +423,7 @@ show_interactive_menu() {
         configuration) render_cell $((13 + index)) $((sel == $((13 + index)))) ;;
         oro) render_cell $((16 + index)) $((sel == $((16 + index)))) ;;
         proxy) render_cell $((22 + index)) $((sel == $((22 + index)))) ;;
+        ai) render_cell $((25 + index)) $((sel == $((25 + index)))) ;;
         *) printf "  %-32s" "" >&2 ;;
       esac
     }
@@ -458,6 +469,16 @@ show_interactive_menu() {
       get_group_item oro 3 $sel; printf "  %-32s" "" >&2; echo "" >&2
       get_group_item oro 4 $sel; printf "  %-32s" "" >&2; echo "" >&2
       get_group_item oro 5 $sel; printf "  %-32s" "" >&2; echo "" >&2
+      
+      # Section 4: AI Agents (standalone section)
+      echo "" >&2
+      printf "  \033[1;34m%-32s\033[0m\n" "AI Agents:" >&2
+      printf "\033[0m" >&2
+      
+      # AI Agents has 3 items
+      get_group_item ai 0 $sel; printf "  %-32s" "" >&2; echo "" >&2
+      get_group_item ai 1 $sel; printf "  %-32s" "" >&2; echo "" >&2
+      get_group_item ai 2 $sel; printf "  %-32s" "" >&2; echo "" >&2
       printf "\033[0m" >&2
     fi
     
@@ -565,7 +586,7 @@ show_interactive_menu() {
         num_input="${key}${second_digit}"
       fi
       # Validate number and update selection (always wait for Enter in next iteration)
-      if [[ "$num_input" =~ ^[1-9]$ ]] || [[ "$num_input" =~ ^1[0-9]$ ]] || [[ "$num_input" == "20" ]] || [[ "$num_input" == "21" ]] || [[ "$num_input" == "22" ]] || [[ "$num_input" == "23" ]] || [[ "$num_input" == "24" ]]; then
+      if [[ "$num_input" =~ ^[1-9]$ ]] || [[ "$num_input" =~ ^1[0-9]$ ]] || [[ "$num_input" =~ ^2[0-7]$ ]]; then
         # Update selected option to match input, wait for Enter to confirm
         selected=$num_input
         redraw_menu_screen $selected $use_two_columns "$input_buffer" "$use_three_columns" "$status_display" || true
@@ -939,6 +960,15 @@ show_interactive_menu() {
       ;;
     24)
       run_command_with_menu_return proxy install-certs
+      ;;
+    25)
+      run_command_with_menu_return codex
+      ;;
+    26)
+      run_command_with_menu_return gemini
+      ;;
+    27)
+      run_command_with_menu_return cursor
       ;;
     v|V)
       if [[ -n "${VERBOSE:-}" ]]; then
