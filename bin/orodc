@@ -3263,7 +3263,7 @@ if [[ "${DC_ORO_MODE}" == "mutagen" ]] || [[ "${DC_ORO_MODE}" == "ssh" ]]; then
         SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
         SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
         if [[ 0 -eq $(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o 'ForwardAgent no' -o IdentitiesOnly=yes -i "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" -p ${SSH_PORT} ${ORO_DC_SSH_ARGS} ${DC_ORO_USER_NAME}@${SSH_HOST} sh -c 'ls "'${DC_ORO_APPDIR}'/"' 2>/dev/null | wc -l) ]]; then
-          local rsync_cmd="${RSYNC_BIN} --exclude var/cache --exclude vendor --exclude node_modules --links -e \"ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o 'ForwardAgent no' -o IdentitiesOnly=yes -i ${DC_ORO_CONFIG_DIR}/ssh_id_ed25519 -p ${SSH_PORT} ${ORO_DC_SSH_ARGS}\" --timeout=3 -r '${DC_ORO_APPDIR}/' ${DC_ORO_USER_NAME}@${SSH_HOST}:'${DC_ORO_APPDIR}/'"
+          rsync_cmd="${RSYNC_BIN} --exclude var/cache --exclude vendor --exclude node_modules --links -e \"ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o 'ForwardAgent no' -o IdentitiesOnly=yes -i ${DC_ORO_CONFIG_DIR}/ssh_id_ed25519 -p ${SSH_PORT} ${ORO_DC_SSH_ARGS}\" --timeout=3 -r '${DC_ORO_APPDIR}/' ${DC_ORO_USER_NAME}@${SSH_HOST}:'${DC_ORO_APPDIR}/'"
           if [[ -n "${DEBUG:-}" ]] || [[ -n "${VERBOSE:-}" ]]; then
             msg_info "Copying source code to the '${DC_ORO_NAME}_appcode' docker volume"
             rsync_cmd="${rsync_cmd/--timeout=3/--timeout=3 --info=progress2}"
@@ -3303,7 +3303,7 @@ if [[ "${DC_ORO_MODE}" == "mutagen" ]] && [[ -n "${DC_ORO_APPDIR:-}" ]] && [[ -n
     DOCKER_CONTAINER_NAME_MUTAGEN=$(${DOCKER_BIN} inspect -f '{{.Name}}' $(bash -c "${DOCKER_COMPOSE_BIN_CMD} ps -q ssh") | cut -c2-)
     if ! mutagen sync list | grep -i "Name: ${MUTAGEN_SESSION_NAME}" > /dev/null 2>&1; then
       # Create mutagen sync session with spinner (unless verbose mode)
-      local mutagen_create_cmd="mutagen sync create --sync-mode=two-way-resolved \
+      mutagen_create_cmd="mutagen sync create --sync-mode=two-way-resolved \
         --scan-mode=accelerated \
         --watch-mode-alpha=portable \
         --watch-mode-beta=force-poll \
@@ -3330,7 +3330,7 @@ if [[ "${DC_ORO_MODE}" == "mutagen" ]] && [[ -n "${DC_ORO_APPDIR:-}" ]] && [[ -n
 
     if [[ "${WAIT_SYNC}" == "1" ]]; then
       # Wait for mutagen sync with spinner (unless verbose mode)
-      local wait_cmd="until mutagen sync list '${MUTAGEN_SESSION_NAME}' 2>/dev/null | grep 'Status:' | grep -q 'Watching for changes'; do sleep 2; done"
+      wait_cmd="until mutagen sync list '${MUTAGEN_SESSION_NAME}' 2>/dev/null | grep 'Status:' | grep -q 'Watching for changes'; do sleep 2; done"
       if [[ -n "${DEBUG:-}" ]] || [[ -n "${VERBOSE:-}" ]]; then
         msg_info "Waiting for Mutagen file synchronization..."
         until mutagen sync list "${MUTAGEN_SESSION_NAME}" | grep 'Status:' | grep 'Watching for changes' > /dev/null 2>&1; do
