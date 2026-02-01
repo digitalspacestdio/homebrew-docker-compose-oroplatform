@@ -2024,6 +2024,13 @@ selected_path_normalized=$(realpath "${ORODC_SELECTED_ENV_PATH:-}" 2>/dev/null |
 debug_log "Script start: PWD='$PWD' current_pwd='$current_pwd'"
 debug_log "Script start: ORODC_SELECTED_ENV_NAME='${ORODC_SELECTED_ENV_NAME:-<not set>}' PATH='${ORODC_SELECTED_ENV_PATH:-<not set>}' CONFIG='${ORODC_SELECTED_ENV_CONFIG:-<not set>}'"
 
+# CRITICAL: Always set SCRIPT_DIR and LIBEXEC_DIR first (needed for source commands)
+# Homebrew installation - resolve symlink to find actual script location
+# BASH_SOURCE may be a symlink (e.g. bin/orodc -> libexec/orodc-main)
+REAL_SCRIPT="$(realpath "${BASH_SOURCE[0]}" 2>/dev/null || readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
+SCRIPT_DIR="$(cd "$(dirname "$REAL_SCRIPT")" && pwd)"
+LIBEXEC_DIR="${SCRIPT_DIR}/orodc"
+
 if [[ -n "${ORODC_SELECTED_ENV_NAME:-}" ]] && [[ -n "${ORODC_SELECTED_ENV_PATH:-}" ]]; then
   debug_log "Script start: Processing ORODC_SELECTED_ENV_* variables"
 
@@ -2075,12 +2082,6 @@ if [[ -n "${ORODC_SELECTED_ENV_NAME:-}" ]] && [[ -n "${ORODC_SELECTED_ENV_PATH:-
       unset ORODC_SELECTED_ENV_CONFIG
     fi
   fi
-else
-  # Homebrew installation - resolve symlink to find actual script location
-  # BASH_SOURCE may be a symlink (e.g. bin/orodc -> libexec/orodc-main)
-  REAL_SCRIPT="$(realpath "${BASH_SOURCE[0]}" 2>/dev/null || readlink -f "${BASH_SOURCE[0]}" 2>/dev/null || echo "${BASH_SOURCE[0]}")"
-  SCRIPT_DIR="$(cd "$(dirname "$REAL_SCRIPT")" && pwd)"
-  LIBEXEC_DIR="${SCRIPT_DIR}/orodc"
 fi
 # Export SCRIPT_DIR so sourced libraries can use it to find orodc-find_free_port
 export SCRIPT_DIR
