@@ -3255,7 +3255,7 @@ if [[ "${DC_ORO_MODE}" == "mutagen" ]] || [[ "${DC_ORO_MODE}" == "ssh" ]]; then
      ( [[ -f "${DC_ORO_APPDIR}/composer.json" ]] || \
        [[ -f "${DC_ORO_APPDIR}/.env.orodc" ]] || \
        [[ -f "${HOME}/.orodc/${DC_ORO_NAME}/.env.orodc" ]] ); then
-    if [[ ${args[0]} != "down" ]] && [[ ${args[0]} != "purge" ]]; then
+    if [[ ${args[0]} != "down" ]] && [[ ${args[0]} != "purge" ]] && [[ ${args[0]} != "init" ]]; then
       ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
         ${DOCKER_BIN} volume create "${DC_ORO_NAME}_appcode"  > /dev/null
         msg_info "Copying source code to the '${DC_ORO_NAME}_appcode' docker volume"
@@ -3289,7 +3289,7 @@ if [[ "${DC_ORO_MODE}" == "mutagen" ]] && [[ -n "${DC_ORO_APPDIR:-}" ]] && [[ -n
       mutagen sync terminate "${MUTAGEN_SESSION_NAME}"
     fi
     WAIT_SYNC=""
-  elif ! echo "$first_non_flag_arg" | grep -i '^\(build\|pull\|config\)' > /dev/null 2>&1; then
+  elif ! echo "$first_non_flag_arg" | grep -i '^\(build\|pull\|config\|init\)' > /dev/null 2>&1; then
     if [[ "0" -eq $(${DOCKER_COMPOSE_BIN_CMD} ps -q ssh  2> /dev/null | wc -l 2> /dev/null) ]]; then
       bash -c "${DOCKER_COMPOSE_BIN_CMD} up -d ssh"
     fi
