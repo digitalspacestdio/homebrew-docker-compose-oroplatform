@@ -84,6 +84,13 @@
 3. **Cache Operations**: Always clear/warm cache after installation
 4. **Step Order**: Follow the exact order specified in the installation guide
 5. **Never Skip CRITICAL Steps**: Steps marked as CRITICAL or REQUIRED must always be executed
+6. **🚨 NEVER SKIP STEPS - EVEN IF THEY SEEM ALREADY DONE**: 
+   - **CRITICAL RULE**: You MUST execute ALL steps from the installation checklist, even if you think they are already completed
+   - **DO NOT** skip steps because "containers are already running" or "files already exist" or "status shows running"
+   - **DO NOT** make assumptions about what is already done - execute every step as written in the guide
+   - **Example**: If Step 11 says "run `orodc up -d` and `orodc ps`", you MUST run these commands even if `orodc status` already shows containers running
+   - **Reason**: Steps may have side effects, verify state, or ensure consistency - skipping them can cause issues
+   - **User permission required**: If you want to skip ANY step, you MUST ask user for explicit permission first: "Step X says to do Y, but it seems already done. Should I skip it or execute it anyway?"
 
 **Temporary Files:**
 - **CRITICAL**: All temporary files MUST be created ONLY in `/tmp/` directory
