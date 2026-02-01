@@ -45,8 +45,8 @@ orodc exec bin/magento setup:install \
   --opensearch-host=search \
   --opensearch-port=9200
 
-# 7. Deploy static content
-orodc exec bin/magento setup:static-content:deploy -f
+# 7. Deploy static content (MUST specify locale - -f alone will NOT deploy CSS styles)
+orodc exec bin/magento setup:static-content:deploy en_US -f
 
 # 8. Compile DI
 orodc exec bin/magento setup:di:compile
@@ -70,9 +70,44 @@ orodc exec bin/magento cache:flush
 ## Common Commands
 
 ### Static Content Deployment
+
+**CRITICAL**: You MUST specify locale(s) explicitly - using `setup:static-content:deploy -f` WITHOUT locale parameters will NOT deploy CSS styles correctly. Pages will appear without styles.
+
+**REQUIRED**: Always specify at least one locale:
+
 ```bash
-orodc exec bin/magento setup:static-content:deploy -f
+# Deploy for specific locale (en_US is default, REQUIRED)
+orodc exec bin/magento setup:static-content:deploy en_US -f
+
+# Deploy for multiple locales
+orodc exec bin/magento setup:static-content:deploy en_US ru_RU -f
+
+# To deploy ALL locales, first get list of all installed locales:
+orodc exec bin/magento info:language:list
+
+# Then deploy for all locales (replace with actual locales from the list):
+orodc exec bin/magento setup:static-content:deploy en_US de_DE fr_FR es_ES ru_RU -f
 ```
+
+**How to get all installed locales:**
+```bash
+# Method 1: List all installed languages/locales (RECOMMENDED)
+orodc exec bin/magento info:language:list
+
+# Method 2: Check database for configured locales
+orodc exec bin/magento db:query "SELECT DISTINCT value FROM core_config_data WHERE path LIKE 'general/locale%'"
+
+# Method 3: Check installed language packs in app/i18n/
+orodc exec ls -la app/i18n/
+```
+
+**Why locale is REQUIRED:**
+- **Note**: In older Magento 2 versions (2.3 and earlier), `setup:static-content:deploy -f` without locale parameters would automatically deploy all locales and themes
+- **In newer Magento 2 versions** (2.4+), this behavior changed - you MUST specify locale(s) explicitly
+- Running `setup:static-content:deploy -f` WITHOUT locale parameters will NOT compile CSS styles properly in newer versions
+- Pages will appear without styles if locale is not specified
+- The `-f` flag only forces regeneration but doesn't ensure CSS compilation without locale
+- Always specify at least one locale (e.g., `en_US`) to ensure styles are deployed correctly
 
 ### Compile Dependency Injection
 ```bash
@@ -122,12 +157,19 @@ orodc exec bin/magento cache:flush
 ### Two-Factor Authentication Error
 If you see "You need to configure Two-Factor Authorization" message after login, disable 2FA using the commands above.
 
-### Static Content Not Updating
-Clear cache and redeploy static content:
+### Static Content Not Updating / Styles Missing
+Clear cache and redeploy static content with explicit locale:
 ```bash
 orodc exec bin/magento cache:flush
-orodc exec bin/magento setup:static-content:deploy -f
+orodc exec bin/magento setup:static-content:deploy en_US -f
 ```
+
+**If styles are still missing:**
+- **CRITICAL**: Always specify locale: `setup:static-content:deploy en_US -f` (NOT just `-f`)
+- Remove pub/static and redeploy: `orodc exec rm -rf pub/static/* && orodc exec bin/magento setup:static-content:deploy en_US -f`
+- Check file permissions: `orodc exec chmod -R 777 pub/static var`
+- Clear browser cache or use incognito mode
+- Verify theme is set correctly: `orodc exec bin/magento config:show design/theme/theme_id`
 
 ### Database Connection Issues
 Verify database configuration:
