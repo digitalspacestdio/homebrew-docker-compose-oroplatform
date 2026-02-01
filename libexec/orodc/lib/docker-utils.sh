@@ -193,14 +193,23 @@ ensure_appcode_volume() {
 
   # Check if volume is empty and sync if needed
   if [[ 0 -eq $(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o 'ForwardAgent no' -o IdentitiesOnly=yes -i "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" -p "${ssh_port}" ${ORO_DC_SSH_ARGS:-} ${DC_ORO_USER_NAME:-developer}@${ssh_host} sh -c 'ls "'${DC_ORO_APPDIR}'/"' 2>/dev/null | wc -l) ]]; then
-    msg_info "Copying source code to the '${volume_name}' docker volume"
     # Use rsync to copy files into volume (works for both ssh and mutagen modes initially)
     local rsync_bin="${RSYNC_BIN:-rsync}"
-    until ${rsync_bin} --exclude var/cache --exclude vendor --exclude node_modules --links -e "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o 'ForwardAgent no' -o IdentitiesOnly=yes -i ${DC_ORO_CONFIG_DIR}/ssh_id_ed25519 -p ${ssh_port} ${ORO_DC_SSH_ARGS:-}" --timeout=3 --info=progress2 -r "${DC_ORO_APPDIR}/" ${DC_ORO_USER_NAME:-developer}@${ssh_host}:"${DC_ORO_APPDIR}/" 2>/dev/null; do
-      echo -n "."
-      sleep 3
-    done
-    echo ""
+    local rsync_cmd="${rsync_bin} --exclude var/cache --exclude vendor --exclude node_modules --links -e \"ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o 'ForwardAgent no' -o IdentitiesOnly=yes -i ${DC_ORO_CONFIG_DIR}/ssh_id_ed25519 -p ${ssh_port} ${ORO_DC_SSH_ARGS:-}\" --timeout=3 -r \"${DC_ORO_APPDIR}/\" ${DC_ORO_USER_NAME:-developer}@${ssh_host}:\"${DC_ORO_APPDIR}/\""
+    
+    if [[ -n "${DEBUG:-}" ]] || [[ -n "${VERBOSE:-}" ]]; then
+      # Verbose mode: show progress
+      msg_info "Copying source code to the '${volume_name}' docker volume"
+      rsync_cmd="${rsync_cmd/--timeout=3/--timeout=3 --info=progress2}"
+      until eval "$rsync_cmd" 2>/dev/null; do
+        echo -n "."
+        sleep 3
+      done
+      echo ""
+    else
+      # Quiet mode: use spinner
+      run_with_spinner "Syncing source code to '${volume_name}' volume" "until $rsync_cmd 2>/dev/null; do sleep 3; done"
+    fi
   fi
 
   return 0
@@ -250,8 +259,9 @@ handle_compose_up() {
 
   # Phase 1: Build images (unless --no-build is specified)
   if [[ "$skip_build" == "false" ]]; then
-    build_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} build ${docker_services}"
-    DC_ORO_NAME="$DC_ORO_NAME" run_with_spinner "Building services" "$build_cmd" || exit $?
+    # Use --progress=plain to ensure output goes to stdout (not TTY) for proper spinner handling
+    build_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} build --progress=plain ${docker_services}"
+    DC_ORO_NAME="$DC_ORO_NAME" run_with_spinner "Building Docker images" "$build_cmd" || exit $?
   fi
 
   # Phase 2: Start services
@@ -295,7 +305,7 @@ handle_compose_up() {
   fi
 
   up_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} up --remove-orphans ${quiet_flags[*]} ${up_flags[*]} ${right_options[*]} ${docker_services}"
-  run_with_spinner "Starting services" "$up_cmd" || exit $?
+  run_with_spinner "Starting containers and waiting for health checks" "$up_cmd" || exit $?
 
   # Calculate total up time and save
   up_end_time=$(date +%s)
