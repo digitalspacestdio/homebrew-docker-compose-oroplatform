@@ -124,6 +124,11 @@ shellcheck script.sh
 
 No Bash changes without shellcheck!
 
+**CRITICAL: `local` keyword can ONLY be used inside functions!**
+- ❌ `local var="value"` in main script body → causes "local can only be used in a function" error
+- ✅ `var="value"` in main script body
+- ✅ `local var="value"` inside function body
+
 ## 7. Never Bloat bin/orodc - Use Modular Architecture
 
 **CRITICAL:** `bin/orodc` is the router - keep it thin!
