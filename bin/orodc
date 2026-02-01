@@ -2800,66 +2800,82 @@ find-up () {
   echo "$path"
 }
 
-# Only set DC_ORO_APPDIR if not already set (e.g., from menu switch)
-if [[ -z "${DC_ORO_APPDIR:-}" ]]; then
-  export DC_ORO_APPDIR=$(find-up composer.json)
-fi
+# Skip legacy initialization if environment was already initialized by modular system
+# This prevents conflicts when switching environments via menu
+if [[ "${ORODC_ENV_INITIALIZED:-}" != "1" ]]; then
+  debug_log "legacy init: ORODC_ENV_INITIALIZED not set, running legacy initialization"
+  
+  # Only set DC_ORO_APPDIR if not already set (e.g., from menu switch)
+  if [[ -z "${DC_ORO_APPDIR:-}" ]]; then
+    export DC_ORO_APPDIR=$(find-up composer.json)
+  fi
 
-if [[ -z "${DC_ORO_APPDIR:-}" ]]; then
-  if [ -z "$(ls -A "$PWD")" ]; then
-    export DC_ORO_APPDIR="$PWD"
-  elif [ -f "$PWD/index.php" ]; then
-    export DC_ORO_APPDIR="$PWD"
+  if [[ -z "${DC_ORO_APPDIR:-}" ]]; then
+    if [ -z "$(ls -A "$PWD")" ]; then
+      export DC_ORO_APPDIR="$PWD"
+    elif [ -f "$PWD/index.php" ]; then
+      export DC_ORO_APPDIR="$PWD"
+    else
+      echo -e "\033[38;5;208m==> Application root folder not found, and current directory is not empty, terminating...\033[0m"
+      exit 1
+    fi
+  fi
+
+  if [[ ! -d "$DC_ORO_APPDIR" ]]; then
+    mkdir -p "$DC_ORO_APPDIR"
+  fi
+
+  if [[ -z $DC_ORO_COMPOSER_AUTH ]] && [[ -z $COMPOSER_AUTH ]]; then
+    if [[ -n "${DC_ORO_CONFIG_DIR:-}" ]] && [[ -d "${DC_ORO_CONFIG_DIR}" ]]; then
+      cd "${DC_ORO_CONFIG_DIR}"
+      if which php > /dev/null 2>&1 && which composer > /dev/null 2>&1; then
+        COMPOSER_HOME=$(php -d display_startup_errors=0 $(which composer) config --working-dir=/tmp --no-interaction --global home 2> /dev/null) || {
+          msg_info "Can't find Composer home. Try setting COMPOSER_AUTH manually."
+        }
+      fi
+
+      if [[ -n ${COMPOSER_HOME} ]] && [[ -f "${COMPOSER_HOME}/auth.json" ]]; then
+        DC_ORO_COMPOSER_AUTH=$(cat "${COMPOSER_HOME}/auth.json")
+      fi
+    fi
+  fi
+
+  cd "$DC_ORO_APPDIR"
+
+  load_env_safe "$DC_ORO_APPDIR/.env"
+  load_env_safe "$DC_ORO_APPDIR/.env-app"
+  load_env_safe "$DC_ORO_APPDIR/.env-app.local"
+
+  # Load global config before local config (global has lower priority)
+  # Determine project name for global config lookup
+  if [[ -n "${DC_ORO_NAME:-}" ]]; then
+    project_name="${DC_ORO_NAME}"
+  elif [[ -n "${DC_ORO_APPDIR:-}" ]]; then
+    project_name=$(basename "$DC_ORO_APPDIR")
+    if [[ "$project_name" == "$HOME" ]] || [[ -z "$project_name" ]] || [[ "$project_name" == "/" ]]; then
+      project_name="default"
+    fi
   else
-    echo -e "\033[38;5;208m==> Application root folder not found, and current directory is not empty, terminating...\033[0m"
-    exit 1
-  fi
-fi
-
-if [[ ! -d "$DC_ORO_APPDIR" ]]; then
-  mkdir -p "$DC_ORO_APPDIR"
-fi
-
-if [[ -z $DC_ORO_COMPOSER_AUTH ]] && [[ -z $COMPOSER_AUTH ]]; then
-  cd "${DC_ORO_CONFIG_DIR}"
-  if which php > /dev/null 2>&1 && which composer > /dev/null 2>&1; then
-    COMPOSER_HOME=$(php -d display_startup_errors=0 $(which composer) config --working-dir=/tmp --no-interaction --global home 2> /dev/null) || {
-      msg_info "Can't find Composer home. Try setting COMPOSER_AUTH manually."
-    }
-  fi
-
-  if [[ -n ${COMPOSER_HOME} ]] && [[ -f "${COMPOSER_HOME}/auth.json" ]]; then
-    DC_ORO_COMPOSER_AUTH=$(cat "${COMPOSER_HOME}/auth.json")
-  fi
-fi
-
-cd "$DC_ORO_APPDIR"
-
-load_env_safe "$DC_ORO_APPDIR/.env"
-load_env_safe "$DC_ORO_APPDIR/.env-app"
-load_env_safe "$DC_ORO_APPDIR/.env-app.local"
-
-# Load global config before local config (global has lower priority)
-# Determine project name for global config lookup
-if [[ -n "${DC_ORO_NAME:-}" ]]; then
-  project_name="${DC_ORO_NAME}"
-elif [[ -n "${DC_ORO_APPDIR:-}" ]]; then
-  project_name=$(basename "$DC_ORO_APPDIR")
-  if [[ "$project_name" == "$HOME" ]] || [[ -z "$project_name" ]] || [[ "$project_name" == "/" ]]; then
     project_name="default"
   fi
+
+  # Load global config first (lower priority)
+  global_config_file="${HOME}/.orodc/${project_name}/.env.orodc"
+  if [[ -f "$global_config_file" ]]; then
+    load_env_safe "$global_config_file"
+  fi
+
+  # Load local config last (higher priority, overrides global)
+  load_env_safe "$DC_ORO_APPDIR/.env.orodc"
+  
+  debug_log "legacy init: completed - DC_ORO_APPDIR='${DC_ORO_APPDIR:-}' DC_ORO_NAME='${DC_ORO_NAME:-}'"
 else
-  project_name="default"
+  debug_log "legacy init: SKIPPED - ORODC_ENV_INITIALIZED=1, using modular initialization"
+  # Still need to cd to project directory for commands to work
+  if [[ -n "${DC_ORO_APPDIR:-}" ]] && [[ -d "${DC_ORO_APPDIR}" ]]; then
+    cd "$DC_ORO_APPDIR"
+  fi
 fi
-
-# Load global config first (lower priority)
-global_config_file="${HOME}/.orodc/${project_name}/.env.orodc"
-if [[ -f "$global_config_file" ]]; then
-  load_env_safe "$global_config_file"
-fi
-
-# Load local config last (higher priority, overrides global)
-load_env_safe "$DC_ORO_APPDIR/.env.orodc"
 
 # Build complete Traefik routing rule
 build_traefik_rule() {
