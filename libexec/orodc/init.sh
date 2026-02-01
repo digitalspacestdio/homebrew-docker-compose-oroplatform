@@ -535,7 +535,18 @@ if prompt_yes_no "Use custom cache image?" "$([ "$USE_CUSTOM_CACHE" = true ] && 
 else
   # Select cache engine type based on existing or default
   CACHE_TYPES=("Redis" "Valkey" "KeyDB")
-  DEFAULT_CACHE_TYPE="${EXISTING_CACHE_ENGINE:-Redis}"
+  # Use existing if set, otherwise check CMS type for smart defaults
+  if [[ -n "$EXISTING_CACHE_ENGINE" ]]; then
+    DEFAULT_CACHE_TYPE="$EXISTING_CACHE_ENGINE"
+  elif [[ "$DETECTED_CMS_TYPE" == "magento" ]]; then
+    # Valkey is Redis-compatible OSS fork, recommended for Magento
+    DEFAULT_CACHE_TYPE="Valkey"
+    if [[ -n "${DEBUG:-}" ]]; then
+      >&2 echo "DEBUG: Using Valkey as default (CMS type: magento)"
+    fi
+  else
+    DEFAULT_CACHE_TYPE="Redis"
+  fi
   SELECTED_CACHE_TYPE=$(prompt_select "Select cache engine:" "$DEFAULT_CACHE_TYPE" "${CACHE_TYPES[@]}")
   
   # Select version based on type (sorted newest to oldest)
