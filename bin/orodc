@@ -3259,16 +3259,22 @@ if [[ "${DC_ORO_MODE}" == "mutagen" ]] || [[ "${DC_ORO_MODE}" == "ssh" ]]; then
     if [[ ${args[0]} != "down" ]] && [[ ${args[0]} != "purge" ]] && [[ ${args[0]} != "init" ]]; then
       ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
         ${DOCKER_BIN} volume create "${DC_ORO_NAME}_appcode"  > /dev/null
-        msg_info "Copying source code to the '${DC_ORO_NAME}_appcode' docker volume"
-        bash -c "${DOCKER_COMPOSE_BIN_CMD} up -d ssh"
+        bash -c "${DOCKER_COMPOSE_BIN_CMD} up -d ssh" >/dev/null 2>&1
         SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
         SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
-        if [[ 0 -eq $(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o 'ForwardAgent no' -o IdentitiesOnly=yes -i "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" -p ${SSH_PORT} ${ORO_DC_SSH_ARGS} ${DC_ORO_USER_NAME}@${SSH_HOST} sh -c 'ls "'${DC_ORO_APPDIR}'/"' | wc -l) ]]; then
-          until ${RSYNC_BIN} --exclude var/cache --exclude vendor --exclude node_modules --links -e "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o 'ForwardAgent no' -o IdentitiesOnly=yes -i ${DC_ORO_CONFIG_DIR}/ssh_id_ed25519 -p ${SSH_PORT} ${ORO_DC_SSH_ARGS}" --timeout=3 --info=progress2 -r "${DC_ORO_APPDIR}/" ${DC_ORO_USER_NAME}@${SSH_HOST}:"${DC_ORO_APPDIR}/" 2> /dev/null; do
-            echo -n ".";
-            sleep 3
-          done
-          echo "";
+        if [[ 0 -eq $(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o 'ForwardAgent no' -o IdentitiesOnly=yes -i "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" -p ${SSH_PORT} ${ORO_DC_SSH_ARGS} ${DC_ORO_USER_NAME}@${SSH_HOST} sh -c 'ls "'${DC_ORO_APPDIR}'/"' 2>/dev/null | wc -l) ]]; then
+          local rsync_cmd="${RSYNC_BIN} --exclude var/cache --exclude vendor --exclude node_modules --links -e \"ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o 'ForwardAgent no' -o IdentitiesOnly=yes -i ${DC_ORO_CONFIG_DIR}/ssh_id_ed25519 -p ${SSH_PORT} ${ORO_DC_SSH_ARGS}\" --timeout=3 -r '${DC_ORO_APPDIR}/' ${DC_ORO_USER_NAME}@${SSH_HOST}:'${DC_ORO_APPDIR}/'"
+          if [[ -n "${DEBUG:-}" ]] || [[ -n "${VERBOSE:-}" ]]; then
+            msg_info "Copying source code to the '${DC_ORO_NAME}_appcode' docker volume"
+            rsync_cmd="${rsync_cmd/--timeout=3/--timeout=3 --info=progress2}"
+            until eval "$rsync_cmd" 2>/dev/null; do
+              echo -n "."
+              sleep 3
+            done
+            echo ""
+          else
+            run_with_spinner "Syncing source code to '${DC_ORO_NAME}_appcode' volume" "until $rsync_cmd 2>/dev/null; do sleep 3; done"
+          fi
         fi
       }
     fi

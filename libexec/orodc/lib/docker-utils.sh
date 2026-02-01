@@ -114,8 +114,9 @@ exec_compose_command() {
   # For build command, use spinner
   if [[ "$docker_cmd" == "build" ]]; then
     # shellcheck disable=SC2154
-    full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${docker_cmd} ${right_flags[*]} ${right_options[*]} ${docker_services}"
-    run_with_spinner "Building services" "$full_cmd"
+    # Use --progress=plain to ensure output goes to stdout (not TTY) for proper spinner handling
+    full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${docker_cmd} --progress=plain ${right_flags[*]} ${right_options[*]} ${docker_services}"
+    run_with_spinner "Building Docker images" "$full_cmd"
     return $?
   fi
 
@@ -296,7 +297,8 @@ handle_compose_up() {
   done
   
   # Add quiet flags if not already present (only when running with spinner, not in verbose mode)
-  quiet_flags=()
+  # Use --progress=plain to disable TTY progress bars that bypass stdout redirection
+  quiet_flags=("--progress=plain")
   if [[ "$has_quiet_pull" == "false" ]]; then
     quiet_flags+=("--quiet-pull")
   fi
