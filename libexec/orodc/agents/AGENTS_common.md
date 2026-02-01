@@ -65,6 +65,27 @@
 - **DO NOT** run `orodc up -d` just to check if project files exist - use file system commands instead
 - **DO NOT** run `orodc up -d` before understanding project status - first run `orodc status` and check files
 
+**🚨 CRITICAL RULE - USE ONLY OFFICIAL COMMANDS:**
+- **NEVER invent your own ways to work with the environment** - use ONLY commands described in documentation
+- **ALWAYS use official OroDC commands** - check `orodc help` or documentation before suggesting any command
+- **DO NOT invent workarounds** - if something seems difficult, check documentation first - there's likely an official command for it
+- **DO NOT use direct Docker commands** - if there's an OroDC command for it, use that instead
+- **Before suggesting ANY command**: 
+  1. Check if it's documented in `orodc help`
+  2. Check installation guides (`orodc agents installation`)
+  3. Check coding rules (`orodc agents rules`)
+  4. If command is not documented, ask user instead of inventing your own solution
+- **Examples of WRONG behavior**:
+  - ❌ Using `docker compose exec` instead of `orodc exec`
+  - ❌ Creating custom scripts to check container status instead of `orodc ps`
+  - ❌ Using direct database connection instead of `orodc psql` or `orodc mysql`
+  - ❌ Inventing new ways to get environment variables instead of `orodc exec env | grep ORO_`
+- **Examples of CORRECT behavior**:
+  - ✅ Using `orodc exec` for container commands (as documented)
+  - ✅ Using `orodc ps` to check container status (as documented)
+  - ✅ Using `orodc status` to check project state (as documented)
+  - ✅ Following installation guide steps exactly as written
+
 **Coding Rules:**
 - Run `orodc agents rules` to see general coding guidelines and CMS-specific coding rules
 
