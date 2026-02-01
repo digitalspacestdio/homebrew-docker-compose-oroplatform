@@ -143,10 +143,76 @@ fix_empty_directory_ownership() {
   return 0
 }
 
+# Ensure appcode volume exists and is synchronized
+# For mutagen/ssh modes: creates volume if missing and performs initial sync
+# For default mode: no-op (uses bind mount, no volume needed)
+# Usage: ensure_appcode_volume
+ensure_appcode_volume() {
+  # Skip for default mode (uses bind mount, no volume needed)
+  if [[ "${DC_ORO_MODE:-default}" == "default" ]]; then
+    return 0
+  fi
+
+  # Skip if DC_ORO_NAME is not set (project not initialized)
+  if [[ -z "${DC_ORO_NAME:-}" ]]; then
+    return 0
+  fi
+
+  local volume_name="${DC_ORO_NAME}_appcode"
+
+  # Check if volume exists - if yes, it's already created and synchronized
+  if ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep -q "^${volume_name}$"; then
+    return 0
+  fi
+
+  # Volume doesn't exist - create it and synchronize
+  ${DOCKER_BIN} volume create "${volume_name}" >/dev/null 2>&1
+  msg_info "Created volume '${volume_name}'"
+
+  # For mutagen/ssh modes, we need to sync files into the volume
+  # Start SSH container first (needed for both modes)
+  if [[ "0" -eq $(${DOCKER_COMPOSE_BIN_CMD} ps -q ssh 2>/dev/null | wc -l 2> /dev/null) ]]; then
+    ${DOCKER_COMPOSE_BIN_CMD} up -d ssh >/dev/null 2>&1
+  fi
+
+  # Wait for SSH container to be ready
+  local ssh_host=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
+  local ssh_port
+  ssh_port=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN_CMD} ps -q ssh 2>/dev/null | head -1) 2>/dev/null | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort' 2>/dev/null || echo "")
+
+  if [[ -z "${ssh_port}" ]]; then
+    msg_warning "Could not determine SSH port, skipping initial sync"
+    return 0
+  fi
+
+  # Check if SSH key exists before attempting sync
+  if [[ ! -f "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" ]]; then
+    msg_warning "SSH key not found, skipping initial sync. Volume created but empty."
+    return 0
+  fi
+
+  # Check if volume is empty and sync if needed
+  if [[ 0 -eq $(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o 'ForwardAgent no' -o IdentitiesOnly=yes -i "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" -p "${ssh_port}" ${ORO_DC_SSH_ARGS:-} ${DC_ORO_USER_NAME:-developer}@${ssh_host} sh -c 'ls "'${DC_ORO_APPDIR}'/"' 2>/dev/null | wc -l) ]]; then
+    msg_info "Copying source code to the '${volume_name}' docker volume"
+    # Use rsync to copy files into volume (works for both ssh and mutagen modes initially)
+    local rsync_bin="${RSYNC_BIN:-rsync}"
+    until ${rsync_bin} --exclude var/cache --exclude vendor --exclude node_modules --links -e "ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o 'ForwardAgent no' -o IdentitiesOnly=yes -i ${DC_ORO_CONFIG_DIR}/ssh_id_ed25519 -p ${ssh_port} ${ORO_DC_SSH_ARGS:-}" --timeout=3 --info=progress2 -r "${DC_ORO_APPDIR}/" ${DC_ORO_USER_NAME:-developer}@${ssh_host}:"${DC_ORO_APPDIR}/" 2>/dev/null; do
+      echo -n "."
+      sleep 3
+    done
+    echo ""
+  fi
+
+  return 0
+}
+
 # Handle compose up command with separate build and start phases
 # Usage: handle_compose_up
 # Expects: docker_services, left_flags, left_options, right_flags, right_options
 handle_compose_up() {
+  # Ensure appcode volume exists and is synchronized before starting containers
+  ensure_appcode_volume
+
   # Get previous timing for statistics only
   # shellcheck disable=SC2034
   prev_timing=$(get_previous_timing "up")

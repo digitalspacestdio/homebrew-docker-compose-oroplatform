@@ -25,7 +25,13 @@
 
 **After Creating Project:**
 - ALWAYS follow complete setup steps from `orodc agents installation magento` (run the command to see full guide)
-- Required steps include: installation, static content deployment, DI compilation, cache clearing, 2FA disabling
+- **CRITICAL steps** (DO NOT SKIP):
+  - Installation via `bin/magento setup:install`
+  - **Static content deployment (frontend build)** - REQUIRED, frontend will not work without it
+  - DI compilation
+  - Cache clearing
+  - 2FA disabling (for development)
+  - **Final step: `orodc up -d`** - ensure containers are running before accessing application
 - Use environment variables from `orodc exec env | grep ORO_` for database and service configuration (shows all OroDC service connection variables)
 
 **Key Commands:**

@@ -12,6 +12,9 @@ source "${SCRIPT_DIR}/lib/docker-utils.sh"
 # Check that we're in a project
 check_in_project || exit 1
 
+# Ensure appcode volume exists before running commands
+ensure_appcode_volume
+
 # Build cli image if needed (before run) to avoid "No services to build" warnings
 # This ensures images are built/pulled before run command executes (same approach as in 'up' command)
 if [[ -z "${DEBUG:-}" ]] && [[ -z "${VERBOSE:-}" ]]; then
