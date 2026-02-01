@@ -45,16 +45,23 @@ orodc exec bin/magento setup:install \
   --opensearch-host=search \
   --opensearch-port=9200
 
-# 7. Deploy static content (MUST specify locale - -f alone will NOT deploy CSS styles)
-orodc exec bin/magento setup:static-content:deploy en_US -f
+# 7. (OPTIONAL) Install Sample Data (Demo Data)
+# Only run if you want demo products, categories, and sample content
+orodc exec bin/magento sampledata:deploy
+orodc exec bin/magento setup:upgrade
+orodc exec bin/magento cache:flush
 
 # 8. Compile DI
 orodc exec bin/magento setup:di:compile
 
-# 9. Clear cache
+# 9. Clear cache (warm up cache)
 orodc exec bin/magento cache:flush
 
-# 10. Disable Two-Factor Authentication (2FA) for development
+# 10. Deploy static content (MUST specify locale - -f alone will NOT deploy CSS styles)
+# IMPORTANT: Static content deployment MUST be done AFTER DI compilation and cache clearing
+orodc exec bin/magento setup:static-content:deploy en_US -f
+
+# 11. Disable Two-Factor Authentication (2FA) for development
 orodc exec bin/magento module:disable Magento_TwoFactorAuth
 orodc exec bin/magento setup:upgrade
 orodc exec bin/magento cache:flush
@@ -129,6 +136,51 @@ orodc exec bin/magento indexer:reindex
 ```bash
 orodc exec bin/magento deploy:mode:set developer
 ```
+
+### Install Sample Data (Demo Data)
+
+**OPTIONAL**: Install sample data to add demo products, categories, CMS pages, and other sample content to your store.
+
+```bash
+# Deploy sample data modules
+orodc exec bin/magento sampledata:deploy
+
+# Install sample data (automatically runs during upgrade)
+orodc exec bin/magento setup:upgrade
+
+# Clear cache after installation
+orodc exec bin/magento cache:flush
+```
+
+**What sample data includes:**
+- Sample products (catalog items)
+- Sample categories
+- Sample CMS pages and blocks
+- Sample sales data
+- Sample customer data (in some versions)
+
+**Alternative method (via Composer):**
+If `sampledata:deploy` command is not available, add sample data packages directly to `composer.json`:
+
+```json
+{
+    "require": {
+        "magento/module-catalog-sample-data": "{version}",
+        "magento/module-configurable-sample-data": "{version}",
+        "magento/module-cms-sample-data": "{version}",
+        "magento/module-sales-sample-data": "{version}"
+    }
+}
+```
+
+Then run:
+```bash
+orodc exec composer update
+orodc exec bin/magento setup:upgrade
+orodc exec bin/magento cache:flush
+```
+
+**Note**: Replace `{version}` with your Magento version (e.g., `100.4.*` for Magento 2.4.x).
 
 ### Disable Two-Factor Authentication (2FA)
 
