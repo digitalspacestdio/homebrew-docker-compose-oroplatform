@@ -26,6 +26,7 @@
 **After Creating Project:**
 - ALWAYS follow complete setup steps from `orodc agents installation magento` (run the command to see full guide)
 - **CRITICAL steps** (DO NOT SKIP):
+  - **OpenSearch configuration** (if using OpenSearch) - REQUIRED before Magento installation
   - Installation via `bin/magento setup:install`
   - **Static content deployment (frontend build)** - REQUIRED, frontend will not work without it
   - DI compilation
@@ -33,6 +34,29 @@
   - 2FA disabling (for development)
   - **Final step: `orodc up -d`** - ensure containers are running before accessing application
 - Use environment variables from `orodc exec env | grep ORO_` for database and service configuration (shows all OroDC service connection variables)
+
+**OpenSearch Configuration (Required for Magento 2 with OpenSearch):**
+- **CRITICAL**: If using OpenSearch 2.0+, you MUST configure `indices.id_field_data.enabled` setting before installing Magento
+- **Why**: OpenSearch 2.0+ disables fielddata access for `_id` field by default. Magento 2 requires this for product indexing and search
+- **When**: Configure BEFORE running `bin/magento setup:install`
+- **How to configure**:
+  ```bash
+  # Ensure containers are running
+  orodc up -d
+  
+  # Configure OpenSearch
+  orodc exec curl -X PUT "http://search:9200/_cluster/settings" \
+    -H 'Content-Type: application/json' \
+    -d '{"persistent": {"indices.id_field_data.enabled": true}}'
+  
+  # Verify setting was applied
+  orodc exec curl -s "http://search:9200/_cluster/settings?include_defaults=true&flat_settings=true" | grep id_field_data
+  ```
+- **Note**: 
+  - Only needed for OpenSearch (not Elasticsearch)
+  - Setting persists across container restarts
+  - Only need to configure once per OpenSearch cluster
+  - If products are not showing in search after installation, check if this setting was configured
 
 **Key Commands:**
 - Magento CLI: `orodc exec bin/magento <command>`
@@ -58,3 +82,8 @@
 - Compile DI: `orodc exec bin/magento setup:di:compile`
 - Deploy static content: `orodc exec bin/magento setup:static-content:deploy -f`
 - Reindex: `orodc exec bin/magento indexer:reindex`
+
+**Troubleshooting:**
+- **Products not showing in search**: Check if OpenSearch `indices.id_field_data.enabled` setting is configured (see OpenSearch Configuration section above)
+- **Search not working**: Verify OpenSearch is running (`orodc ps | grep search`) and configured correctly
+- **Frontend without styles**: Ensure static content was deployed with explicit locale: `orodc exec bin/magento setup:static-content:deploy en_US -f`
