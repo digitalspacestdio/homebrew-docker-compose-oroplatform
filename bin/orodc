@@ -2197,10 +2197,11 @@ fi
 # Initialize environment for most commands
 # Skip for: help, version, proxy, image, init (these don't require project)
 case "$1" in
-  help|man|version|proxy|image|docker-build|init|status)
+  help|man|version|proxy|image|docker-build|init|status|agents)
     # Skip initialization for these commands
     # init: creates project, so doesn't need existing project
     # status: read-only command, should not initialize or create files
+    # agents: documentation-only, has own project detection logic
     ;;
   codex|gemini|cursor)
     # Codex/Gemini/Cursor need project context but should work gracefully without project
@@ -3295,33 +3296,45 @@ if [[ "${DC_ORO_MODE}" == "mutagen" ]] && [[ -n "${DC_ORO_APPDIR:-}" ]] && [[ -n
     fi
     DOCKER_CONTAINER_NAME_MUTAGEN=$(${DOCKER_BIN} inspect -f '{{.Name}}' $(bash -c "${DOCKER_COMPOSE_BIN_CMD} ps -q ssh") | cut -c2-)
     if ! mutagen sync list | grep -i "Name: ${MUTAGEN_SESSION_NAME}" > /dev/null 2>&1; then
-      mutagen sync create --sync-mode=two-way-resolved \
-      --scan-mode=accelerated \
-      --watch-mode-alpha=portable \
-      --watch-mode-beta=force-poll \
-      --watch-polling-interval-beta=30 \
-      --ignore=".git" \
-      --ignore=".idea" \
-      --ignore=".history" \
-      --ignore=".mysql.initdb.d" \
-      --ignore=".psql.initdb.d" \
-      --ignore="var" \
-      --ignore-vcs \
-      --symlink-mode=ignore \
-      --name=${MUTAGEN_SESSION_NAME} \
-      "$DC_ORO_APPDIR" docker://${DC_ORO_USER_NAME}@${DOCKER_CONTAINER_NAME_MUTAGEN}${DC_ORO_APPDIR}
+      # Create mutagen sync session with spinner (unless verbose mode)
+      local mutagen_create_cmd="mutagen sync create --sync-mode=two-way-resolved \
+        --scan-mode=accelerated \
+        --watch-mode-alpha=portable \
+        --watch-mode-beta=force-poll \
+        --watch-polling-interval-beta=30 \
+        --ignore='.git' \
+        --ignore='.idea' \
+        --ignore='.history' \
+        --ignore='.mysql.initdb.d' \
+        --ignore='.psql.initdb.d' \
+        --ignore='var' \
+        --ignore-vcs \
+        --symlink-mode=ignore \
+        --name='${MUTAGEN_SESSION_NAME}' \
+        '${DC_ORO_APPDIR}' 'docker://${DC_ORO_USER_NAME}@${DOCKER_CONTAINER_NAME_MUTAGEN}${DC_ORO_APPDIR}'"
+      if [[ -n "${DEBUG:-}" ]] || [[ -n "${VERBOSE:-}" ]]; then
+        msg_info "Creating Mutagen sync session..."
+        eval "$mutagen_create_cmd"
+      else
+        run_with_spinner "Creating Mutagen sync session" "$mutagen_create_cmd"
+      fi
     else
       WAIT_SYNC=""
     fi
 
     if [[ "${WAIT_SYNC}" == "1" ]]; then
-      until mutagen sync list "${MUTAGEN_SESSION_NAME}" | grep 'Status:' | grep 'Watching for changes' > /dev/null 2>&1; do
-        if which tput > /dev/null 2>&1; then
-          tput cuu 1 && tput el
-        fi
-        mutagen sync list "${MUTAGEN_SESSION_NAME}" | grep 'Status:' | echo $(awk -F: '{ print $2 }')
-        sleep 3
-      done
+      # Wait for mutagen sync with spinner (unless verbose mode)
+      local wait_cmd="until mutagen sync list '${MUTAGEN_SESSION_NAME}' 2>/dev/null | grep 'Status:' | grep -q 'Watching for changes'; do sleep 2; done"
+      if [[ -n "${DEBUG:-}" ]] || [[ -n "${VERBOSE:-}" ]]; then
+        msg_info "Waiting for Mutagen file synchronization..."
+        until mutagen sync list "${MUTAGEN_SESSION_NAME}" | grep 'Status:' | grep 'Watching for changes' > /dev/null 2>&1; do
+          mutagen sync list "${MUTAGEN_SESSION_NAME}" | grep 'Status:' | awk -F: '{ print $2 }'
+          sleep 3
+        done
+        msg_ok "Mutagen synchronization completed"
+      else
+        run_with_spinner "Synchronizing files with Mutagen" "$wait_cmd"
+      fi
     fi
   fi
 fi
