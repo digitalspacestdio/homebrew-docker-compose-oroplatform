@@ -2,6 +2,38 @@
 
 **Complete guide for creating a new Magento 2 project from scratch.**
 
+## Installation Checklist
+
+**Use this checklist to track installation progress. Check off each step as you complete it.**
+
+### Prerequisites Checklist
+
+- [ ] Navigate to empty project directory
+- [ ] Run `orodc init` manually in terminal (MUST be done by user BEFORE using agent)
+- [ ] Run `orodc up -d`
+- [ ] Verify containers are running with `orodc ps`
+
+### Installation Steps Checklist
+
+- [ ] Step 1: Verify directory is empty
+- [ ] Step 2: Create Magento project (composer create-project)
+- [ ] Step 3: Get environment variables
+- [ ] Step 4: Install Magento via CLI (with admin credentials from user)
+- [ ] Step 5: Deploy static content (build frontend) - **CRITICAL, DO NOT SKIP**
+- [ ] Step 6: Compile Dependency Injection
+- [ ] Step 7: Clear cache
+- [ ] Step 8: Disable Two-Factor Authentication (development)
+- [ ] Step 9: Ensure containers are running (`orodc up -d` and `orodc ps`)
+
+### Final Verification Checklist
+
+- [ ] All containers are running (`orodc ps` shows "Running" status)
+- [ ] Frontend is accessible: `https://{project_name}.docker.local`
+- [ ] Admin panel is accessible: `https://{project_name}.docker.local/admin`
+- [ ] Admin credentials are saved (ask user if needed)
+
+---
+
 ## Prerequisites
 
 - Complete steps 1-4 from `orodc agents installation` (common part):
@@ -104,13 +136,15 @@ orodc exec bin/magento setup:install \
 
 **Note**: Replace `<USER_PROVIDED_*>` placeholders with actual values provided by user.
 
-### Step 5: Deploy Static Content
+### Step 5: Deploy Static Content (Build Frontend)
 
-**REQUIRED**: Deploy static content after installation:
+**CRITICAL - REQUIRED**: Deploy static content (build frontend) after installation. **DO NOT SKIP THIS STEP** - frontend will not work without it:
 
 ```bash
 orodc exec bin/magento setup:static-content:deploy -f
 ```
+
+**IMPORTANT**: This step builds the frontend assets. Without it, the frontend will not display correctly.
 
 ### Step 6: Compile Dependency Injection
 
@@ -136,16 +170,35 @@ orodc exec bin/magento setup:upgrade
 orodc exec bin/magento cache:flush
 ```
 
+### Step 9: Ensure Containers Are Running
+
+**REQUIRED**: Verify and ensure all containers are running:
+
+```bash
+orodc up -d
+orodc ps
+```
+
+**IMPORTANT**: 
+- Run `orodc up -d` to ensure all containers are started
+- Verify with `orodc ps` that all containers show "Running" status
+- This is the final step before accessing the application
+
 ## Verification
 
-- **Frontend**: `https://{project_name}.docker.local`
-- **Admin Panel**: `https://{project_name}.docker.local/admin`
-- **Admin Credentials**: Ask user for admin username and password (credentials were set during installation in Step 4)
+**After completing all installation steps, verify:**
+
+- [ ] **Frontend**: `https://{project_name}.docker.local` - should display Magento storefront
+- [ ] **Admin Panel**: `https://{project_name}.docker.local/admin` - should display admin login page
+- [ ] **Admin Credentials**: Ask user for admin username and password (credentials were set during installation in Step 4)
+- [ ] **Containers**: Run `orodc ps` - all containers should show "Running" status
 
 ## Important Notes
 
 - **CE vs Enterprise**: `composer create-project` installs Community Edition (CE) only. For Enterprise Edition, use git clone from Enterprise repository or contact Magento support
-- **All steps are required**: Installation, static content deployment, DI compilation, and cache clearing
+- **All steps are required**: Installation, static content deployment (frontend build), DI compilation, cache clearing, and final container check
+- **Frontend build is critical**: Step 5 (static content deployment) MUST be executed - frontend will not work without it
+- **Final step required**: Always run `orodc up -d` at the end (Step 9) to ensure containers are running before accessing the application
 - **Use environment variables**: Always use variables from `orodc exec env | grep ORO_` for configuration (shows all OroDC service connection variables)
-- **Containers must be running**: Ensure `orodc ps` shows all containers running before installation
+- **Containers must be running**: Ensure `orodc ps` shows all containers running before installation and after final step
 - **See full guide**: Reference `docs/MAGENTO.md` for complete setup guide and troubleshooting
