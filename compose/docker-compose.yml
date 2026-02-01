@@ -86,8 +86,12 @@ services:
       - 'NODE_OPTIONS="--max-old-space-size=1024"'
       - 'SYMFONY_ENV=${SYMFONY_ENV:-dev}'
       - 'XDEBUG_MODE=${XDEBUG_MODE_FPM:-off}'
+      - 'GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
+      - 'ORO_GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
     depends_on:
       database:
+        condition: service_healthy
+      gotenberg:
         condition: service_healthy
     restart: always
     deploy:
@@ -175,6 +179,8 @@ services:
       - 'NODE_OPTIONS="--max-old-space-size=1024"'
       - 'SYMFONY_ENV=${SYMFONY_ENV:-dev}'
       - 'XDEBUG_MODE=${XDEBUG_MODE_CLI:-off}'
+      - 'GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
+      - 'ORO_GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
     depends_on:
       database:
         condition: service_healthy
@@ -185,6 +191,8 @@ services:
       redis:
         condition: service_healthy
       mail:
+        condition: service_healthy
+      gotenberg:
         condition: service_healthy
     deploy:
       resources:
@@ -230,11 +238,11 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=dc_shared_net"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws.entrypoints=web"
-      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws.rule=${DC_ORO_TRAEFIK_RULE} && (PathPrefix(`/ws`) || Header(`Upgrade`, `websocket`))"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws.rule=(${DC_ORO_TRAEFIK_RULE}) && (PathPrefix(`/ws`) || Header(`Upgrade`, `websocket`))"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws.service=${DC_ORO_NAME:-unnamed}-ws"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws.priority=100"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws-default.entrypoints=default"
-      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws-default.rule=${DC_ORO_TRAEFIK_RULE} && (PathPrefix(`/ws`) || Header(`Upgrade`, `websocket`))"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws-default.rule=(${DC_ORO_TRAEFIK_RULE}) && (PathPrefix(`/ws`) || Header(`Upgrade`, `websocket`))"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws-default.service=${DC_ORO_NAME:-unnamed}-ws"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws-default.priority=100"
       - "traefik.http.services.${DC_ORO_NAME:-unnamed}-ws.loadbalancer.server.port=8080"
@@ -279,8 +287,12 @@ services:
       - 'NODE_OPTIONS="--max-old-space-size=1024"'
       - 'SYMFONY_ENV=${SYMFONY_ENV:-dev}'
       - 'XDEBUG_MODE=${XDEBUG_MODE_WEBSOCKET:-off}'
+      - 'GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
+      - 'ORO_GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
     depends_on:
       database:
+        condition: service_healthy
+      gotenberg:
         condition: service_healthy
     deploy:
       resources:
@@ -319,22 +331,22 @@ services:
       - "traefik.enable=true"
       - "traefik.docker.network=dc_shared_net"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-redirect.entrypoints=web"
-      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-redirect.rule=${DC_ORO_TRAEFIK_RULE} && Path(`/mailbox`)"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-redirect.rule=(${DC_ORO_TRAEFIK_RULE}) && Path(`/mailbox`)"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-redirect.middlewares=${DC_ORO_NAME:-unnamed}-mail-redirect"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-redirect.priority=300"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-redirect-default.entrypoints=default"
-      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-redirect-default.rule=${DC_ORO_TRAEFIK_RULE} && Path(`/mailbox`)"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-redirect-default.rule=(${DC_ORO_TRAEFIK_RULE}) && Path(`/mailbox`)"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-redirect-default.middlewares=${DC_ORO_NAME:-unnamed}-mail-redirect"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-redirect-default.priority=300"
       - "traefik.http.middlewares.${DC_ORO_NAME:-unnamed}-mail-redirect.redirectregex.regex=^https?://[^/]+/mailbox$$"
       - "traefik.http.middlewares.${DC_ORO_NAME:-unnamed}-mail-redirect.redirectregex.replacement=/mailbox/"
       - "traefik.http.middlewares.${DC_ORO_NAME:-unnamed}-mail-redirect.redirectregex.permanent=true"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail.entrypoints=web"
-      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail.rule=${DC_ORO_TRAEFIK_RULE} && PathPrefix(`/mailbox/`)"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail.rule=(${DC_ORO_TRAEFIK_RULE}) && PathPrefix(`/mailbox/`)"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail.service=${DC_ORO_NAME:-unnamed}-mail"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail.priority=250"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-default.entrypoints=default"
-      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-default.rule=${DC_ORO_TRAEFIK_RULE} && PathPrefix(`/mailbox/`)"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-default.rule=(${DC_ORO_TRAEFIK_RULE}) && PathPrefix(`/mailbox/`)"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-default.service=${DC_ORO_NAME:-unnamed}-mail"
       - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-mail-default.priority=250"
       - "traefik.http.services.${DC_ORO_NAME:-unnamed}-mail.loadbalancer.server.port=8025"
@@ -348,6 +360,33 @@ services:
       start_period: 10s
       interval: 5s
       retries: 18
+
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    hostname: gotenberg.${DC_ORO_NAME:-unnamed}.docker.local
+    container_name: ${DC_ORO_NAME:-unnamed}_gotenberg
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    ports:
+      - "${DC_ORO_GOTENBERG_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_GOTENBERG:-${DC_ORO_PORT_PREFIX}00}:3000"
+    restart: always
+    networks:
+      - default
+      - dc_shared_net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    healthcheck:
+      test: /bin/bash -c "</dev/tcp/localhost/3000"
+      start_period: 5s
+      interval: 5s
+      retries: 18
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
 
   xhgui:
     image: "xhgui/xhgui:0.18.4"
@@ -602,6 +641,8 @@ services:
         condition: service_healthy
       mail:
         condition: service_healthy
+      gotenberg:
+        condition: service_healthy
     environment:
       - 'APP_DIR=${DC_ORO_APPDIR:-/var/www}'
       - 'DC_ORO_APPDIR=${DC_ORO_APPDIR:-/var/www}'
@@ -643,6 +684,8 @@ services:
       - 'SYMFONY_ENV=${SYMFONY_ENV:-dev}'
       - 'XDEBUG_MODE=${XDEBUG_MODE_CLI:-off}'
       - 'ORO_SSH_PUBLIC_KEY=${ORO_SSH_PUBLIC_KEY:-""}'
+      - 'GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
+      - 'ORO_GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
     restart: always
     deploy:
       resources:

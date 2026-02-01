@@ -1513,7 +1513,12 @@ print_results_table() {
     if [[ "$status_display" == "running" ]]; then
       status_color="\033[32m"
     elif [[ "$status_display" == "stopped" ]] || [[ "$status_display" == "not found" ]]; then
-      status_color="\033[31m"
+      # If test is skipped, use gray color; otherwise red
+      if [[ "$test_result" == "SKIP" ]]; then
+        status_color="\033[90m"
+      else
+        status_color="\033[31m"
+      fi
     else
       status_color="\033[33m"
     fi
@@ -1528,7 +1533,7 @@ print_results_table() {
       result_color="\033[31m"
       result_text="FAIL"
     elif [[ "$test_result" == "SKIP" ]]; then
-      result_color="\033[33m"
+      result_color="\033[34m"
       result_text="SKIP"
     else
       result_color="\033[90m"
@@ -1537,8 +1542,7 @@ print_results_table() {
     
     # Print in column format (use %b for escape sequences)
     printf "Service:   %s\n" "$service"
-    printf "Container: %s\n" "$container"
-    printf "Image:     %s\n" "$image"
+    printf "Container: %s (%s)\n" "$container" "$image"
     printf "Status:    %b%s\033[0m\n" "$status_color" "$status_display"
     printf "Test:      %b%s\033[0m\n" "$result_color" "$result_text"
     

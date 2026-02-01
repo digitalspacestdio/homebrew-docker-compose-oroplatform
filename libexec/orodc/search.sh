@@ -19,15 +19,54 @@ if [[ "$search_cmd" == "reindex" ]]; then
   shift
   
   # First reindex backend search (admin panel)
-  backend_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm cli php ./bin/console oro:search:reindex $*"
+  # Build bash -c command with properly escaped full command string
+  # Use single quotes for outer shell to prevent variable expansion issues
+  if [[ $# -gt 0 ]]; then
+    # Build command string with all arguments properly escaped using printf %q
+    local cmd_parts=("php" "./bin/console" "oro:search:reindex")
+    for arg in "$@"; do
+      cmd_parts+=("$(printf %q "$arg")")
+    done
+    # Join parts with spaces - printf %q already handles quoting
+    local full_cmd
+    printf -v full_cmd '%s ' "${cmd_parts[@]}"
+    full_cmd="${full_cmd% }"  # Remove trailing space
+    backend_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm cli bash -c '${full_cmd}'"
+  else
+    backend_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm cli bash -c 'php ./bin/console oro:search:reindex'"
+  fi
   run_with_spinner "Reindexing backend search (admin panel)" "$backend_cmd" || exit $?
   
   # Then reindex website search (storefront)
-  website_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm cli php ./bin/console oro:website-search:reindex $*"
+  if [[ $# -gt 0 ]]; then
+    # Build command string with all arguments properly escaped
+    local cmd_parts=("php" "./bin/console" "oro:website-search:reindex")
+    for arg in "$@"; do
+      cmd_parts+=("$(printf %q "$arg")")
+    done
+    local full_cmd
+    printf -v full_cmd '%s ' "${cmd_parts[@]}"
+    full_cmd="${full_cmd% }"  # Remove trailing space
+    website_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm cli bash -c '${full_cmd}'"
+  else
+    website_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm cli bash -c 'php ./bin/console oro:website-search:reindex'"
+  fi
   run_with_spinner "Reindexing website search (storefront)" "$website_cmd" || exit $?
 else
   # Execute specific search command in cli container with spinner
   shift
-  search_console_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm cli php ./bin/console \"oro:search:${search_cmd}\" $*"
+  if [[ $# -gt 0 ]]; then
+    # Build command string with all arguments properly escaped
+    local cmd_parts=("php" "./bin/console" "oro:search:${search_cmd}")
+    for arg in "$@"; do
+      cmd_parts+=("$(printf %q "$arg")")
+    done
+    local full_cmd
+    printf -v full_cmd '%s ' "${cmd_parts[@]}"
+    full_cmd="${full_cmd% }"  # Remove trailing space
+    search_console_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm cli bash -c '${full_cmd}'"
+  else
+    search_console_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm cli bash -c 'php ./bin/console oro:search:${search_cmd}'"
+  fi
   run_with_spinner "Executing oro:search:${search_cmd}" "$search_console_cmd" || exit $?
 fi

@@ -208,6 +208,8 @@ if [[ "$*" == *"-d"* ]]; then
   msg_info ""
 else
   # Foreground mode - show full output
+  # Note: In foreground mode, docker compose up shows logs in real-time and doesn't exit
+  # Spinner is not appropriate here as the command runs continuously
   # Show dashboard info before starting (containers will start and keep running)
   msg_info ""
   msg_info "Proxy will be available at:"

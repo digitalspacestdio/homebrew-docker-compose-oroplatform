@@ -1,55 +1,10 @@
 #!/bin/bash
-set -e
-if [ "$DEBUG" ]; then set -x; fi
-
-# Determine script directory and source libraries
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/lib/common.sh"
-source "${SCRIPT_DIR}/lib/ui.sh"
-source "${SCRIPT_DIR}/lib/environment.sh"
-
-# Determine project directory (same logic as init.sh and initialize_environment)
-# Codex works without full project initialization, but needs DC_ORO_APPDIR for CMS detection
-if [[ -z "${DC_ORO_APPDIR:-}" ]]; then
-  PROJECT_DIR=$(find-up composer.json)
-fi
-if [[ -z "$PROJECT_DIR" ]]; then
-  PROJECT_DIR=$(find-up .env.orodc)
-fi
-if [[ -z "$PROJECT_DIR" ]]; then
-  PROJECT_DIR="$PWD"
-fi
-export DC_ORO_APPDIR="$PROJECT_DIR"
-
-# Determine project name for config lookup
-PROJECT_NAME=$(basename "$PROJECT_DIR")
-if [[ "$PROJECT_NAME" == "$HOME" ]] || [[ -z "$PROJECT_NAME" ]] || [[ "$PROJECT_NAME" == "/" ]]; then
-  PROJECT_NAME="default"
-fi
-
-# Load .env.orodc files to get DC_ORO_CMS_TYPE and other config
-# Priority: local > global (same as initialize_environment)
-local_config_file="$PROJECT_DIR/.env.orodc"
-global_config_file="${HOME}/.orodc/${PROJECT_NAME}/.env.orodc"
-
-# Load global config first (lower priority)
-if [[ -f "$global_config_file" ]]; then
-  load_env_safe "$global_config_file"
-fi
-
-# Load local config last (higher priority, overrides global)
-if [[ -f "$local_config_file" ]]; then
-  load_env_safe "$local_config_file"
-fi
-
-# Set DC_ORO_PROJECT_NAME variable for use in system prompt
-export DC_ORO_PROJECT_NAME="$PROJECT_NAME"
-
-# Check if Codex CLI is installed
-CODEX_BIN=$(resolve_bin "codex" "Codex CLI is required. Install from: https://github.com/context7/codex-cli")
+# System prompt generation library for AI agents
+# This library provides unified functions for generating system prompts for all AI agents
 
 # Detect or load CMS type
-get_cms_type_for_codex() {
+# Normalizes: base -> php-generic
+get_cms_type() {
   local cms_type
   # Load from environment if available (from .env.orodc)
   if [[ -n "${DC_ORO_CMS_TYPE:-}" ]]; then
@@ -59,7 +14,7 @@ get_cms_type_for_codex() {
     cms_type=$(detect_application_kind)
   fi
   
-  # Normalize: base -> php-generic for Codex
+  # Normalize: base -> php-generic
   if [[ "$cms_type" == "base" ]]; then
     echo "php-generic"
   else
@@ -67,7 +22,8 @@ get_cms_type_for_codex() {
   fi
 }
 
-# Get documentation context for Codex
+# Get documentation context
+# Returns path to README.md (project or OroDC) or temp file with help output
 get_documentation_context() {
   local project_dir="${DC_ORO_APPDIR:-$PWD}"
   local orodc_readme=""
@@ -79,8 +35,13 @@ get_documentation_context() {
   local bin_orodc=""
   if command -v orodc >/dev/null 2>&1; then
     bin_orodc=$(command -v orodc)
-  elif [[ -f "${SCRIPT_DIR}/../../bin/orodc" ]]; then
-    bin_orodc="${SCRIPT_DIR}/../../bin/orodc"
+  else
+    # Try to find relative to libexec/orodc/lib/system-prompt.sh
+    local lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+    local libexec_dir="$(cd "$lib_dir/.." && pwd)"
+    if [[ -f "$libexec_dir/../../bin/orodc" ]]; then
+      bin_orodc="$(cd "$libexec_dir/../../bin" && pwd)/orodc"
+    fi
   fi
   
   if [[ -n "$bin_orodc" ]]; then
@@ -112,7 +73,11 @@ get_documentation_context() {
   fi
 }
 
-# Generate system prompt for Codex
+# Generate system prompt
+# Arguments:
+#   $1 - CMS type
+#   $2 - Documentation context (file path or content)
+#   $3 - Agents source directory (path to agents/ folder)
 generate_system_prompt() {
   local cms_type="$1"
   local doc_context="$2"
@@ -149,6 +114,24 @@ generate_system_prompt() {
   local common_content=""
   if [[ -f "${agents_source_dir}/AGENTS_common.md" ]]; then
     common_content=$(cat "${agents_source_dir}/AGENTS_common.md")
+  fi
+  
+  # Generate application URLs based on CMS type
+  local application_urls=""
+  if [[ -n "${DC_ORO_NAME:-}" ]]; then
+    case "$cms_type" in
+      oro|magento)
+        application_urls="- Frontend: https://${DC_ORO_NAME}.docker.local
+- Admin Panel: https://${DC_ORO_NAME}.docker.local/admin"
+        ;;
+      wintercms)
+        application_urls="- Frontend: https://${DC_ORO_NAME}.docker.local
+- Admin Panel: https://${DC_ORO_NAME}.docker.local/backend"
+        ;;
+      *)
+        application_urls="- Application: https://${DC_ORO_NAME}.docker.local"
+        ;;
+    esac
   fi
   
   cat <<EOF
@@ -246,7 +229,7 @@ You are an AI coding assistant specialized in helping developers work with OroDC
 - ALWAYS use OroDC commands (\`orodc <command>\`) for ALL operations
 - NEVER suggest direct Docker or docker-compose commands unless explicitly required
 - **CRITICAL**: NEVER suggest running \`orodc init\` - it must be executed by user BEFORE launching agent
-- \`orodc init\` is NOT interactive and requires user to run it manually in terminal before using \`orodc codex\`
+- \`orodc init\` is NOT interactive and requires user to run it manually in terminal before using agent
 - If environment is not initialized, inform user they need to run \`orodc init\` manually in their terminal first
 - Note: \`orodc init\` configures the OroDC Docker environment, not the project codebase
 - Follow OroDC conventions and project structure strictly
@@ -370,21 +353,7 @@ ${common_content}
 - Run \`orodc agents installation ${cms_file_type}\` to see installation guide for ${cms_type}
 
 **Application URLs:**
-$(if [[ -n "${DC_ORO_NAME:-}" ]]; then
-  case "$cms_type" in
-    oro|magento)
-      echo "- Frontend: https://${DC_ORO_NAME}.docker.local"
-      echo "- Admin Panel: https://${DC_ORO_NAME}.docker.local/admin"
-      ;;
-    wintercms)
-      echo "- Frontend: https://${DC_ORO_NAME}.docker.local"
-      echo "- Admin Panel: https://${DC_ORO_NAME}.docker.local/backend"
-      ;;
-    *)
-      echo "- Application: https://${DC_ORO_NAME}.docker.local"
-      ;;
-  esac
-fi)
+${application_urls}
 
 # DOCUMENTATION
 
@@ -457,21 +426,49 @@ ${doc_context}
 EOF
 }
 
-# Main execution
-main() {
-  # Detect CMS type
-  local cms_type=$(get_cms_type_for_codex)
-  msg_info "Detected CMS type: $cms_type"
+# Prepare project environment for AI agent
+# Sets up project directory, loads config, determines project name
+prepare_project_environment() {
+  # Determine project directory (same logic as init.sh and initialize_environment)
+  # AI agents work without full project initialization, but need DC_ORO_APPDIR for CMS detection
+  if [[ -z "${DC_ORO_APPDIR:-}" ]]; then
+    PROJECT_DIR=$(find-up composer.json)
+  fi
+  if [[ -z "$PROJECT_DIR" ]]; then
+    PROJECT_DIR=$(find-up .env.orodc)
+  fi
+  if [[ -z "$PROJECT_DIR" ]]; then
+    PROJECT_DIR="$PWD"
+  fi
+  export DC_ORO_APPDIR="$PROJECT_DIR"
   
-  # Get documentation context
-  local doc_context=$(get_documentation_context)
-  if [[ -f "$doc_context" ]]; then
-    msg_info "Using documentation: $doc_context"
-  else
-    msg_info "Using orodc help output as documentation"
+  # Determine project name for config lookup
+  PROJECT_NAME=$(basename "$PROJECT_DIR")
+  if [[ "$PROJECT_NAME" == "$HOME" ]] || [[ -z "$PROJECT_NAME" ]] || [[ "$PROJECT_NAME" == "/" ]]; then
+    PROJECT_NAME="default"
   fi
   
-  # Determine project name for AGENTS.md file location
+  # Load .env.orodc files to get DC_ORO_CMS_TYPE and other config
+  # Priority: local > global (same as initialize_environment)
+  local_config_file="$PROJECT_DIR/.env.orodc"
+  global_config_file="${HOME}/.orodc/${PROJECT_NAME}/.env.orodc"
+  
+  # Load global config first (lower priority)
+  if [[ -f "$global_config_file" ]]; then
+    load_env_safe "$global_config_file"
+  fi
+  
+  # Load local config last (higher priority, overrides global)
+  if [[ -f "$local_config_file" ]]; then
+    load_env_safe "$local_config_file"
+  fi
+  
+  # Set DC_ORO_PROJECT_NAME variable for use in system prompt
+  export DC_ORO_PROJECT_NAME="$PROJECT_NAME"
+}
+
+# Get project name for AGENTS.md file location
+get_project_name() {
   local project_name=""
   if [[ -n "${DC_ORO_NAME:-}" ]]; then
     project_name="$DC_ORO_NAME"
@@ -486,43 +483,12 @@ main() {
     project_name="default"
   fi
   
-  # Create AGENTS.md file in ~/.orodc/{project_name}/ directory
-  local agents_dir="${HOME}/.orodc/${project_name}"
-  local agents_file="${agents_dir}/AGENTS.md"
-  mkdir -p "$agents_dir"
-  
-  # Normalize CMS type for file names (php-generic -> php-generic, base -> php-generic)
-  local cms_file_type="$cms_type"
-  if [[ "$cms_file_type" == "base" ]]; then
-    cms_file_type="php-generic"
-  fi
-  
-  # No need to copy agent files - orodc agents command reads directly from source directory
-  # Only generate system prompt file (AGENTS.md) which references orodc agents commands
-  local agents_source_dir="${SCRIPT_DIR}/agents"
-  generate_system_prompt "$cms_type" "$doc_context" "$agents_source_dir" > "$agents_file"
-  msg_info "Created system prompt file: $agents_file"
-  
-  # Track temp files for cleanup (only help output, not AGENTS.md - it should persist)
-  local temp_files=()
-  if [[ ! -f "$doc_context" ]] || [[ "$doc_context" == /tmp/orodc-help.* ]]; then
-    temp_files+=("$doc_context")
-  fi
-  
-  # Cleanup temp files on exit (AGENTS.md is not in temp_files, so it will persist)
-  if [[ ${#temp_files[@]} -gt 0 ]]; then
-    cleanup_temp_files() {
-      rm -f "${temp_files[@]}"
-    }
-    trap cleanup_temp_files EXIT
-  fi
-  
-  # Execute Codex CLI with all passed arguments
-  # Codex CLI accepts [PROMPT] as optional first argument for initial prompt
-  # System prompt is passed via experimental_instructions_file config pointing to AGENTS.md
-  msg_info "Launching Codex CLI with CMS type: $cms_type"
-  
-  # Pass Docker access to Codex CLI via environment variables
+  echo "$project_name"
+}
+
+# Export Docker and project context variables for AI agent
+export_environment_context() {
+  # Pass Docker access to AI agent via environment variables
   # These variables are set by initialize_environment if project is initialized
   if [[ -n "${DOCKER_BIN:-}" ]]; then
     export DOCKER_BIN
@@ -543,46 +509,4 @@ main() {
   if [[ -n "${DC_ORO_APPDIR:-}" ]]; then
     export DC_ORO_APPDIR
   fi
-  
-  # Pass system prompt and context via environment variables (for reference)
-  export CODEX_SYSTEM_PROMPT="$(cat "$agents_file")"
-  export CODEX_CMS_TYPE="$cms_type"
-  export CODEX_DOC_CONTEXT="$doc_context"
-  
-  # Build Codex CLI arguments
-  # Codex CLI uses experimental_instructions_file for system prompt
-  # First argument (if provided) is the user prompt, not a subcommand
-  local codex_args=()
-  
-  # EXTREMELY DANGEROUS: Skip all confirmation prompts and execute commands without sandboxing
-  # This gives Codex full system access without any restrictions or safety checks
-  # Intended solely for running in environments that are externally sandboxed
-  codex_args+=("--dangerously-bypass-approvals-and-sandbox")
-  
-  # Set working directory to project directory if available
-  if [[ -n "${DC_ORO_APPDIR:-}" ]] && [[ -d "${DC_ORO_APPDIR}" ]]; then
-    codex_args+=("-C" "${DC_ORO_APPDIR}")
-  fi
-  
-  # Pass system prompt via experimental_instructions_file config
-  # AGENTS.md file is created in ~/.orodc/{project_name}/AGENTS.md
-  codex_args+=("-c" "experimental_instructions_file=\"${agents_file}\"")
-  
-  # If user provided arguments, pass them as user prompt (first positional argument)
-  # System prompt is already set via experimental_instructions_file
-  if [[ $# -gt 0 ]]; then
-    # User provided a prompt - pass all arguments as user prompt
-    codex_args+=("$@")
-  fi
-  
-  # Execute codex with arguments
-  # System prompt is set via experimental_instructions_file config
-  # User prompt (if provided) is passed as first positional argument after flags
-  
-  # Print command being executed (dark gray text)
-  msg_debug "Executing: $CODEX_BIN ${codex_args[*]}"
-  
-  exec "$CODEX_BIN" "${codex_args[@]}"
 }
-
-main "$@"
