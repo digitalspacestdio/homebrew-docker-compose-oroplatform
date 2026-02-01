@@ -13,6 +13,11 @@
 2. **Frontend build**: Step 9 is MANDATORY (static content deployment)
 3. **Step order**: Steps MUST be executed in order (DI compile → cache → static content)
 4. **Never skip CRITICAL steps**: Steps marked 🔴 must always be executed
+5. **🚨 NEVER SKIP STEPS - EVEN IF THEY SEEM ALREADY DONE**:
+   - **CRITICAL**: You MUST execute ALL steps from the checklist, even if you think they are already completed
+   - **DO NOT** skip Step 11 because `orodc status` shows containers running - you MUST run `orodc up -d` and `orodc ps` as written
+   - **DO NOT** skip any step because "it seems already done" - execute every step as specified
+   - **User permission required**: If you want to skip ANY step, you MUST ask user for explicit permission: "Step X says to do Y, but it seems already done. Should I skip it or execute it anyway?"
 
 **Magento-specific critical steps:**
 - **Step 6**: Sample Data → REQUIRED if user requests demo data
@@ -349,17 +354,20 @@ orodc exec bin/magento cache:flush
 
 ### Step 11: Ensure Containers Are Running
 
-**REQUIRED**: Verify and ensure all containers are running:
+**🔴 REQUIRED - NEVER SKIP THIS STEP**: Verify and ensure all containers are running:
 
 ```bash
 orodc up -d
 orodc ps
 ```
 
-**IMPORTANT**: 
-- Run `orodc up -d` to ensure all containers are started
-- Verify with `orodc ps` that all containers show "Running" status
-- This is the final step before accessing the application
+**🚨 CRITICAL RULES**:
+- **MUST execute both commands**: Run `orodc up -d` AND `orodc ps` - do NOT skip even if containers seem running
+- **DO NOT skip because status shows running**: Even if `orodc status` shows containers running, you MUST execute Step 11 as written
+- **DO NOT make assumptions**: Do not assume containers are running - execute the commands to verify and ensure they are running
+- **This is a verification step**: This step ensures containers are running AND verifies their status - skipping it can cause issues
+- **User permission required**: If you want to skip this step, you MUST ask user: "Step 11 says to run `orodc up -d` and `orodc ps`, but containers seem running. Should I skip it or execute it anyway?"
+- This is the final step before accessing the application - it must be executed to ensure everything is ready
 
 ## Verification
 

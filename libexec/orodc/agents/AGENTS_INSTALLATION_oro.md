@@ -13,6 +13,11 @@
 2. **Frontend build**: Step 5 is MANDATORY (assets build)
 3. **Step order**: Steps MUST be executed in order
 4. **Never skip CRITICAL steps**: Steps marked 🔴 must always be executed
+5. **🚨 NEVER SKIP STEPS - EVEN IF THEY SEEM ALREADY DONE**:
+   - **CRITICAL**: You MUST execute ALL steps from the checklist, even if you think they are already completed
+   - **DO NOT** skip steps because "containers are already running" or "files already exist" or "status shows running"
+   - **DO NOT** make assumptions about what is already done - execute every step as written in the guide
+   - **User permission required**: If you want to skip ANY step, you MUST ask user for explicit permission: "Step X says to do Y, but it seems already done. Should I skip it or execute it anyway?"
 
 **Oro-specific critical steps:**
 - **Step 4**: oro:install with `--sample-data=y` → if user requests demo data
@@ -39,6 +44,7 @@
 - [ ] **Step 4: Install Oro Platform** - **🔴 Use `--sample-data=y` if user requests demo data**
 - [ ] **Step 5: Build assets (frontend)** - **🔴 CRITICAL, ALWAYS REQUIRED**
 - [ ] Step 6: Clear and warm up cache
+- [ ] **Step 7: Ensure containers are running** - **🔴 REQUIRED - NEVER SKIP THIS STEP** (`orodc up -d` and `orodc ps`)
 
 ### Final Verification Checklist
 
@@ -224,6 +230,23 @@ orodc exec bin/console cache:clear
 orodc exec bin/console cache:warmup
 ```
 
+### Step 7: Ensure Containers Are Running
+
+**🔴 REQUIRED - NEVER SKIP THIS STEP**: Verify and ensure all containers are running:
+
+```bash
+orodc up -d
+orodc ps
+```
+
+**🚨 CRITICAL RULES**:
+- **MUST execute both commands**: Run `orodc up -d` AND `orodc ps` - do NOT skip even if containers seem running
+- **DO NOT skip because status shows running**: Even if `orodc status` shows containers running, you MUST execute Step 7 as written
+- **DO NOT make assumptions**: Do not assume containers are running - execute the commands to verify and ensure they are running
+- **This is a verification step**: This step ensures containers are running AND verifies their status - skipping it can cause issues
+- **User permission required**: If you want to skip this step, you MUST ask user: "Step 7 says to run `orodc up -d` and `orodc ps`, but containers seem running. Should I skip it or execute it anyway?"
+- This is the final step before accessing the application - it must be executed to ensure everything is ready
+
 ## Verification
 
 - **Frontend**: `https://{project_name}.docker.local`
@@ -236,8 +259,9 @@ orodc exec bin/console cache:warmup
 
 1. **Demo data (Step 4)**: If user requests demo data → use `--sample-data=y`
 2. **Frontend build (Step 5)**: ALWAYS execute - frontend will not work without it
-3. **Step order**: install → assets build → cache clear/warmup
+3. **Step order**: install → assets build → cache clear/warmup → verify containers
 4. **Never skip CRITICAL**: Steps marked 🔴 must always be executed
+5. **Final step required**: Always run `orodc up -d` and `orodc ps` at the end (Step 7) to ensure containers are running before accessing the application
 
 ### Oro-Specific Notes:
 
