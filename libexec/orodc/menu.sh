@@ -662,18 +662,43 @@ show_interactive_menu() {
           return
         }
         
+        debug_log "menu switch: cd to '$selected_path' succeeded, PWD='$PWD'"
+        
         # Clear environment variables to force reinitialization
         unset ORODC_ENV_INITIALIZED
         unset DC_ORO_NAME
         unset DC_ORO_APPDIR
         unset DC_ORO_CONFIG_DIR
         
-        # Reinitialize environment
-        initialize_environment 2>/dev/null || true
+        # Also set ORODC_SELECTED_ENV_* for bin/orodc compatibility
+        # These variables tell bin/orodc which environment we switched to
+        local env_name=$(basename "$selected_path")
+        export ORODC_SELECTED_ENV_NAME="$env_name"
+        export ORODC_SELECTED_ENV_PATH="$selected_path"
+        export ORODC_SELECTED_ENV_CONFIG="${HOME}/.orodc/${env_name}"
+        
+        debug_log "menu switch: set ORODC_SELECTED_ENV_NAME='$env_name' PATH='$selected_path'"
+        
+        # Reinitialize environment - show errors for debugging
+        if ! initialize_environment; then
+          msg_warning "Environment initialization had issues, but continuing..." >&2
+          debug_log "menu switch: initialize_environment returned non-zero"
+        fi
+        
+        debug_log "menu switch: after initialize_environment DC_ORO_NAME='${DC_ORO_NAME:-}' DC_ORO_APPDIR='${DC_ORO_APPDIR:-}'"
+        
+        # Verify that environment was initialized correctly
+        if [[ -z "${DC_ORO_NAME:-}" ]] || [[ -z "${DC_ORO_APPDIR:-}" ]]; then
+          # Fallback: set from selected_path if initialize_environment didn't set them
+          export DC_ORO_NAME="$env_name"
+          export DC_ORO_APPDIR="$selected_path"
+          export DC_ORO_CONFIG_DIR="${HOME}/.orodc/${env_name}"
+          debug_log "menu switch: fallback - set DC_ORO_NAME='$env_name' DC_ORO_APPDIR='$selected_path'"
+        fi
         
         # Show success message
         echo "" >&2
-        msg_ok "Switched to environment: $(basename "$selected_path") (exit code: 0)" >&2
+        msg_ok "Switched to environment: ${DC_ORO_NAME:-$(basename "$selected_path")} (exit code: 0)" >&2
         echo "" >&2
         
         # Restart menu
