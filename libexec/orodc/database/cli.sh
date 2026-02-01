@@ -17,6 +17,10 @@ if [[ $# -eq 0 ]]; then
   set -- "bash"
 fi
 
+# Ensure appcode volume exists before starting containers
+source "${SCRIPT_DIR}/../lib/docker-utils.sh"
+ensure_appcode_volume
+
 # Ensure dependencies are started before running command
 # This prevents "Creating..." and "Starting..." messages from appearing during run
 # Build cli image first (if needed) to avoid "No services to build" warnings during run

@@ -3439,6 +3439,9 @@ execute_in_container() {
     
     run_cmd="$run_cmd $service"
     
+    # Ensure appcode volume exists before starting service
+    ensure_appcode_volume
+    
     # Start the service in background first
     ${DOCKER_COMPOSE_BIN_CMD} up -d "$service" >/dev/null 2>&1
     
