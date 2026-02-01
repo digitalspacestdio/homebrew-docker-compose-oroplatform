@@ -70,6 +70,8 @@ services:
       - 'NODE_OPTIONS="--max-old-space-size=1024"'
       - 'SYMFONY_ENV=${SYMFONY_ENV:-dev}'
       - 'XDEBUG_MODE=${XDEBUG_MODE_CONSUMER:-off}'
+      - 'GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
+      - 'ORO_GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
     depends_on:
       database:
         condition: service_healthy
@@ -80,6 +82,8 @@ services:
       redis:
         condition: service_healthy
       mail:
+        condition: service_healthy
+      gotenberg:
         condition: service_healthy
       fpm:
         condition: service_healthy

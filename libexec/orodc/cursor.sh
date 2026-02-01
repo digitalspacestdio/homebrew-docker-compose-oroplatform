@@ -9,7 +9,7 @@ source "${SCRIPT_DIR}/lib/ui.sh"
 source "${SCRIPT_DIR}/lib/environment.sh"
 
 # Determine project directory (same logic as init.sh and initialize_environment)
-# Gemini works without full project initialization, but needs DC_ORO_APPDIR for CMS detection
+# Cursor works without full project initialization, but needs DC_ORO_APPDIR for CMS detection
 if [[ -z "${DC_ORO_APPDIR:-}" ]]; then
   PROJECT_DIR=$(find-up composer.json)
 fi
@@ -21,7 +21,7 @@ if [[ -z "$PROJECT_DIR" ]]; then
 fi
 export DC_ORO_APPDIR="$PROJECT_DIR"
 
-# Determine project name for config lookup
+# Determine project name for b.,config lookup
 PROJECT_NAME=$(basename "$PROJECT_DIR")
 if [[ "$PROJECT_NAME" == "$HOME" ]] || [[ -z "$PROJECT_NAME" ]] || [[ "$PROJECT_NAME" == "/" ]]; then
   PROJECT_NAME="default"
@@ -45,11 +45,12 @@ fi
 # Set DC_ORO_PROJECT_NAME variable for use in system prompt
 export DC_ORO_PROJECT_NAME="$PROJECT_NAME"
 
-# Check if Gemini CLI is installed
-GEMINI_BIN=$(resolve_bin "gemini" "Gemini CLI is required. Install from: https://github.com/context7/gemini-cli")
+# Check if Cursor CLI is installed
+# Cursor CLI command is 'agent', not 'cursor'
+CURSOR_BIN=$(resolve_bin "agent" "Cursor CLI is required. Install from: https://cursor.com/docs/cli/installation")
 
 # Detect or load CMS type
-get_cms_type_for_gemini() {
+get_cms_type_for_cursor() {
   local cms_type
   # Load from environment if available (from .env.orodc)
   if [[ -n "${DC_ORO_CMS_TYPE:-}" ]]; then
@@ -59,7 +60,7 @@ get_cms_type_for_gemini() {
     cms_type=$(detect_application_kind)
   fi
   
-  # Normalize: base -> php-generic for Gemini
+  # Normalize: base -> php-generic for Cursor
   if [[ "$cms_type" == "base" ]]; then
     echo "php-generic"
   else
@@ -67,7 +68,7 @@ get_cms_type_for_gemini() {
   fi
 }
 
-# Get documentation context for Gemini
+# Get documentation context for Cursor
 get_documentation_context() {
   local project_dir="${DC_ORO_APPDIR:-$PWD}"
   local orodc_readme=""
@@ -112,7 +113,7 @@ get_documentation_context() {
   fi
 }
 
-# Generate system prompt for Gemini
+# Generate system prompt for Cursor
 generate_system_prompt() {
   local cms_type="$1"
   local doc_context="$2"
@@ -149,6 +150,24 @@ generate_system_prompt() {
   local common_content=""
   if [[ -f "${agents_source_dir}/AGENTS_common.md" ]]; then
     common_content=$(cat "${agents_source_dir}/AGENTS_common.md")
+  fi
+  
+  # Generate application URLs based on CMS type
+  local application_urls=""
+  if [[ -n "${DC_ORO_NAME:-}" ]]; then
+    case "$cms_type" in
+      oro|magento)
+        application_urls="- Frontend: https://${DC_ORO_NAME}.docker.local
+- Admin Panel: https://${DC_ORO_NAME}.docker.local/admin"
+        ;;
+      wintercms)
+        application_urls="- Frontend: https://${DC_ORO_NAME}.docker.local
+- Admin Panel: https://${DC_ORO_NAME}.docker.local/backend"
+        ;;
+      *)
+        application_urls="- Application: https://${DC_ORO_NAME}.docker.local"
+        ;;
+    esac
   fi
   
   cat <<EOF
@@ -235,9 +254,10 @@ You are an AI coding assistant specialized in helping developers work with OroDC
   - Framework-specific files (\`bin/console\`, \`bin/magento\`, \`artisan\`, etc.)
   - Existing code structure
 - If project exists: work with existing codebase, help modify and improve it
-- If project doesn't exist (empty directory): **MUST follow installation guide from \`orodc agents installation\`**
+- If project doesn't exist (empty directory): **MUST follow installation guide**
+  - **Run \`orodc agents installation\`** to get complete installation guide (common + CMS-specific steps)
   - Create project using \`orodc exec composer create-project\` or \`orodc exec git clone\` (depending on CMS type)
-  - Follow ALL steps from installation guide (run \`orodc agents installation\` to see full guide)
+  - Follow ALL steps from the guide shown by \`orodc agents installation\`
   - Never skip installation steps
 - **ONLY use \`orodc exec\`** when you need to run commands INSIDE containers (after containers are running)
 
@@ -245,7 +265,7 @@ You are an AI coding assistant specialized in helping developers work with OroDC
 - ALWAYS use OroDC commands (\`orodc <command>\`) for ALL operations
 - NEVER suggest direct Docker or docker-compose commands unless explicitly required
 - **CRITICAL**: NEVER suggest running \`orodc init\` - it must be executed by user BEFORE launching agent
-- \`orodc init\` is NOT interactive and requires user to run it manually in terminal before using \`orodc gemini\`
+- \`orodc init\` is NOT interactive and requires user to run it manually in terminal before using \`orodc cursor\`
 - If environment is not initialized, inform user they need to run \`orodc init\` manually in their terminal first
 - Note: \`orodc init\` configures the OroDC Docker environment, not the project codebase
 - Follow OroDC conventions and project structure strictly
@@ -369,21 +389,7 @@ ${common_content}
 - Run \`orodc agents installation ${cms_file_type}\` to see installation guide for ${cms_type}
 
 **Application URLs:**
-$(if [[ -n "${DC_ORO_NAME:-}" ]]; then
-  case "$cms_type" in
-    oro|magento)
-      echo "- Frontend: https://${DC_ORO_NAME}.docker.local"
-      echo "- Admin Panel: https://${DC_ORO_NAME}.docker.local/admin"
-      ;;
-    wintercms)
-      echo "- Frontend: https://${DC_ORO_NAME}.docker.local"
-      echo "- Admin Panel: https://${DC_ORO_NAME}.docker.local/backend"
-      ;;
-    *)
-      echo "- Application: https://${DC_ORO_NAME}.docker.local"
-      ;;
-  esac
-fi)
+${application_urls}
 
 # DOCUMENTATION
 
@@ -459,7 +465,7 @@ EOF
 # Main execution
 main() {
   # Detect CMS type
-  local cms_type=$(get_cms_type_for_gemini)
+  local cms_type=$(get_cms_type_for_cursor)
   msg_info "Detected CMS type: $cms_type"
   
   # Get documentation context
@@ -516,12 +522,13 @@ main() {
     trap cleanup_temp_files EXIT
   fi
   
-  # Execute Gemini CLI with all passed arguments
-  # Gemini CLI accepts [query..] as positional arguments for initial prompt
-  # System prompt is passed via GEMINI_SYSTEM_MD environment variable pointing to AGENTS.md
-  msg_info "Launching Gemini CLI with CMS type: $cms_type"
+  # Execute Cursor CLI with all passed arguments
+  # Cursor CLI accepts [query..] as positional arguments for initial prompt
+  # System prompt is passed via .cursorrules file or environment variable
+  # Based on Cursor CLI documentation, we'll use .cursorrules file in project directory
+  msg_info "Launching Cursor CLI with CMS type: $cms_type"
   
-  # Pass Docker access to Gemini CLI via environment variables
+  # Pass Docker access to Cursor CLI via environment variables
   # These variables are set by initialize_environment if project is initialized
   if [[ -n "${DOCKER_BIN:-}" ]]; then
     export DOCKER_BIN
@@ -543,48 +550,73 @@ main() {
     export DC_ORO_APPDIR
   fi
   
-  # Pass system prompt via GEMINI_SYSTEM_MD environment variable
-  # Gemini CLI will use this file as the system prompt
-  # AGENTS.md file is created in ~/.orodc/{project_name}/AGENTS.md
-  export GEMINI_SYSTEM_MD="$agents_file"
+  # Create .cursorrules file in project directory with system prompt
+  # Cursor CLI reads .cursorrules from the current working directory
+  local project_dir="${DC_ORO_APPDIR:-$PWD}"
+  local cursorrules_file="${project_dir}/.cursorrules"
   
-  # Pass context via environment variables (for reference)
-  export GEMINI_SYSTEM_PROMPT="$(cat "$agents_file")"
-  export GEMINI_CMS_TYPE="$cms_type"
-  export GEMINI_DOC_CONTEXT="$doc_context"
-  
-  # Build Gemini CLI arguments
-  # Gemini CLI uses positional arguments for user prompt
-  local gemini_args=()
-  
-  # EXTREMELY DANGEROUS: Skip all confirmation prompts and execute commands without sandboxing
-  # This gives Gemini full system access without any restrictions or safety checks
-  # Intended solely for running in environments that are externally sandboxed
-  # Use --yolo flag (equivalent to --approval-mode yolo)
-  gemini_args+=("--yolo")
-  
-  # If user provided arguments, pass them as positional prompt arguments
-  # System prompt is already set via GEMINI_SYSTEM_MD environment variable
-  if [[ $# -gt 0 ]]; then
-    # User provided a prompt - pass all arguments as positional prompt
-    gemini_args+=("$@")
+  # Backup existing .cursorrules if it exists
+  local cursorrules_backup=""
+  if [[ -f "$cursorrules_file" ]]; then
+    cursorrules_backup="${cursorrules_file}.orodc-backup-$(date +%s)"
+    cp "$cursorrules_file" "$cursorrules_backup"
+    msg_info "Backed up existing .cursorrules to: $cursorrules_backup"
   fi
   
-  # Change to project directory if available (Gemini CLI works in current directory)
+  # Write system prompt to .cursorrules file
+  generate_system_prompt "$cms_type" "$doc_context" "$agents_source_dir" > "$cursorrules_file"
+  msg_info "Created .cursorrules file: $cursorrules_file"
+  
+  # Cleanup function to restore original .cursorrules if needed
+  cleanup_cursorrules() {
+    if [[ -n "$cursorrules_backup" ]] && [[ -f "$cursorrules_backup" ]]; then
+      mv "$cursorrules_backup" "$cursorrules_file"
+      msg_info "Restored original .cursorrules file"
+    elif [[ -f "$cursorrules_file" ]]; then
+      # Only remove if we created it (no backup means it didn't exist before)
+      if [[ -z "$cursorrules_backup" ]]; then
+        rm -f "$cursorrules_file"
+        msg_info "Removed temporary .cursorrules file"
+      fi
+    fi
+  }
+  
+  # Set trap to restore .cursorrules on exit (but don't restore - let user keep it)
+  # Actually, we should keep the .cursorrules file for the user, so we won't restore it
+  # Only restore if there was a backup (user had existing .cursorrules)
+  # But actually, let's keep it - it's useful for the user
+  
+  # Pass context via environment variables (for reference)
+  export CURSOR_SYSTEM_PROMPT="$(cat "$agents_file")"
+  export CURSOR_CMS_TYPE="$cms_type"
+  export CURSOR_DOC_CONTEXT="$doc_context"
+  
+  # Build Cursor CLI arguments
+  # Cursor CLI uses positional arguments for user prompt
+  local cursor_args=()
+  
+  # Change to project directory if available (Cursor CLI works in current directory)
   if [[ -n "${DC_ORO_APPDIR:-}" ]] && [[ -d "${DC_ORO_APPDIR}" ]]; then
     cd "${DC_ORO_APPDIR}" || true
   fi
   
-  # Execute gemini with arguments
-  # System prompt is set via GEMINI_SYSTEM_MD environment variable
+  # If user provided arguments, pass them as positional prompt arguments
+  # System prompt is already set via .cursorrules file
+  if [[ $# -gt 0 ]]; then
+    # User provided a prompt - pass all arguments as positional prompt
+    cursor_args+=("$@")
+  fi
+  
+  # Execute cursor with arguments
+  # System prompt is set via .cursorrules file in project directory
   # User prompt (if provided) is passed as positional arguments
   
   # Print command being executed (dark gray text)
-  msg_debug "Executing: $GEMINI_BIN ${gemini_args[*]}"
-  msg_debug "System prompt file: $agents_file"
+  msg_debug "Executing: $CURSOR_BIN ${cursor_args[*]}"
+  msg_debug "System prompt file: $cursorrules_file"
   msg_debug "Working directory: $PWD"
   
-  exec "$GEMINI_BIN" "${gemini_args[@]}"
+  exec "$CURSOR_BIN" "${cursor_args[@]}"
 }
 
 main "$@"

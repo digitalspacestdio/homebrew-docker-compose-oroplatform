@@ -162,7 +162,7 @@ show_interactive_menu() {
   
   # Interactive selection with arrow keys
   local selected=1
-  local total_options=23
+  local total_options=24
   local choice=""
   
   # Function to truncate text to maximum length
@@ -289,7 +289,7 @@ show_interactive_menu() {
     printf "\033[0m\033[?25h" >&2
     tput sgr0 2>/dev/null || true
     stty sane 2>/dev/null || true
-    echo -n "Use ↑↓ arrows to navigate, or type number [1-23], 'v' for VERBOSE, 'q' to quit: " >&2
+    echo -n "Use ↑↓ arrows to navigate, or type number [1-24], 'v' for VERBOSE, 'q' to quit: " >&2
     # Display input buffer if user is typing a number
     if [[ -n "$input_buf" ]]; then
       printf "%s" "$input_buf" >&2
@@ -332,6 +332,7 @@ show_interactive_menu() {
       "Install dependencies"
       "Start proxy"
       "Stop proxy"
+      "Install proxy certificates"
     )
     
     # Helper function to render a single cell
@@ -394,6 +395,7 @@ show_interactive_menu() {
       local sel=$1
       render_cell 22 $((sel == 22))
       render_cell 23 $((sel == 23))
+      render_cell 24 $((sel == 24))
     }
     
     # Helper to get item from group by index
@@ -447,10 +449,10 @@ show_interactive_menu() {
       printf "  \033[1;31m%-32s\033[0m  \033[1;37m%-32s\033[0m\n" "Oro Maintenance:" "Proxy:" >&2
       printf "\033[0m" >&2
       
-      # Oro has 6 items, Proxy has 2
+      # Oro has 6 items, Proxy has 3
       get_group_item oro 0 $sel; get_group_item proxy 0 $sel; echo "" >&2
       get_group_item oro 1 $sel; get_group_item proxy 1 $sel; echo "" >&2
-      get_group_item oro 2 $sel; printf "  %-32s" "" >&2; echo "" >&2
+      get_group_item oro 2 $sel; get_group_item proxy 2 $sel; echo "" >&2
       get_group_item oro 3 $sel; printf "  %-32s" "" >&2; echo "" >&2
       get_group_item oro 4 $sel; printf "  %-32s" "" >&2; echo "" >&2
       get_group_item oro 5 $sel; printf "  %-32s" "" >&2; echo "" >&2
@@ -561,7 +563,7 @@ show_interactive_menu() {
         num_input="${key}${second_digit}"
       fi
       # Validate number and update selection (always wait for Enter in next iteration)
-      if [[ "$num_input" =~ ^[1-9]$ ]] || [[ "$num_input" =~ ^1[0-9]$ ]] || [[ "$num_input" == "20" ]] || [[ "$num_input" == "21" ]] || [[ "$num_input" == "22" ]] || [[ "$num_input" == "23" ]]; then
+      if [[ "$num_input" =~ ^[1-9]$ ]] || [[ "$num_input" =~ ^1[0-9]$ ]] || [[ "$num_input" == "20" ]] || [[ "$num_input" == "21" ]] || [[ "$num_input" == "22" ]] || [[ "$num_input" == "23" ]] || [[ "$num_input" == "24" ]]; then
         # Update selected option to match input, wait for Enter to confirm
         selected=$num_input
         redraw_menu_screen $selected $use_two_columns "$input_buffer" "$use_three_columns" "$status_display" || true
@@ -906,6 +908,9 @@ show_interactive_menu() {
       ;;
     23)
       run_command_with_menu_return proxy down
+      ;;
+    24)
+      run_command_with_menu_return proxy install-certs
       ;;
     v|V)
       if [[ -n "${VERBOSE:-}" ]]; then

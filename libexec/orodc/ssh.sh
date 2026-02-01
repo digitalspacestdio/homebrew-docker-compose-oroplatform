@@ -68,17 +68,17 @@ if [[ "$ssh_container_running" == "false" ]]; then
   fi
   
   # Try to start ssh container directly with docker compose
-  if [[ -n "${DEBUG:-}" ]]; then
-    # In debug mode, show output
+  if [[ -n "${DEBUG:-}" ]] || [[ -n "${VERBOSE:-}" ]]; then
+    # In debug/verbose mode, show output
     DC_ORO_NAME="$DC_ORO_NAME" ORO_SSH_PUBLIC_KEY="${ORO_SSH_PUBLIC_KEY:-}" bash -c "${DOCKER_COMPOSE_BIN_CMD} up -d ssh"
     start_result=$?
   else
-    # In normal mode, suppress output but capture errors
-    error_output=$(DC_ORO_NAME="$DC_ORO_NAME" ORO_SSH_PUBLIC_KEY="${ORO_SSH_PUBLIC_KEY:-}" bash -c "${DOCKER_COMPOSE_BIN_CMD} up -d ssh" 2>&1)
-    start_result=$?
-    if [[ $start_result -ne 0 ]]; then
-      # Show error output if failed
-      echo "$error_output" >&2
+    # In normal mode, use spinner
+    start_cmd="DC_ORO_NAME=\"$DC_ORO_NAME\" ORO_SSH_PUBLIC_KEY=\"${ORO_SSH_PUBLIC_KEY:-}\" bash -c \"${DOCKER_COMPOSE_BIN_CMD} up -d --quiet-pull --quiet-build ssh\""
+    if ! run_with_spinner "Starting SSH container" "$start_cmd"; then
+      start_result=1
+    else
+      start_result=0
     fi
   fi
   
@@ -181,10 +181,20 @@ if [[ ! -f "$SSH_KEY" ]]; then
     # If SSH container is running, restart it to apply the new key
     # Use 'up -d' instead of 'restart' to re-read environment variables
     if [[ "$ssh_container_running" == "true" ]]; then
-      msg_info "Restarting SSH container to apply new key..."
       set +e
-      DC_ORO_NAME="$DC_ORO_NAME" ORO_SSH_PUBLIC_KEY="$ORO_SSH_PUBLIC_KEY" bash -c "${DOCKER_COMPOSE_BIN_CMD} up -d ssh" >/dev/null 2>&1
-      restart_result=$?
+      if [[ -n "${DEBUG:-}" ]] || [[ -n "${VERBOSE:-}" ]]; then
+        # In debug/verbose mode, show output
+        DC_ORO_NAME="$DC_ORO_NAME" ORO_SSH_PUBLIC_KEY="$ORO_SSH_PUBLIC_KEY" bash -c "${DOCKER_COMPOSE_BIN_CMD} up -d ssh"
+        restart_result=$?
+      else
+        # In normal mode, use spinner
+        restart_cmd="DC_ORO_NAME=\"$DC_ORO_NAME\" ORO_SSH_PUBLIC_KEY=\"$ORO_SSH_PUBLIC_KEY\" bash -c \"${DOCKER_COMPOSE_BIN_CMD} up -d --quiet-pull --quiet-build ssh\""
+        if run_with_spinner "Restarting SSH container to apply new key" "$restart_cmd"; then
+          restart_result=0
+        else
+          restart_result=1
+        fi
+      fi
       set -e
       
       if [[ $restart_result -eq 0 ]]; then

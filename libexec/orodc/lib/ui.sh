@@ -148,13 +148,14 @@ run_with_spinner() {
   local cmd="$*"
 
   # If DEBUG or VERBOSE mode is enabled, or command contains verbose flags, run directly without spinner
+  # Show logs directly in verbose mode
   if [[ -n "${DEBUG:-}" ]] || [[ -n "${VERBOSE:-}" ]] || [[ "$cmd" =~ (--verbose|-vv) ]]; then
     msg_info "$message..."  # writes to stderr
     eval "$cmd"
     return $?
   fi
 
-  # Run with spinner
+  # Run with spinner (no logs during execution)
   local log_file
   log_file=$(mktemp /tmp/orodc-output.XXXXXX)
   local exit_code=0
@@ -185,20 +186,24 @@ run_with_spinner() {
     msg_error "Command failed (exit code: $exit_code)"  # writes to stderr
     echo "" >&2
 
-    # Show last 20 lines of the log (write to stderr for consistency)
-    local line_count=$(wc -l < "$log_file")
-    if [[ $line_count -gt 20 ]]; then
-      msg_info "Last 20 lines of output:"  # writes to stderr
-      echo "" >&2
-      tail -n 20 "$log_file" >&2  # writes to stderr
-      echo "" >&2
+    # Show last 100 lines of log on error
+    if [[ -f "$log_file" ]] && [[ -s "$log_file" ]]; then
+      local line_count=$(wc -l < "$log_file" 2>/dev/null || echo "0")
+      if [[ $line_count -gt 100 ]]; then
+        msg_info "Last 100 lines of output:"  # writes to stderr
+        echo "" >&2
+        tail -n 100 "$log_file" >&2  # writes to stderr
+        echo "" >&2
+      else
+        # If log is 100 lines or less, show everything (write to stderr)
+        cat "$log_file" >&2
+        echo "" >&2
+      fi
       msg_info "Full log available at: $log_file"  # writes to stderr
-      msg_info "View with: cat $log_file"  # writes to stderr
-    else
-      # If log is 20 lines or less, show everything (write to stderr)
-      cat "$log_file" >&2
       echo "" >&2
-      msg_info "Full log saved at: $log_file"  # writes to stderr
+    else
+      msg_info "Full log available at: $log_file"  # writes to stderr
+      echo "" >&2
     fi
 
     # Keep log file for user inspection

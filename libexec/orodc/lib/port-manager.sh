@@ -22,6 +22,7 @@ find_and_export_ports() {
   export DC_ORO_PORT_REDIS="${DC_ORO_PORT_REDIS:-${DC_ORO_PORT_PREFIX}79}"
   export DC_ORO_PORT_MAIL_WEBGUI="${DC_ORO_PORT_MAIL_WEBGUI:-${DC_ORO_PORT_PREFIX}25}"
   export DC_ORO_PORT_SSH="${DC_ORO_PORT_SSH:-${DC_ORO_PORT_PREFIX}22}"
+  export DC_ORO_PORT_GOTENBERG="${DC_ORO_PORT_GOTENBERG:-${DC_ORO_PORT_PREFIX}00}"
   debug_log "find_and_export_ports: STEP 1 - Base ports set with prefix"
 
   # Find orodc-find_free_port utility

@@ -15,20 +15,21 @@ check_in_project || exit 1
 cache_cmd="${1:-clear}"
 
 # Always remove cache directories through CLI container before executing cache command
+# docker compose run automatically starts containers if needed
+# -q flag suppresses docker compose output (Creating..., Starting...) but keeps command output
 if [[ "$cache_cmd" == "clear" ]]; then
-  # Remove all cache directories through CLI container with spinner
-  # Errors are treated as warnings - log is saved for user inspection
-  cache_clear_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm cli bash -c \"rm -rf var/cache/* || true\""
+  # Remove all cache directories through CLI container
+  # Errors are treated as warnings
+  cache_clear_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm -q cli bash -c \"rm -rf var/cache/* || true\""
   
-  # Use run_with_spinner like in start containers
-  # run_with_spinner will show spinner and handle logging automatically
-  # We capture exit code but don't exit - errors are treated as warnings
-  if ! run_with_spinner "Removing cache directories" "$cache_clear_cmd"; then
-    # Command failed - show warning (run_with_spinner already showed error and log location)
-    msg_warning "Some cache directories may not have been removed (see log above for details)"
+  if ! eval "$cache_clear_cmd"; then
+    # Command failed - show warning
+    msg_warning "Some cache directories may not have been removed"
   fi
 fi
 
-# Execute cache command in cli container with spinner
-cache_console_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm cli php ./bin/console \"cache:${cache_cmd}\" \"${@:2}\""
-run_with_spinner "Executing cache:${cache_cmd}" "$cache_console_cmd" || exit $?
+# Execute cache command in cli container
+# docker compose run automatically starts containers if needed
+# -q flag suppresses docker compose output (Creating..., Starting...) but keeps command output
+cache_console_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm -q cli php ./bin/console \"cache:${cache_cmd}\" \"${@:2}\""
+eval "$cache_console_cmd" || exit $?

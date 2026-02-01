@@ -206,7 +206,29 @@ handle_compose_up() {
     up_flags+=("--wait")
   fi
 
-  up_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} up --remove-orphans ${up_flags[*]} ${right_options[*]} ${docker_services}"
+  # Add quiet flags to suppress output when running with spinner
+  # This ensures spinner is visible and not overwritten by docker compose output
+  has_quiet_pull=false
+  has_quiet_build=false
+  for flag in "${up_flags[@]}"; do
+    if [[ "$flag" == "--quiet-pull" ]]; then
+      has_quiet_pull=true
+    fi
+    if [[ "$flag" == "--quiet-build" ]]; then
+      has_quiet_build=true
+    fi
+  done
+  
+  # Add quiet flags if not already present (only when running with spinner, not in verbose mode)
+  quiet_flags=()
+  if [[ "$has_quiet_pull" == "false" ]]; then
+    quiet_flags+=("--quiet-pull")
+  fi
+  if [[ "$has_quiet_build" == "false" ]]; then
+    quiet_flags+=("--quiet-build")
+  fi
+
+  up_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} up --remove-orphans ${quiet_flags[*]} ${up_flags[*]} ${right_options[*]} ${docker_services}"
   run_with_spinner "Starting services" "$up_cmd" || exit $?
 
   # Calculate total up time and save
@@ -243,10 +265,29 @@ show_service_urls() {
     proxy_running=true
   fi
 
-  # Show domain URL if proxy is running
+  # Show domain URLs if proxy is running
   if [[ "$proxy_running" == "true" ]]; then
+    # Main domain (bold green)
     # shellcheck disable=SC2059
     printf "\033[1;32m[${DC_ORO_NAME}] Application: https://${DC_ORO_NAME}.docker.local\033[0m\n"
+    
+    # Additional domains from DC_ORO_EXTRA_HOSTS
+    if [[ -n "${DC_ORO_EXTRA_HOSTS:-}" ]]; then
+      IFS=',' read -ra HOSTS <<< "$DC_ORO_EXTRA_HOSTS"
+      for host in "${HOSTS[@]}"; do
+        # Trim whitespace
+        host=$(echo "$host" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        if [[ -n "$host" ]]; then
+          # Auto-append .docker.local if host is a single word (no dots)
+          if [[ "$host" != *.* ]]; then
+            host="$host.docker.local"
+          fi
+          # shellcheck disable=SC2059
+          printf "\033[1;32m[${DC_ORO_NAME}] Application: https://${host}\033[0m\n"
+        fi
+      done
+    fi
+    
     echo "" >&2
   fi
 
@@ -254,7 +295,14 @@ show_service_urls() {
   # shellcheck disable=SC2059
   printf "\033[0;37m[${DC_ORO_NAME}] Application: http://localhost:${DC_ORO_PORT_NGINX}\033[0m\n"
   # shellcheck disable=SC2059
-  printf "\033[0;37m[${DC_ORO_NAME}] Mailhog: http://localhost:${DC_ORO_PORT_MAIL_WEBGUI}\033[0m\n"
+  printf "\033[0;37m[${DC_ORO_NAME}] Mailpit: http://localhost:${DC_ORO_PORT_MAIL_WEBGUI}\033[0m\n"
+  
+  # Show Mailpit alternative entry point on main domain if proxy is running
+  if [[ "$proxy_running" == "true" ]]; then
+    # shellcheck disable=SC2059
+    printf "\033[0;37m[${DC_ORO_NAME}] Mailpit: https://${DC_ORO_NAME}.docker.local/mailbox\033[0m\n"
+  fi
+  
   # shellcheck disable=SC2059
   printf "\033[0;37m[${DC_ORO_NAME}] Elasticsearch: http://localhost:${DC_ORO_PORT_SEARCH}\033[0m\n"
   # shellcheck disable=SC2059

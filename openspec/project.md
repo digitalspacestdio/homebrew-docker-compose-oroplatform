@@ -261,7 +261,18 @@ fi
 3. **Error Handling:**
    - On success: Log file is removed, success message displayed
    - On failure: Log file preserved, error message shown with log location
-   - Last 20 lines of log displayed automatically (full log available at path)
+   - Last 100 lines of log displayed automatically (full log available at path)
+
+4. **Verbose Mode:**
+   - When `DEBUG=1` or `VERBOSE=1` is set, or command contains `--verbose` flag:
+     - Spinner is disabled
+     - Logs are displayed directly in real-time (no redirection to file)
+     - Full command output is visible immediately
+   - When verbose mode is NOT set:
+     - Spinner is shown during execution
+     - Logs are hidden during execution (redirected to temporary file)
+     - On success: Only success message is shown
+     - On error: Last 100 lines of log are displayed + path to full log file
 
 4. **Consistent Usage Pattern:**
    - **Critical operations**: `run_with_spinner "Message" "$cmd" || exit $?`
