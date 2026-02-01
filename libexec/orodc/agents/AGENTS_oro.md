@@ -4,10 +4,30 @@
 **For common instructions, see: `orodc agents common`**
 **For Oro coding rules, see: `orodc agents rules`**
 
+---
+
+## ⚠️ CRITICAL: FOR NEW PROJECT INSTALLATION
+
+**🔴 BEFORE STARTING ANY ORO INSTALLATION, RUN THIS COMMAND:**
+
+```bash
+orodc agents installation oro
+```
+
+**This is MANDATORY to get the complete step-by-step installation guide with:**
+- All required steps in correct order
+- Sample data (demo data) installation option (`--sample-data=y`)
+- Assets build (frontend) - REQUIRED
+- All critical steps that MUST NOT be skipped
+
+**🚨 DO NOT attempt installation without reading the installation guide first!**
+
+---
+
 **Oro Platform Project (OroCommerce, OroCRM, etc.)**
 
 **Creating New Project (Empty Directory):**
-- **MUST follow installation guide**: Run `orodc agents installation` to see complete step-by-step instructions
+- **🔴 MANDATORY**: Run `orodc agents installation oro` FIRST to see complete step-by-step instructions
 - **Git clone (Recommended)**: 
   - OroCommerce: `orodc exec git clone --single-branch --branch 6.1.4 https://github.com/oroinc/orocommerce-application.git .`
   - OroPlatform: `orodc exec git clone --single-branch --branch 6.1 https://github.com/oroinc/platform-application.git .`
@@ -40,3 +60,14 @@
 - Install assets: `orodc exec bin/console oro:assets:install`
 - Run migrations: `orodc exec bin/console oro:migration:load`
 - Build assets: `orodc exec bin/console oro:assets:build default -w`
+
+**🚨 IMPORTANT - When Installing New Oro Project:**
+- **If user requests demo data** → use `--sample-data=y` in oro:install command
+- **If user does NOT want demo data** → use `--sample-data=n` in oro:install command
+- **Assets build is ALWAYS required** → `orodc exec bin/console oro:assets:build default -w`
+- **DO NOT skip assets build** - frontend will not work without it!
+
+**After Installation - CRITICAL Steps (DO NOT SKIP):**
+1. **🔴 Assets build**: `orodc exec bin/console oro:assets:build default -w` - REQUIRED
+2. **Cache operations**: `orodc exec bin/console cache:clear && orodc exec bin/console cache:warmup`
+3. **Verify**: Access frontend and admin panel to confirm everything works
