@@ -475,9 +475,32 @@ prepare_project_environment() {
   if [[ -z "$PROJECT_DIR" ]]; then
     PROJECT_DIR=$(find-up .env.orodc)
   fi
+  
+  # If still not found, check for global configuration by project name (directory name)
+  # This allows working in a directory that has global config but no local files yet
   if [[ -z "$PROJECT_DIR" ]]; then
-    PROJECT_DIR="$PWD"
+    local project_name=$(basename "$PWD")
+    if [[ "$project_name" == "$HOME" ]] || [[ -z "$project_name" ]] || [[ "$project_name" == "/" ]]; then
+      project_name="default"
+    fi
+    local global_config_file="${HOME}/.orodc/${project_name}/.env.orodc"
+    # Also check for old format global config
+    local old_global_config_file="${HOME}/.orodc/${project_name}.env.orodc"
+    # Check for config directory (indicates project was initialized before)
+    local config_dir="${HOME}/.orodc/${project_name}"
+    
+    if [[ -f "$global_config_file" ]] || [[ -f "$old_global_config_file" ]]; then
+      # Global config exists for this directory name, use current directory as project
+      PROJECT_DIR="$PWD"
+    elif [[ -d "$config_dir" ]]; then
+      # Config directory exists (project was initialized), use current directory as project
+      PROJECT_DIR="$PWD"
+    else
+      # Fallback to current directory if nothing found
+      PROJECT_DIR="$PWD"
+    fi
   fi
+  
   export DC_ORO_APPDIR="$PROJECT_DIR"
   
   # Determine project name for config lookup
