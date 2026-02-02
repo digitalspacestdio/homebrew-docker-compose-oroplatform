@@ -22,9 +22,18 @@ export_database_interactive() {
   mkdir -p "$backup_dir"
 
   local default_filename="database-$(date +'%Y%m%d%H%M%S').sql.gz"
-  echo -n "Enter filename [default: $default_filename]: " >&2
-  read -r filename
+  local filename=""
 
+  # Check if filename provided as argument
+  if [[ -n "${right_flags[0]:-}" ]]; then
+    filename="${right_flags[0]}"
+  # Interactive mode: stdin is a terminal
+  elif [[ -t 0 ]]; then
+    echo -n "Enter filename [default: $default_filename]: " >&2
+    read -r filename
+  fi
+
+  # Use default if no filename provided
   if [[ -z "$filename" ]]; then
     filename="$default_filename"
   fi
