@@ -12,7 +12,7 @@ validate_project() {
   
   # Skip validation for commands that don't require a project
   case "$command" in
-    help|man|version|proxy|image|docker-build|init|codex|gemini|status|"")
+    help|man|version|proxy|image|docker-build|init|codex|gemini|cursor|status|"")
       return 0
       ;;
   esac
