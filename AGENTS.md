@@ -520,6 +520,35 @@ To add support for a new CMS:
 3. **Follow installation guides** step-by-step when creating new projects
 4. **Reference coding rules** when writing code
 
+### 🔴 CRITICAL: CMS Installation Rule
+
+**MANDATORY:** If user requests to **install**, **setup**, **deploy**, or **create** a CMS project (Magento, Oro, Symfony, Laravel, etc.), you **MUST**:
+
+1. **FIRST**: Execute `orodc agents installation` (or `orodc agents installation <cms-type>`) to get the complete installation guide
+2. **THEN**: Follow the installation guide **step-by-step** without skipping any steps
+3. **NEVER** attempt installation without reading the guide first
+4. **NEVER** skip steps marked as CRITICAL, REQUIRED, or 🔴
+5. **ALWAYS** execute steps in the exact order specified in the guide
+
+**Why this matters:**
+- Installation guides contain critical steps that are easy to miss (e.g., OpenSearch configuration, static content deployment)
+- Skipping steps can result in broken functionality (e.g., frontend without styles, search not working)
+- Each CMS has specific requirements that are documented in the installation guide
+- The guide includes proper order of operations (e.g., DI compile → cache → static content)
+
+**Example workflow:**
+```
+User: "Install Magento"
+Agent: [Executes] orodc agents installation magento
+Agent: [Reads guide, then follows steps 1-11 in order]
+```
+
+**Common mistakes to avoid:**
+- ❌ Starting installation without reading the guide
+- ❌ Skipping "optional" steps that are actually required
+- ❌ Changing the order of steps
+- ❌ Assuming steps are already done without verifying
+
 ---
 
 # ⚠️ Known Issues
