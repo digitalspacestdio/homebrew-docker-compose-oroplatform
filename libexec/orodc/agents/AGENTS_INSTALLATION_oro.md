@@ -1,12 +1,12 @@
 # Oro Platform Installation Guide
 
-**Complete guide for creating a new Oro Platform project from scratch.**
+**Complete step-by-step guide for creating a new Oro Platform project from scratch.**
 
 ---
 
 ## ⚠️ CRITICAL WARNINGS - READ BEFORE STARTING
 
-**🔴 ALL steps in this guide are REQUIRED unless explicitly marked optional.**
+**🔴 MANDATORY: Read this entire guide before starting installation!**
 
 **🚨 UNIVERSAL RULES APPLY** (see `orodc agents installation` common part):
 1. **Demo data**: If user requests demo data → use `--sample-data=y` in oro:install (Step 4)
@@ -58,13 +58,45 @@
 
 ## Prerequisites
 
-- Complete steps 1-4 from `orodc agents installation` (common part):
-  - Navigate to empty project directory
-  - Run `orodc init` manually in terminal (MUST be done by user BEFORE using agent)
-  - Run `orodc up -d`
-  - Verify containers are running with `orodc ps`
+**🔴 REQUIRED**: Complete steps 1-4 from `orodc agents installation` (common part) BEFORE starting Oro installation:
+
+1. **Navigate to empty project directory**
+   ```bash
+   cd /path/to/project/directory
+   ```
+
+2. **Run `orodc init` manually in terminal** (MUST be done by user BEFORE using agent)
+   ```bash
+   orodc init
+   ```
+   This configures the Docker environment (database, search engine, cache, etc.)
+
+3. **Start Docker containers**
+   ```bash
+   orodc up -d
+   ```
+   **IMPORTANT**: Containers MUST be running before proceeding with project creation.
+
+4. **Verify containers are running**
+   ```bash
+   orodc ps
+   ```
+   All containers should show "Running" status before proceeding.
+
+**🚨 CRITICAL**: Do NOT proceed with Oro installation until all prerequisites are completed and containers are running.
 
 ## Installation Steps
+
+**🔴 IMPORTANT: Execute steps in this exact order!**
+
+**Quick reference for critical steps:**
+- **Step 1**: Verify directory is empty
+- **Step 2**: Create Oro project (git clone or composer create-project)
+- **Step 3**: Install dependencies (composer install)
+- **Step 4**: Install Oro Platform (use `--sample-data=y` if user requested demo data)
+- **Step 5**: Build assets (CRITICAL - frontend will not work without this)
+- **Step 6**: Clear and warm up cache
+- **Step 7**: Ensure containers are running (final verification)
 
 ### Step 1: Verify Directory is Empty
 
@@ -79,31 +111,38 @@ orodc exec ls -la
 
 ### Step 2: Create Oro Project
 
-Choose one of the following methods:
+**REQUIRED**: Create the Oro project codebase. Choose one of the following methods:
+
+**Why this is needed**: This step downloads/clones the Oro Platform application code into your project directory.
 
 #### Method 1: Clone from GitHub (Recommended)
 
-Oro projects can be cloned from GitHub repositories:
+Oro projects can be cloned from GitHub repositories. This method supports both Community and Enterprise editions.
 
 **Option A: OroCommerce**
 ```bash
 orodc exec git clone --single-branch --branch 6.1.4 https://github.com/oroinc/orocommerce-application.git .
 ```
+*Clones OroCommerce 6.1.4 from GitHub*
 
 **Option B: OroPlatform**
 ```bash
 orodc exec git clone --single-branch --branch 6.1 https://github.com/oroinc/platform-application.git .
 ```
+*Clones OroPlatform 6.1 from GitHub*
 
 **Option C: MarelloCommerce**
 ```bash
 # Clone from Marello repository (check latest branch)
 orodc exec git clone --single-branch --branch <version> <marello-repo-url> .
 ```
+*Clones MarelloCommerce from repository (check latest version)*
+
+**Note**: Git clone method allows you to specify exact version/branch and works for both CE and Enterprise editions.
 
 #### Method 2: Create via Composer (CE Edition Only)
 
-**IMPORTANT**: Composer create-project installs **Community Edition (CE)** only.
+**IMPORTANT**: Composer create-project installs **Community Edition (CE)** only. For Enterprise Edition, use git clone method.
 
 **OroCommerce CE:**
 ```bash
@@ -117,22 +156,41 @@ orodc exec composer create-project oro/platform-application .
 
 **For Enterprise Edition**: Enterprise versions require access to private Oro repositories and cannot be installed via public composer create-project. Use git clone from your Enterprise repository or contact Oro support for Enterprise installation instructions.
 
+**After project creation**: The project directory should contain Oro application files (app/, bin/, vendor/, etc.)
+
 ### Step 3: Install Dependencies
 
-Install PHP dependencies via Composer:
+**REQUIRED**: Install PHP dependencies via Composer.
+
+**Why this is needed**: Oro Platform requires PHP packages (dependencies) to be installed before installation. This step downloads and installs all required packages defined in `composer.json`.
+
+**How to install**:
 
 ```bash
 orodc exec composer install
 ```
 
+**What this does**:
+- Downloads all PHP dependencies defined in `composer.json`
+- Installs packages into `vendor/` directory
+- May take several minutes depending on internet speed and number of dependencies
+
+**Important Notes**:
+- This step must be done AFTER project creation (Step 2) and BEFORE Oro installation (Step 4)
+- If `composer install` fails, check internet connection and composer authentication (if using private repositories)
+- For Enterprise Edition, ensure you have access to private Oro repositories
+
 ### Step 4: Install Oro Platform
 
-**REQUIRED**: Run Oro installation command.
+**🔴 REQUIRED**: Run Oro installation command. This step sets up the database, installs the application, and creates the admin account.
 
 **🔴 CRITICAL - DEMO DATA DECISION:**
-- **If user asks for "demo data", "sample data", "with demo"** → use `--sample-data=y`
+- **If user asks for "demo data", "sample data", "with demo", "test products"** → use `--sample-data=y`
 - **If user does NOT mention demo data** → use `--sample-data=n`
 - **🚨 DO NOT FORGET to set the correct --sample-data flag based on user request!**
+- **🚨 DO NOT ask user about demo data** - use the flag based on what user requested in their original request
+
+**Why this is needed**: This command initializes the Oro Platform application, creates database schema, installs initial data, and sets up the admin account.
 
 **IMPORTANT**: Before running installation:
 - **NEVER** ask user to provide admin credentials
@@ -207,28 +265,60 @@ This command will:
 
 Build frontend assets. **This step is MANDATORY** - frontend will not work without it!
 
+**Why this is needed**: Oro Platform requires frontend assets (CSS, JavaScript) to be compiled and built before the frontend can work correctly. This step compiles and builds all frontend assets.
+
 **🚨 WARNING: Skipping this step will result in:**
 - Broken frontend with no CSS styles
 - Missing JavaScript functionality
 - White pages or unstyled content
+- Admin panel may not work correctly
+
+**When to build**: This step MUST be done AFTER Oro installation (Step 4) and BEFORE accessing the frontend.
 
 **YOU MUST EXECUTE THIS STEP:**
 
+**Recommended (with watch mode for development):**
 ```bash
 orodc exec bin/console oro:assets:build default -w
 ```
+*The `-w` flag enables "watch" mode, which rebuilds assets automatically when files change (useful for development)*
 
-**Note**: The `-w` flag enables "watch" mode. For one-time build without watch mode, use:
+**Alternative (one-time build without watch mode):**
 ```bash
 orodc exec bin/console oro:assets:build
 ```
+*Use this for production builds or when you don't need automatic rebuilding*
+
+**Important Notes**:
+- This step may take several minutes depending on the number of assets
+- Watch mode (`-w`) keeps the process running - you can stop it with Ctrl+C after initial build
+- For production, use one-time build without watch mode
+- **DO NOT skip this step** - frontend will not work without it
 
 ### Step 6: Clear and Warm Up Cache
 
+**REQUIRED**: Clear and warm up cache after assets build.
+
+**Why this is needed**: After building assets and installing Oro, the cache may contain stale data. Clearing and warming up cache ensures all new assets and configurations are properly loaded.
+
+**How to clear and warm up cache**:
+
 ```bash
+# Clear all cache
 orodc exec bin/console cache:clear
+
+# Warm up cache (preload frequently used data)
 orodc exec bin/console cache:warmup
 ```
+
+**What these commands do**:
+- `cache:clear` - Removes all cached data (config, routes, etc.)
+- `cache:warmup` - Preloads frequently used data into cache for better performance
+
+**Important Notes**:
+- This step must be done AFTER assets build (Step 5) and BEFORE accessing the application
+- Cache operations ensure that all new assets and configurations are properly loaded
+- Skipping this step may result in outdated cache showing old data
 
 ### Step 7: Ensure Containers Are Running
 

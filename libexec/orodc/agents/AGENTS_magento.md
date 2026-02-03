@@ -8,20 +8,37 @@
 
 ## ⚠️ CRITICAL: FOR NEW PROJECT INSTALLATION
 
-**🔴 BEFORE STARTING ANY MAGENTO INSTALLATION, RUN THIS COMMAND:**
+**🔴 BEFORE STARTING ANY MAGENTO INSTALLATION, YOU MUST:**
 
-```bash
-orodc agents installation magento
-```
+1. **Execute this command FIRST:**
+   ```bash
+   orodc agents installation magento
+   ```
+
+2. **Read the complete installation guide** that appears
+
+3. **Follow ALL steps in the guide** in the exact order specified
 
 **This is MANDATORY to get the complete step-by-step installation guide with:**
 - All required steps in correct order
 - Sample data (demo data) installation if requested
 - Frontend build (static content deployment) - REQUIRED
-- OpenSearch configuration
+- OpenSearch configuration (REQUIRED if using OpenSearch - must be done AFTER `orodc up -d`)
 - All critical steps that MUST NOT be skipped
 
-**🚨 DO NOT attempt installation without reading the installation guide first!**
+**🚨 CRITICAL RULES:**
+- **DO NOT** attempt installation without reading the installation guide first
+- **DO NOT** skip any steps, even if they seem already done
+- **DO NOT** change the order of steps
+- **DO NOT** skip OpenSearch configuration if using OpenSearch (Step 4)
+- **DO NOT** skip static content deployment (Step 9) - frontend will not work without it
+- **DO NOT** skip Step 11 (`orodc up -d` and `orodc ps`) - always verify containers are running
+
+**If user asks to "install Magento", "setup Magento", "deploy Magento", or "create Magento project":**
+1. First execute: `orodc agents installation magento`
+2. Read the guide
+3. Follow steps 1-11 in order
+4. Check off each step from the checklist as you complete it
 
 ---
 

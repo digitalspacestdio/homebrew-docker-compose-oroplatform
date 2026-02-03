@@ -1,12 +1,12 @@
 # Magento 2 Installation Guide
 
-**Complete guide for creating a new Magento 2 project from scratch.**
+**Complete step-by-step guide for creating a new Magento 2 project from scratch.**
 
 ---
 
 ## ⚠️ CRITICAL WARNINGS - READ BEFORE STARTING
 
-**🔴 ALL steps in this guide are REQUIRED unless explicitly marked optional.**
+**🔴 MANDATORY: Read this entire guide before starting installation!**
 
 **🚨 UNIVERSAL RULES APPLY** (see `orodc agents installation` common part):
 1. **Demo data**: If user requests demo data → execute Step 6 (Sample Data)
@@ -20,6 +20,7 @@
    - **User permission required**: If you want to skip ANY step, you MUST ask user for explicit permission: "Step X says to do Y, but it seems already done. Should I skip it or execute it anyway?"
 
 **Magento-specific critical steps:**
+- **Step 4**: OpenSearch Configuration → REQUIRED if using OpenSearch (must be done AFTER `orodc up -d`)
 - **Step 6**: Sample Data → REQUIRED if user requests demo data
 - **Step 9**: Static Content Deploy → ALWAYS REQUIRED (frontend build)
 
@@ -62,13 +63,49 @@
 
 ## Prerequisites
 
-- Complete steps 1-4 from `orodc agents installation` (common part):
-  - Navigate to empty project directory
-  - Run `orodc init` manually in terminal (MUST be done by user BEFORE using agent)
-  - Run `orodc up -d`
-  - Verify containers are running with `orodc ps`
+**🔴 REQUIRED**: Complete steps 1-4 from `orodc agents installation` (common part) BEFORE starting Magento installation:
+
+1. **Navigate to empty project directory**
+   ```bash
+   cd /path/to/project/directory
+   ```
+
+2. **Run `orodc init` manually in terminal** (MUST be done by user BEFORE using agent)
+   ```bash
+   orodc init
+   ```
+   This configures the Docker environment (database, search engine, cache, etc.)
+
+3. **Start Docker containers**
+   ```bash
+   orodc up -d
+   ```
+   **IMPORTANT**: Containers MUST be running before proceeding. OpenSearch configuration (Step 4) requires containers to be running.
+
+4. **Verify containers are running**
+   ```bash
+   orodc ps
+   ```
+   All containers should show "Running" status before proceeding.
+
+**🚨 CRITICAL**: Do NOT proceed with Magento installation until all prerequisites are completed and containers are running.
 
 ## Installation Steps
+
+**🔴 IMPORTANT: Execute steps in this exact order!**
+
+**Quick reference for critical steps:**
+- **Step 1**: Verify directory is empty
+- **Step 2**: Extract environment variables (requires containers running)
+- **Step 3**: Create Magento project
+- **Step 4**: Configure OpenSearch (REQUIRED if using OpenSearch - must be done AFTER `orodc up -d`)
+- **Step 5**: Install Magento via CLI
+- **Step 6**: Install Sample Data (only if user requested demo data)
+- **Step 7**: Compile DI
+- **Step 8**: Clear cache
+- **Step 9**: Deploy static content (CRITICAL - frontend will not work without this)
+- **Step 10**: Disable 2FA (development)
+- **Step 11**: Ensure containers are running (final verification)
 
 ### Step 1: Verify Directory is Empty
 
@@ -83,13 +120,17 @@ orodc exec ls -la
 
 ### Step 2: Extract Environment Variables
 
-**REQUIRED**: Before running installation commands, extract environment variables needed for Magento configuration:
+**REQUIRED**: Before running installation commands, extract environment variables needed for Magento configuration.
+
+**Why this is needed**: Magento installation requires database connection details, base URL, and search engine configuration. These are provided by OroDC as environment variables.
+
+**How to extract**:
 
 ```bash
 # Primary command: Get all OroDC service connection variables
 orodc exec env | grep ORO_
 
-# Or get all environment variables
+# Or get all environment variables (shows everything)
 orodc exec env
 
 # Filter by specific service:
@@ -97,16 +138,18 @@ orodc exec env | grep -i database
 orodc exec env | grep -i search
 ```
 
+**Key variables you'll need for Magento installation** (save these or keep them accessible):
+- `DOCKER_BASE_URL` - Application base URL (e.g., `https://myproject.docker.local`)
+- `ORO_DB_HOST` - Database host (usually `database`)
+- `ORO_DB_NAME` - Database name (usually `app_db`)
+- `ORO_DB_USER` - Database user (usually `app_db_user`)
+- `ORO_DB_PASSWORD` - Database password (usually `app_db_pass`)
+- Search engine host (usually `search`) and port (usually `9200`)
+
 **IMPORTANT**: 
-- **MUST be done BEFORE Step 4 (Magento installation)** - you'll need these variables for `setup:install` command
-- Save these variables or keep them accessible
-- Key variables you'll need for Magento installation:
-  - `DOCKER_BASE_URL` - Application base URL
-  - `ORO_DB_HOST` - Database host (usually "database")
-  - `ORO_DB_NAME` - Database name
-  - `ORO_DB_USER` - Database user
-  - `ORO_DB_PASSWORD` - Database password
-  - Search engine host (usually "search") and port (usually 9200)
+- **MUST be done BEFORE Step 5 (Magento installation)** - you'll need these variables for `setup:install` command
+- These variables are available only when containers are running (`orodc up -d` must be executed first)
+- Save these variables or keep them accessible for Step 5
 
 ### Step 3: Create Magento Project
 
@@ -130,18 +173,33 @@ orodc exec composer create-project --repository-url=https://repo.magento.com/ ma
 
 ### Step 4: Configure OpenSearch for Magento 2 (If Using OpenSearch)
 
-**REQUIRED IF USING OPENSEARCH**: Before installing Magento, configure OpenSearch to enable `indices.id_field_data.enabled` setting. This is required for Magento 2 product search to work correctly with OpenSearch 2.0+.
+**🔴 REQUIRED IF USING OPENSEARCH**: Before installing Magento, configure OpenSearch to enable `indices.id_field_data.enabled` setting. This is required for Magento 2 product search to work correctly with OpenSearch 2.0+.
 
-**Why this is needed**: OpenSearch 2.0+ disables fielddata access for `_id` field by default for performance and security reasons. Magento 2 requires this setting to be enabled for proper product indexing and search.
+**🚨 CRITICAL TIMING**: 
+- **MUST be done AFTER `orodc up -d`** (containers must be running and OpenSearch must be ready)
+- **MUST be done BEFORE Step 5** (Magento installation via `bin/magento setup:install`)
+- **DO NOT** configure OpenSearch before containers are running - it will fail
+- Configure immediately after containers start and OpenSearch is ready, before running `bin/magento setup:install`
+
+**Why this is needed**: OpenSearch 2.0+ disables fielddata access for `_id` field by default for performance and security reasons. Magento 2 requires this setting to be enabled for proper product indexing and search. **Without this configuration, product search will not work correctly and you'll see errors related to `_id` field access.**
 
 **How to configure**:
 
-**Recommended method** (using orodc exec):
+**Step 4.1: Ensure containers are running**
 ```bash
-# Ensure containers are running first
+# If containers are not running, start them first
 orodc up -d
 
-# Wait for OpenSearch to be ready, then configure:
+# Wait a few seconds for OpenSearch to be ready (usually 10-30 seconds)
+# Check if OpenSearch is ready:
+orodc exec curl -s "http://search:9200/_cluster/health" | grep -q "green\|yellow" && echo "OpenSearch is ready" || echo "Waiting for OpenSearch..."
+```
+
+**Step 4.2: Configure OpenSearch setting**
+
+**Recommended method** (using orodc exec):
+```bash
+# Configure the required setting
 orodc exec curl -X PUT "http://search:9200/_cluster/settings" \
   -H 'Content-Type: application/json' \
   -d '{
@@ -154,7 +212,11 @@ orodc exec curl -X PUT "http://search:9200/_cluster/settings" \
 **Alternative method** (if curl is not available in PHP container):
 ```bash
 # From host machine (if port 9200 is exposed):
-curl -X PUT "http://localhost:9200/_cluster/settings" \
+# First, check what port OpenSearch is exposed on:
+orodc ps | grep search
+
+# Then configure (replace PORT with actual port, usually 30292 or similar):
+curl -X PUT "http://localhost:PORT/_cluster/settings" \
   -H 'Content-Type: application/json' \
   -d '{
     "persistent": {
@@ -163,17 +225,24 @@ curl -X PUT "http://localhost:9200/_cluster/settings" \
   }'
 ```
 
-**Verify the setting was applied**:
+**Step 4.3: Verify the setting was applied**
 ```bash
+# Verify the setting is enabled
 orodc exec curl -s "http://search:9200/_cluster/settings?include_defaults=true&flat_settings=true" | grep id_field_data
 # Should show: "indices.id_field_data.enabled":"true"
 ```
 
-**Note**: 
-- This step is only needed if you're using OpenSearch (not Elasticsearch)
-- The setting persists across container restarts
-- You only need to do this once per OpenSearch cluster
-- If you're using Elasticsearch, skip this step
+**If verification fails:**
+- Wait a few more seconds and try again (OpenSearch may need time to apply the setting)
+- Check OpenSearch logs: `orodc compose logs search`
+- Ensure OpenSearch container is running: `orodc ps | grep search`
+
+**Important Notes**: 
+- This step is **only needed if you're using OpenSearch** (not Elasticsearch)
+- The setting persists across container restarts (stored in OpenSearch cluster settings)
+- You only need to do this **once per OpenSearch cluster**
+- If you're using Elasticsearch, **skip this step** and proceed to Step 5
+- **If you skip this step and use OpenSearch**, product search will fail with errors related to `_id` field access
 
 ### Step 5: Install Magento via CLI
 

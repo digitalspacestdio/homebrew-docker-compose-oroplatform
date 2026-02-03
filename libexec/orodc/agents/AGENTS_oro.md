@@ -8,11 +8,16 @@
 
 ## ⚠️ CRITICAL: FOR NEW PROJECT INSTALLATION
 
-**🔴 BEFORE STARTING ANY ORO INSTALLATION, RUN THIS COMMAND:**
+**🔴 BEFORE STARTING ANY ORO INSTALLATION, YOU MUST:**
 
-```bash
-orodc agents installation oro
-```
+1. **Execute this command FIRST:**
+   ```bash
+   orodc agents installation oro
+   ```
+
+2. **Read the complete installation guide** that appears
+
+3. **Follow ALL steps in the guide** in the exact order specified
 
 **This is MANDATORY to get the complete step-by-step installation guide with:**
 - All required steps in correct order
@@ -20,7 +25,18 @@ orodc agents installation oro
 - Assets build (frontend) - REQUIRED
 - All critical steps that MUST NOT be skipped
 
-**🚨 DO NOT attempt installation without reading the installation guide first!**
+**🚨 CRITICAL RULES:**
+- **DO NOT** attempt installation without reading the installation guide first
+- **DO NOT** skip any steps, even if they seem already done
+- **DO NOT** change the order of steps
+- **DO NOT** skip assets build (Step 5) - frontend will not work without it
+- **DO NOT** skip Step 7 (`orodc up -d` and `orodc ps`) - always verify containers are running
+
+**If user asks to "install Oro", "setup Oro", "deploy Oro", or "create Oro project":**
+1. First execute: `orodc agents installation oro`
+2. Read the guide
+3. Follow steps 1-7 in order
+4. Check off each step from the checklist as you complete it
 
 ---
 
