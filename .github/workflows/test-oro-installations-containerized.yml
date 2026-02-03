@@ -35,6 +35,8 @@ env:
   HOMEBREW_NO_ANALYTICS: 1
   # OroDC containerized mode with path sync
   DC_ORO_MODE: default
+  # Disable interactive prompts in CI
+  DC_ORO_PURGE_FORCE: 1
 
 jobs:
   # Test installations in isolated containers - Universal (X64 + ARM64)
@@ -77,6 +79,7 @@ jobs:
         HOMEBREW_NO_INSTALL_CLEANUP: 1
         HOMEBREW_NO_ANALYTICS: 1
         DC_ORO_MODE: default
+        DC_ORO_PURGE_FORCE: 1
     
     timeout-minutes: 90
     name: Test ${{ matrix.application.name }} (${{ matrix.application.version }}) [${{ matrix.arch.name }}]

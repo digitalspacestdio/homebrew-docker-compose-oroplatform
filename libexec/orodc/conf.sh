@@ -12,7 +12,7 @@ source "${SCRIPT_DIR}/lib/wizard.sh"
 # Check if running in interactive mode
 is_interactive() {
   # If called from interactive menu, always use interactive mode
-  if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+  if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
     return 0
   fi
   # Otherwise check if stdin/stdout are TTYs

@@ -9,9 +9,9 @@ debug_log() {
 }
 
 # Clear log on new session (only once per process tree)
-if [[ "${ORODC_LOG_CLEARED:-}" != "1" ]]; then
+if [[ "${DC_ORO_LOG_CLEARED:-}" != "1" ]]; then
   echo "=== New orodc session $(date '+%Y-%m-%d %H:%M:%S') ===" > "$DEBUG_LOG"
-  export ORODC_LOG_CLEARED=1
+  export DC_ORO_LOG_CLEARED=1
 fi
 
 # Setup logging only when OroDC is used as PHP binary

@@ -858,11 +858,11 @@ list_environments() {
 
       # Restart the entire script in the new directory
       # Export selected environment name so it's preserved after exec
-      export ORODC_SELECTED_ENV_NAME="$selected_name"
-      export ORODC_SELECTED_ENV_PATH="$absolute_path"
-      export ORODC_SELECTED_ENV_CONFIG="$selected_config_dir"
+      export DC_ORO_SELECTED_ENV_NAME="$selected_name"
+      export DC_ORO_SELECTED_ENV_PATH="$absolute_path"
+      export DC_ORO_SELECTED_ENV_CONFIG="$selected_config_dir"
 
-      debug_log "list_environments: Exporting ORODC_SELECTED_ENV_NAME='$selected_name' PATH='$absolute_path' CONFIG='$selected_config_dir'"
+      debug_log "list_environments: Exporting DC_ORO_SELECTED_ENV_NAME='$selected_name' PATH='$absolute_path' CONFIG='$selected_config_dir'"
       # Unset all environment-related variables to force recalculation
       unset DC_ORO_NAME
       unset DC_ORO_CONFIG_DIR
@@ -2019,10 +2019,10 @@ export PWD=$(realpath "$(pwd)" 2>/dev/null || pwd)
 # Use selected environment name if available (from menu switch), otherwise use basename
 # Compare using realpath to handle symlinks and relative paths
 current_pwd=$(realpath "$(pwd)" 2>/dev/null || pwd)
-selected_path_normalized=$(realpath "${ORODC_SELECTED_ENV_PATH:-}" 2>/dev/null || echo "${ORODC_SELECTED_ENV_PATH:-}")
+selected_path_normalized=$(realpath "${DC_ORO_SELECTED_ENV_PATH:-}" 2>/dev/null || echo "${DC_ORO_SELECTED_ENV_PATH:-}")
 
 debug_log "Script start: PWD='$PWD' current_pwd='$current_pwd'"
-debug_log "Script start: ORODC_SELECTED_ENV_NAME='${ORODC_SELECTED_ENV_NAME:-<not set>}' PATH='${ORODC_SELECTED_ENV_PATH:-<not set>}' CONFIG='${ORODC_SELECTED_ENV_CONFIG:-<not set>}'"
+debug_log "Script start: DC_ORO_SELECTED_ENV_NAME='${DC_ORO_SELECTED_ENV_NAME:-<not set>}' PATH='${DC_ORO_SELECTED_ENV_PATH:-<not set>}' CONFIG='${DC_ORO_SELECTED_ENV_CONFIG:-<not set>}'"
 
 # CRITICAL: Always set SCRIPT_DIR and LIBEXEC_DIR first (needed for source commands)
 # Homebrew installation - resolve symlink to find actual script location
@@ -2031,13 +2031,13 @@ REAL_SCRIPT="$(realpath "${BASH_SOURCE[0]}" 2>/dev/null || readlink -f "${BASH_S
 SCRIPT_DIR="$(cd "$(dirname "$REAL_SCRIPT")" && pwd)"
 LIBEXEC_DIR="${SCRIPT_DIR}/orodc"
 
-if [[ -n "${ORODC_SELECTED_ENV_NAME:-}" ]] && [[ -n "${ORODC_SELECTED_ENV_PATH:-}" ]]; then
-  debug_log "Script start: Processing ORODC_SELECTED_ENV_* variables"
+if [[ -n "${DC_ORO_SELECTED_ENV_NAME:-}" ]] && [[ -n "${DC_ORO_SELECTED_ENV_PATH:-}" ]]; then
+  debug_log "Script start: Processing DC_ORO_SELECTED_ENV_* variables"
 
   # Debug output if DEBUG is set
   if [[ -n "${DEBUG:-}" ]]; then
-    echo "[DEBUG] ORODC_SELECTED_ENV_NAME: ${ORODC_SELECTED_ENV_NAME}" >&2
-    echo "[DEBUG] ORODC_SELECTED_ENV_PATH: ${ORODC_SELECTED_ENV_PATH}" >&2
+    echo "[DEBUG] DC_ORO_SELECTED_ENV_NAME: ${DC_ORO_SELECTED_ENV_NAME}" >&2
+    echo "[DEBUG] DC_ORO_SELECTED_ENV_PATH: ${DC_ORO_SELECTED_ENV_PATH}" >&2
     echo "[DEBUG] current_pwd: $current_pwd" >&2
     echo "[DEBUG] selected_path_normalized: $selected_path_normalized" >&2
     echo "[DEBUG] Comparison: '$current_pwd' == '$selected_path_normalized'" >&2
@@ -2045,19 +2045,19 @@ if [[ -n "${ORODC_SELECTED_ENV_NAME:-}" ]] && [[ -n "${ORODC_SELECTED_ENV_PATH:-
   
   # Check if we're in the selected directory (with tolerance for path variations)
   if [[ "$current_pwd" == "$selected_path_normalized" ]]; then
-    debug_log "Script start: Paths match - setting DC_ORO_NAME='${ORODC_SELECTED_ENV_NAME}' DC_ORO_APPDIR='${ORODC_SELECTED_ENV_PATH}'"
-    export DC_ORO_NAME="${ORODC_SELECTED_ENV_NAME}"
-    if [[ -n "${ORODC_SELECTED_ENV_CONFIG:-}" ]]; then
-      export DC_ORO_CONFIG_DIR="${ORODC_SELECTED_ENV_CONFIG}"
+    debug_log "Script start: Paths match - setting DC_ORO_NAME='${DC_ORO_SELECTED_ENV_NAME}' DC_ORO_APPDIR='${DC_ORO_SELECTED_ENV_PATH}'"
+    export DC_ORO_NAME="${DC_ORO_SELECTED_ENV_NAME}"
+    if [[ -n "${DC_ORO_SELECTED_ENV_CONFIG:-}" ]]; then
+      export DC_ORO_CONFIG_DIR="${DC_ORO_SELECTED_ENV_CONFIG}"
     else
       export DC_ORO_CONFIG_DIR="$HOME/.$(basename $0)/${DC_ORO_NAME}"
     fi
     # Set DC_ORO_APPDIR to the selected path to ensure correct project directory
-    export DC_ORO_APPDIR="${ORODC_SELECTED_ENV_PATH}"
+    export DC_ORO_APPDIR="${DC_ORO_SELECTED_ENV_PATH}"
     # Clear selection variables after use
-    unset ORODC_SELECTED_ENV_NAME
-    unset ORODC_SELECTED_ENV_PATH
-    unset ORODC_SELECTED_ENV_CONFIG
+    unset DC_ORO_SELECTED_ENV_NAME
+    unset DC_ORO_SELECTED_ENV_PATH
+    unset DC_ORO_SELECTED_ENV_CONFIG
   else
     # If paths don't match, we might need to cd first
     # This can happen if exec didn't preserve the directory change
@@ -2068,18 +2068,18 @@ if [[ -n "${ORODC_SELECTED_ENV_NAME:-}" ]] && [[ -n "${ORODC_SELECTED_ENV_PATH:-
       fi
       cd "$selected_path_normalized" || true
       export PWD=$(realpath "$(pwd)" 2>/dev/null || pwd)
-      debug_log "Script start: After cd - PWD='$PWD' setting DC_ORO_NAME='${ORODC_SELECTED_ENV_NAME}' DC_ORO_APPDIR='${ORODC_SELECTED_ENV_PATH}'"
-      export DC_ORO_NAME="${ORODC_SELECTED_ENV_NAME}"
-      if [[ -n "${ORODC_SELECTED_ENV_CONFIG:-}" ]]; then
-        export DC_ORO_CONFIG_DIR="${ORODC_SELECTED_ENV_CONFIG}"
+      debug_log "Script start: After cd - PWD='$PWD' setting DC_ORO_NAME='${DC_ORO_SELECTED_ENV_NAME}' DC_ORO_APPDIR='${DC_ORO_SELECTED_ENV_PATH}'"
+      export DC_ORO_NAME="${DC_ORO_SELECTED_ENV_NAME}"
+      if [[ -n "${DC_ORO_SELECTED_ENV_CONFIG:-}" ]]; then
+        export DC_ORO_CONFIG_DIR="${DC_ORO_SELECTED_ENV_CONFIG}"
       else
         export DC_ORO_CONFIG_DIR="$HOME/.$(basename $0)/${DC_ORO_NAME}"
       fi
-      export DC_ORO_APPDIR="${ORODC_SELECTED_ENV_PATH}"
+      export DC_ORO_APPDIR="${DC_ORO_SELECTED_ENV_PATH}"
       # Clear selection variables after use
-      unset ORODC_SELECTED_ENV_NAME
-      unset ORODC_SELECTED_ENV_PATH
-      unset ORODC_SELECTED_ENV_CONFIG
+      unset DC_ORO_SELECTED_ENV_NAME
+      unset DC_ORO_SELECTED_ENV_PATH
+      unset DC_ORO_SELECTED_ENV_CONFIG
     fi
   fi
 fi
@@ -2272,9 +2272,9 @@ execute_with_menu_return() {
   # Always add empty line after command execution
   echo "" >&2
   
-  # If ORODC_IS_INTERACTIVE_MENU is set, return to menu after command
+  # If DC_ORO_IS_INTERACTIVE_MENU is set, return to menu after command
   # No additional output or processing - just return to menu
-  if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+  if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
     echo -n "Press Enter to continue..." >&2
     read -r
     exec "${LIBEXEC_DIR}/menu.sh"
@@ -2288,7 +2288,7 @@ case "$1" in
   # Docker Compose commands - route to compose.sh module
   compose)
     shift
-    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+    if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
       execute_with_menu_return "${LIBEXEC_DIR}/compose.sh" "$@"
     else
       exec "${LIBEXEC_DIR}/compose.sh" "$@"
@@ -2301,7 +2301,7 @@ case "$1" in
     case "$1" in
       mysql)
         shift
-        if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+        if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
           execute_with_menu_return "${LIBEXEC_DIR}/database/mysql.sh" "$@"
         else
           exec "${LIBEXEC_DIR}/database/mysql.sh" "$@"
@@ -2309,7 +2309,7 @@ case "$1" in
         ;;
       psql)
         shift
-        if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+        if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
           execute_with_menu_return "${LIBEXEC_DIR}/database/psql.sh" "$@"
         else
           exec "${LIBEXEC_DIR}/database/psql.sh" "$@"
@@ -2317,7 +2317,7 @@ case "$1" in
         ;;
       import)
         shift
-        if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+        if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
           execute_with_menu_return "${LIBEXEC_DIR}/database/import.sh" "$@"
         else
           exec "${LIBEXEC_DIR}/database/import.sh" "$@"
@@ -2325,7 +2325,7 @@ case "$1" in
         ;;
       export)
         shift
-        if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+        if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
           execute_with_menu_return "${LIBEXEC_DIR}/database/export.sh" "$@"
         else
           exec "${LIBEXEC_DIR}/database/export.sh" "$@"
@@ -2333,7 +2333,7 @@ case "$1" in
         ;;
       cli)
         shift
-        if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+        if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
           execute_with_menu_return "${LIBEXEC_DIR}/database/cli.sh" "$@"
         else
           exec "${LIBEXEC_DIR}/database/cli.sh" "$@"
@@ -2341,7 +2341,7 @@ case "$1" in
         ;;
       purge)
         shift
-        if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+        if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
           execute_with_menu_return "${LIBEXEC_DIR}/database/purge.sh" "$@"
         else
           exec "${LIBEXEC_DIR}/database/purge.sh" "$@"
@@ -2806,8 +2806,8 @@ find-up () {
 
 # Skip legacy initialization if environment was already initialized by modular system
 # This prevents conflicts when switching environments via menu
-if [[ "${ORODC_ENV_INITIALIZED:-}" != "1" ]]; then
-  debug_log "legacy init: ORODC_ENV_INITIALIZED not set, running legacy initialization"
+if [[ "${DC_ORO_ENV_INITIALIZED:-}" != "1" ]]; then
+  debug_log "legacy init: DC_ORO_ENV_INITIALIZED not set, running legacy initialization"
   
   # Only set DC_ORO_APPDIR if not already set (e.g., from menu switch)
   if [[ -z "${DC_ORO_APPDIR:-}" ]]; then
@@ -2874,7 +2874,7 @@ if [[ "${ORODC_ENV_INITIALIZED:-}" != "1" ]]; then
   
   debug_log "legacy init: completed - DC_ORO_APPDIR='${DC_ORO_APPDIR:-}' DC_ORO_NAME='${DC_ORO_NAME:-}'"
 else
-  debug_log "legacy init: SKIPPED - ORODC_ENV_INITIALIZED=1, using modular initialization"
+  debug_log "legacy init: SKIPPED - DC_ORO_ENV_INITIALIZED=1, using modular initialization"
   # Still need to cd to project directory for commands to work
   if [[ -n "${DC_ORO_APPDIR:-}" ]] && [[ -d "${DC_ORO_APPDIR}" ]]; then
     cd "$DC_ORO_APPDIR"
@@ -3650,7 +3650,7 @@ is_orodc_special_command() {
 
 # Show interactive menu when no arguments provided and in interactive terminal
 # This must be checked BEFORE PHP redirect to prevent menu from being bypassed
-if [[ $# -eq 0 ]] && [[ -z "${first_non_flag_arg:-}" ]] && [[ ${#args[@]} -eq 0 ]] && [[ ${#left_flags[@]} -eq 0 ]] && [[ ${#right_flags[@]} -eq 0 ]] && [[ ${#left_options[@]} -eq 0 ]] && [[ ${#right_options[@]} -eq 0 ]] && [[ -t 0 ]] && [[ -z "${ORODC_NO_MENU:-}" ]]; then
+if [[ $# -eq 0 ]] && [[ -z "${first_non_flag_arg:-}" ]] && [[ ${#args[@]} -eq 0 ]] && [[ ${#left_flags[@]} -eq 0 ]] && [[ ${#right_flags[@]} -eq 0 ]] && [[ ${#left_options[@]} -eq 0 ]] && [[ ${#right_options[@]} -eq 0 ]] && [[ -t 0 ]] && [[ -z "${DC_ORO_NO_MENU:-}" ]]; then
   # Check if current directory is an OroPlatform project
   if ! is_oroplatform_project "$PWD"; then
     # Try to switch to last used environment
@@ -4373,7 +4373,7 @@ case "$1" in
     case "$1" in
       up)
         shift
-        if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+        if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
           execute_with_menu_return "${LIBEXEC_DIR}/proxy/up.sh" "$@"
         else
           exec "${LIBEXEC_DIR}/proxy/up.sh" "$@"
@@ -4381,7 +4381,7 @@ case "$1" in
         ;;
       down)
         shift
-        if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+        if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
           execute_with_menu_return "${LIBEXEC_DIR}/proxy/down.sh" "$@"
         else
           exec "${LIBEXEC_DIR}/proxy/down.sh" "$@"
@@ -4389,7 +4389,7 @@ case "$1" in
         ;;
       install-certs)
         shift
-        if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+        if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
           execute_with_menu_return "${LIBEXEC_DIR}/proxy/install-certs.sh" "$@"
         else
           exec "${LIBEXEC_DIR}/proxy/install-certs.sh" "$@"
@@ -4397,7 +4397,7 @@ case "$1" in
         ;;
       restart)
         shift
-        if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+        if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
           execute_with_menu_return "${LIBEXEC_DIR}/proxy/restart.sh" "$@"
         else
           exec "${LIBEXEC_DIR}/proxy/restart.sh" "$@"
@@ -4417,7 +4417,7 @@ case "$1" in
     case "$1" in
       build)
         shift
-        if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+        if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
           execute_with_menu_return "${LIBEXEC_DIR}/image/build.sh" "$@"
         else
           exec "${LIBEXEC_DIR}/image/build.sh" "$@"
@@ -4440,7 +4440,7 @@ case "$1" in
   # Single-file commands
   init)
     shift
-    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+    if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
       execute_with_menu_return "${LIBEXEC_DIR}/init.sh" "$@"
     else
       exec "${LIBEXEC_DIR}/init.sh" "$@"
@@ -4449,7 +4449,7 @@ case "$1" in
 
   list)
     shift
-    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+    if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
       execute_with_menu_return "${LIBEXEC_DIR}/list.sh" "$@"
     else
       exec "${LIBEXEC_DIR}/list.sh" "$@"
@@ -4458,7 +4458,7 @@ case "$1" in
 
   conf)
     shift
-    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+    if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
       execute_with_menu_return "${LIBEXEC_DIR}/conf.sh" "$@"
     else
       exec "${LIBEXEC_DIR}/conf.sh" "$@"
@@ -4467,7 +4467,7 @@ case "$1" in
 
   purge)
     shift
-    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+    if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
       execute_with_menu_return "${LIBEXEC_DIR}/purge.sh" "$@"
     else
       exec "${LIBEXEC_DIR}/purge.sh" "$@"
@@ -4476,7 +4476,7 @@ case "$1" in
 
   config-refresh)
     shift
-    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+    if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
       execute_with_menu_return "${LIBEXEC_DIR}/config-refresh.sh" "$@"
     else
       exec "${LIBEXEC_DIR}/config-refresh.sh" "$@"
@@ -4485,7 +4485,7 @@ case "$1" in
 
   ssh)
     shift
-    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+    if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
       execute_with_menu_return "${LIBEXEC_DIR}/ssh.sh" "$@"
     else
       exec "${LIBEXEC_DIR}/ssh.sh" "$@"
@@ -4494,7 +4494,7 @@ case "$1" in
 
   install)
     shift
-    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+    if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
       execute_with_menu_return "${LIBEXEC_DIR}/install.sh" "$@"
     else
       exec "${LIBEXEC_DIR}/install.sh" "$@"
@@ -4503,7 +4503,7 @@ case "$1" in
 
   cache)
     shift
-    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+    if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
       execute_with_menu_return "${LIBEXEC_DIR}/cache.sh" "$@"
     else
       exec "${LIBEXEC_DIR}/cache.sh" "$@"
@@ -4512,7 +4512,7 @@ case "$1" in
 
   search)
     shift
-    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+    if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
       execute_with_menu_return "${LIBEXEC_DIR}/search.sh" "$@"
     else
       exec "${LIBEXEC_DIR}/search.sh" "$@"
@@ -4521,7 +4521,7 @@ case "$1" in
 
   php)
     shift
-    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+    if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
       execute_with_menu_return "${LIBEXEC_DIR}/php.sh" "$@"
     else
       exec "${LIBEXEC_DIR}/php.sh" "$@"
@@ -4530,7 +4530,7 @@ case "$1" in
 
   composer)
     shift
-    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+    if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
       execute_with_menu_return "${LIBEXEC_DIR}/composer.sh" "$@"
     else
       exec "${LIBEXEC_DIR}/composer.sh" "$@"
@@ -4539,7 +4539,7 @@ case "$1" in
 
   agents)
     shift
-    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+    if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
       execute_with_menu_return "${LIBEXEC_DIR}/agents.sh" "$@"
     else
       exec "${LIBEXEC_DIR}/agents.sh" "$@"
@@ -4548,7 +4548,7 @@ case "$1" in
 
   exec)
     shift
-    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+    if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
       execute_with_menu_return "${LIBEXEC_DIR}/exec.sh" "$@"
     else
       exec "${LIBEXEC_DIR}/exec.sh" "$@"
@@ -4557,7 +4557,7 @@ case "$1" in
 
   platform-update)
     shift
-    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+    if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
       execute_with_menu_return "${LIBEXEC_DIR}/platform-update.sh" "$@"
     else
       exec "${LIBEXEC_DIR}/platform-update.sh" "$@"
@@ -4566,7 +4566,7 @@ case "$1" in
 
   doctor)
     shift
-    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+    if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
       execute_with_menu_return "${LIBEXEC_DIR}/doctor.sh" "$@"
     else
       exec "${LIBEXEC_DIR}/doctor.sh" "$@"
@@ -4575,7 +4575,7 @@ case "$1" in
 
   env)
     shift
-    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+    if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
       execute_with_menu_return "${LIBEXEC_DIR}/env.sh" "$@"
     else
       exec "${LIBEXEC_DIR}/env.sh" "$@"
@@ -4584,7 +4584,7 @@ case "$1" in
 
   status)
     shift
-    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+    if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
       execute_with_menu_return "${LIBEXEC_DIR}/status.sh" "$@"
     else
       exec "${LIBEXEC_DIR}/status.sh" "$@"
@@ -4613,7 +4613,7 @@ case "$1" in
     # Aliases: orodc up/down/logs/ps -> orodc compose up/down/logs/ps
     cmd="$1"
     shift
-    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+    if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
       execute_with_menu_return "${LIBEXEC_DIR}/compose.sh" "$cmd" "$@"
     else
       exec "${LIBEXEC_DIR}/compose.sh" "$cmd" "$@"
@@ -4641,7 +4641,7 @@ case "$1" in
 
   codex)
     shift
-    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+    if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
       execute_with_menu_return "${LIBEXEC_DIR}/ai/codex.sh" "$@"
     else
       exec "${LIBEXEC_DIR}/ai/codex.sh" "$@"
@@ -4650,7 +4650,7 @@ case "$1" in
 
   gemini)
     shift
-    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+    if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
       execute_with_menu_return "${LIBEXEC_DIR}/ai/gemini.sh" "$@"
     else
       exec "${LIBEXEC_DIR}/ai/gemini.sh" "$@"
@@ -4659,7 +4659,7 @@ case "$1" in
 
   cursor)
     shift
-    if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+    if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
       execute_with_menu_return "${LIBEXEC_DIR}/ai/cursor.sh" "$@"
     else
       exec "${LIBEXEC_DIR}/ai/cursor.sh" "$@"

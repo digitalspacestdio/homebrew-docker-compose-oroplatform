@@ -147,7 +147,7 @@ libexec/orodc/new-module.sh
 # Router addition in bin/orodc
 new-module)
   shift
-  if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+  if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
     execute_with_menu_return "${LIBEXEC_DIR}/new-module.sh" "$@"
   else
     exec "${LIBEXEC_DIR}/new-module.sh" "$@"

@@ -114,12 +114,12 @@ main() {
   
   if is_interactive; then
     # Interactive mode - use existing function from environment.sh
-    # This function handles selection and exports ORODC_SELECTED_PATH
+    # This function handles selection and exports DC_ORO_SELECTED_PATH
     list_environments
     exit_code=$?
     
     # Exit code 2 means environment switch was requested
-    # The path is already exported in ORODC_SELECTED_PATH by list_environments
+    # The path is already exported in DC_ORO_SELECTED_PATH by list_environments
     exit $exit_code
   else
     # Non-interactive mode

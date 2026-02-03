@@ -185,13 +185,13 @@ Each option delegates to existing `orodc` functionality:
 **Skip Menu When:**
 - `$# -gt 0` (arguments provided)
 - Not a TTY (`[[ ! -t 0 ]]`)
-- `ORODC_NO_MENU=1` environment variable set
+- `DC_ORO_NO_MENU=1` environment variable set
 - Piped input detected
 
 **Implementation:**
 ```bash
 # Early in script, after argument parsing
-if [[ $# -eq 0 ]] && [[ -t 0 ]] && [[ -z "${ORODC_NO_MENU:-}" ]]; then
+if [[ $# -eq 0 ]] && [[ -t 0 ]] && [[ -z "${DC_ORO_NO_MENU:-}" ]]; then
   show_interactive_menu
   exit $?
 fi
@@ -235,7 +235,7 @@ fi
 - All existing `orodc` commands continue to work unchanged
 - Menu only activates when no arguments provided
 - Non-interactive usage (scripts, CI/CD) unaffected
-- Environment variable `ORODC_NO_MENU=1` allows explicit opt-out
+- Environment variable `DC_ORO_NO_MENU=1` allows explicit opt-out
 
 ## Future Enhancements
 

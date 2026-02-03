@@ -18,7 +18,7 @@ source "${SCRIPT_DIR}/lib/docker-utils.sh"
 source "${SCRIPT_DIR}/lib/environment.sh"
 
 # Helper function to run command via orodc and return to menu
-# This function simply calls orodc with ORODC_IS_INTERACTIVE_MENU=1
+# This function simply calls orodc with DC_ORO_IS_INTERACTIVE_MENU=1
 # to ensure menu reflects 1:1 command line behavior
 run_command_with_menu_return() {
   local cmd="$1"
@@ -40,11 +40,11 @@ run_command_with_menu_return() {
   # Flush output buffers to ensure message is displayed before exec
   echo "" >&2
   
-  # Execute command via orodc with ORODC_IS_INTERACTIVE_MENU=1
+  # Execute command via orodc with DC_ORO_IS_INTERACTIVE_MENU=1
   # This tells orodc to return to menu after completion
   # Command executes exactly as it would from command line
   # bin/orodc handles menu return via execute_with_menu_return
-  exec env ORODC_IS_INTERACTIVE_MENU=1 "$orodc_cmd" "$cmd" "$@"
+  exec env DC_ORO_IS_INTERACTIVE_MENU=1 "$orodc_cmd" "$cmd" "$@"
 }
 
 # Show interactive menu
@@ -654,8 +654,8 @@ show_interactive_menu() {
       list_environments
       local switch_result=$?
       set -e
-      selected_path="${ORODC_SELECTED_PATH:-}"
-      unset ORODC_SELECTED_PATH
+      selected_path="${DC_ORO_SELECTED_PATH:-}"
+      unset DC_ORO_SELECTED_PATH
       
       if [[ $switch_result -eq 2 ]]; then
         if [[ -z "$selected_path" ]]; then
@@ -688,19 +688,19 @@ show_interactive_menu() {
         debug_log "menu switch: cd to '$selected_path' succeeded, PWD='$PWD'"
         
         # Clear environment variables to force reinitialization
-        unset ORODC_ENV_INITIALIZED
+        unset DC_ORO_ENV_INITIALIZED
         unset DC_ORO_NAME
         unset DC_ORO_APPDIR
         unset DC_ORO_CONFIG_DIR
         
-        # Also set ORODC_SELECTED_ENV_* for bin/orodc compatibility
+        # Also set DC_ORO_SELECTED_ENV_* for bin/orodc compatibility
         # These variables tell bin/orodc which environment we switched to
         local env_name=$(basename "$selected_path")
-        export ORODC_SELECTED_ENV_NAME="$env_name"
-        export ORODC_SELECTED_ENV_PATH="$selected_path"
-        export ORODC_SELECTED_ENV_CONFIG="${HOME}/.orodc/${env_name}"
+        export DC_ORO_SELECTED_ENV_NAME="$env_name"
+        export DC_ORO_SELECTED_ENV_PATH="$selected_path"
+        export DC_ORO_SELECTED_ENV_CONFIG="${HOME}/.orodc/${env_name}"
         
-        debug_log "menu switch: set ORODC_SELECTED_ENV_NAME='$env_name' PATH='$selected_path'"
+        debug_log "menu switch: set DC_ORO_SELECTED_ENV_NAME='$env_name' PATH='$selected_path'"
         
         # Reinitialize environment - show errors for debugging
         if ! initialize_environment; then

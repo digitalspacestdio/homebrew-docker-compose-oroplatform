@@ -51,7 +51,7 @@ The system SHALL display an interactive menu when `orodc` is executed without an
 - **AND** command SHALL execute normally
 
 #### Scenario: Skip menu with environment variable
-- **WHEN** `ORODC_NO_MENU=1` environment variable is set
+- **WHEN** `DC_ORO_NO_MENU=1` environment variable is set
 - **THEN** menu SHALL be skipped even in interactive mode
 
 ### Requirement: Menu Option: Platform Update

@@ -62,19 +62,19 @@ detect_nginx_container() {
     echo "📋 Found nginx container: $NGINX_CONTAINER"
     
     # Get OroDC network name
-    ORODC_NETWORK=$(docker inspect "$NGINX_CONTAINER" --format '{{range $net, $config := .NetworkSettings.Networks}}{{$net}} {{end}}' | awk '{print $1}')
+    DC_ORO_NETWORK=$(docker inspect "$NGINX_CONTAINER" --format '{{range $net, $config := .NetworkSettings.Networks}}{{$net}} {{end}}' | awk '{print $1}')
     
-    if [ -z "$ORODC_NETWORK" ]; then
+    if [ -z "$DC_ORO_NETWORK" ]; then
         echo "❌ Could not detect OroDC network"
         return 1
     fi
     
-    echo "📋 Found OroDC network: $ORODC_NETWORK"
+    echo "📋 Found OroDC network: $DC_ORO_NETWORK"
     
     # Connect current container to OroDC network
     echo "🔗 Connecting to OroDC network..."
     CURRENT_CONTAINER=$(hostname)
-    docker network connect "$ORODC_NETWORK" "$CURRENT_CONTAINER" 2>/dev/null || {
+    docker network connect "$DC_ORO_NETWORK" "$CURRENT_CONTAINER" 2>/dev/null || {
         echo "⚠️  Already connected to network or connection failed, continuing..."
     }
     
