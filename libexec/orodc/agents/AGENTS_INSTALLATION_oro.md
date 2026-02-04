@@ -44,7 +44,8 @@
 - [ ] **Step 4: Install Oro Platform** - **🔴 Use `--sample-data=y` if user requests demo data**
 - [ ] **Step 5: Build assets (frontend)** - **🔴 CRITICAL, ALWAYS REQUIRED**
 - [ ] Step 6: Clear and warm up cache
-- [ ] **Step 7: Ensure containers are running** - **🔴 REQUIRED - NEVER SKIP THIS STEP** (`orodc up -d` and `orodc ps`)
+- [ ] **Step 7: Generate product images** - **🔴 CRITICAL - REQUIRED FOR PRODUCTION**
+- [ ] **Step 8: Ensure containers are running** - **🔴 REQUIRED - NEVER SKIP THIS STEP** (`orodc up -d` and `orodc ps`)
 
 ### Final Verification Checklist
 
@@ -96,7 +97,8 @@
 - **Step 4**: Install Oro Platform (use `--sample-data=y` if user requested demo data)
 - **Step 5**: Build assets (CRITICAL - frontend will not work without this)
 - **Step 6**: Clear and warm up cache
-- **Step 7**: Ensure containers are running (final verification)
+- **Step 7**: Generate product images (CRITICAL - required for production)
+- **Step 8**: Ensure containers are running (final verification)
 
 ### Step 1: Verify Directory is Empty
 
@@ -320,7 +322,41 @@ orodc exec bin/console cache:warmup
 - Cache operations ensure that all new assets and configurations are properly loaded
 - Skipping this step may result in outdated cache showing old data
 
-### Step 7: Ensure Containers Are Running
+### Step 7: Generate Product Images
+
+**🔴 CRITICAL - REQUIRED FOR PRODUCTION**
+
+Generate product images. **This step is MANDATORY** - product images will not be generated in production without it!
+
+**Why this is needed**: Oro Platform requires product images to be resized and generated for different display contexts (thumbnails, product pages, etc.). This command processes all product images and generates required sizes.
+
+**🚨 WARNING: Skipping this step will result in:**
+- Missing product images in production
+- Broken product image display on frontend
+- Products without thumbnails or images
+- Poor user experience with missing visual content
+
+**When to generate**: This step MUST be done AFTER cache clear/warmup (Step 6) and BEFORE accessing the application.
+
+**YOU MUST EXECUTE THIS STEP**:
+
+```bash
+orodc exec bin/console product:image:resize-all
+```
+
+**What this command does**:
+- Processes all product images in the system
+- Generates required image sizes (thumbnails, product page images, etc.)
+- Ensures all product images are available for frontend display
+- Required for proper product image display in production
+
+**Important Notes**:
+- This step may take several minutes depending on the number of products and images
+- **DO NOT skip this step** - product images will not be generated in production without it
+- This is especially critical if demo data was installed (Step 4 with `--sample-data=y`)
+- Must be executed AFTER Oro installation and assets build
+
+### Step 8: Ensure Containers Are Running
 
 **🔴 REQUIRED - NEVER SKIP THIS STEP**: Verify and ensure all containers are running:
 
@@ -331,10 +367,10 @@ orodc ps
 
 **🚨 CRITICAL RULES**:
 - **MUST execute both commands**: Run `orodc up -d` AND `orodc ps` - do NOT skip even if containers seem running
-- **DO NOT skip because status shows running**: Even if `orodc status` shows containers running, you MUST execute Step 7 as written
+- **DO NOT skip because status shows running**: Even if `orodc status` shows containers running, you MUST execute Step 8 as written
 - **DO NOT make assumptions**: Do not assume containers are running - execute the commands to verify and ensure they are running
 - **This is a verification step**: This step ensures containers are running AND verifies their status - skipping it can cause issues
-- **User permission required**: If you want to skip this step, you MUST ask user: "Step 7 says to run `orodc up -d` and `orodc ps`, but containers seem running. Should I skip it or execute it anyway?"
+- **User permission required**: If you want to skip this step, you MUST ask user: "Step 8 says to run `orodc up -d` and `orodc ps`, but containers seem running. Should I skip it or execute it anyway?"
 - This is the final step before accessing the application - it must be executed to ensure everything is ready
 
 ## Verification
@@ -349,9 +385,10 @@ orodc ps
 
 1. **Demo data (Step 4)**: If user requests demo data → use `--sample-data=y`
 2. **Frontend build (Step 5)**: ALWAYS execute - frontend will not work without it
-3. **Step order**: install → assets build → cache clear/warmup → verify containers
-4. **Never skip CRITICAL**: Steps marked 🔴 must always be executed
-5. **Final step required**: Always run `orodc up -d` and `orodc ps` at the end (Step 7) to ensure containers are running before accessing the application
+3. **Product images (Step 7)**: ALWAYS execute - product images will not be generated in production without it
+4. **Step order**: install → assets build → cache clear/warmup → product images → verify containers
+5. **Never skip CRITICAL**: Steps marked 🔴 must always be executed
+6. **Final step required**: Always run `orodc up -d` and `orodc ps` at the end (Step 8) to ensure containers are running before accessing the application
 
 ### Oro-Specific Notes:
 
@@ -360,4 +397,5 @@ orodc ps
 - **Installation command**: Use `orodc exec bin/console oro:install` with all required parameters (see Step 4 for full example)
 - **Demo data rule**: Use `--sample-data=y` when user explicitly requests demo data (phrases like "with demo", "sample data", "test products")
 - **Assets building**: ALWAYS build assets after installation - this is MANDATORY, not optional
+- **Product images**: ALWAYS generate product images after installation - this is MANDATORY for production, product images will not be generated without it
 - **See full guide**: Reference `docs/ORO.md` for complete setup guide and troubleshooting
