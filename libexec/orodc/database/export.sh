@@ -100,7 +100,7 @@ export_database_interactive() {
   echo "" >&2
   
   # If running from interactive menu, pause before returning
-  if [[ -n "${ORODC_IS_INTERACTIVE_MENU:-}" ]]; then
+  if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
     echo -n "Press Enter to continue..." >&2
     read -r
   fi

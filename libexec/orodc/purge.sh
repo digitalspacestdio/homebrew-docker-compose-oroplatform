@@ -11,7 +11,7 @@ source "${SCRIPT_DIR}/lib/environment.sh"
 # Check that we're in a project
 check_in_project || exit 1
 
-# Check for --yes flag or ORODC_PURGE_FORCE environment variable
+# Check for --yes flag or DC_ORO_PURGE_FORCE environment variable
 SKIP_CONFIRMATION=false
 for arg in "$@"; do
   case "$arg" in
@@ -21,7 +21,7 @@ for arg in "$@"; do
   esac
 done
 
-if [[ "${ORODC_PURGE_FORCE:-}" == "1" ]] || [[ "${ORODC_PURGE_FORCE:-}" == "true" ]]; then
+if [[ "${DC_ORO_PURGE_FORCE:-}" == "1" ]] || [[ "${DC_ORO_PURGE_FORCE:-}" == "true" ]]; then
   SKIP_CONFIRMATION=true
 fi
 
@@ -34,7 +34,7 @@ if [[ "$SKIP_CONFIRMATION" != "true" ]]; then
   # Mark that purge was confirmed
   export PURGE_CONFIRMED=true
 else
-  msg_info "Skipping confirmation (--yes flag or ORODC_PURGE_FORCE=1 detected)"
+  msg_info "Skipping confirmation (--yes flag or DC_ORO_PURGE_FORCE=1 detected)"
   export PURGE_CONFIRMED=true
 fi
 

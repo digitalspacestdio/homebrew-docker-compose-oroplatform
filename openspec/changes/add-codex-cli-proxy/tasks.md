@@ -23,7 +23,7 @@
 
 - [x] 3.1 Add `codex` case to command routing in `bin/orodc`
 - [x] 3.2 Route to `libexec/orodc/codex.sh` module
-- [x] 3.3 Support interactive menu integration (if `ORODC_IS_INTERACTIVE_MENU` is set)
+- [x] 3.3 Support interactive menu integration (if `DC_ORO_IS_INTERACTIVE_MENU` is set)
 
 ## 4. Optional: Add CMS Type to Init Wizard
 

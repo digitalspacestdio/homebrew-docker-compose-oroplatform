@@ -130,6 +130,6 @@ The system SHALL route `orodc codex` command following modular architecture patt
 
 #### Scenario: Support interactive menu
 - **WHEN** `orodc codex` is executed from interactive menu
-- **AND** `ORODC_IS_INTERACTIVE_MENU` is set
+- **AND** `DC_ORO_IS_INTERACTIVE_MENU` is set
 - **THEN** command SHALL execute and return to menu after completion
 - **AND** SHALL follow `execute_with_menu_return` pattern

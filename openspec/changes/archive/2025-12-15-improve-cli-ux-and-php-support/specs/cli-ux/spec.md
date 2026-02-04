@@ -64,7 +64,7 @@ The system SHALL require user confirmation before executing destructive operatio
 - **AND** operation SHALL proceed only if user enters 'y' or 'yes'
 
 #### Scenario: Purge skips confirmation in non-interactive mode
-- **WHEN** user runs `orodc purge` with piped input or `ORODC_PURGE_FORCE=1`
+- **WHEN** user runs `orodc purge` with piped input or `DC_ORO_PURGE_FORCE=1`
 - **THEN** confirmation SHALL be skipped
 - **AND** a warning message SHALL be displayed
 - **AND** operation SHALL proceed automatically

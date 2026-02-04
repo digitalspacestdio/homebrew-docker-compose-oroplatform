@@ -1478,7 +1478,7 @@ run_goss_check_for_service() {
   fi
   
   # Store log file path in global variable for caller
-  export ORODC_DOCTOR_LOG_FILE="$log_file"
+  export DC_ORO_DOCTOR_LOG_FILE="$log_file"
   
   # Return appropriate exit code
   if [[ $exit_code -eq 0 ]]; then

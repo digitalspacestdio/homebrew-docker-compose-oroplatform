@@ -15,7 +15,7 @@
 
 - [x] 2.1 Add `cursor` case to command routing in `bin/orodc`
 - [x] 2.2 Route to `libexec/orodc/cursor.sh` module
-- [x] 2.3 Support interactive menu integration (if `ORODC_IS_INTERACTIVE_MENU` is set)
+- [x] 2.3 Support interactive menu integration (if `DC_ORO_IS_INTERACTIVE_MENU` is set)
 
 ## 3. System Prompt Configuration
 

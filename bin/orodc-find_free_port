@@ -170,7 +170,9 @@ find_free_ports_batch() {
         # Port matches default but is occupied - find alternative starting from default
         local usage_info
         usage_info=$(get_port_usage_info "$SELECTED_PORT" "$PROJECT_NAME")
-        echo -e "\033[33m==> Warning: Port $SELECTED_PORT (default) is occupied by $usage_info, searching for alternative\033[0m" >&2
+        if [[ -n "${DEBUG:-}" ]] || [[ -n "${VERBOSE:-}" ]]; then
+          echo -e "\033[33m==> Warning: compose.yml port=${SELECTED_PORT} (default=${DEFAULT_PORT}) is occupied by ${usage_info}. Searching for alternative starting from default.\033[0m" >&2
+        fi
       fi
     elif [[ -n "$SELECTED_PORT" ]] && [[ "$SELECTED_PORT" != "$DEFAULT_PORT" ]]; then
       # SELECTED_PORT exists but doesn't match default - check if it's used by our project
@@ -187,7 +189,9 @@ find_free_ports_batch() {
           port_found="$SELECTED_PORT"
         else
           # Port is occupied by another project - warn and use default instead
-          echo -e "\033[33m==> Warning: Port $SELECTED_PORT in compose.yml is occupied by $usage_info, searching for alternative\033[0m" >&2
+          if [[ -n "${DEBUG:-}" ]] || [[ -n "${VERBOSE:-}" ]]; then
+            echo -e "\033[33m==> Warning: compose.yml port=${SELECTED_PORT} (source=compose.yml, default=${DEFAULT_PORT}) is occupied by ${usage_info}. Searching for alternative.\033[0m" >&2
+          fi
         fi
       fi
     fi

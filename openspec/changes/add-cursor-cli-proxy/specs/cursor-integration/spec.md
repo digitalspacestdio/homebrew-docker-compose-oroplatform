@@ -97,6 +97,6 @@ The system SHALL route `orodc cursor` command following modular architecture pat
 
 #### Scenario: Support interactive menu
 - **WHEN** `orodc cursor` is executed from interactive menu
-- **AND** `ORODC_IS_INTERACTIVE_MENU` is set
+- **AND** `DC_ORO_IS_INTERACTIVE_MENU` is set
 - **THEN** command SHALL execute and return to menu after completion
 - **AND** SHALL follow `execute_with_menu_return` pattern

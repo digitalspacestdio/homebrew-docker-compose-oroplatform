@@ -438,7 +438,7 @@ list_environments() {
   
   # Export selected path via environment variable (for menu.sh to read)
   # This allows menu.sh to change directory
-  export ORODC_SELECTED_PATH="$selected_path"
+  export DC_ORO_SELECTED_PATH="$selected_path"
   
   # Return special code to indicate environment switch
   # Menu will handle directory change and reinitialization
@@ -511,7 +511,7 @@ build_traefik_rule() {
 # This function MUST be called before any docker compose commands
 initialize_environment() {
   # Don't reinitialize if already done
-  if [[ "${ORODC_ENV_INITIALIZED:-}" == "1" ]]; then
+  if [[ "${DC_ORO_ENV_INITIALIZED:-}" == "1" ]]; then
     return 0
   fi
 
@@ -589,7 +589,7 @@ initialize_environment() {
     else
       # Not in a project - this is OK for some commands (init, proxy, etc.)
       export DC_ORO_APPDIR=""
-      export ORODC_ENV_INITIALIZED=1
+      export DC_ORO_ENV_INITIALIZED=1
       return 0
     fi
   fi
@@ -1090,5 +1090,5 @@ initialize_environment() {
     fi
   fi
 
-  export ORODC_ENV_INITIALIZED=1
+  export DC_ORO_ENV_INITIALIZED=1
 }

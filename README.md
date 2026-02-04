@@ -1867,7 +1867,7 @@ brew install mutagen-io/mutagen/mutagen
 orodc purge && orodc install
 
 # Force purge without confirmation (CI/CD)
-ORODC_PURGE_FORCE=1 orodc purge
+DC_ORO_PURGE_FORCE=1 orodc purge
 
 # Check logs
 orodc logs [service-name]
@@ -1886,7 +1886,7 @@ orodc purge
 # Output shows warning and prompts: Are you sure? [y/N]
 
 # Non-interactive mode (CI/CD, scripts)
-ORODC_PURGE_FORCE=1 orodc purge
+DC_ORO_PURGE_FORCE=1 orodc purge
 # Proceeds without asking
 ```
 

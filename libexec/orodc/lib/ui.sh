@@ -399,6 +399,17 @@ confirm_yes_no() {
   local default="${2:-no}"
   local answer=""
   local char
+  local input_source="/dev/tty"
+
+  if [[ ! -r /dev/tty ]]; then
+    if [[ ! -t 0 ]]; then
+      if [[ "$default" == "yes" ]]; then
+        return 0
+      fi
+      return 1
+    fi
+    input_source="/dev/stdin"
+  fi
 
   while true; do
     if [[ "$default" == "yes" ]]; then
@@ -409,7 +420,7 @@ confirm_yes_no() {
 
     # Read input character by character, filtering only Latin letters and digits
     answer=""
-    while IFS= read -rsn1 char </dev/tty 2>/dev/null || IFS= read -rsn1 char; do
+    while IFS= read -rsn1 char <"$input_source" 2>/dev/null || IFS= read -rsn1 char; do
       # Handle Enter key (empty char or newline)
       if [[ -z "$char" ]] || [[ "$char" == $'\n' ]] || [[ "$char" == $'\r' ]]; then
         break
