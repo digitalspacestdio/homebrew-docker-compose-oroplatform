@@ -567,27 +567,46 @@ show_interactive_menu() {
     # Handle direct number input
     # Always wait for Enter - no immediate selection
     elif [[ "$key" =~ ^[0-9]$ ]]; then
-      # Add first digit to input buffer
-      input_buffer="$key"
-      local num_input="$key"
-      # Try to read second digit if available (for 10-21)
-      # Use timeout to check if user is typing two-digit number
-      # But NEVER select immediately - always wait for explicit Enter
-      local second_digit=""
-      # Try reading from /dev/tty first (better for Mac), then fallback to stdin
-      if ! IFS= read -rsn1 -t 0.6 second_digit </dev/tty 2>/dev/null; then
-        # If /dev/tty read failed, try stdin
-        IFS= read -rsn1 -t 0.6 second_digit 2>/dev/null || true
+      # Add digit to input buffer (accumulate digits for multi-digit numbers)
+      if [[ -z "$input_buffer" ]]; then
+        input_buffer="$key"
+      else
+        input_buffer="${input_buffer}${key}"
       fi
-      # Filter: only allow digits for second character (for two-digit numbers)
-      if [[ -n "$second_digit" ]] && [[ "$second_digit" =~ ^[0-9]$ ]]; then
-        # Second digit entered - add to buffer and combine them
-        input_buffer="${key}${second_digit}"
-        num_input="${key}${second_digit}"
-      fi
-      # Validate number and update selection (always wait for Enter in next iteration)
+      
+      # Try to read additional digits if user is typing a multi-digit number
+      # Use a short timeout to check if more digits are coming
+      local additional_digit=""
+      local max_digits=2  # Maximum 2 digits (1-27)
+      
+      # Keep reading digits until we have max_digits or timeout
+      while [[ ${#input_buffer} -lt $max_digits ]]; do
+        # Try reading from /dev/tty first (better for Mac), then fallback to stdin
+        # Use 0.5s timeout to allow users to type two-digit numbers comfortably
+        if ! IFS= read -rsn1 -t 0.5 additional_digit </dev/tty 2>/dev/null; then
+          # If /dev/tty read failed, try stdin
+          if ! IFS= read -rsn1 -t 0.5 additional_digit 2>/dev/null; then
+            # Timeout - no more digits available, break
+            break
+          fi
+        fi
+        
+        # Filter: only allow digits
+        if [[ -n "$additional_digit" ]] && [[ "$additional_digit" =~ ^[0-9]$ ]]; then
+          # Add digit to buffer
+          input_buffer="${input_buffer}${additional_digit}"
+        else
+          # Non-digit character - put it back if possible, or break
+          # Note: We can't reliably "unread" a character, so we break here
+          # The non-digit will be handled in the next loop iteration
+          break
+        fi
+      done
+      
+      # Validate the complete number
+      local num_input="$input_buffer"
       if [[ "$num_input" =~ ^[1-9]$ ]] || [[ "$num_input" =~ ^1[0-9]$ ]] || [[ "$num_input" =~ ^2[0-7]$ ]]; then
-        # Update selected option to match input, wait for Enter to confirm
+        # Valid number - update selected option, wait for Enter to confirm
         selected=$num_input
         redraw_menu_screen $selected $use_two_columns "$input_buffer" "$use_three_columns" "$status_display" || true
         # Continue loop to wait for Enter - NEVER break here
