@@ -82,7 +82,6 @@ fi
 msg_info "Starting installation process..."
 
 # Build project images first (if needed) to avoid showing build output during run commands
-# This ensures images are built under spinner instead of showing raw Docker output
 services_to_build="fpm cli websocket ssh"
 
 # Check if consumer service exists and add it to build list

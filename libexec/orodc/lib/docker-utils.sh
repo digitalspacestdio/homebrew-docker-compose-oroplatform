@@ -172,7 +172,8 @@ ensure_appcode_volume() {
   # For mutagen/ssh modes, we need to sync files into the volume
   # Start SSH container first (needed for both modes)
   if [[ "0" -eq $(${DOCKER_COMPOSE_BIN_CMD} ps -q ssh 2>/dev/null | wc -l 2> /dev/null) ]]; then
-    ${DOCKER_COMPOSE_BIN_CMD} up -d ssh >/dev/null 2>&1
+    local ssh_up_cmd="${DOCKER_COMPOSE_BIN_CMD} up -d ssh"
+    run_with_spinner "Starting SSH sync container" "$ssh_up_cmd" || true
   fi
 
   # Wait for SSH container to be ready
@@ -219,9 +220,6 @@ ensure_appcode_volume() {
 # Usage: handle_compose_up
 # Expects: docker_services, left_flags, left_options, right_flags, right_options
 handle_compose_up() {
-  # Ensure appcode volume exists and is synchronized before starting containers
-  ensure_appcode_volume
-
   # Get previous timing for statistics only
   # shellcheck disable=SC2034
   prev_timing=$(get_previous_timing "up")
@@ -234,6 +232,9 @@ handle_compose_up() {
 
   # If DEBUG or VERBOSE, run without timing wrapper
   if [[ -n "${DEBUG:-}" ]] || [[ -n "${VERBOSE:-}" ]]; then
+    # Ensure appcode volume exists and is synchronized before starting containers
+    ensure_appcode_volume
+
     # Phase 1: Build images (unless --no-build is specified)
     if [[ "$skip_build" == "false" ]]; then
       build_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} build ${docker_services}"
@@ -256,6 +257,14 @@ handle_compose_up() {
 
   # Record start time for entire up operation
   up_start_time=$(date +%s)
+
+  # Pull all required images upfront so build/sync/start don't stall on pulls
+  pull_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} pull --ignore-buildable --quiet ${docker_services}"
+  run_with_spinner "Pulling Docker images" "$pull_cmd" || true
+
+  # Ensure appcode volume exists and is synchronized (ssh/mutagen modes)
+  # Images are already pulled above, so SSH container start won't stall
+  ensure_appcode_volume
 
   # Phase 1: Build images (unless --no-build is specified)
   if [[ "$skip_build" == "false" ]]; then
