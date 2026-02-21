@@ -1,0 +1,58 @@
+[client]
+default-character-set = utf8
+
+[mysqld]
+# SQL Mode
+sql_mode = ""
+explicit_defaults_for_timestamp = 1
+
+# Binary Logging (MySQL 5.7 compatible)
+disable_log_bin
+expire_logs_days = 1
+log_bin_trust_function_creators = 1
+
+# Logging
+general_log = 0
+slow_query_log = 0
+log_output = TABLE
+
+# Fine Tuning
+max_allowed_packet    = 512M
+max_connections       = 4096
+thread_stack          = 192K
+thread_cache_size     = 8
+interactive_timeout   = 300
+wait_timeout          = 900
+sort_buffer_size      = 16M
+read_rnd_buffer_size  = 16M
+read_buffer_size      = 16M
+join_buffer_size      = 16M
+key_buffer_size       = 256M
+tmp_table_size        = 256M
+max_heap_table_size   = 256M
+net_read_timeout      = 10
+
+# Table Settings (5.7: 0 or 1 only; 2 is MySQL 8.0+)
+lower_case_table_names = 1
+table_open_cache = 250
+
+# InnoDB Settings
+innodb_doublewrite              = 0
+innodb_file_per_table           = 1
+innodb_thread_concurrency       = 8
+innodb_lock_wait_timeout        = 300
+innodb_flush_method             = O_DIRECT
+innodb_log_files_in_group       = 2
+innodb_log_file_size            = 512M
+innodb_log_buffer_size          = 64M
+innodb_flush_log_at_trx_commit  = 2
+innodb_buffer_pool_size         = 1G
+innodb_buffer_pool_instances    = 2
+
+# File Permissions
+secure_file_priv = /tmp
+
+[mysqldump]
+quick
+quote-names
+max_allowed_packet = 16M

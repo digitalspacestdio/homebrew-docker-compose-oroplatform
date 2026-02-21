@@ -46,7 +46,8 @@ compose/docker/
 │
 ├── mysql/                        # MySQL database
 │   ├── initdb.d/                 # Initialization scripts
-│   └── my.cnf                    # MySQL configuration
+│   ├── my-5.7.cnf                 # MySQL 5.7 config (expire_logs_days, etc.)
+│   └── my-8.cnf                  # MySQL 8+ config (binlog_expire_logs_seconds, etc.)
 │
 ├── pgsql/                        # PostgreSQL database
 │   └── initdb.d/

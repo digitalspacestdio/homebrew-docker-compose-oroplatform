@@ -297,8 +297,17 @@ perform_database_import() {
     exit 1
   fi
 
-  db_name="${DC_ORO_DATABASE_DBNAME:-app_db}"
-  
+  db_name="${DC_ORO_DATABASE_DBNAME:-oro_db}"
+
+  # Ensure database connection variables are exported with defaults.
+  # These may not be set in the host shell (only in Docker Compose interpolation),
+  # so export them to guarantee correct values when eval expands $VAR references.
+  export DC_ORO_DATABASE_HOST="${DC_ORO_DATABASE_HOST:-database}"
+  export DC_ORO_DATABASE_PORT="${DC_ORO_DATABASE_PORT:-$([ "${DC_ORO_DATABASE_SCHEMA}" = "mysql" ] && echo 3306 || echo 5432)}"
+  export DC_ORO_DATABASE_USER="${DC_ORO_DATABASE_USER:-oro_db_user}"
+  export DC_ORO_DATABASE_PASSWORD="${DC_ORO_DATABASE_PASSWORD:-oro_db_pass}"
+  export DC_ORO_DATABASE_DBNAME="${DC_ORO_DATABASE_DBNAME:-${db_name}}"
+
   # Require user to confirm dropping existing database before import
   echo "" >&2
   msg_danger "This will DELETE ALL DATA in database '${db_name}'!"
@@ -327,15 +336,21 @@ perform_database_import() {
   recreate_db_cmd="${DOCKER_COMPOSE_BIN_CMD} up -d database"
   run_with_spinner "Recreating database container" "$recreate_db_cmd" || exit $?
 
-  # Wait for database to be ready and the specific database to exist
+  # MySQL needs --profile run-only for database-cli (service has profiles: ["run-only"])
+  db_cli_cmd="${DOCKER_COMPOSE_BIN_CMD}"
+  if [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]] && [[ "$DOCKER_COMPOSE_BIN_CMD" != *"run-only"* ]]; then
+    db_cli_cmd="${DOCKER_COMPOSE_BIN_CMD} --profile run-only"
+  fi
+
+  # Wait for database to be ready and the specific database to exist (max 120s to avoid infinite hang)
   if [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]]; then
-    wait_server_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm database-cli bash -c \"until PGPASSWORD=\\\$DC_ORO_DATABASE_PASSWORD psql -h \\\$DC_ORO_DATABASE_HOST -p \\\$DC_ORO_DATABASE_PORT -U \\\$DC_ORO_DATABASE_USER -d postgres -c 'SELECT 1' >/dev/null 2>&1; do sleep 1; done\""
+    wait_server_cmd="${db_cli_cmd} run --rm database-cli bash -c \"until PGPASSWORD=\\\$DC_ORO_DATABASE_PASSWORD psql -h \\\$DC_ORO_DATABASE_HOST -p \\\$DC_ORO_DATABASE_PORT -U \\\$DC_ORO_DATABASE_USER -d postgres -c 'SELECT 1' >/dev/null 2>&1; do sleep 1; done\""
     run_with_spinner "Waiting for PostgreSQL server" "$wait_server_cmd" || exit $?
-    wait_db_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm database-cli bash -c \"until PGPASSWORD=\\\$DC_ORO_DATABASE_PASSWORD psql -h \\\$DC_ORO_DATABASE_HOST -p \\\$DC_ORO_DATABASE_PORT -U \\\$DC_ORO_DATABASE_USER -d ${db_name} -c 'SELECT 1' >/dev/null 2>&1; do sleep 1; done\""
+    wait_db_cmd="${db_cli_cmd} run --rm database-cli bash -c \"until PGPASSWORD=\\\$DC_ORO_DATABASE_PASSWORD psql -h \\\$DC_ORO_DATABASE_HOST -p \\\$DC_ORO_DATABASE_PORT -U \\\$DC_ORO_DATABASE_USER -d ${db_name} -c 'SELECT 1' >/dev/null 2>&1; do sleep 1; done\""
   elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]]; then
-    wait_server_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm database-cli bash -c \"until MYSQL_PWD=\\\$DC_ORO_DATABASE_PASSWORD mysqladmin -h \\\$DC_ORO_DATABASE_HOST -P \\\$DC_ORO_DATABASE_PORT -u \\\$DC_ORO_DATABASE_USER ping >/dev/null 2>&1; do sleep 1; done\""
+    wait_server_cmd="${db_cli_cmd} run --rm database-cli bash -c \"for i in \\\$(seq 1 120); do MYSQL_PWD=\\\$DC_ORO_DATABASE_PASSWORD mysqladmin -h \\\$DC_ORO_DATABASE_HOST -P \\\$DC_ORO_DATABASE_PORT -u \\\$DC_ORO_DATABASE_USER ping 2>/dev/null && exit 0; sleep 1; done; echo 'Timeout: MySQL server not ready after 120s' >&2; exit 1\""
     run_with_spinner "Waiting for MySQL server" "$wait_server_cmd" || exit $?
-    wait_db_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm database-cli bash -c \"until MYSQL_PWD=\\\$DC_ORO_DATABASE_PASSWORD mysql -h \\\$DC_ORO_DATABASE_HOST -P \\\$DC_ORO_DATABASE_PORT -u \\\$DC_ORO_DATABASE_USER -e 'USE ${db_name}; SELECT 1' >/dev/null 2>&1; do sleep 1; done\""
+    wait_db_cmd="${db_cli_cmd} run --rm database-cli bash -c \"for i in \\\$(seq 1 120); do MYSQL_PWD=\\\$DC_ORO_DATABASE_PASSWORD mysql -h \\\$DC_ORO_DATABASE_HOST -P \\\$DC_ORO_DATABASE_PORT -u \\\$DC_ORO_DATABASE_USER -e 'USE ${db_name}; SELECT 1' 2>/dev/null && exit 0; sleep 1; done; echo 'Timeout: database ${db_name} not ready after 120s. Last error:' >&2; MYSQL_PWD=\\\$DC_ORO_DATABASE_PASSWORD mysql -h \\\$DC_ORO_DATABASE_HOST -P \\\$DC_ORO_DATABASE_PORT -u \\\$DC_ORO_DATABASE_USER -e 'USE ${db_name}; SELECT 1' 2>&1; exit 1\""
   else
     msg_error "Unknown database schema: ${DC_ORO_DATABASE_SCHEMA}"
     exit 1
@@ -354,9 +369,9 @@ perform_database_import() {
   DB_DUMP_BASENAME=$(echo "${DB_DUMP##*/}")
 
   if [[ $DC_ORO_DATABASE_SCHEMA == "pdo_pgsql" ]] || [[ $DC_ORO_DATABASE_SCHEMA == "postgres" ]];then
-    DB_IMPORT_CMD="sed -E 's/[Oo][Ww][Nn][Ee][Rr]:[[:space:]]*[a-zA-Z0-9_]+/Owner: '\$DC_ORO_DATABASE_USER'/g' | sed -E 's/[Oo][Ww][Nn][Ee][Rr][[:space:]]+[Tt][Oo][[:space:]]+[a-zA-Z0-9_]+/OWNER TO '\$DC_ORO_DATABASE_USER'/g' | sed -E 's/[Ff][Oo][Rr][[:space:]]+[Rr][Oo][Ll][Ee][[:space:]]+[a-zA-Z0-9_]+/FOR ROLE '\$DC_ORO_DATABASE_USER'/g' | sed -E 's/[Tt][Oo][[:space:]]+[a-zA-Z0-9_]+;/TO '\$DC_ORO_DATABASE_USER';/g' | sed -E '/^[[:space:]]*[Rr][Ee][Vv][Oo][Kk][Ee][[:space:]]+[Aa][Ll][Ll]/d' | sed -e '/SET transaction_timeout = 0;/d' | sed -E '/[\\]restrict|[\\]unrestrict/d' | PGPASSWORD=\$DC_ORO_DATABASE_PASSWORD psql --set ON_ERROR_STOP=on -h \$DC_ORO_DATABASE_HOST -p \$DC_ORO_DATABASE_PORT -U \$DC_ORO_DATABASE_USER -d \$DC_ORO_DATABASE_DBNAME -1 >/dev/null"
+    DB_IMPORT_CMD="sed -E 's/[Oo][Ww][Nn][Ee][Rr]:[[:space:]]*[a-zA-Z0-9_]+/Owner: '\\\$DC_ORO_DATABASE_USER'/g' | sed -E 's/[Oo][Ww][Nn][Ee][Rr][[:space:]]+[Tt][Oo][[:space:]]+[a-zA-Z0-9_]+/OWNER TO '\\\$DC_ORO_DATABASE_USER'/g' | sed -E 's/[Ff][Oo][Rr][[:space:]]+[Rr][Oo][Ll][Ee][[:space:]]+[a-zA-Z0-9_]+/FOR ROLE '\\\$DC_ORO_DATABASE_USER'/g' | sed -E 's/[Tt][Oo][[:space:]]+[a-zA-Z0-9_]+;/TO '\\\$DC_ORO_DATABASE_USER';/g' | sed -E '/^[[:space:]]*[Rr][Ee][Vv][Oo][Kk][Ee][[:space:]]+[Aa][Ll][Ll]/d' | sed -e '/SET transaction_timeout = 0;/d' | sed -E '/[\\]restrict|[\\]unrestrict/d' | PGPASSWORD=\\\$DC_ORO_DATABASE_PASSWORD psql --set ON_ERROR_STOP=on -h \\\$DC_ORO_DATABASE_HOST -p \\\$DC_ORO_DATABASE_PORT -U \\\$DC_ORO_DATABASE_USER -d \\\$DC_ORO_DATABASE_DBNAME -1 >/dev/null"
   elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "pdo_mysql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]];then
-    DB_IMPORT_CMD="sed -E 's/[Dd][Ee][Ff][Ii][Nn][Ee][Rr][ ]*=[ ]*[^*]*\*/DEFINER=CURRENT_USER \*/' | MYSQL_PWD=\$DC_ORO_DATABASE_PASSWORD mysql -h\$DC_ORO_DATABASE_HOST -P\$DC_ORO_DATABASE_PORT -u\$DC_ORO_DATABASE_USER \$DC_ORO_DATABASE_DBNAME"
+    DB_IMPORT_CMD="sed -E 's/[Dd][Ee][Ff][Ii][Nn][Ee][Rr][ ]*=[ ]*[^*]*\*/DEFINER=CURRENT_USER \*/' | MYSQL_PWD=\\\$DC_ORO_DATABASE_PASSWORD mysql -h\\\$DC_ORO_DATABASE_HOST -P\\\$DC_ORO_DATABASE_PORT -u\\\$DC_ORO_DATABASE_USER \\\$DC_ORO_DATABASE_DBNAME"
   fi
 
   # Always remove shebang lines (#!/bin/bash, etc.) - they cause psql syntax errors
@@ -368,59 +383,39 @@ perform_database_import() {
   # For .sql.gz files, we use compressed file size (pv will show progress of compressed data)
   # For .sql files, we use file size for accurate progress percentage
   # pv is optional - if not available in container, fall back to spinner
-  PV_CMD=""
   PV_AVAILABLE=false
-  if [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "pdo_pgsql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "pdo_mysql" ]]; then
-    # Check if pv is available in database-cli container (optional - user may have custom container)
-    # Test by running a simple pv --version command in the container
-    # Use --no-deps to avoid starting dependencies, and -T to disable TTY for non-interactive check
-    if ${DOCKER_COMPOSE_BIN_CMD} run --rm --no-deps -T database-cli bash -c "command -v pv >/dev/null 2>&1" >/dev/null 2>&1; then
-      PV_AVAILABLE=true
-      # Get file size from host (file is mounted in container at /${DB_DUMP_BASENAME})
-      DB_DUMP_SIZE=$(stat -f%z "$DB_DUMP" 2>/dev/null || stat -c%s "$DB_DUMP" 2>/dev/null || echo "0")
-      if [[ "$DB_DUMP_SIZE" -gt 0 ]]; then
-        # Use file size for accurate progress percentage
-        # For .sql.gz, this shows progress of compressed data being processed
-        # For .sql, this shows accurate progress percentage
-        PV_CMD="pv -s ${DB_DUMP_SIZE} -p -t -r -e -b |"
-      else
-        # Fallback if size cannot be determined
-        PV_CMD="pv -p -t -r -e -b |"
-      fi
-    elif [[ -n "${DEBUG:-}" ]]; then
-      # Show debug info if pv is not available
-      msg_info "pv not available in database-cli container, using spinner instead" >&2
-      if [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "pdo_pgsql" ]]; then
-        msg_info "To enable pv, rebuild PostgreSQL image: orodc docker-build pgsql" >&2
-      else
-        msg_info "To enable pv, rebuild MySQL image: orodc docker-build mysql" >&2
-      fi
-    fi
+  if ${db_cli_cmd} run --rm --no-deps -T database-cli bash -c "command -v pv >/dev/null 2>&1" >/dev/null 2>&1; then
+    PV_AVAILABLE=true
+  elif [[ -n "${DEBUG:-}" ]]; then
+    msg_info "pv not available in database-cli container, using spinner instead" >&2
   fi
   
+  READ_CMD="cat"
+  if [[ "$PV_AVAILABLE" == "true" ]]; then
+    READ_CMD="pv"
+  fi
+
   if echo ${DB_DUMP_BASENAME} | grep -i 'sql\.gz$' > /dev/null; then
-    DB_IMPORT_CMD="zcat ${DB_DUMP_BASENAME} | ${SHEBANG_REMOVE_SED} ${DOMAIN_REPLACE_SED} sed -E 's/^[[:space:]]*[Cc][Rr][Ee][Aa][Tt][Ee][[:space:]]+[Ff][Uu][Nn][Cc][Tt][Ii][Oo][Nn]/CREATE OR REPLACE FUNCTION/g' | ${PV_CMD} ${DB_IMPORT_CMD}"
+    DB_IMPORT_CMD="${READ_CMD} /${DB_DUMP_BASENAME} | zcat | ${SHEBANG_REMOVE_SED} ${DOMAIN_REPLACE_SED} sed -E 's/^[[:space:]]*[Cc][Rr][Ee][Aa][Tt][Ee][[:space:]]+[Ff][Uu][Nn][Cc][Tt][Ii][Oo][Nn]/CREATE OR REPLACE FUNCTION/g' | ${DB_IMPORT_CMD}"
   else
-    DB_IMPORT_CMD="cat /${DB_DUMP_BASENAME} | ${SHEBANG_REMOVE_SED} ${DOMAIN_REPLACE_SED} sed -E 's/^[[:space:]]*[Cc][Rr][Ee][Aa][Tt][Ee][[:space:]]+[Ff][Uu][Nn][Cc][Tt][Ii][Oo][Nn]/CREATE OR REPLACE FUNCTION/g' | ${PV_CMD} ${DB_IMPORT_CMD}"
+    DB_IMPORT_CMD="${READ_CMD} /${DB_DUMP_BASENAME} | ${SHEBANG_REMOVE_SED} ${DOMAIN_REPLACE_SED} sed -E 's/^[[:space:]]*[Cc][Rr][Ee][Aa][Tt][Ee][[:space:]]+[Ff][Uu][Nn][Cc][Tt][Ii][Oo][Nn]/CREATE OR REPLACE FUNCTION/g' | ${DB_IMPORT_CMD}"
   fi
 
   # Show import details (context information)
   msg_info "From: $DB_DUMP"
   msg_info "File size: $(du -h "$DB_DUMP" | cut -f1)"
-  msg_info "Database: $DC_ORO_DATABASE_HOST:$DC_ORO_DATABASE_PORT/$DC_ORO_DATABASE_DBNAME"
+  msg_info "Database: ${DC_ORO_DATABASE_HOST:-database}:${DC_ORO_DATABASE_PORT:-}/${db_name}"
 
-  # Use pv for progress display if available (optional)
-  # pv writes progress to stderr, so we need to preserve stderr for progress display
-  # Remove --quiet flag to allow pv output, but keep -i for interactive mode
-  if [[ "$PV_AVAILABLE" == "true" ]] && [[ -n "$PV_CMD" ]]; then
-    # pv will show progress on stderr, so we don't use spinner (it would interfere)
-    import_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} run -i --rm -v \"${DB_DUMP}:/${DB_DUMP_BASENAME}\" database-cli bash -c \"$DB_IMPORT_CMD\""
+  # Use db_cli_cmd for MySQL (includes --profile run-only for database-cli)
+  import_compose_cmd="${db_cli_cmd:-${DOCKER_COMPOSE_BIN_CMD}}"
+  # --no-deps: database is already running and healthy (checked above), skip dependency orchestration logs
+  if [[ "$PV_AVAILABLE" == "true" ]]; then
+    import_cmd="${import_compose_cmd} ${left_flags[*]} ${left_options[*]} run --quiet --no-deps -i --rm -v \"${DB_DUMP}:/${DB_DUMP_BASENAME}\" database-cli bash -c \"$DB_IMPORT_CMD\""
     echo "" >&2
-    msg_info "Importing database (showing progress)..." >&2
+    msg_info "Importing database..." >&2
     eval "$import_cmd" || return $?
   else
-    # Fallback to spinner for MySQL, custom containers without pv, or if pv check failed
-    import_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} run --quiet -i --rm -v \"${DB_DUMP}:/${DB_DUMP_BASENAME}\" database-cli bash -c \"$DB_IMPORT_CMD\""
+    import_cmd="${import_compose_cmd} ${left_flags[*]} ${left_options[*]} run --quiet --no-deps -i --rm -v \"${DB_DUMP}:/${DB_DUMP_BASENAME}\" database-cli bash -c \"$DB_IMPORT_CMD\""
     run_with_spinner "Importing database" "$import_cmd" || return $?
   fi
 

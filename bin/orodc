@@ -2613,8 +2613,8 @@ load_cached_profiles() {
     # Commands that always need CLI profiles (for proper cleanup)
     if [[ "$cmd_to_check" =~ ^(down|purge)$ ]]; then
       include_cli_profiles=true
-    # Commands that need database-cli profile
-    elif [[ "$cmd_to_check" =~ ^(mysql|psql|database-cli)$ ]] || \
+    # Commands that need database-cli profile (database import/export use database-cli)
+    elif [[ "$cmd_to_check" =~ ^(mysql|psql|database-cli|database)$ ]] || \
        echo "$cmd_to_check" | grep -i 'import.*db\|export.*db\|dump.*db' > /dev/null; then
       include_cli_profiles=true
     # Commands that need php-cli profile (already handled by auto-redirect, but for completeness)
@@ -2913,8 +2913,8 @@ build_traefik_rule() {
 build_traefik_rule
 
 parse_dsn_uri "$ORO_DB_URL" "database" "DC_ORO"
-export DC_ORO_DATABASE_USER=${DC_ORO_DATABASE_USER:-app}
-export DC_ORO_DATABASE_PASSWORD=${DC_ORO_DATABASE_PASSWORD:-app}
+export DC_ORO_DATABASE_USER=${DC_ORO_DATABASE_USER:-oro_db_user}
+export DC_ORO_DATABASE_PASSWORD=${DC_ORO_DATABASE_PASSWORD:-oro_db_pass}
 
 parse_dsn_uri "$ORO_SEARCH_URL" "search" "DC_ORO"
 parse_dsn_uri "$ORO_MQ_DSN" "mq" "DC_ORO"

@@ -209,10 +209,9 @@ find_free_ports_batch() {
     fi
     
     if [[ -n "$port_found" ]]; then
-      # For database services, don't add to __FOUND_PORTS to allow port reuse between mysql/pgsql
-      if [[ "$SERVICE_NAME" != "database" ]]; then
-        __FOUND_PORTS+=" $port_found"
-      fi
+      # Always add to __FOUND_PORTS to prevent other services (mail, nginx, etc) from getting same port
+      # Database can reuse from __FOUND_PORTS (mysql/pgsql - only one active) via is_port_used_batch
+      __FOUND_PORTS+=" $port_found"
       echo "${SERVICE_NAME}:${port_found}"
     else
       echo -e "\033[38;5;208m==> Error: could not find a free port for $SERVICE_NAME\033[0m" >&2
@@ -301,61 +300,17 @@ is_port_used_batch() {
     fi
   fi
   
-  # If port is used by our project, it's available for reuse
-  if [[ "$used_by_our_project" == "true" ]]; then
-    [[ "$DEBUG" == "1" ]] && echo "DEBUG: Port $p is used by our project, allowing reuse" >&2
-    return 1
-  fi
-  
+  # CRITICAL: Always check port_in_use first - port cannot be rebound if already listening
+  # Even our own container holds the port during recreate, causing "port already allocated"
   if [[ "$port_in_use" == "true" ]]; then
     [[ "$DEBUG" == "1" ]] && echo "DEBUG: Port $p is listening on host (lsof/ss/netstat)" >&2
     return 0
   fi
   
-  # If port is used by our project but not by local process, check if container is running
-  # If container is stopped/exited, we can reuse the port
+  # Port not listening - if used by our stopped project container, we can reuse
   if [[ "$used_by_our_project" == "true" ]]; then
-    # Check if the container using this port is actually running
-    local container_running=false
-    while read -r name ports; do
-      [[ -z "$name" ]] && continue
-      
-      local container_project
-      local container_service
-      get_container_labels "$name" container_project container_service
-      
-      if [[ "$container_project" == "$PROJECT_NAME" ]]; then
-        # Check if this container uses the port and is running
-        for part in ${ports//,/ }; do
-          part="${part// /}"
-          if [[ "$part" == *"->"* ]]; then
-            local host_port_part="${part%->*}"
-            if [[ "$host_port_part" == *":"* ]]; then
-              local host_port="${host_port_part##*:}"
-            else
-              local host_port="$host_port_part"
-            fi
-            if [[ "$host_port" != *"-"* ]] && [[ "$host_port" == "$p" ]]; then
-              # Check if container is running (not stopped/exited)
-              if docker ps --format '{{.Names}}' | grep -q "^${name}$"; then
-                container_running=true
-                break 2
-              fi
-            fi
-          fi
-        done
-      fi
-    done <<< "$__DOCKER_CONTAINERS_CACHE"
-    
-    # If container is running, port is in use
-    if [[ "$container_running" == "true" ]]; then
-      [[ "$DEBUG" == "1" ]] && echo "DEBUG: Port $p is used by running container from our project ($PROJECT_NAME)" >&2
-      return 0
-    else
-      # Container is stopped/exited, port can be reused
-      [[ "$DEBUG" == "1" ]] && echo "DEBUG: Port $p was used by stopped container from our project ($PROJECT_NAME), allowing reuse" >&2
-      return 1
-    fi
+    [[ "$DEBUG" == "1" ]] && echo "DEBUG: Port $p was used by stopped container from our project ($PROJECT_NAME), allowing reuse" >&2
+    return 1
   fi
   
   # Check Docker containers from other projects

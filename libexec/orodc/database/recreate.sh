@@ -25,6 +25,16 @@ if [[ -z "${DC_ORO_DATABASE_SCHEMA:-}" ]]; then
 fi
 
 db_name="${DC_ORO_DATABASE_DBNAME:-oro_db}"
+
+# Ensure database connection variables are exported with defaults.
+# These may not be set in the host shell (only in Docker Compose interpolation),
+# so export them to guarantee correct values when eval expands $VAR references.
+export DC_ORO_DATABASE_HOST="${DC_ORO_DATABASE_HOST:-database}"
+export DC_ORO_DATABASE_PORT="${DC_ORO_DATABASE_PORT:-$([ "${DC_ORO_DATABASE_SCHEMA}" = "mysql" ] && echo 3306 || echo 5432)}"
+export DC_ORO_DATABASE_USER="${DC_ORO_DATABASE_USER:-oro_db_user}"
+export DC_ORO_DATABASE_PASSWORD="${DC_ORO_DATABASE_PASSWORD:-oro_db_pass}"
+export DC_ORO_DATABASE_DBNAME="${DC_ORO_DATABASE_DBNAME:-${db_name}}"
+
 echo "" >&2
 msg_danger "This will DELETE ALL DATA in database '${db_name}'!"
 if ! confirm_yes_no "Continue?"; then
@@ -57,14 +67,18 @@ msg_info "Recreating database container..."
 recreate_db_cmd="${DOCKER_COMPOSE_BIN_CMD} up -d database"
 run_with_spinner "Recreating database container" "$recreate_db_cmd" || exit $?
 
-# Wait for database to be ready
+# MySQL needs --profile run-only for database-cli
+db_cli_cmd="${DOCKER_COMPOSE_BIN_CMD}"
+if [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]] && [[ "$DOCKER_COMPOSE_BIN_CMD" != *"run-only"* ]]; then
+  db_cli_cmd="${DOCKER_COMPOSE_BIN_CMD} --profile run-only"
+fi
+
+# Wait for database to be ready (max 120s to avoid infinite hang)
 msg_info "Waiting for database to be ready..."
 if [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]]; then
-  # Wait for PostgreSQL to be ready
-  wait_db_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm database-cli bash -c \"until PGPASSWORD=\\\$DC_ORO_DATABASE_PASSWORD psql -h \\\$DC_ORO_DATABASE_HOST -p \\\$DC_ORO_DATABASE_PORT -U \\\$DC_ORO_DATABASE_USER -d postgres -c 'SELECT 1' >/dev/null 2>&1; do sleep 1; done\""
+  wait_db_cmd="${db_cli_cmd} run --rm database-cli bash -c \"until PGPASSWORD=\\\$DC_ORO_DATABASE_PASSWORD psql -h \\\$DC_ORO_DATABASE_HOST -p \\\$DC_ORO_DATABASE_PORT -U \\\$DC_ORO_DATABASE_USER -d postgres -c 'SELECT 1' >/dev/null 2>&1; do sleep 1; done\""
 elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]]; then
-  # Wait for MySQL to be ready
-  wait_db_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm database-cli bash -c \"until MYSQL_PWD=\\\$DC_ORO_DATABASE_PASSWORD mysqladmin -h \\\$DC_ORO_DATABASE_HOST -P \\\$DC_ORO_DATABASE_PORT -u \\\$DC_ORO_DATABASE_USER ping >/dev/null 2>&1; do sleep 1; done\""
+  wait_db_cmd="${db_cli_cmd} run --rm database-cli bash -c \"for i in \\\$(seq 1 120); do MYSQL_PWD=\\\$DC_ORO_DATABASE_PASSWORD mysqladmin -h \\\$DC_ORO_DATABASE_HOST -P \\\$DC_ORO_DATABASE_PORT -u \\\$DC_ORO_DATABASE_USER ping 2>/dev/null && exit 0; sleep 1; done; echo 'Timeout: MySQL server not ready after 120s' >&2; exit 1\""
 else
   msg_error "Unknown database schema: ${DC_ORO_DATABASE_SCHEMA}"
   exit 1

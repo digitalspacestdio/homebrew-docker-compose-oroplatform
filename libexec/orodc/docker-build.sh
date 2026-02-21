@@ -190,7 +190,7 @@ case "$BUILD_TARGET" in
     msg_header "Building MySQL Image"
 
     if [[ -z "$MYSQL_VERSION" ]]; then
-      MYSQL_VERSIONS=("8.0" "8.4")
+      MYSQL_VERSIONS=("5.7" "8.0" "8.4")
       msg_info "Building all MySQL versions: ${MYSQL_VERSIONS[*]}"
     else
       MYSQL_VERSIONS=("$MYSQL_VERSION")
@@ -199,8 +199,12 @@ case "$BUILD_TARGET" in
     FAILED=0
     for ver in "${MYSQL_VERSIONS[@]}"; do
       msg_info ""
+      mysql_dockerfile="${DOCKER_DIR}/mysql/Dockerfile"
+      if [[ "$ver" == "5.7" ]]; then
+        mysql_dockerfile="${DOCKER_DIR}/mysql/Dockerfile.5.7"
+      fi
       build_image \
-        "${DOCKER_DIR}/mysql/Dockerfile" \
+        "${mysql_dockerfile}" \
         "${DOCKER_DIR}/mysql/" \
         "ghcr.io/digitalspacestdio/orodc-mysql:${ver}" \
         "MySQL ${ver}" \
@@ -264,9 +268,13 @@ case "$BUILD_TARGET" in
 
     # MySQL (all versions)
     msg_info "=== MySQL ==="
-    for ver in 8.0 8.4; do
+    for ver in 5.7 8.0 8.4; do
+      mysql_dockerfile="${DOCKER_DIR}/mysql/Dockerfile"
+      if [[ "$ver" == "5.7" ]]; then
+        mysql_dockerfile="${DOCKER_DIR}/mysql/Dockerfile.5.7"
+      fi
       if build_image \
-        "${DOCKER_DIR}/mysql/Dockerfile" \
+        "${mysql_dockerfile}" \
         "${DOCKER_DIR}/mysql/" \
         "ghcr.io/digitalspacestdio/orodc-mysql:${ver}" \
         "MySQL ${ver}" \
