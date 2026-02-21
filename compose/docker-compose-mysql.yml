@@ -18,7 +18,7 @@ services:
       MYSQL_ROOT_HOST: '%'
     volumes:
       - '${DC_ORO_CONFIG_DIR}/docker/mysql/initdb.d:/docker-entrypoint-initdb.d:ro'
-      - '${DC_ORO_CONFIG_DIR}/docker/mysql/my.cnf:/etc/mysql/conf.d/oro.cnf:ro'
+      - '${DC_ORO_CONFIG_DIR}/docker/mysql/${DC_ORO_MYSQL_CONF:-my-8.cnf}:/etc/mysql/conf.d/oro.cnf:ro'
       - 'mysql-data:/var/lib/mysql:delegated'
     ports:
       - '${DC_ORO_DATABASE_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_MYSQL:-3306}:3306'

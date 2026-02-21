@@ -7,13 +7,9 @@ sql_mode = ""
 explicit_defaults_for_timestamp = 1
 
 # Authentication Plugin
-# MySQL 8.0+ uses caching_sha2_password by default (more secure than mysql_native_password)
-# This is the default and works with all modern clients (PHP 7.4+, PDO, mysqli, etc.)
-# No configuration needed - caching_sha2_password is enabled by default
+# MySQL 8.0+ uses caching_sha2_password by default (see initdb.d for mysql_native_password fix for MariaDB client)
 
-# Binary Logging
-# Note: disable_log_bin may cause issues in MySQL 8.0+ with replication
-# Comment out if using replication or MySQL 8.0+
+# Binary Logging (MySQL 8.0+)
 disable_log_bin
 binlog_expire_logs_seconds = 3600
 log_bin_trust_function_creators = 1
@@ -39,20 +35,17 @@ tmp_table_size        = 256M
 max_heap_table_size   = 256M
 net_read_timeout      = 10
 
-# Table Settings
-# Note: lower_case_table_names = 2 is MySQL 8.0+ only
-# For MySQL 5.7, use 0 or 1 instead
+# Table Settings (lower_case_table_names = 2 is MySQL 8.0+ only)
 lower_case_table_names = 2
 table_open_cache = 250
 
 # InnoDB Settings
+# innodb_log_file_size and innodb_log_files_in_group deprecated in MySQL 8.0.30+, kept for 8.0 < 8.0.30
 innodb_doublewrite              = 0
 innodb_file_per_table           = 1
 innodb_thread_concurrency       = 8
 innodb_lock_wait_timeout        = 300
 innodb_flush_method             = O_DIRECT
-# Note: innodb_log_file_size and innodb_log_files_in_group are deprecated in MySQL 8.0.30+
-# They are ignored in newer versions but kept for compatibility with MySQL 5.7 and 8.0 < 8.0.30
 innodb_log_files_in_group       = 2
 innodb_log_file_size            = 512M
 innodb_log_buffer_size          = 64M

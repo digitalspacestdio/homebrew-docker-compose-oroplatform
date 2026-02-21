@@ -1293,11 +1293,14 @@ platform_update_interactive() {
   msg_info "Stopping application services..."
   
   # Stop application services but keep dependencies
-  # Services to stop: fpm, nginx, websocket, consumer
-  # Services to keep: database, redis, elasticsearch, rabbitmq
+  # Only stop services that exist in compose config (websocket/consumer are Oro-only)
   local services_to_stop=("fpm" "nginx" "websocket" "consumer")
+  local available_services
+  available_services=$(${DOCKER_COMPOSE_BIN_CMD} config --services 2>/dev/null || true)
   for service in "${services_to_stop[@]}"; do
-    ${DOCKER_COMPOSE_BIN_CMD} stop "$service" >/dev/null 2>&1 || true
+    if echo "$available_services" | grep -q "^${service}$"; then
+      ${DOCKER_COMPOSE_BIN_CMD} stop "$service" >/dev/null 2>&1 || true
+    fi
   done
   
   msg_info "Running platform update..."
@@ -2610,8 +2613,8 @@ load_cached_profiles() {
     # Commands that always need CLI profiles (for proper cleanup)
     if [[ "$cmd_to_check" =~ ^(down|purge)$ ]]; then
       include_cli_profiles=true
-    # Commands that need database-cli profile
-    elif [[ "$cmd_to_check" =~ ^(mysql|psql|database-cli)$ ]] || \
+    # Commands that need database-cli profile (database import/export use database-cli)
+    elif [[ "$cmd_to_check" =~ ^(mysql|psql|database-cli|database)$ ]] || \
        echo "$cmd_to_check" | grep -i 'import.*db\|export.*db\|dump.*db' > /dev/null; then
       include_cli_profiles=true
     # Commands that need php-cli profile (already handled by auto-redirect, but for completeness)
@@ -2910,8 +2913,8 @@ build_traefik_rule() {
 build_traefik_rule
 
 parse_dsn_uri "$ORO_DB_URL" "database" "DC_ORO"
-export DC_ORO_DATABASE_USER=${DC_ORO_DATABASE_USER:-app}
-export DC_ORO_DATABASE_PASSWORD=${DC_ORO_DATABASE_PASSWORD:-app}
+export DC_ORO_DATABASE_USER=${DC_ORO_DATABASE_USER:-oro_db_user}
+export DC_ORO_DATABASE_PASSWORD=${DC_ORO_DATABASE_PASSWORD:-oro_db_pass}
 
 parse_dsn_uri "$ORO_SEARCH_URL" "search" "DC_ORO"
 parse_dsn_uri "$ORO_MQ_DSN" "mq" "DC_ORO"

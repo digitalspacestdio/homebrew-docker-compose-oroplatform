@@ -82,7 +82,12 @@ fi
 msg_info "Starting installation process..."
 
 # Build project images first (if needed) to avoid showing build output during run commands
-services_to_build="fpm cli websocket ssh"
+services_to_build="fpm cli ssh"
+
+# Check if websocket service exists (Oro projects only) and add to build list
+if ${DOCKER_COMPOSE_BIN_CMD} config --services 2>/dev/null | grep -q "^websocket$"; then
+  services_to_build="${services_to_build} websocket"
+fi
 
 # Check if consumer service exists and add it to build list
 if ${DOCKER_COMPOSE_BIN_CMD} config --services 2>/dev/null | grep -q "^consumer$"; then
@@ -123,24 +128,25 @@ if [[ -n "${DC_ORO_DATABASE_SCHEMA:-}" ]]; then
     # Recreate database container
     recreate_db_cmd="${DOCKER_COMPOSE_BIN_CMD} up -d database"
     run_with_spinner "Recreating database container" "$recreate_db_cmd" || exit $?
-    
-    # Wait for database to be ready and the specific database to exist
+
+    # MySQL needs --profile run-only for database-cli (service has profiles: ["run-only"])
+    db_cli_cmd="${DOCKER_COMPOSE_BIN_CMD}"
+    if [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]] && [[ "$DOCKER_COMPOSE_BIN_CMD" != *"run-only"* ]]; then
+      db_cli_cmd="${DOCKER_COMPOSE_BIN_CMD} --profile run-only"
+    fi
+
+    # Wait for database to be ready and the specific database to exist (max 120s to avoid infinite hang)
     if [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]]; then
       # Wait for PostgreSQL to be ready and the specific database to exist
       # First wait for PostgreSQL server to be ready
-      wait_server_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm database-cli bash -c \"until PGPASSWORD=\\\$DC_ORO_DATABASE_PASSWORD psql -h \\\$DC_ORO_DATABASE_HOST -p \\\$DC_ORO_DATABASE_PORT -U \\\$DC_ORO_DATABASE_USER -d postgres -c 'SELECT 1' >/dev/null 2>&1; do sleep 1; done\""
+      wait_server_cmd="${db_cli_cmd} run --rm database-cli bash -c \"until PGPASSWORD=\\\$DC_ORO_DATABASE_PASSWORD psql -h \\\$DC_ORO_DATABASE_HOST -p \\\$DC_ORO_DATABASE_PORT -U \\\$DC_ORO_DATABASE_USER -d postgres -c 'SELECT 1' >/dev/null 2>&1; do sleep 1; done\""
       run_with_spinner "Waiting for PostgreSQL server" "$wait_server_cmd" || exit $?
       # Then wait for the specific database to exist (created by POSTGRES_DB or initdb.d)
-      # Use the db_name variable directly to avoid shell escaping issues
-      wait_db_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm database-cli bash -c \"until PGPASSWORD=\\\$DC_ORO_DATABASE_PASSWORD psql -h \\\$DC_ORO_DATABASE_HOST -p \\\$DC_ORO_DATABASE_PORT -U \\\$DC_ORO_DATABASE_USER -d ${db_name} -c 'SELECT 1' >/dev/null 2>&1; do sleep 1; done\""
+      wait_db_cmd="${db_cli_cmd} run --rm database-cli bash -c \"until PGPASSWORD=\\\$DC_ORO_DATABASE_PASSWORD psql -h \\\$DC_ORO_DATABASE_HOST -p \\\$DC_ORO_DATABASE_PORT -U \\\$DC_ORO_DATABASE_USER -d ${db_name} -c 'SELECT 1' >/dev/null 2>&1; do sleep 1; done\""
     elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]]; then
-      # Wait for MySQL to be ready and the specific database to exist
-      # First wait for MySQL server to be ready
-      wait_server_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm database-cli bash -c \"until MYSQL_PWD=\\\$DC_ORO_DATABASE_PASSWORD mysqladmin -h \\\$DC_ORO_DATABASE_HOST -P \\\$DC_ORO_DATABASE_PORT -u \\\$DC_ORO_DATABASE_USER ping >/dev/null 2>&1; do sleep 1; done\""
+      wait_server_cmd="${db_cli_cmd} run --rm database-cli bash -c \"for i in \\\$(seq 1 120); do MYSQL_PWD=\\\$DC_ORO_DATABASE_PASSWORD mysqladmin -h \\\$DC_ORO_DATABASE_HOST -P \\\$DC_ORO_DATABASE_PORT -u \\\$DC_ORO_DATABASE_USER ping 2>/dev/null && exit 0; sleep 1; done; echo 'Timeout: MySQL server not ready after 120s' >&2; exit 1\""
       run_with_spinner "Waiting for MySQL server" "$wait_server_cmd" || exit $?
-      # Then wait for the specific database to exist (created by MYSQL_DATABASE or initdb.d)
-      # Use the db_name variable directly to avoid shell escaping issues
-      wait_db_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm database-cli bash -c \"until MYSQL_PWD=\\\$DC_ORO_DATABASE_PASSWORD mysql -h \\\$DC_ORO_DATABASE_HOST -P \\\$DC_ORO_DATABASE_PORT -u \\\$DC_ORO_DATABASE_USER -e 'USE ${db_name}; SELECT 1' >/dev/null 2>&1; do sleep 1; done\""
+      wait_db_cmd="${db_cli_cmd} run --rm database-cli bash -c \"for i in \\\$(seq 1 120); do MYSQL_PWD=\\\$DC_ORO_DATABASE_PASSWORD mysql -h \\\$DC_ORO_DATABASE_HOST -P \\\$DC_ORO_DATABASE_PORT -u \\\$DC_ORO_DATABASE_USER -e 'USE ${db_name}; SELECT 1' 2>/dev/null && exit 0; sleep 1; done; echo 'Timeout: database ${db_name} not ready after 120s. Last error:' >&2; MYSQL_PWD=\\\$DC_ORO_DATABASE_PASSWORD mysql -h \\\$DC_ORO_DATABASE_HOST -P \\\$DC_ORO_DATABASE_PORT -u \\\$DC_ORO_DATABASE_USER -e 'USE ${db_name}; SELECT 1' 2>&1; exit 1\""
     fi
     run_with_spinner "Waiting for database '${db_name}'" "$wait_db_cmd" || exit $?
     

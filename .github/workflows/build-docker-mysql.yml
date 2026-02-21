@@ -9,9 +9,9 @@ on:
   workflow_dispatch:
     inputs:
       mysql_versions:
-        description: 'MySQL versions to build (comma-separated, e.g., "8.0,8.4")'
+        description: 'MySQL versions to build (comma-separated, e.g., "5.7,8.0,8.4")'
         required: false
-        default: '8.0,8.4'
+        default: '5.7,8.0,8.4'
 
 permissions:
   contents: read
@@ -30,7 +30,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             VERSIONS="${{ github.event.inputs.mysql_versions }}"
           else
-            VERSIONS="8.0,8.4"
+            VERSIONS="5.7,8.0,8.4"
           fi
           JSON_VERSIONS=$(echo "$VERSIONS" | jq -R -c 'split(",")')
           echo "versions=$JSON_VERSIONS" >> $GITHUB_OUTPUT
@@ -47,6 +47,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Determine Dockerfile
+        id: dockerfile
+        run: |
+          VERSION="${{ matrix.version }}"
+          MAJOR="${VERSION%%.*}"
+          if [ "$MAJOR" -lt 8 ] && [ -f "compose/docker/mysql/Dockerfile.${VERSION}" ]; then
+            echo "file=compose/docker/mysql/Dockerfile.${VERSION}" >> $GITHUB_OUTPUT
+          else
+            echo "file=compose/docker/mysql/Dockerfile" >> $GITHUB_OUTPUT
+          fi
+
       - name: Log in to GHCR
         uses: docker/login-action@v3
         with:
@@ -61,7 +72,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: compose/docker/mysql
-          file: compose/docker/mysql/Dockerfile
+          file: ${{ steps.dockerfile.outputs.file }}
           platforms: linux/amd64
           push: true
           build-args: |
@@ -78,6 +89,8 @@ jobs:
     strategy:
       matrix:
         version: ${{ fromJson(needs.prepare-matrix.outputs.versions) }}
+        exclude:
+          - version: "5.7"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -109,6 +122,7 @@ jobs:
   create-mysql-manifest:
     name: Create multi-arch manifest for MySQL ${{ matrix.version }}
     needs: [prepare-matrix, build-mysql-amd64, build-mysql-arm64]
+    if: always() && needs.build-mysql-amd64.result == 'success'
     runs-on: ubuntu-latest
     strategy:
       matrix:
@@ -123,9 +137,21 @@ jobs:
 
       - name: Create and push multi-arch manifest
         run: |
-          docker buildx imagetools create \
-            --tag ghcr.io/${{ github.repository_owner }}/orodc-mysql:${{ matrix.version }} \
-            ghcr.io/${{ github.repository_owner }}/orodc-mysql:${{ matrix.version }}-amd64 \
-            ghcr.io/${{ github.repository_owner }}/orodc-mysql:${{ matrix.version }}-arm64
+          VERSION="${{ matrix.version }}"
+          MAJOR="${VERSION%%.*}"
+          OWNER="${{ github.repository_owner }}"
+          IMAGE="ghcr.io/${OWNER}/orodc-mysql"
 
-          echo "Created multi-arch manifest for MySQL ${{ matrix.version }}"
+          if [ "$MAJOR" -lt 8 ]; then
+            # 5.7 is amd64-only
+            docker buildx imagetools create \
+              --tag "${IMAGE}:${VERSION}" \
+              "${IMAGE}:${VERSION}-amd64"
+          else
+            docker buildx imagetools create \
+              --tag "${IMAGE}:${VERSION}" \
+              "${IMAGE}:${VERSION}-amd64" \
+              "${IMAGE}:${VERSION}-arm64"
+          fi
+
+          echo "Created manifest for MySQL ${VERSION}"

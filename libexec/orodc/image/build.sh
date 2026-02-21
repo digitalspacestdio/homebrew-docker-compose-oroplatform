@@ -389,10 +389,12 @@ if [[ -f ".env.orodc" ]] && [[ -n "${DC_ORO_CONFIG_DIR:-}" ]] && [[ -d "${DC_ORO
       BUILD_START=$(date +%s)
       
       # Check which services exist before building
-      # Consumer is only available for Oro projects (docker-compose-consumer.yml)
-      services_to_build="fpm cli websocket ssh"
+      # Websocket and consumer are only available for Oro projects
+      services_to_build="fpm cli ssh"
       
-      # Check if consumer service exists in compose config
+      if ${DOCKER_COMPOSE_BIN_CMD} config --services 2>/dev/null | grep -q "^websocket$"; then
+        services_to_build="${services_to_build} websocket"
+      fi
       if ${DOCKER_COMPOSE_BIN_CMD} config --services 2>/dev/null | grep -q "^consumer$"; then
         services_to_build="${services_to_build} consumer"
       fi

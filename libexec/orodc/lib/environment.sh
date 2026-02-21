@@ -650,6 +650,24 @@ initialize_environment() {
       load_env_safe "$local_config_file"
     fi
     
+    # MySQL: Backward compat - derive DC_ORO_MYSQL_* from DC_ORO_DATABASE_* (compose uses MYSQL_ vars)
+    if [[ "${DC_ORO_DATABASE_SCHEMA:-}" == "mysql" ]] && [[ -z "${DC_ORO_MYSQL_IMAGE:-}" ]] && [[ -n "${DC_ORO_DATABASE_IMAGE:-}" ]]; then
+      export DC_ORO_MYSQL_IMAGE="${DC_ORO_DATABASE_IMAGE}"
+      export DC_ORO_MYSQL_VERSION="${DC_ORO_DATABASE_VERSION:-8.4}"
+      debug_log "initialize_environment: derived DC_ORO_MYSQL_IMAGE from DC_ORO_DATABASE_IMAGE (backward compat)"
+    fi
+    # MySQL: Select config file by version (my-5.7.cnf for <8, my-8.cnf for 8+)
+    if [[ "${DC_ORO_DATABASE_SCHEMA:-}" == "mysql" ]] && [[ -z "${DC_ORO_MYSQL_CONF:-}" ]]; then
+      local mysql_ver="${DC_ORO_MYSQL_VERSION:-${DC_ORO_DATABASE_VERSION:-8.4}}"
+      local mysql_major="${mysql_ver%%.*}"
+      if [[ "${mysql_major:-8}" -lt 8 ]]; then
+        export DC_ORO_MYSQL_CONF="my-5.7.cnf"
+      else
+        export DC_ORO_MYSQL_CONF="my-8.cnf"
+      fi
+      debug_log "initialize_environment: DC_ORO_MYSQL_CONF=${DC_ORO_MYSQL_CONF} (version ${mysql_ver})"
+    fi
+
     # CRITICAL: Normalize variables AFTER loading all .env files
     # This ensures orodc is the source of truth and overrides any external values
     # Normalize empty variables to unset (so default values are used in docker-compose.yml)
@@ -995,6 +1013,12 @@ initialize_environment() {
     fi
     
     if is_oro_project 2>/dev/null; then
+      if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-oro.yml" ]]; then
+        DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-oro.yml"
+        debug_log "initialize_environment: added docker-compose-oro.yml (Oro project detected)"
+      else
+        debug_log "initialize_environment: docker-compose-oro.yml not found (Oro project detected)"
+      fi
       if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-consumer.yml" ]]; then
         DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-consumer.yml"
         debug_log "initialize_environment: added docker-compose-consumer.yml (Oro project detected)"
@@ -1002,7 +1026,7 @@ initialize_environment() {
         debug_log "initialize_environment: docker-compose-consumer.yml not found (Oro project detected)"
       fi
     else
-      debug_log "initialize_environment: skipping docker-compose-consumer.yml (not an Oro project)"
+      debug_log "initialize_environment: skipping docker-compose-oro.yml and docker-compose-consumer.yml (not an Oro project)"
     fi
     
     # Include CMS-specific cron service (Ofelia)

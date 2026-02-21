@@ -445,7 +445,7 @@ else
     fi
     SELECTED_DB_VERSION=$(prompt_select "Select MySQL version:" "$DEFAULT_MYSQL_VERSION" "${MYSQL_VERSIONS[@]}")
     SELECTED_DB_SCHEMA="mysql"
-    SELECTED_DB_IMAGE="mysql:${SELECTED_DB_VERSION}"
+    SELECTED_DB_IMAGE="ghcr.io/digitalspacestdio/orodc-mysql:${SELECTED_DB_VERSION}"
   fi
 fi
 
@@ -722,6 +722,10 @@ EOF
   update_env_var "$TARGET_ENV_FILE" "DC_ORO_DATABASE_SCHEMA" "$SELECTED_DB_SCHEMA"
   update_env_var "$TARGET_ENV_FILE" "DC_ORO_DATABASE_VERSION" "$SELECTED_DB_VERSION"
   update_env_var "$TARGET_ENV_FILE" "DC_ORO_DATABASE_IMAGE" "$SELECTED_DB_IMAGE"
+  if [[ "$SELECTED_DB_SCHEMA" == "mysql" ]]; then
+    update_env_var "$TARGET_ENV_FILE" "DC_ORO_MYSQL_IMAGE" "$SELECTED_DB_IMAGE"
+    update_env_var "$TARGET_ENV_FILE" "DC_ORO_MYSQL_VERSION" "$SELECTED_DB_VERSION"
+  fi
   
   # Search Engine Configuration
   update_env_var "$TARGET_ENV_FILE" "DC_ORO_SEARCH_ENGINE" "$SELECTED_SEARCH_TYPE"

@@ -1,10 +1,61 @@
-# Oro Platform Consumer Service
+# Oro Platform specific services: WebSocket and Gotenberg
 # This file is conditionally included only for Oro Platform projects
-# Consumer runs oro:message-queue:consume for background job processing
 services:
-  consumer:
-    container_name: "${DC_ORO_NAME:-unnamed}_consumer_${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}"
-    hostname: consumer.${DC_ORO_NAME:-unnamed}.docker.local
+  fpm:
+    environment:
+      - 'ORO_WEBSOCKET_SERVER_DSN=${DC_ORO_WEBSOCKET_SERVER_DSN:-//0.0.0.0:8080}'
+      - 'ORO_WEBSOCKET_FRONTEND_DSN=${DC_ORO_WEBSOCKET_FRONTEND_DSN:-//${DC_ORO_NAME:-unnamed}.docker.local/ws}'
+      - 'ORO_WEBSOCKET_BACKEND_DSN=${DC_ORO_WEBSOCKET_BACKEND_DSN:-tcp://websocket:8080}'
+      - 'GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
+      - 'ORO_GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
+    depends_on:
+      database:
+        condition: service_healthy
+      gotenberg:
+        condition: service_healthy
+
+  cli:
+    environment:
+      - 'ORO_WEBSOCKET_SERVER_DSN=${DC_ORO_WEBSOCKET_SERVER_DSN:-//0.0.0.0:8080}'
+      - 'ORO_WEBSOCKET_FRONTEND_DSN=${DC_ORO_WEBSOCKET_FRONTEND_DSN:-//${DC_ORO_NAME:-unnamed}.docker.local/ws}'
+      - 'ORO_WEBSOCKET_BACKEND_DSN=${DC_ORO_WEBSOCKET_BACKEND_DSN:-tcp://websocket:8080}'
+      - 'GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
+      - 'ORO_GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
+    depends_on:
+      database:
+        condition: service_healthy
+      search:
+        condition: service_healthy
+      mq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mail:
+        condition: service_healthy
+      gotenberg:
+        condition: service_healthy
+
+  ssh:
+    environment:
+      - 'GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
+      - 'ORO_GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
+    depends_on:
+      database:
+        condition: service_healthy
+      search:
+        condition: service_healthy
+      mq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mail:
+        condition: service_healthy
+      gotenberg:
+        condition: service_healthy
+
+  websocket:
+    container_name: "${DC_ORO_NAME:-unnamed}_websocket_${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}"
+    hostname: websocket.${DC_ORO_NAME:-unnamed}.docker.local
     dns:
       - 1.1.1.1
       - 8.8.8.8
@@ -22,7 +73,7 @@ services:
         PHP_GID: "${DC_ORO_PHP_GID:-1000}"
         COMPOSER_VERSION: "${DC_ORO_COMPOSER_VERSION:-2}"
     user: "${DC_ORO_USER_NAME:-developer}"
-    command: sh -c 'until php bin/console oro:message-queue:consume -vv; do echo "Consumer crashed, restarting in 15s..."; sleep 15; done'
+    command: sh -c 'until php bin/console gos:websocket:server; do echo "Websocket crashed, restarting in 15s..."; sleep 15; done'
     volumes:
       - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
       - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
@@ -30,9 +81,25 @@ services:
       - "mail-certs:/certs:ro"
     working_dir: "${DC_ORO_APPDIR:-/var/www}"
     restart: always
+    networks:
+      - default
+      - dc_shared_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=dc_shared_net"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws.entrypoints=web"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws.rule=(${DC_ORO_TRAEFIK_RULE}) && (PathPrefix(`/ws`) || Header(`Upgrade`, `websocket`))"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws.service=${DC_ORO_NAME:-unnamed}-ws"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws.priority=100"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws-default.entrypoints=default"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws-default.rule=(${DC_ORO_TRAEFIK_RULE}) && (PathPrefix(`/ws`) || Header(`Upgrade`, `websocket`))"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws-default.service=${DC_ORO_NAME:-unnamed}-ws"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws-default.priority=100"
+      - "traefik.http.services.${DC_ORO_NAME:-unnamed}-ws.loadbalancer.server.port=8080"
+      - "traefik.http.services.${DC_ORO_NAME:-unnamed}-ws.loadbalancer.server.scheme=http"
     environment:
       - 'DC_ORO_DATABASE_HOST=${DC_ORO_DATABASE_HOST:-database}'
-      - 'DC_ORO_DATABASE_PORT=${DC_ORO_DATABASE_PORT:-3306}'
+      - 'DC_ORO_DATABASE_PORT=${DC_ORO_DATABASE_PORT:-5432}'
       - 'DC_ORO_DATABASE_USER=${DC_ORO_DATABASE_USER:-oro_db_user}'
       - 'DC_ORO_DATABASE_PASSWORD=${DC_ORO_DATABASE_PASSWORD:-oro_db_pass}'
       - 'DC_ORO_DATABASE_DBNAME=${DC_ORO_DATABASE_DBNAME:-oro_db}'
@@ -66,31 +133,48 @@ services:
       - 'ORO_WEBSOCKET_BACKEND_DSN=${DC_ORO_WEBSOCKET_BACKEND_DSN:-tcp://websocket:8080}'
       - 'XHGUI_MONGO_HOSTNAME=mongodb'
       - 'XHGUI_MONGO_DATABASE=xhprof'
-      - 'COMPOSER_AUTH=${DC_ORO_COMPOSER_AUTH:-""}'
+      - 'COMPOSER_AUTH=${DC_ORO_COMPOSER_AUTH}'
       - 'NODE_OPTIONS="--max-old-space-size=1024"'
       - 'SYMFONY_ENV=${SYMFONY_ENV:-dev}'
-      - 'XDEBUG_MODE=${XDEBUG_MODE_CONSUMER:-off}'
+      - 'XDEBUG_MODE=${XDEBUG_MODE_WEBSOCKET:-off}'
       - 'GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
       - 'ORO_GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
     depends_on:
       database:
         condition: service_healthy
-      search:
-        condition: service_healthy
-      mq:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      mail:
-        condition: service_healthy
       gotenberg:
-        condition: service_healthy
-      fpm:
         condition: service_healthy
     deploy:
       resources:
         limits:
           memory: 7G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    hostname: gotenberg.${DC_ORO_NAME:-unnamed}.docker.local
+    container_name: ${DC_ORO_NAME:-unnamed}_gotenberg
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    ports:
+      - "${DC_ORO_GOTENBERG_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_GOTENBERG:-${DC_ORO_PORT_PREFIX}00}:3000"
+    restart: always
+    networks:
+      - default
+      - dc_shared_net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    healthcheck:
+      test: /bin/bash -c "</dev/tcp/localhost/3000"
+      start_period: 5s
+      interval: 5s
+      retries: 18
     logging:
       driver: "json-file"
       options:

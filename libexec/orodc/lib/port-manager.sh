@@ -111,18 +111,41 @@ find_and_export_ports() {
 
   # Use batch port resolution for better performance
   debug_log "find_and_export_ports: calling orodc-find_free_port --batch"
-  BATCH_PORTS=$("$find_port_bin" --batch "${project_name}" "$config_dir" \
-    nginx "${DC_ORO_PORT_PREFIX}80" \
-    xhgui "${DC_ORO_PORT_PREFIX}81" \
-    database "${DC_ORO_PORT_PREFIX}06" \
-    database "${DC_ORO_PORT_PREFIX}32" \
-    search "${DC_ORO_PORT_PREFIX}92" \
-    mq "${DC_ORO_PORT_PREFIX}72" \
-    redis "${DC_ORO_PORT_PREFIX}79" \
-    mail "${DC_ORO_PORT_PREFIX}25" \
-    ssh "${DC_ORO_PORT_PREFIX}22" 2>&1)
-  
-  local exit_code=$?
+  local exit_code=0
+  if [[ -z "${DEBUG:-}" ]] && [[ -z "${VERBOSE:-}" ]]; then
+    local port_tmpfile
+    port_tmpfile=$(mktemp /tmp/orodc-ports.XXXXXX)
+
+    "$find_port_bin" --batch "${project_name}" "$config_dir" \
+      nginx "${DC_ORO_PORT_PREFIX}80" \
+      xhgui "${DC_ORO_PORT_PREFIX}81" \
+      database "${DC_ORO_PORT_PREFIX}06" \
+      database "${DC_ORO_PORT_PREFIX}32" \
+      search "${DC_ORO_PORT_PREFIX}92" \
+      mq "${DC_ORO_PORT_PREFIX}72" \
+      redis "${DC_ORO_PORT_PREFIX}79" \
+      mail "${DC_ORO_PORT_PREFIX}25" \
+      ssh "${DC_ORO_PORT_PREFIX}22" > "$port_tmpfile" 2>&1 &
+    local port_pid=$!
+
+    show_spinner $port_pid "Scanning ports"
+    wait $port_pid || exit_code=$?
+
+    BATCH_PORTS=$(cat "$port_tmpfile")
+    rm -f "$port_tmpfile"
+  else
+    BATCH_PORTS=$("$find_port_bin" --batch "${project_name}" "$config_dir" \
+      nginx "${DC_ORO_PORT_PREFIX}80" \
+      xhgui "${DC_ORO_PORT_PREFIX}81" \
+      database "${DC_ORO_PORT_PREFIX}06" \
+      database "${DC_ORO_PORT_PREFIX}32" \
+      search "${DC_ORO_PORT_PREFIX}92" \
+      mq "${DC_ORO_PORT_PREFIX}72" \
+      redis "${DC_ORO_PORT_PREFIX}79" \
+      mail "${DC_ORO_PORT_PREFIX}25" \
+      ssh "${DC_ORO_PORT_PREFIX}22" 2>&1)
+    exit_code=$?
+  fi
   debug_log "find_and_export_ports: orodc-find_free_port exit_code=$exit_code"
   
   if [[ $exit_code -ne 0 ]] || [[ -z "$BATCH_PORTS" ]]; then

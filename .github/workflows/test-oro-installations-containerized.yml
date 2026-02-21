@@ -259,17 +259,24 @@ jobs:
             echo "🚀 Starting services..."  
             su -c 'cd "'"$PROJECT_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc up -d' runner
             
-            # Wait for services with timeout
+            # Wait for nginx container to be running (it depends on fpm which depends on database+gotenberg)
             echo "⏳ Waiting for services to start (max 5 minutes)..."
             timeout 300 bash -c '
               set -e
-              while [ $(docker ps --filter "name=${UNIQUE_PROJECT_NAME}" --format "{{.Status}}" | grep -c -E "(Up|healthy)" ) -lt 6 ]; do
-                echo "Services starting... $(date)"
-                echo "Current status: $(docker ps --filter "name=${UNIQUE_PROJECT_NAME}" --format "{{.Names}}: {{.Status}}" | head -3)"
+              while ! docker ps --filter "name=${UNIQUE_PROJECT_NAME}" --format "{{.Names}}" | grep -q nginx; do
+                echo "Waiting for nginx... $(date)"
+                echo "Running: $(docker ps --filter "name=${UNIQUE_PROJECT_NAME}" --format "{{.Names}}: {{.Status}}")"
                 sleep 10
+              done
+              echo "Nginx found, waiting for healthy status..."
+              while ! docker ps --filter "name=${UNIQUE_PROJECT_NAME}" --filter "health=healthy" --format "{{.Names}}" | grep -q nginx; do
+                echo "Waiting for nginx healthy... $(date)"
+                sleep 5
               done
             ' || {
               echo "❌ Services failed to start within timeout"
+              echo "📋 All containers (including exited):"
+              docker ps -a --filter "name=${UNIQUE_PROJECT_NAME}" --format "{{.Names}}: {{.Status}}"
               su -c 'cd "'"$PROJECT_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc logs --tail=20' runner
               exit 1
             }
