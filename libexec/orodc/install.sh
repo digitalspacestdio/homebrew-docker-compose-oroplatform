@@ -82,7 +82,12 @@ fi
 msg_info "Starting installation process..."
 
 # Build project images first (if needed) to avoid showing build output during run commands
-services_to_build="fpm cli websocket ssh"
+services_to_build="fpm cli ssh"
+
+# Check if websocket service exists (Oro projects only) and add to build list
+if ${DOCKER_COMPOSE_BIN_CMD} config --services 2>/dev/null | grep -q "^websocket$"; then
+  services_to_build="${services_to_build} websocket"
+fi
 
 # Check if consumer service exists and add it to build list
 if ${DOCKER_COMPOSE_BIN_CMD} config --services 2>/dev/null | grep -q "^consumer$"; then

@@ -1293,11 +1293,14 @@ platform_update_interactive() {
   msg_info "Stopping application services..."
   
   # Stop application services but keep dependencies
-  # Services to stop: fpm, nginx, websocket, consumer
-  # Services to keep: database, redis, elasticsearch, rabbitmq
+  # Only stop services that exist in compose config (websocket/consumer are Oro-only)
   local services_to_stop=("fpm" "nginx" "websocket" "consumer")
+  local available_services
+  available_services=$(${DOCKER_COMPOSE_BIN_CMD} config --services 2>/dev/null || true)
   for service in "${services_to_stop[@]}"; do
-    ${DOCKER_COMPOSE_BIN_CMD} stop "$service" >/dev/null 2>&1 || true
+    if echo "$available_services" | grep -q "^${service}$"; then
+      ${DOCKER_COMPOSE_BIN_CMD} stop "$service" >/dev/null 2>&1 || true
+    fi
   done
   
   msg_info "Running platform update..."

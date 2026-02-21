@@ -995,6 +995,12 @@ initialize_environment() {
     fi
     
     if is_oro_project 2>/dev/null; then
+      if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-oro.yml" ]]; then
+        DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-oro.yml"
+        debug_log "initialize_environment: added docker-compose-oro.yml (Oro project detected)"
+      else
+        debug_log "initialize_environment: docker-compose-oro.yml not found (Oro project detected)"
+      fi
       if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-consumer.yml" ]]; then
         DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-consumer.yml"
         debug_log "initialize_environment: added docker-compose-consumer.yml (Oro project detected)"
@@ -1002,7 +1008,7 @@ initialize_environment() {
         debug_log "initialize_environment: docker-compose-consumer.yml not found (Oro project detected)"
       fi
     else
-      debug_log "initialize_environment: skipping docker-compose-consumer.yml (not an Oro project)"
+      debug_log "initialize_environment: skipping docker-compose-oro.yml and docker-compose-consumer.yml (not an Oro project)"
     fi
     
     # Include CMS-specific cron service (Ofelia)

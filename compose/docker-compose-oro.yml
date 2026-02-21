@@ -1,0 +1,181 @@
+# Oro Platform specific services: WebSocket and Gotenberg
+# This file is conditionally included only for Oro Platform projects
+services:
+  fpm:
+    environment:
+      - 'ORO_WEBSOCKET_SERVER_DSN=${DC_ORO_WEBSOCKET_SERVER_DSN:-//0.0.0.0:8080}'
+      - 'ORO_WEBSOCKET_FRONTEND_DSN=${DC_ORO_WEBSOCKET_FRONTEND_DSN:-//${DC_ORO_NAME:-unnamed}.docker.local/ws}'
+      - 'ORO_WEBSOCKET_BACKEND_DSN=${DC_ORO_WEBSOCKET_BACKEND_DSN:-tcp://websocket:8080}'
+      - 'GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
+      - 'ORO_GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
+    depends_on:
+      database:
+        condition: service_healthy
+      gotenberg:
+        condition: service_healthy
+
+  cli:
+    environment:
+      - 'ORO_WEBSOCKET_SERVER_DSN=${DC_ORO_WEBSOCKET_SERVER_DSN:-//0.0.0.0:8080}'
+      - 'ORO_WEBSOCKET_FRONTEND_DSN=${DC_ORO_WEBSOCKET_FRONTEND_DSN:-//${DC_ORO_NAME:-unnamed}.docker.local/ws}'
+      - 'ORO_WEBSOCKET_BACKEND_DSN=${DC_ORO_WEBSOCKET_BACKEND_DSN:-tcp://websocket:8080}'
+      - 'GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
+      - 'ORO_GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
+    depends_on:
+      database:
+        condition: service_healthy
+      search:
+        condition: service_healthy
+      mq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mail:
+        condition: service_healthy
+      gotenberg:
+        condition: service_healthy
+
+  ssh:
+    environment:
+      - 'GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
+      - 'ORO_GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
+    depends_on:
+      database:
+        condition: service_healthy
+      search:
+        condition: service_healthy
+      mq:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      mail:
+        condition: service_healthy
+      gotenberg:
+        condition: service_healthy
+
+  websocket:
+    container_name: "${DC_ORO_NAME:-unnamed}_websocket_${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}"
+    hostname: websocket.${DC_ORO_NAME:-unnamed}.docker.local
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    build:
+      dockerfile: Dockerfile.project
+      context: "${DC_ORO_CONFIG_DIR:-.}/docker/project-php-node-symfony"
+      args:
+        BASE_IMAGE: "ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.4}-node${DC_ORO_NODE_VERSION:-22}-composer${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}"
+        APP_DIR: "${DC_ORO_APPDIR:-/var/www}"
+        PHP_VERSION: "${DC_ORO_PHP_VERSION:-8.4}"
+        NODE_VERSION: "${DC_ORO_NODE_VERSION:-22}"
+        PHP_USER_NAME: "${DC_ORO_PHP_USER_NAME:-developer}"
+        PHP_USER_GROUP: "${DC_ORO_PHP_USER_GROUP:-developer}"
+        PHP_UID: "${DC_ORO_PHP_UID:-1000}"
+        PHP_GID: "${DC_ORO_PHP_GID:-1000}"
+        COMPOSER_VERSION: "${DC_ORO_COMPOSER_VERSION:-2}"
+    user: "${DC_ORO_USER_NAME:-developer}"
+    command: sh -c 'until php bin/console gos:websocket:server; do echo "Websocket crashed, restarting in 15s..."; sleep 15; done'
+    volumes:
+      - "appcode:${DC_ORO_APPDIR:-/var/www}:consistent"
+      - "home-user:/home/${DC_ORO_PHP_USER_NAME:-developer}"
+      - "home-root:/root"
+      - "mail-certs:/certs:ro"
+    working_dir: "${DC_ORO_APPDIR:-/var/www}"
+    restart: always
+    networks:
+      - default
+      - dc_shared_net
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=dc_shared_net"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws.entrypoints=web"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws.rule=(${DC_ORO_TRAEFIK_RULE}) && (PathPrefix(`/ws`) || Header(`Upgrade`, `websocket`))"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws.service=${DC_ORO_NAME:-unnamed}-ws"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws.priority=100"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws-default.entrypoints=default"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws-default.rule=(${DC_ORO_TRAEFIK_RULE}) && (PathPrefix(`/ws`) || Header(`Upgrade`, `websocket`))"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws-default.service=${DC_ORO_NAME:-unnamed}-ws"
+      - "traefik.http.routers.${DC_ORO_NAME:-unnamed}-ws-default.priority=100"
+      - "traefik.http.services.${DC_ORO_NAME:-unnamed}-ws.loadbalancer.server.port=8080"
+      - "traefik.http.services.${DC_ORO_NAME:-unnamed}-ws.loadbalancer.server.scheme=http"
+    environment:
+      - 'DC_ORO_DATABASE_HOST=${DC_ORO_DATABASE_HOST:-database}'
+      - 'DC_ORO_DATABASE_PORT=${DC_ORO_DATABASE_PORT:-5432}'
+      - 'DC_ORO_DATABASE_USER=${DC_ORO_DATABASE_USER:-oro_db_user}'
+      - 'DC_ORO_DATABASE_PASSWORD=${DC_ORO_DATABASE_PASSWORD:-oro_db_pass}'
+      - 'DC_ORO_DATABASE_DBNAME=${DC_ORO_DATABASE_DBNAME:-oro_db}'
+      - 'ORO_DB_URL=${DC_ORO_DATABASE_URI:-"postgres://${DC_ORO_DATABASE_USER:-oro_db_user}:${DC_ORO_DATABASE_PASSWORD:-oro_db_pass}@${DC_ORO_DATABASE_HOST:-database}:${DC_ORO_DATABASE_PORT:-5432}/${DC_ORO_DATABASE_DBNAME:-oro_db}"}'
+      - 'ORO_DB_DSN=${DC_ORO_DATABASE_URI:-"postgres://${DC_ORO_DATABASE_USER:-oro_db_user}:${DC_ORO_DATABASE_PASSWORD:-oro_db_pass}@${DC_ORO_DATABASE_HOST:-database}:${DC_ORO_DATABASE_PORT:-5432}/${DC_ORO_DATABASE_DBNAME:-oro_db}"}'
+      - 'ORO_DB_HOST=${DC_ORO_DATABASE_HOST:-database}'
+      - 'ORO_DB_PORT=${DC_ORO_DATABASE_PORT:-5432}'
+      - 'ORO_DB_NAME=${DC_ORO_DATABASE_DBNAME:-oro_db}'
+      - 'ORO_DB_USER=${DC_ORO_DATABASE_USER:-oro_db_user}'
+      - 'ORO_DB_PASSWORD=${DC_ORO_DATABASE_PASSWORD:-oro_db_pass}'
+      - 'ORO_SEARCH_URL=${DC_ORO_SEARCH_URI:-elastic-search://search:9200}'
+      - 'ORO_SEARCH_DSN=${DC_ORO_SEARCH_URI:-elastic-search://search:9200}'
+      - 'ORO_SEARCH_ENGINE_DSN=${DC_ORO_SEARCH_URI:-elastic-search://search:9200}?prefix=oro_search'
+      - 'ORO_WEBSITE_SEARCH_ENGINE_DSN=${DC_ORO_SEARCH_URI:-elastic-search://search:9200}?prefix=oro_website_search'
+      - 'ORO_MQ_DSN=${DC_ORO_MQ_URI:-""}'
+      - 'ORO_REDIS_URL=${DC_ORO_REDIS_URI:-""}'
+      - 'ORO_SESSION_DSN=${DC_ORO_REDIS_URI:-""}/0'
+      - 'ORO_REDIS_CACHE_DSN=${DC_ORO_REDIS_URI:-""}/1'
+      - 'ORO_REDIS_DOCTRINE_DSN=${DC_ORO_REDIS_URI:-""}/2'
+      - 'ORO_REDIS_LAYOUT_DSN=${DC_ORO_REDIS_URI:-""}/3'
+      - 'ORO_MAILER_DRIVER=${ORO_MAILER_DRIVER:-smtp}'
+      - 'ORO_MAILER_HOST=${ORO_MAILER_HOST:-mail}'
+      - 'ORO_MAILER_PORT=${ORO_MAILER_PORT:-1025}'
+      - 'ORO_MAILER_ENCRYPTION=${ORO_MAILER_ENCRYPTION:-starttls}'
+      - 'ORO_MAILER_USER=${ORO_MAILER_USER:-}'
+      - 'ORO_MAILER_PASSWORD=${ORO_MAILER_PASSWORD:-}'
+      - 'ORO_SECRET=${ORO_SECRET-ThisTokenIsNotSoSecretChangeIt}'
+      - 'ORO_ENABLE_PRICE_SHARDING=${ORO_ENABLE_PRICE_SHARDING:-0}'
+      - 'ORO_WEBSOCKET_SERVER_DSN=${DC_ORO_WEBSOCKET_SERVER_DSN:-//0.0.0.0:8080}'
+      - 'ORO_WEBSOCKET_FRONTEND_DSN=${DC_ORO_WEBSOCKET_FRONTEND_DSN:-//${DC_ORO_NAME:-unnamed}.docker.local/ws}'
+      - 'ORO_WEBSOCKET_BACKEND_DSN=${DC_ORO_WEBSOCKET_BACKEND_DSN:-tcp://websocket:8080}'
+      - 'XHGUI_MONGO_HOSTNAME=mongodb'
+      - 'XHGUI_MONGO_DATABASE=xhprof'
+      - 'COMPOSER_AUTH=${DC_ORO_COMPOSER_AUTH}'
+      - 'NODE_OPTIONS="--max-old-space-size=1024"'
+      - 'SYMFONY_ENV=${SYMFONY_ENV:-dev}'
+      - 'XDEBUG_MODE=${XDEBUG_MODE_WEBSOCKET:-off}'
+      - 'GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
+      - 'ORO_GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
+    depends_on:
+      database:
+        condition: service_healthy
+      gotenberg:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          memory: 7G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+
+  gotenberg:
+    image: gotenberg/gotenberg:8
+    hostname: gotenberg.${DC_ORO_NAME:-unnamed}.docker.local
+    container_name: ${DC_ORO_NAME:-unnamed}_gotenberg
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    ports:
+      - "${DC_ORO_GOTENBERG_BIND_HOST:-127.0.0.1}:${DC_ORO_PORT_GOTENBERG:-${DC_ORO_PORT_PREFIX}00}:3000"
+    restart: always
+    networks:
+      - default
+      - dc_shared_net
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    healthcheck:
+      test: /bin/bash -c "</dev/tcp/localhost/3000"
+      start_period: 5s
+      interval: 5s
+      retries: 18
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
