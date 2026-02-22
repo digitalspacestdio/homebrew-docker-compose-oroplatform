@@ -18,11 +18,13 @@ CODEX_BIN=$(resolve_bin "codex" "Codex CLI is required. Install from: https://gi
 # Main execution
 main() {
   # Detect CMS type
-  local cms_type=$(get_cms_type)
+  local cms_type
+  cms_type=$(get_cms_type)
   msg_info "Detected CMS type: $cms_type"
   
   # Get documentation context
-  local doc_context=$(get_documentation_context)
+  local doc_context
+  doc_context=$(get_documentation_context)
   if [[ -f "$doc_context" ]]; then
     msg_info "Using documentation: $doc_context"
   else
@@ -30,7 +32,8 @@ main() {
   fi
   
   # Get project name
-  local project_name=$(get_project_name)
+  local project_name
+  project_name=$(get_project_name)
   
   # Create AGENTS.md file in ~/.orodc/{project_name}/ directory
   local agents_dir="${HOME}/.orodc/${project_name}"
@@ -58,19 +61,21 @@ main() {
   
   # Execute Codex CLI with all passed arguments
   # Codex CLI accepts [PROMPT] as optional first argument for initial prompt
-  # System prompt is passed via experimental_instructions_file config pointing to AGENTS.md
+  # System prompt is passed via model_instructions_file config pointing to AGENTS.md
   msg_info "Launching Codex CLI with CMS type: $cms_type"
   
   # Export Docker and project context
   export_environment_context
   
   # Pass system prompt and context via environment variables (for reference)
-  export CODEX_SYSTEM_PROMPT="$(cat "$agents_file")"
+  local codex_system_prompt
+  codex_system_prompt="$(cat "$agents_file")"
+  export CODEX_SYSTEM_PROMPT="$codex_system_prompt"
   export CODEX_CMS_TYPE="$cms_type"
   export CODEX_DOC_CONTEXT="$doc_context"
   
   # Build Codex CLI arguments
-  # Codex CLI uses experimental_instructions_file for system prompt
+  # Codex CLI uses model_instructions_file for system prompt
   # First argument (if provided) is the user prompt, not a subcommand
   local codex_args=()
   
@@ -84,19 +89,19 @@ main() {
     codex_args+=("-C" "${DC_ORO_APPDIR}")
   fi
   
-  # Pass system prompt via experimental_instructions_file config
+  # Pass system prompt via model_instructions_file config
   # AGENTS.md file is created in ~/.orodc/{project_name}/AGENTS.md
-  codex_args+=("-c" "experimental_instructions_file=\"${agents_file}\"")
+  codex_args+=("-c" "model_instructions_file=\"${agents_file}\"")
   
   # If user provided arguments, pass them as user prompt (first positional argument)
-  # System prompt is already set via experimental_instructions_file
+  # System prompt is already set via model_instructions_file
   if [[ $# -gt 0 ]]; then
     # User provided a prompt - pass all arguments as user prompt
     codex_args+=("$@")
   fi
   
   # Execute codex with arguments
-  # System prompt is set via experimental_instructions_file config
+  # System prompt is set via model_instructions_file config
   # User prompt (if provided) is passed as first positional argument after flags
   
   # Print command being executed (dark gray text)

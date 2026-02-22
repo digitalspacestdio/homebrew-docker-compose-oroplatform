@@ -144,7 +144,7 @@ msg_info "CMS type will be auto-detected if not set."
 AUTO_DETECTED_CMS="$DETECTED_CMS_TYPE_DISPLAY"
 
 if prompt_yes_no "Set CMS type explicitly?" "$([ -n "$EXISTING_CMS_TYPE" ] && echo yes || echo no)"; then
-  CMS_TYPES=("php-generic" "symfony" "laravel" "wintercms" "magento" "oro")
+  CMS_TYPES=("php-generic" "magento" "oro")
   DEFAULT_CMS=""
   
   # Determine default: existing > auto-detected > php-generic
@@ -158,6 +158,11 @@ if prompt_yes_no "Set CMS type explicitly?" "$([ -n "$EXISTING_CMS_TYPE" ] && ec
   
   # Normalize existing CMS type for display
   if [[ "$DEFAULT_CMS" == "base" ]]; then
+    DEFAULT_CMS="php-generic"
+  fi
+
+  # If previous/default value is not present in menu, fallback to php-generic
+  if [[ ! " ${CMS_TYPES[*]} " == *" ${DEFAULT_CMS} "* ]]; then
     DEFAULT_CMS="php-generic"
   fi
   
