@@ -1,4 +1,5 @@
 #!/bin/ash
+# shellcheck shell=dash
 set -ex
 
 echo "=== OroDC PHP 8.4 Final Image Build Script ==="
@@ -29,7 +30,6 @@ apk add --no-cache \
     procps \
     rsync \
     vim \
-    micro \
     postgresql-client \
     mysql-client \
     util-linux \
@@ -55,7 +55,6 @@ echo "http://dl-2.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositorie
 apk add --no-cache \
     shadow \
     htop \
-    btop \
     su-exec
 
 # Install sudo and configure permissions
@@ -95,9 +94,9 @@ ln -s /usr/bin/jpegoptim /usr/local/bin/
 
 # Create developer user with configurable UID/GID
 echo "=== Creating developer user ==="
-addgroup -g $PHP_GID ${PHP_USER_GROUP}
-adduser -u $PHP_UID -G ${PHP_USER_GROUP} -s /bin/sh -D ${PHP_USER_NAME}
+addgroup -g "${PHP_GID}" "${PHP_USER_GROUP}"
+adduser -u "${PHP_UID}" -G "${PHP_USER_GROUP}" -s /bin/sh -D "${PHP_USER_NAME}"
 rm -rf /var/www/*
-chown ${PHP_USER_NAME}:${PHP_USER_GROUP} /var/www
+chown "${PHP_USER_NAME}":"${PHP_USER_GROUP}" /var/www
 
 echo "=== Build completed successfully ==="

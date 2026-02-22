@@ -71,11 +71,21 @@ DC_ORO_PHP_VERSION="${DC_ORO_PHP_VERSION:-8.4}"
 DC_ORO_NODE_VERSION="${DC_ORO_NODE_VERSION:-22}"
 DC_ORO_COMPOSER_VERSION="${DC_ORO_COMPOSER_VERSION:-2}"
 DC_ORO_PHP_DIST="${DC_ORO_PHP_DIST:-alpine}"
+EFFECTIVE_COMPOSER_VERSION="${DC_ORO_COMPOSER_VERSION}"
+
+# Composer 2.2 LTS is the compatible build source for PHP 7.1.
+# Keep image tags as "composer2", but use build arg 2.2 internally.
+if [[ "${DC_ORO_PHP_VERSION}" == "7.1" ]] && [[ "${DC_ORO_COMPOSER_VERSION}" == "2" ]]; then
+  EFFECTIVE_COMPOSER_VERSION="2.2"
+fi
 
 msg_ok "Configuration detected:"
 msg_info "  PHP Version:      ${DC_ORO_PHP_VERSION}"
 msg_info "  Node.js Version:  ${DC_ORO_NODE_VERSION}"
 msg_info "  Composer Version: ${DC_ORO_COMPOSER_VERSION}"
+if [[ "${EFFECTIVE_COMPOSER_VERSION}" != "${DC_ORO_COMPOSER_VERSION}" ]]; then
+  msg_info "  Composer Build Arg: ${EFFECTIVE_COMPOSER_VERSION}"
+fi
 msg_info "  PHP Distribution: ${DC_ORO_PHP_DIST}"
 msg_info ""
 
@@ -183,7 +193,7 @@ if ${DOCKER_BIN} images -q "${PHP_BASE_TAG}" 2>/dev/null | grep -q .; then
   IMAGE_SIZE=$(${DOCKER_BIN} images "${PHP_BASE_TAG}" --format "{{.Size}}")
   msg_info "Image size: ${IMAGE_SIZE}"
 else
-  msg_info "Image not found locally: ${PHP_BASE_TAG}"
+  msg_warning "Image not found locally: ${PHP_BASE_TAG}"
 fi
 
 msg_info ""
@@ -261,7 +271,7 @@ if ${DOCKER_BIN} images -q "${PHP_FINAL_TAG}" 2>/dev/null | grep -q .; then
   IMAGE_SIZE=$(${DOCKER_BIN} images "${PHP_FINAL_TAG}" --format "{{.Size}}")
   msg_info "Image size: ${IMAGE_SIZE}"
 else
-  msg_info "Image not found locally: ${PHP_FINAL_TAG}"
+  msg_warning "Image not found locally: ${PHP_FINAL_TAG}"
 fi
 
 msg_info ""
@@ -308,7 +318,7 @@ fi
 
 if [[ "$SHOULD_BUILD_FINAL" == "true" ]]; then
   BUILD_START=$(date +%s)
-  build_cmd="${DOCKER_BIN} build ${NO_CACHE_FLAG} --build-arg PHP_VERSION=\"${DC_ORO_PHP_VERSION}\" --build-arg NODE_VERSION=\"${DC_ORO_NODE_VERSION}\" --build-arg COMPOSER_VERSION=\"${DC_ORO_COMPOSER_VERSION}\" --build-arg PHP_IMAGE=\"${PHP_BASE_TAG}\" -f \"${DOCKER_DIR}/php-node-symfony/${DC_ORO_PHP_VERSION}/Dockerfile\" -t \"${PHP_FINAL_TAG}\" \"${DOCKER_DIR}/php-node-symfony/\""
+  build_cmd="${DOCKER_BIN} build ${NO_CACHE_FLAG} --build-arg PHP_VERSION=\"${DC_ORO_PHP_VERSION}\" --build-arg NODE_VERSION=\"${DC_ORO_NODE_VERSION}\" --build-arg COMPOSER_VERSION=\"${EFFECTIVE_COMPOSER_VERSION}\" --build-arg PHP_IMAGE=\"${PHP_BASE_TAG}\" -f \"${DOCKER_DIR}/php-node-symfony/${DC_ORO_PHP_VERSION}/Dockerfile\" -t \"${PHP_FINAL_TAG}\" \"${DOCKER_DIR}/php-node-symfony/\""
   if run_with_spinner "Building PHP+Node.js final image" "$build_cmd"; then
     BUILD_END=$(date +%s)
     BUILD_DURATION=$((BUILD_END - BUILD_START))

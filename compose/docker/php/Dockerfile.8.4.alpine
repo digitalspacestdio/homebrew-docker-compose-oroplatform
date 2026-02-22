@@ -42,7 +42,6 @@ RUN apk add --no-cache \
     rsync \
     libpq \
     vim \
-    micro \
     postgresql-client \
     mysql-client \
     util-linux \
