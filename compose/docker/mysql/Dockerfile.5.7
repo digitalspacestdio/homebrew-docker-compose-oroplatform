@@ -1,20 +1,96 @@
-FROM debian:buster-slim
+# syntax=docker/dockerfile:1.7
+FROM gcc:12-bookworm AS builder
 
 SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 
-RUN groupadd -r mysql && useradd -r -g mysql mysql
+ARG MYSQL_SRC_URL="https://cdn.mysql.com/Downloads/MySQL-5.7/mysql-boost-5.7.44.tar.gz"
+ARG MYSQL_SRC_SHA256="b8fe262c4679cb7bbc379a3f1addc723844db168628ce2acf78d33906849e491"
 
-RUN apt-get update && apt-get install -y --no-install-recommends gnupg && rm -rf /var/lib/apt/lists/*
+# Build dependencies for MySQL 5.7 source build (formula-inspired).
+RUN set -eux; \
+	apt-get update; \
+	apt-get install -y --no-install-recommends \
+		bison \
+		ca-certificates \
+		cmake \
+		curl \
+		libaio-dev \
+		libevent-dev \
+		liblz4-dev \
+		libncurses-dev \
+		libssl-dev \
+		make \
+		pkg-config \
+		xz-utils \
+		zlib1g-dev \
+	; \
+	rm -rf /var/lib/apt/lists/*
 
-ENV GOSU_VERSION 1.17
+WORKDIR /tmp
+
+RUN set -eux; \
+	curl -fsSL "$MYSQL_SRC_URL" -o mysql-boost-5.7.44.tar.gz; \
+	echo "${MYSQL_SRC_SHA256}  mysql-boost-5.7.44.tar.gz" | sha256sum -c -; \
+	tar -xzf mysql-boost-5.7.44.tar.gz; \
+	mv mysql-5.7.44 mysql-src
+
+WORKDIR /tmp/mysql-src
+
+# Same patch approach as in brew formula: cmake reads MYSQL_VERSION file.
+RUN set -eux; \
+	mv VERSION MYSQL_VERSION; \
+	sed -i 's|${CMAKE_SOURCE_DIR}/VERSION|${CMAKE_SOURCE_DIR}/MYSQL_VERSION|g' cmake/mysql_version.cmake
+
+RUN set -eux; \
+	export CFLAGS='-O2'; \
+	export CXXFLAGS='-O2'; \
+	mkdir -p build; \
+	cd build; \
+	cmake .. \
+		-DCMAKE_BUILD_TYPE=Release \
+		-DCMAKE_INSTALL_PREFIX=/usr/local/mysql \
+		-DCOMPILATION_COMMENT=OroDC \
+		-DDEFAULT_CHARSET=utf8 \
+		-DDEFAULT_COLLATION=utf8_general_ci \
+		-DINSTALL_DOCDIR=share/doc/mysql \
+		-DINSTALL_INCLUDEDIR=include/mysql \
+		-DINSTALL_INFODIR=share/info \
+		-DINSTALL_MANDIR=share/man \
+		-DINSTALL_MYSQLSHAREDIR=share/mysql \
+		-DINSTALL_PLUGINDIR=lib/plugin \
+		-DWITH_BOOST=../boost \
+		-DWITH_SSL=system \
+		-DWITH_NUMA=OFF \
+		-DWITH_UNIT_TESTS=OFF \
+		-DWITH_EMBEDDED_SERVER=ON \
+		-DENABLE_DTRACE=0 \
+	; \
+	make -j"$(nproc)"; \
+	make install
+
+FROM debian:bookworm-slim
+
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
+# add our user and group first to make sure their IDs get assigned consistently
+RUN set -eux; \
+	groupadd -r mysql; \
+	useradd -r -g mysql mysql
+
+RUN set -eux; \
+	apt-get update; \
+	apt-get install -y --no-install-recommends gnupg; \
+	rm -rf /var/lib/apt/lists/*
+
+ENV GOSU_VERSION=1.19
 RUN set -eux; \
 	savedAptMark="$(apt-mark showmanual)"; \
 	apt-get update; \
 	apt-get install -y --no-install-recommends ca-certificates wget; \
 	rm -rf /var/lib/apt/lists/*; \
 	dpkgArch="$(dpkg --print-architecture | awk -F- '{ print $NF }')"; \
-	wget -O /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$dpkgArch"; \
-	wget -O /usr/local/bin/gosu.asc "https://github.com/tianon/gosu/releases/download/$GOSU_VERSION/gosu-$dpkgArch.asc"; \
+	wget -O /usr/local/bin/gosu "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${dpkgArch}"; \
+	wget -O /usr/local/bin/gosu.asc "https://github.com/tianon/gosu/releases/download/${GOSU_VERSION}/gosu-${dpkgArch}.asc"; \
 	export GNUPGHOME="$(mktemp -d)"; \
 	gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys B42F6819007F00F88E364FD4036A9C25BF357DD4; \
 	gpg --batch --verify /usr/local/bin/gosu.asc /usr/local/bin/gosu; \
@@ -33,55 +109,36 @@ RUN set -eux; \
 	apt-get update; \
 	apt-get install -y --no-install-recommends \
 		bzip2 \
+		libatomic1 \
+		libaio1 \
+		libevent-2.1-7 \
+		libgcc-s1 \
+		liblz4-1 \
+		libncurses6 \
+		libssl3 \
+		libstdc++6 \
 		openssl \
 		perl \
+		pv \
 		xz-utils \
 		zstd \
 	; \
 	rm -rf /var/lib/apt/lists/*
 
+COPY --from=builder /usr/local/mysql /usr/local/mysql
+
 RUN set -eux; \
-	key='859BE8D7C586F538430B19C2467B942D3A79BD29'; \
-	export GNUPGHOME="$(mktemp -d)"; \
-	gpg --batch --keyserver keyserver.ubuntu.com --recv-keys "$key"; \
-	mkdir -p /etc/apt/keyrings; \
-	gpg --batch --export "$key" > /etc/apt/keyrings/mysql.gpg; \
-	gpgconf --kill all; \
-	rm -rf "$GNUPGHOME"
+	ln -s /usr/local/mysql/bin/* /usr/local/bin/; \
+	mkdir -p /var/lib/mysql /var/run/mysqld; \
+	chown -R mysql:mysql /var/lib/mysql /var/run/mysqld; \
+	chmod 1777 /var/lib/mysql /var/run/mysqld
 
-ENV MYSQL_MAJOR 5.7
-ENV MYSQL_VERSION 5.7.44-1debian10
-
-RUN echo 'deb [ signed-by=/etc/apt/keyrings/mysql.gpg ] http://repo.mysql.com/apt/debian/ buster mysql-5.7' > /etc/apt/sources.list.d/mysql.list
-
-# hadolint ignore=DL3008
-RUN { \
-		echo mysql-community-server mysql-community-server/data-dir select ''; \
-		echo mysql-community-server mysql-community-server/root-pass password ''; \
-		echo mysql-community-server mysql-community-server/re-root-pass password ''; \
-		echo mysql-community-server mysql-community-server/remove-test-db select false; \
-	} | debconf-set-selections \
-	&& apt-get update \
-	&& apt-get install -y \
-		mysql-server="${MYSQL_VERSION}" \
-	&& find /etc/mysql/ -name '*.cnf' -print0 \
-		| xargs -0 grep -lZE '^(bind-address|log)' \
-		| xargs -rt -0 sed -Ei 's/^(bind-address|log)/#&/' \
-	&& printf '[mysqld]\nskip-host-cache\nskip-name-resolve\n' > /etc/mysql/conf.d/docker.cnf \
-	&& rm -rf /var/lib/apt/lists/* \
-	&& rm -rf /var/lib/mysql && mkdir -p /var/lib/mysql /var/run/mysqld \
-	&& chown -R mysql:mysql /var/lib/mysql /var/run/mysqld \
-	&& chmod 1777 /var/run/mysqld /var/lib/mysql
-
-# Install pv (pipe viewer) for progress display during database import
-RUN set -eux; \
-	apt-get update; \
-	apt-get install -y --no-install-recommends pv; \
-	apt-get clean; \
-	rm -rf /var/lib/apt/lists/*
+ENV MYSQL_MAJOR=5.7
+ENV MYSQL_VERSION=5.7.44-source
 
 VOLUME /var/lib/mysql
 
+COPY config/ /etc/mysql/
 COPY docker-entrypoint-5.7.sh /usr/local/bin/docker-entrypoint.sh
 RUN ln -s usr/local/bin/docker-entrypoint.sh /entrypoint.sh
 ENTRYPOINT ["docker-entrypoint.sh"]

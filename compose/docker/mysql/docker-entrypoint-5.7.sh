@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -eo pipefail
 shopt -s nullglob
 
@@ -55,6 +55,7 @@ _is_sourced() {
 # process initializer files, based on file extensions
 docker_process_init_files() {
 	# mysql here for backwards compatibility "${mysql[@]}"
+	# shellcheck disable=SC2034
 	mysql=( docker_process_sql )
 
 	echo
@@ -69,6 +70,7 @@ docker_process_init_files() {
 					"$f"
 				else
 					mysql_note "$0: sourcing $f"
+					# shellcheck disable=SC1090
 					. "$f"
 				fi
 				;;
@@ -120,30 +122,9 @@ mysql_socket_fix() {
 
 # Do a temporary startup of the MySQL server, for init purposes
 docker_temp_server_start() {
-	if [ "${MYSQL_MAJOR}" = '5.7' ]; then
-		"$@" --skip-networking --default-time-zone=SYSTEM --socket="${SOCKET}" &
-		mysql_note "Waiting for server startup"
-		local i
-		for i in {30..0}; do
-			# only use the root password if the database has already been initialized
-			# so that it won't try to fill in a password file when it hasn't been set yet
-			extraArgs=()
-			if [ -z "$DATABASE_ALREADY_EXISTS" ]; then
-				extraArgs+=( '--dont-use-mysql-root-password' )
-			fi
-			if docker_process_sql "${extraArgs[@]}" --database=mysql <<<'SELECT 1' &> /dev/null; then
-				break
-			fi
-			sleep 1
-		done
-		if [ "$i" = 0 ]; then
-			mysql_error "Unable to start server."
-		fi
-	else
-		# For 5.7+ the server is ready for use as soon as startup command unblocks
-		if ! "$@" --daemonize --skip-networking --default-time-zone=SYSTEM --socket="${SOCKET}"; then
-			mysql_error "Unable to start server."
-		fi
+	# For 5.7+ the server is ready for use as soon as startup command unblocks
+	if ! "$@" --daemonize --skip-networking --default-time-zone=SYSTEM --socket="${SOCKET}"; then
+		mysql_error "Unable to start server."
 	fi
 }
 
@@ -157,7 +138,7 @@ docker_temp_server_stop() {
 
 # Verify that the minimally required password settings are set for new databases.
 docker_verify_minimum_env() {
-	if [ -z "$MYSQL_ROOT_PASSWORD" -a -z "$MYSQL_ALLOW_EMPTY_PASSWORD" -a -z "$MYSQL_RANDOM_ROOT_PASSWORD" ]; then
+	if [ -z "$MYSQL_ROOT_PASSWORD" ] && [ -z "$MYSQL_ALLOW_EMPTY_PASSWORD" ] && [ -z "$MYSQL_RANDOM_ROOT_PASSWORD" ]; then
 		mysql_error <<-'EOF'
 			Database is uninitialized and password option is not specified
 			    You need to specify one of the following as an environment variable:
@@ -235,7 +216,8 @@ docker_create_db_directories() {
 # initializes the database directory
 docker_init_database_dir() {
 	mysql_note "Initializing database files"
-	"$@" --initialize-insecure --default-time-zone=SYSTEM
+	"$@" --initialize-insecure --default-time-zone=SYSTEM --autocommit=1
+	# explicitly enable autocommit to combat https://bugs.mysql.com/bug.php?id=110535 (TODO remove this when 8.0 is EOL; see https://github.com/mysql/mysql-server/commit/7dbf4f80ed15f3c925cfb2b834142f23a2de719a)
 	mysql_note "Database files initialized"
 }
 
@@ -313,6 +295,9 @@ docker_setup_db() {
 
 	# tell docker_process_sql to not use MYSQL_ROOT_PASSWORD since it is just now being set
 	docker_process_sql --dont-use-mysql-root-password --database=mysql <<-EOSQL
+		-- enable autocommit explicitly (in case it was disabled globally)
+		SET autocommit = 1;
+
 		-- What's done in this file shouldn't be replicated
 		--  or products like mysql-fabric won't work
 		SET @@SESSION.SQL_LOG_BIN=0;
@@ -395,7 +380,7 @@ _main() {
 		# If container is started as root user, restart as dedicated mysql user
 		if [ "$(id -u)" = "0" ]; then
 			mysql_note "Switching to dedicated user 'mysql'"
-			exec gosu mysql "$BASH_SOURCE" "$@"
+			exec gosu mysql "${BASH_SOURCE[0]}" "$@"
 		fi
 
 		# there's no database, so it needs to be initialized
