@@ -30,14 +30,14 @@ Check for any of these packages in `composer.json` → `require`:
 
 **Alternative considered:** Check for `bin/console oro:*` commands → Too slow (requires PHP execution), fragile.
 
-### Decision 2: Separate compose file for consumer (not profile)
+### Decision 2: Keep consumer in Oro-specific compose file (not profile)
 
-Extract consumer to `docker-compose-consumer.yml` and conditionally include via `-f` flag.
+Define consumer in `docker-compose-oro.yml` and conditionally include this Oro-specific file via `-f` flag.
 
-**Why:** 
+**Why:**
 - Profiles require explicit `--profile consumer` which changes UX
-- Separate file allows clean conditional inclusion based on detection
-- Follows existing pattern for database (`docker-compose-pgsql.yml`, `docker-compose-mysql.yml`)
+- Oro-specific file allows clean conditional inclusion based on detection
+- Keeps Oro-only services (`consumer`, `websocket`, `gotenberg`) together
 
 **Alternative considered:** Docker Compose profiles → Would require users to remember `--profile` flags.
 

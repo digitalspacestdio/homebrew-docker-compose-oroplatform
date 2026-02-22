@@ -67,12 +67,12 @@ As usage expands to other CMS systems (Magento 2, MageOS, Adobe Commerce), we ne
 
 **File Structure:**
 - `docker-compose.yml` - Base services only
-- `docker-compose-consumer.yml` - Consumer service (Oro)
+- `docker-compose-oro.yml` - Oro-specific services (consumer, websocket, gotenberg)
 - `docker-compose-websocket.yml` - WebSocket service (Oro)
 - `docker-compose-cron.yml` - Cron service (Magento)
 
 **Why:** 
-- Follows existing pattern (`docker-compose-consumer.yml`, `docker-compose-pgsql.yml`)
+- Follows existing pattern (`docker-compose-oro.yml`, `docker-compose-pgsql.yml`)
 - Allows independent enablement of features
 - Easy to extend with new CMS types
 

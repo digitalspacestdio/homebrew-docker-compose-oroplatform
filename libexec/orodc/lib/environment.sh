@@ -999,7 +999,7 @@ initialize_environment() {
       debug_log "initialize_environment: DC_ORO_DATABASE_SCHEMA not set, skipping database-specific compose file"
     fi
 
-    # Add consumer compose file for Oro projects
+    # Add Oro-specific compose file for Oro projects
     # Source common.sh to get is_oro_project function
     local common_sh_path=""
     if [[ -n "${SCRIPT_DIR:-}" ]] && [[ -f "${SCRIPT_DIR}/lib/common.sh" ]]; then
@@ -1019,14 +1019,8 @@ initialize_environment() {
       else
         debug_log "initialize_environment: docker-compose-oro.yml not found (Oro project detected)"
       fi
-      if [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-consumer.yml" ]]; then
-        DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-consumer.yml"
-        debug_log "initialize_environment: added docker-compose-consumer.yml (Oro project detected)"
-      else
-        debug_log "initialize_environment: docker-compose-consumer.yml not found (Oro project detected)"
-      fi
     else
-      debug_log "initialize_environment: skipping docker-compose-oro.yml and docker-compose-consumer.yml (not an Oro project)"
+      debug_log "initialize_environment: skipping docker-compose-oro.yml (not an Oro project)"
     fi
     
     # Include CMS-specific cron service (Ofelia)

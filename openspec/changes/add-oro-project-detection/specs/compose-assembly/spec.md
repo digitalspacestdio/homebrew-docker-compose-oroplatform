@@ -1,25 +1,25 @@
 ## ADDED Requirements
 
-### Requirement: Consumer Service in Separate Compose File
+### Requirement: Consumer Service in Oro-Specific Compose File
 
-The Oro message queue consumer service SHALL be defined in a separate compose file that is conditionally included based on Oro project detection.
+The Oro message queue consumer service SHALL be defined in Oro-specific compose file and conditionally included based on Oro project detection.
 
-#### Scenario: Consumer service defined in docker-compose-consumer.yml
+#### Scenario: Consumer service defined in docker-compose-oro.yml
 - **WHEN** OroDC compose files are processed
-- **THEN** `consumer` service definition SHALL exist in `compose/docker-compose-consumer.yml`
+- **THEN** `consumer` service definition SHALL exist in `compose/docker-compose-oro.yml`
 - **AND** `consumer` service SHALL NOT exist in base `compose/docker-compose.yml`
-- **AND** `docker-compose-consumer.yml` SHALL contain full consumer service configuration including build, volumes, environment, depends_on
+- **AND** `docker-compose-oro.yml` SHALL contain full consumer service configuration including build, volumes, environment, depends_on
 
 #### Scenario: Consumer compose file included for Oro projects
 - **WHEN** `orodc up` or similar compose command is executed
 - **AND** project is detected as Oro project (via `is_oro_project()` or `DC_ORO_IS_ORO_PROJECT=1`)
-- **THEN** `docker-compose-consumer.yml` SHALL be included in compose command via `-f` flag
+- **THEN** `docker-compose-oro.yml` SHALL be included in compose command via `-f` flag
 - **AND** consumer service SHALL start with other services
 
 #### Scenario: Consumer compose file excluded for non-Oro projects
 - **WHEN** `orodc up` or similar compose command is executed
 - **AND** project is NOT detected as Oro project
-- **THEN** `docker-compose-consumer.yml` SHALL NOT be included in compose command
+- **THEN** `docker-compose-oro.yml` SHALL NOT be included in compose command
 - **AND** no consumer service SHALL be started
 - **AND** no errors related to missing `oro:message-queue:consume` command SHALL occur
 
@@ -33,7 +33,7 @@ The system SHALL assemble Docker Compose command with files in specific order to
   1. `docker-compose.yml` (base services)
   2. `docker-compose-default.yml` (sync mode, if applicable)
   3. `docker-compose-pgsql.yml` (database)
-  4. `docker-compose-consumer.yml` (Oro consumer)
+  4. `docker-compose-oro.yml` (Oro services including consumer)
   5. `.docker-compose.user.yml` (user overrides, if exists)
 
 #### Scenario: Standard compose file order for non-Oro project
@@ -43,7 +43,7 @@ The system SHALL assemble Docker Compose command with files in specific order to
   2. `docker-compose-default.yml` (sync mode, if applicable)
   3. `docker-compose-pgsql.yml` (database)
   4. `.docker-compose.user.yml` (user overrides, if exists)
-- **AND** `docker-compose-consumer.yml` SHALL NOT be included
+- **AND** `docker-compose-oro.yml` SHALL NOT be included
 
 ### Requirement: Debug Output for Compose Assembly
 
