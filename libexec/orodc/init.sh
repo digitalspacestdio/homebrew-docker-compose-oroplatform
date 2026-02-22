@@ -144,7 +144,7 @@ msg_info "CMS type will be auto-detected if not set."
 AUTO_DETECTED_CMS="$DETECTED_CMS_TYPE_DISPLAY"
 
 if prompt_yes_no "Set CMS type explicitly?" "$([ -n "$EXISTING_CMS_TYPE" ] && echo yes || echo no)"; then
-  CMS_TYPES=("php-generic" "symfony" "laravel" "wintercms" "magento" "oro")
+  CMS_TYPES=("php-generic" "magento" "oro")
   DEFAULT_CMS=""
   
   # Determine default: existing > auto-detected > php-generic
@@ -158,6 +158,11 @@ if prompt_yes_no "Set CMS type explicitly?" "$([ -n "$EXISTING_CMS_TYPE" ] && ec
   
   # Normalize existing CMS type for display
   if [[ "$DEFAULT_CMS" == "base" ]]; then
+    DEFAULT_CMS="php-generic"
+  fi
+
+  # If previous/default value is not present in menu, fallback to php-generic
+  if [[ ! " ${CMS_TYPES[*]} " == *" ${DEFAULT_CMS} "* ]]; then
     DEFAULT_CMS="php-generic"
   fi
   
@@ -204,10 +209,14 @@ init_page_php() {
   echo "" >&2
   
   # Get or set values from wizard data
-  local SELECTED_PHP=$(wizard_get "SELECTED_PHP" "${EXISTING_PHP_VERSION:-8.4}")
-  local SELECTED_NODE=$(wizard_get "SELECTED_NODE" "${EXISTING_NODE_VERSION:-22}")
-  local SELECTED_COMPOSER=$(wizard_get "SELECTED_COMPOSER" "${EXISTING_COMPOSER_VERSION:-2}")
-  local SELECTED_PHP_IMAGE=$(wizard_get "SELECTED_PHP_IMAGE" "$EXISTING_PHP_IMAGE")
+  local SELECTED_PHP
+  local SELECTED_NODE
+  local SELECTED_COMPOSER
+  local SELECTED_PHP_IMAGE
+  SELECTED_PHP=$(wizard_get "SELECTED_PHP" "${EXISTING_PHP_VERSION:-8.4}")
+  SELECTED_NODE=$(wizard_get "SELECTED_NODE" "${EXISTING_NODE_VERSION:-22}")
+  SELECTED_COMPOSER=$(wizard_get "SELECTED_COMPOSER" "${EXISTING_COMPOSER_VERSION:-2}")
+  SELECTED_PHP_IMAGE=$(wizard_get "SELECTED_PHP_IMAGE" "$EXISTING_PHP_IMAGE")
   
   # Determine if using custom image
   USE_CUSTOM_PHP=false
@@ -217,7 +226,7 @@ init_page_php() {
   
   if prompt_yes_no "Use custom PHP image?" "$([ "$USE_CUSTOM_PHP" = true ] && echo yes || echo no)"; then
     >&2 echo -n "Enter custom PHP image$([ -n "$SELECTED_PHP_IMAGE" ] && echo " [current: $SELECTED_PHP_IMAGE]" || echo ""): "
-    read SELECTED_PHP_IMAGE </dev/tty
+    read -r SELECTED_PHP_IMAGE </dev/tty
     # If empty, keep existing
     if [[ -z "$SELECTED_PHP_IMAGE" ]] && [[ -n "$EXISTING_PHP_IMAGE" ]]; then
       SELECTED_PHP_IMAGE="$EXISTING_PHP_IMAGE"
@@ -228,7 +237,7 @@ init_page_php() {
     SELECTED_COMPOSER="${EXISTING_COMPOSER_VERSION:-2}"
   else
     # Select PHP version (sorted newest to oldest)
-    PHP_VERSIONS=("8.5" "8.4" "8.3" "8.2" "8.1" "7.4" "7.3")
+    PHP_VERSIONS=("8.5" "8.4" "8.3" "8.2" "8.1" "7.4" "7.3" "7.2" "7.1")
     DEFAULT_PHP="${SELECTED_PHP:-${EXISTING_PHP_VERSION:-8.4}}"
     SELECTED_PHP=$(prompt_select "Select PHP version:" "$DEFAULT_PHP" "${PHP_VERSIONS[@]}")
     
@@ -236,32 +245,33 @@ init_page_php() {
     read -ra COMPATIBLE_NODE_VERSIONS <<< "$(get_compatible_node_versions "$SELECTED_PHP")"
     
     # Determine default Node.js version based on PHP or existing config
-    if [[ -n "$EXISTING_NODE_VERSION" ]] && [[ " ${COMPATIBLE_NODE_VERSIONS[*]} " =~ " ${EXISTING_NODE_VERSION} " ]]; then
+    if [[ -n "$EXISTING_NODE_VERSION" ]] && [[ " ${COMPATIBLE_NODE_VERSIONS[*]} " == *" ${EXISTING_NODE_VERSION} "* ]]; then
       DEFAULT_NODE="$EXISTING_NODE_VERSION"
     else
       case "$SELECTED_PHP" in
         8.5) DEFAULT_NODE="24" ;;
         8.4) DEFAULT_NODE="22" ;;
         8.1|8.2|8.3) DEFAULT_NODE="20" ;;
-        7.3|7.4) DEFAULT_NODE="16" ;;
+        7.2|7.3|7.4) DEFAULT_NODE="16" ;;
+        7.1) DEFAULT_NODE="14" ;;
         *) DEFAULT_NODE="22" ;;
       esac
       
       # Ensure default is in compatible versions list
-      if [[ ! " ${COMPATIBLE_NODE_VERSIONS[*]} " =~ " ${DEFAULT_NODE} " ]]; then
+      if [[ ! " ${COMPATIBLE_NODE_VERSIONS[*]} " == *" ${DEFAULT_NODE} "* ]]; then
         DEFAULT_NODE="${COMPATIBLE_NODE_VERSIONS[0]}"
       fi
     fi
     
     SELECTED_NODE=$(prompt_select "Select Node.js version (compatible with PHP $SELECTED_PHP):" "${SELECTED_NODE:-$DEFAULT_NODE}" "${COMPATIBLE_NODE_VERSIONS[@]}")
     
-    # Select Composer version (only for PHP 7.3, others use Composer 2 automatically)
-    if [[ "$SELECTED_PHP" == "7.3" ]]; then
+    # Select Composer version for legacy PHP versions
+    if [[ "$SELECTED_PHP" == "7.1" ]] || [[ "$SELECTED_PHP" == "7.2" ]] || [[ "$SELECTED_PHP" == "7.3" ]]; then
       COMPOSER_VERSIONS=("1" "2")
       DEFAULT_COMPOSER="${SELECTED_COMPOSER:-${EXISTING_COMPOSER_VERSION:-1}}"
       SELECTED_COMPOSER=$(prompt_select "Select Composer version:" "$DEFAULT_COMPOSER" "${COMPOSER_VERSIONS[@]}")
     else
-      # PHP 7.4+ always uses Composer 2
+      # PHP 7.4+ uses Composer 2
       SELECTED_COMPOSER="2"
     fi
     
@@ -295,7 +305,7 @@ fi
 
 if prompt_yes_no "Use custom PHP image?" "$([ "$USE_CUSTOM_PHP" = true ] && echo yes || echo no)"; then
   >&2 echo -n "Enter custom PHP image$([ -n "$EXISTING_PHP_IMAGE" ] && echo " [current: $EXISTING_PHP_IMAGE]" || echo ""): "
-  read SELECTED_PHP_IMAGE </dev/tty
+  read -r SELECTED_PHP_IMAGE </dev/tty
   # If empty, keep existing
   if [[ -z "$SELECTED_PHP_IMAGE" ]] && [[ -n "$EXISTING_PHP_IMAGE" ]]; then
     SELECTED_PHP_IMAGE="$EXISTING_PHP_IMAGE"
@@ -306,7 +316,7 @@ if prompt_yes_no "Use custom PHP image?" "$([ "$USE_CUSTOM_PHP" = true ] && echo
   SELECTED_COMPOSER="${EXISTING_COMPOSER_VERSION:-2}"
 else
   # Select PHP version (sorted newest to oldest)
-  PHP_VERSIONS=("8.5" "8.4" "8.3" "8.2" "8.1" "7.4" "7.3")
+  PHP_VERSIONS=("8.5" "8.4" "8.3" "8.2" "8.1" "7.4" "7.3" "7.2" "7.1")
   DEFAULT_PHP="${EXISTING_PHP_VERSION:-8.4}"
   SELECTED_PHP=$(prompt_select "Select PHP version:" "$DEFAULT_PHP" "${PHP_VERSIONS[@]}")
   
@@ -318,19 +328,20 @@ else
   read -ra COMPATIBLE_NODE_VERSIONS <<< "$(get_compatible_node_versions "$SELECTED_PHP")"
   
   # Determine default Node.js version based on PHP or existing config
-  if [[ -n "$EXISTING_NODE_VERSION" ]] && [[ " ${COMPATIBLE_NODE_VERSIONS[*]} " =~ " ${EXISTING_NODE_VERSION} " ]]; then
+  if [[ -n "$EXISTING_NODE_VERSION" ]] && [[ " ${COMPATIBLE_NODE_VERSIONS[*]} " == *" ${EXISTING_NODE_VERSION} "* ]]; then
     DEFAULT_NODE="$EXISTING_NODE_VERSION"
   else
     case "$SELECTED_PHP" in
       8.5) DEFAULT_NODE="24" ;;
       8.4) DEFAULT_NODE="22" ;;
       8.1|8.2|8.3) DEFAULT_NODE="20" ;;
-      7.3|7.4) DEFAULT_NODE="16" ;;
+      7.2|7.3|7.4) DEFAULT_NODE="16" ;;
+      7.1) DEFAULT_NODE="14" ;;
       *) DEFAULT_NODE="22" ;;
     esac
     
     # Ensure default is in compatible versions list
-    if [[ ! " ${COMPATIBLE_NODE_VERSIONS[*]} " =~ " ${DEFAULT_NODE} " ]]; then
+    if [[ ! " ${COMPATIBLE_NODE_VERSIONS[*]} " == *" ${DEFAULT_NODE} "* ]]; then
       DEFAULT_NODE="${COMPATIBLE_NODE_VERSIONS[0]}"
     fi
   fi
@@ -341,10 +352,10 @@ else
     >&2 echo "DEBUG: Selected Node.js: '$SELECTED_NODE'"
   fi
   
-  # Select Composer version (only for PHP 7.3, others use Composer 2 automatically)
-  if [[ "$SELECTED_PHP" == "7.3" ]]; then
+  # Select Composer version for legacy PHP versions
+  if [[ "$SELECTED_PHP" == "7.1" ]] || [[ "$SELECTED_PHP" == "7.2" ]] || [[ "$SELECTED_PHP" == "7.3" ]]; then
     COMPOSER_VERSIONS=("1" "2")
-    # Default Composer version for PHP 7.3
+    # Default Composer version for legacy PHP
     if [[ -n "$EXISTING_COMPOSER_VERSION" ]]; then
       DEFAULT_COMPOSER="$EXISTING_COMPOSER_VERSION"
     else
@@ -357,7 +368,7 @@ else
       >&2 echo "DEBUG: Selected Composer: '$SELECTED_COMPOSER'"
     fi
   else
-    # PHP 7.4+ always uses Composer 2
+    # PHP 7.4+ uses Composer 2
     SELECTED_COMPOSER="2"
     if [[ -n "${DEBUG:-}" ]]; then
       >&2 echo "DEBUG: Using Composer 2 (automatic for PHP $SELECTED_PHP)"
@@ -382,7 +393,7 @@ fi
 
 if prompt_yes_no "Use custom database image?" "$([ "$USE_CUSTOM_DB" = true ] && echo yes || echo no)"; then
   >&2 echo -n "Enter custom database image$([ -n "$EXISTING_DB_IMAGE" ] && echo " [current: $EXISTING_DB_IMAGE]" || echo ""): "
-  read SELECTED_DB_IMAGE </dev/tty
+  read -r SELECTED_DB_IMAGE </dev/tty
   # If empty, keep existing
   if [[ -z "$SELECTED_DB_IMAGE" ]] && [[ -n "$EXISTING_DB_IMAGE" ]]; then
     SELECTED_DB_IMAGE="$EXISTING_DB_IMAGE"
@@ -427,7 +438,7 @@ else
   if [[ "$SELECTED_DB_TYPE" == "PostgreSQL" ]]; then
     PGSQL_VERSIONS=("17.4" "16.6" "15.1")
     # Only use existing version if it's valid for PostgreSQL and schema hasn't changed
-    if [[ "$EXISTING_DB_SCHEMA" == "pgsql" ]] && [[ " ${PGSQL_VERSIONS[*]} " =~ " ${EXISTING_DB_VERSION} " ]]; then
+    if [[ "$EXISTING_DB_SCHEMA" == "pgsql" ]] && [[ " ${PGSQL_VERSIONS[*]} " == *" ${EXISTING_DB_VERSION} "* ]]; then
       DEFAULT_PGSQL_VERSION="$EXISTING_DB_VERSION"
     else
       DEFAULT_PGSQL_VERSION="17.4"
@@ -438,7 +449,7 @@ else
   else
     MYSQL_VERSIONS=("9.0" "8.4" "8.0" "5.7")
     # Only use existing version if it's valid for MySQL and schema hasn't changed
-    if [[ "$EXISTING_DB_SCHEMA" == "mysql" ]] && [[ " ${MYSQL_VERSIONS[*]} " =~ " ${EXISTING_DB_VERSION} " ]]; then
+    if [[ "$EXISTING_DB_SCHEMA" == "mysql" ]] && [[ " ${MYSQL_VERSIONS[*]} " == *" ${EXISTING_DB_VERSION} "* ]]; then
       DEFAULT_MYSQL_VERSION="$EXISTING_DB_VERSION"
     else
       DEFAULT_MYSQL_VERSION="8.4"
@@ -463,7 +474,7 @@ fi
 
 if prompt_yes_no "Use custom search engine image?" "$([ "$USE_CUSTOM_SEARCH" = true ] && echo yes || echo no)"; then
   >&2 echo -n "Enter custom search image$([ -n "$EXISTING_SEARCH_IMAGE" ] && echo " [current: $EXISTING_SEARCH_IMAGE]" || echo ""): "
-  read SELECTED_SEARCH_IMAGE </dev/tty
+  read -r SELECTED_SEARCH_IMAGE </dev/tty
   # If empty, keep existing
   if [[ -z "$SELECTED_SEARCH_IMAGE" ]] && [[ -n "$EXISTING_SEARCH_IMAGE" ]]; then
     SELECTED_SEARCH_IMAGE="$EXISTING_SEARCH_IMAGE"
@@ -491,7 +502,7 @@ else
   if [[ "$SELECTED_SEARCH_TYPE" == "Elasticsearch" ]]; then
     ELASTIC_VERSIONS=("8.15.0" "8.10.3" "7.17.0")
     # Only use existing version if it's valid for Elasticsearch and type hasn't changed
-    if [[ "$EXISTING_SEARCH_ENGINE" == "Elasticsearch" ]] && [[ " ${ELASTIC_VERSIONS[*]} " =~ " ${EXISTING_SEARCH_VERSION} " ]]; then
+    if [[ "$EXISTING_SEARCH_ENGINE" == "Elasticsearch" ]] && [[ " ${ELASTIC_VERSIONS[*]} " == *" ${EXISTING_SEARCH_VERSION} "* ]]; then
       DEFAULT_ELASTIC_VERSION="$EXISTING_SEARCH_VERSION"
     else
       DEFAULT_ELASTIC_VERSION="8.15.0"
@@ -501,7 +512,7 @@ else
   else
     OPENSEARCH_VERSIONS=("3.3.0" "3.0.0" "2.15.0" "2.11.0" "1.3.0")
     # Only use existing version if it's valid for OpenSearch and type hasn't changed
-    if [[ "$EXISTING_SEARCH_ENGINE" == "OpenSearch" ]] && [[ " ${OPENSEARCH_VERSIONS[*]} " =~ " ${EXISTING_SEARCH_VERSION} " ]]; then
+    if [[ "$EXISTING_SEARCH_ENGINE" == "OpenSearch" ]] && [[ " ${OPENSEARCH_VERSIONS[*]} " == *" ${EXISTING_SEARCH_VERSION} "* ]]; then
       DEFAULT_OPENSEARCH_VERSION="$EXISTING_SEARCH_VERSION"
     else
       DEFAULT_OPENSEARCH_VERSION="3.3.0"
@@ -525,7 +536,7 @@ fi
 
 if prompt_yes_no "Use custom cache image?" "$([ "$USE_CUSTOM_CACHE" = true ] && echo yes || echo no)"; then
   >&2 echo -n "Enter custom cache image$([ -n "$EXISTING_CACHE_IMAGE" ] && echo " [current: $EXISTING_CACHE_IMAGE]" || echo ""): "
-  read SELECTED_CACHE_IMAGE </dev/tty
+  read -r SELECTED_CACHE_IMAGE </dev/tty
   # If empty, keep existing
   if [[ -z "$SELECTED_CACHE_IMAGE" ]] && [[ -n "$EXISTING_CACHE_IMAGE" ]]; then
     SELECTED_CACHE_IMAGE="$EXISTING_CACHE_IMAGE"
@@ -553,7 +564,7 @@ else
   if [[ "$SELECTED_CACHE_TYPE" == "Redis" ]]; then
     REDIS_VERSIONS=("7.4" "7.2" "6.2")
     # Only use existing version if it's valid for Redis and type hasn't changed
-    if [[ "$EXISTING_CACHE_ENGINE" == "Redis" ]] && [[ " ${REDIS_VERSIONS[*]} " =~ " ${EXISTING_CACHE_VERSION} " ]]; then
+    if [[ "$EXISTING_CACHE_ENGINE" == "Redis" ]] && [[ " ${REDIS_VERSIONS[*]} " == *" ${EXISTING_CACHE_VERSION} "* ]]; then
       DEFAULT_REDIS_VERSION="$EXISTING_CACHE_VERSION"
     else
       DEFAULT_REDIS_VERSION="7.4"
@@ -563,7 +574,7 @@ else
   elif [[ "$SELECTED_CACHE_TYPE" == "Valkey" ]]; then
     VALKEY_VERSIONS=("9.0" "8.0" "7.2")
     # Only use existing version if it's valid for Valkey and type hasn't changed
-    if [[ "$EXISTING_CACHE_ENGINE" == "Valkey" ]] && [[ " ${VALKEY_VERSIONS[*]} " =~ " ${EXISTING_CACHE_VERSION} " ]]; then
+    if [[ "$EXISTING_CACHE_ENGINE" == "Valkey" ]] && [[ " ${VALKEY_VERSIONS[*]} " == *" ${EXISTING_CACHE_VERSION} "* ]]; then
       DEFAULT_VALKEY_VERSION="$EXISTING_CACHE_VERSION"
     else
       DEFAULT_VALKEY_VERSION="9.0"
@@ -573,7 +584,7 @@ else
   else
     KEYDB_VERSIONS=("6.3.4" "6.3.3")
     # Only use existing version if it's valid for KeyDB and type hasn't changed
-    if [[ "$EXISTING_CACHE_ENGINE" == "KeyDB" ]] && [[ " ${KEYDB_VERSIONS[*]} " =~ " ${EXISTING_CACHE_VERSION} " ]]; then
+    if [[ "$EXISTING_CACHE_ENGINE" == "KeyDB" ]] && [[ " ${KEYDB_VERSIONS[*]} " == *" ${EXISTING_CACHE_VERSION} "* ]]; then
       DEFAULT_KEYDB_VERSION="$EXISTING_CACHE_VERSION"
     else
       DEFAULT_KEYDB_VERSION="6.3.4"
@@ -597,7 +608,7 @@ fi
 
 if prompt_yes_no "Use custom RabbitMQ image?" "$([ "$USE_CUSTOM_RABBITMQ" = true ] && echo yes || echo no)"; then
   >&2 echo -n "Enter custom RabbitMQ image$([ -n "$EXISTING_RABBITMQ_IMAGE" ] && echo " [current: $EXISTING_RABBITMQ_IMAGE]" || echo ""): "
-  read SELECTED_RABBITMQ_IMAGE </dev/tty
+  read -r SELECTED_RABBITMQ_IMAGE </dev/tty
   # If empty, keep existing
   if [[ -z "$SELECTED_RABBITMQ_IMAGE" ]] && [[ -n "$EXISTING_RABBITMQ_IMAGE" ]]; then
     SELECTED_RABBITMQ_IMAGE="$EXISTING_RABBITMQ_IMAGE"

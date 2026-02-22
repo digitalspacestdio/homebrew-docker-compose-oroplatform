@@ -2,7 +2,7 @@
 # shellcheck shell=dash
 set -ex
 
-echo "=== OroDC PHP 7.4 Final Image Build Script ==="
+echo "=== OroDC PHP 7.1 Final Image Build Script ==="
 
 # Install additional packages for full OroDC functionality
 apk add --no-cache \
@@ -16,7 +16,6 @@ apk add --no-cache \
     git \
     nss-tools \
     openssh \
-    msmtp-openrc \
     msmtp \
     jpegoptim \
     pngquant \
@@ -47,14 +46,12 @@ fi
 # Create /var/run/php directory
 mkdir -p /var/run/php
 
-# Add edge repositories for additional packages
-echo "http://dl-2.alpinelinux.org/alpine/edge/main" >> /etc/apk/repositories
-echo "http://dl-2.alpinelinux.org/alpine/edge/community" >> /etc/apk/repositories
-
-# Install packages from edge repositories
+# Install additional tools from configured branch repositories
 apk add --no-cache \
     shadow \
     htop
+
+# Try to install optional packages (may be unavailable on alpine 3.10)
 
 # Install sudo and configure permissions
 apk add --no-cache sudo
@@ -62,6 +59,9 @@ echo "developer ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
 
 # Install Python 2 for Node.js modules
 apk add --no-cache python2
+
+# Install deps for node-sass
+apk add --no-cache gcc g++ make
 
 # Install and configure Zsh + Starship
 apk add --no-cache zsh

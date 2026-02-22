@@ -4,7 +4,7 @@ name: Build & Publish PHP Base and PHP+Node.js multi-arch images to GHCR
 # This workflow uses 4 Docker Hub accounts to distribute rate limits (200 pulls/6h per account = 800 total)
 # 
 # Required GitHub Secrets (8 total):
-#   DOCKERHUB_USERNAME_1, DOCKERHUB_TOKEN_1  - for PHP 7.3, 7.4, 8.4
+#   DOCKERHUB_USERNAME_1, DOCKERHUB_TOKEN_1  - for PHP 7.1, 7.2, 7.3, 7.4, 8.4
 #   DOCKERHUB_USERNAME_2, DOCKERHUB_TOKEN_2  - for PHP 8.1, 8.5
 #   DOCKERHUB_USERNAME_3, DOCKERHUB_TOKEN_3  - for PHP 8.2
 #   DOCKERHUB_USERNAME_4, DOCKERHUB_TOKEN_4  - for PHP 8.3
@@ -23,7 +23,7 @@ on:
   workflow_dispatch:
     inputs:
       php_versions:
-        description: 'PHP versions to build (comma-separated: 7.3,7.4,8.1,8.2,8.3,8.4,8.5 or "all")'
+        description: 'PHP versions to build (comma-separated: 7.1,7.2,7.3,7.4,8.1,8.2,8.3,8.4,8.5 or "all")'
         required: false
         default: 'all'
       skip_tests:
@@ -55,6 +55,28 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # PHP 7.1
+          - php: "7.1"
+            php_version: "7.1"
+            arch: X64
+            arch_name: amd64
+            platform: linux/amd64
+          - php: "7.1"
+            php_version: "7.1"
+            arch: ARM64
+            arch_name: arm64
+            platform: linux/arm64
+          # PHP 7.2
+          - php: "7.2"
+            php_version: "7.2"
+            arch: X64
+            arch_name: amd64
+            platform: linux/amd64
+          - php: "7.2"
+            php_version: "7.2"
+            arch: ARM64
+            arch_name: arm64
+            platform: linux/arm64
           # PHP 7.3
           - php: "7.3"
             php_version: "7.3"
@@ -141,6 +163,8 @@ jobs:
         id: docker-creds
         run: |
           case "${{ matrix.php }}" in
+            "7.1") KEY_NUM=1 ;;
+            "7.2") KEY_NUM=1 ;;
             "7.3") KEY_NUM=1 ;;
             "7.4") KEY_NUM=1 ;;
             "8.1") KEY_NUM=2 ;;
@@ -243,7 +267,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        version: ["7.3", "7.4", "8.1", "8.2", "8.3", "8.4", "8.5"]
+        version: ["7.1", "7.2", "7.3", "7.4", "8.1", "8.2", "8.3", "8.4", "8.5"]
     steps:
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -274,6 +298,62 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          # PHP 7.1 + Node 14 + Composer 1, 2 (amd64)
+          - php: "7.1"
+            node: "14"
+            composer: "1"
+            composer_arg: "1"
+            arch: X64
+            arch_name: amd64
+            platform: linux/amd64
+          - php: "7.1"
+            node: "14"
+            composer: "2"
+            composer_arg: "2.2"
+            arch: X64
+            arch_name: amd64
+            platform: linux/amd64
+          # PHP 7.1 + Node 14 + Composer 1, 2 (arm64)
+          - php: "7.1"
+            node: "14"
+            composer: "1"
+            composer_arg: "1"
+            arch: ARM64
+            arch_name: arm64
+            platform: linux/arm64
+          - php: "7.1"
+            node: "14"
+            composer: "2"
+            composer_arg: "2.2"
+            arch: ARM64
+            arch_name: arm64
+            platform: linux/arm64
+          # PHP 7.2 + Node 16 + Composer 1, 2 (amd64)
+          - php: "7.2"
+            node: "16"
+            composer: "1"
+            arch: X64
+            arch_name: amd64
+            platform: linux/amd64
+          - php: "7.2"
+            node: "16"
+            composer: "2"
+            arch: X64
+            arch_name: amd64
+            platform: linux/amd64
+          # PHP 7.2 + Node 16 + Composer 1, 2 (arm64)
+          - php: "7.2"
+            node: "16"
+            composer: "1"
+            arch: ARM64
+            arch_name: arm64
+            platform: linux/arm64
+          - php: "7.2"
+            node: "16"
+            composer: "2"
+            arch: ARM64
+            arch_name: arm64
+            platform: linux/arm64
           # PHP 7.3 + Node 16 + Composer 1, 2 (amd64)
           - php: "7.3"
             node: "16"
@@ -549,6 +629,8 @@ jobs:
         id: docker-creds
         run: |
           case "${{ matrix.php }}" in
+            "7.1") KEY_NUM=1 ;;
+            "7.2") KEY_NUM=1 ;;
             "7.3") KEY_NUM=1 ;;
             "7.4") KEY_NUM=1 ;;
             "8.1") KEY_NUM=2 ;;
@@ -620,7 +702,7 @@ jobs:
               --platform ${{ matrix.platform }} \
               --tag ghcr.io/${{ github.repository_owner }}/orodc-php-node-symfony:${{ matrix.php }}-node${{ matrix.node }}-composer${{ matrix.composer }}-alpine-${{ matrix.arch_name }} \
               --build-arg NODE_VERSION=${{ matrix.node }} \
-              --build-arg COMPOSER_VERSION=${{ matrix.composer }} \
+              --build-arg COMPOSER_VERSION=${{ matrix.composer_arg || matrix.composer }} \
               --label "build.hash=${{ steps.check-rebuild.outputs.hash }}" \
               --label "build.date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')" \
               --label "build.commit=${{ github.sha }}" \
@@ -652,6 +734,20 @@ jobs:
     strategy:
       matrix:
         include:
+          # PHP 7.1 + Node 14 + Composer 1, 2
+          - php: "7.1"
+            node: "14"
+            composer: "1"
+          - php: "7.1"
+            node: "14"
+            composer: "2"
+          # PHP 7.2 + Node 16 + Composer 1, 2
+          - php: "7.2"
+            node: "16"
+            composer: "1"
+          - php: "7.2"
+            node: "16"
+            composer: "2"
           # PHP 7.3 + Node 16 + Composer 1, 2
           - php: "7.3"
             node: "16"

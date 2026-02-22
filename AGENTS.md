@@ -438,7 +438,7 @@ The smart detection ensures:
      - `orodc agents installation` for installation guides
 
 4. **AI Agent Launch:**
-   - Passes system prompt via `experimental_instructions_file` config
+   - Passes system prompt via `model_instructions_file` config
    - Sets working directory to project directory
    - Exports Docker and project context variables
 

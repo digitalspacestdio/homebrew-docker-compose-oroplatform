@@ -1,11 +1,11 @@
-ARG ALPINE_VERSION=3.15
-ARG PHP_VERSION=7.4
+ARG ALPINE_VERSION=3.12
+ARG PHP_VERSION=7.2
 FROM php:${PHP_VERSION}-fpm-alpine${ALPINE_VERSION} AS app_php
 ARG STABILITY="stable"
 ENV STABILIT=${STABILITY}
 ARG EXT_REDIS_VERSION=5.3.7
 ARG EXT_IGBINARY_VERSION=3.2.15
-ARG EXT_MONGODB_VERSION=1.19.4
+ARG EXT_MONGODB_VERSION=1.9.0
 ARG EXT_XDEBUG_VERSION=3.1.6
 ARG EXT_RDKAFKA_VERSION=6.0.3
 # persistent / runtime deps
@@ -80,27 +80,21 @@ RUN set -eux; \
   docker-php-source extract; \
   docker-php-ext-configure zip; \
   docker-php-ext-configure imap --with-imap --with-imap-ssl; \
-  docker-php-ext-configure gd --with-freetype --with-webp --with-jpeg; \
+  docker-php-ext-configure gd --with-jpeg-dir=/usr/include --with-png-dir=/usr/include --with-webp-dir=/usr/include; \
   \
   mkdir -p /usr/src/php/ext/igbinary; \
   curl -fsSL https://github.com/igbinary/igbinary/archive/$EXT_IGBINARY_VERSION.tar.gz | tar xvz -C /usr/src/php/ext/igbinary --strip 1; \
   docker-php-ext-install -j$(printf "2\n$(nproc)" | sort -g | head -n1) igbinary; \
-  rm -rf /usr/src/php/ext/igbinary; \
   \
   mkdir -p /usr/src/php/ext/redis; \
   curl -fsSL https://github.com/phpredis/phpredis/archive/$EXT_REDIS_VERSION.tar.gz | tar xvz -C /usr/src/php/ext/redis --strip 1; \
   docker-php-ext-configure redis --enable-redis-igbinary; \
   docker-php-ext-install -j$(printf "2\n$(nproc)" | sort -g | head -n1) redis; \
-  rm -rf /usr/src/php/ext/redis; \
   \
   mkdir -p /usr/src/php/ext/mongodb; \
-  git clone https://github.com/mongodb/mongo-php-driver.git /usr/src/php/ext/mongodb && \
-  cd /usr/src/php/ext/mongodb && \
-  git checkout $EXT_MONGODB_VERSION && \
-  git submodule update --init --recursive; \
+  git clone --recursive --branch $EXT_MONGODB_VERSION --depth 1 https://github.com/mongodb/mongo-php-driver.git /usr/src/php/ext/mongodb; \
   docker-php-ext-configure mongodb; \
   docker-php-ext-install -j$(printf "2\n$(nproc)" | sort -g | head -n1) mongodb; \
-  rm -rf /usr/src/php/ext/mongodb; \
   \
   mkdir -p /usr/src/php/ext/xdebug; \
   curl -fsSL https://github.com/xdebug/xdebug/archive/refs/tags/$EXT_XDEBUG_VERSION.tar.gz | tar xvz -C /usr/src/php/ext/xdebug --strip 1; \
@@ -142,8 +136,5 @@ RUN set -eux; \
       | awk 'system("[ -e /usr/local/lib/" $1 " ]") == 0 { next } { print "so:" $1 }' \
   )"; \
   apk add --no-cache --virtual .app-phpexts-rundeps $runDeps; \
-  \
-  # Set permissions for xdebug config files to allow removal by non-root users
-  chmod 666 "${PHP_INI_DIR}/conf.d/docker-php-ext-xdebug.ini" 2>/dev/null || true; \
   \
   apk del .build-deps

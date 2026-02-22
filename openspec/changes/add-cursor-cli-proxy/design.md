@@ -35,7 +35,7 @@ This change creates a proxy command that automatically configures Cursor CLI wit
 
 ### Decision: Cursor CLI System Prompt Injection Method
 - **What**: Determine Cursor CLI's method for accepting system prompts (environment variable, config file, or CLI flag)
-- **Why**: Cursor CLI may use different mechanism than Codex (`experimental_instructions_file`) or Gemini (`GEMINI_SYSTEM_MD`)
+- **Why**: Cursor CLI may use different mechanism than Codex (`model_instructions_file`) or Gemini (`GEMINI_SYSTEM_MD`)
 - **Alternatives considered**:
   - Assume same as Codex (rejected - need to verify Cursor CLI API)
   - Assume same as Gemini (rejected - need to verify Cursor CLI API)
