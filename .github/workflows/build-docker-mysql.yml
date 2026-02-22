@@ -89,11 +89,21 @@ jobs:
     strategy:
       matrix:
         version: ${{ fromJson(needs.prepare-matrix.outputs.versions) }}
-        exclude:
-          - version: "5.7"
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Determine Dockerfile
+        id: dockerfile
+        run: |
+          VERSION="${{ matrix.version }}"
+          if [ -f "compose/docker/mysql/Dockerfile.${VERSION}" ]; then
+            echo "file=compose/docker/mysql/Dockerfile.${VERSION}" >> $GITHUB_OUTPUT
+            echo "tag_suffix=-arm64" >> $GITHUB_OUTPUT
+          else
+            echo "file=compose/docker/mysql/Dockerfile" >> $GITHUB_OUTPUT
+            echo "tag_suffix=-arm64" >> $GITHUB_OUTPUT
+          fi
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -109,7 +119,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: compose/docker/mysql
-          file: compose/docker/mysql/Dockerfile
+          file: ${{ steps.dockerfile.outputs.file }}
           platforms: linux/arm64
           push: true
           build-args: |
@@ -138,20 +148,12 @@ jobs:
       - name: Create and push multi-arch manifest
         run: |
           VERSION="${{ matrix.version }}"
-          MAJOR="${VERSION%%.*}"
           OWNER="${{ github.repository_owner }}"
           IMAGE="ghcr.io/${OWNER}/orodc-mysql"
 
-          if [ "$MAJOR" -lt 8 ]; then
-            # 5.7 is amd64-only
-            docker buildx imagetools create \
-              --tag "${IMAGE}:${VERSION}" \
-              "${IMAGE}:${VERSION}-amd64"
-          else
-            docker buildx imagetools create \
-              --tag "${IMAGE}:${VERSION}" \
-              "${IMAGE}:${VERSION}-amd64" \
-              "${IMAGE}:${VERSION}-arm64"
-          fi
+          docker buildx imagetools create \
+            --tag "${IMAGE}:${VERSION}" \
+            "${IMAGE}:${VERSION}-amd64" \
+            "${IMAGE}:${VERSION}-arm64"
 
           echo "Created manifest for MySQL ${VERSION}"
