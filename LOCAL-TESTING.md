@@ -11,7 +11,7 @@ This guide describes various methods for testing OroDC locally.
 ### Testing in existing project
 ```bash
 # Navigate to Oro application directory
-cd ~/orocommerce  # or ~/marello, ~/orocrm, etc.
+cd ~/orocommerce  # or ~/marello, etc.
 
 # Test basic commands
 orodc version                    # OroDC version
@@ -28,11 +28,11 @@ For complete installation testing, manually clone and test applications:
 
 ```bash
 # Clone application
-git clone --single-branch --branch 6.1.4 https://github.com/oroinc/platform-application.git ~/test-oroplatform
-cd ~/test-oroplatform
+git clone --single-branch --branch 6.1.4 https://github.com/oroinc/orocommerce-application.git ~/test-orocommerce
+cd ~/test-orocommerce
 
 # Configure OroDC
-echo "DC_ORO_NAME=test-oroplatform" > .env.orodc
+echo "DC_ORO_NAME=test-orocommerce" > .env.orodc
 echo "DC_ORO_PORT_PREFIX=301" >> .env.orodc
 echo "DC_ORO_MODE=ssh" >> .env.orodc
 
@@ -44,14 +44,12 @@ curl -I http://localhost:30180
 
 # Cleanup
 orodc down --volumes --remove-orphans
-cd .. && rm -rf ~/test-oroplatform
+cd .. && rm -rf ~/test-orocommerce
 ```
 
 ### Supported applications:
 - **marello** - https://github.com/marellocommerce/marello-application.git
 - **orocommerce** - https://github.com/oroinc/orocommerce-application.git
-- **oroplatform** - https://github.com/oroinc/platform-application.git
-- **orocrm** - https://github.com/oroinc/crm-application.git
 
 ## 🐳 GitHub Actions Locally (Act)
 
@@ -70,11 +68,11 @@ echo 'GITHUB_TOKEN=your_token_here' > .secrets
 ### Running Tests
 ```bash
 # Test installation workflow
-act workflow_dispatch -W .github/workflows/test-oro-installations.yml \
+act workflow_dispatch -W .github/workflows/test-oro-installations-containerized.yml \
     -j test-installation \
-    --matrix application:oroplatform \
+    --matrix application:orocommerce \
     --matrix version:6.1.4 \
-    --matrix repo_url:https://github.com/oroinc/platform-application.git \
+    --matrix repo_url:https://github.com/oroinc/orocommerce-application.git \
     --secret-file .secrets
 ```
 
@@ -147,7 +145,7 @@ echo "DC_ORO_MODE=ssh" > .env.orodc
 orodc install && orodc up -d
 
 # 3. Workflow test
-act workflow_dispatch -W .github/workflows/test-oro-installations.yml --secret-file .secrets
+act workflow_dispatch -W .github/workflows/test-oro-installations-containerized.yml --secret-file .secrets
 ```
 
 ### Debugging issue:

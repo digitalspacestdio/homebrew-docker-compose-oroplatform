@@ -1,6 +1,10 @@
 #!/bin/bash
 set -x
-[ -f /etc/ssh/sshd_config.backup ] && cp /etc/ssh/sshd_config.backup /etc/ssh/sshd_config || cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup
+if [ -f /etc/ssh/sshd_config.backup ]; then
+	cp /etc/ssh/sshd_config.backup /etc/ssh/sshd_config
+else
+	cp /etc/ssh/sshd_config /etc/ssh/sshd_config.backup
+fi
 [ -f /etc/ssh/hostkeys/ssh_host_rsa_key ] || ssh-keygen -t rsa -f /etc/ssh/hostkeys/ssh_host_rsa_key -N ''; \
 [ -f /etc/ssh/hostkeys/ssh_host_ecdsa_key ] || ssh-keygen -t ecdsa -f /etc/ssh/hostkeys/ssh_host_ecdsa_key -N ''; \
 [ -f /etc/ssh/hostkeys/ssh_host_ed25519_key ] || ssh-keygen -t ed25519 -f /etc/ssh/hostkeys/ssh_host_ed25519_key -N ''; \
@@ -12,23 +16,28 @@ echo 'PermitTTY yes' | tee -a /etc/ssh/sshd_config
 echo 'PermitUserEnvironment yes' | tee -a /etc/ssh/sshd_config
 echo 'AllowAgentForwarding yes' | tee -a /etc/ssh/sshd_config
 
+: "${PHP_USER_NAME:=developer}"
+: "${PHP_UID:=1000}"
+: "${PHP_GID:=1000}"
+: "${APP_DIR:=/var/www}"
+
 if [[ -n $ORO_SSH_PUBLIC_KEY ]]; then
 	mkdir -p /root/.ssh
 	echo "${ORO_SSH_PUBLIC_KEY}" > /root/.ssh/authorized_keys
 	chmod -R 0600 /root/.ssh
-	if which zsh; then
-		chsh -s $(which zsh) $USER
+	if zsh_path="$(command -v zsh)"; then
+		usermod -s "${zsh_path}" "${USER}"
 	fi
 
 	if [[ -n $PHP_UID ]]; then
 		PHP_USER_HOME=$(eval echo "~$PHP_USER_NAME")
-		mkdir -p ${PHP_USER_HOME}/.ssh
-		echo "${ORO_SSH_PUBLIC_KEY}" > ${PHP_USER_HOME}/.ssh/authorized_keys
-		chmod 0700 ${PHP_USER_HOME}/.ssh
-		chmod -R 0600 ${PHP_USER_HOME}/.ssh/*
-		chown -R "${PHP_USER_NAME}" ${PHP_USER_HOME}
-		usermod -s /bin/bash $PHP_USER_NAME
-		usermod -p '*' $PHP_USER_NAME
+		mkdir -p "${PHP_USER_HOME}/.ssh"
+		echo "${ORO_SSH_PUBLIC_KEY}" > "${PHP_USER_HOME}/.ssh/authorized_keys"
+		chmod 0700 "${PHP_USER_HOME}/.ssh"
+		chmod -R 0600 "${PHP_USER_HOME}"/.ssh/*
+		chown -R "${PHP_USER_NAME}" "${PHP_USER_HOME}"
+		usermod -s /bin/bash "${PHP_USER_NAME}"
+		usermod -p '*' "${PHP_USER_NAME}"
 		
 		cat >> /etc/ssh/sshd_config <<- EOM
 		Match User ${PHP_USER_NAME}
@@ -47,15 +56,15 @@ if [[ -n $ORO_SSH_PUBLIC_KEY ]]; then
 		chown "${PHP_UID}" "${PHP_USER_HOME}/.ssh/environment"
 		chmod 600 "${PHP_USER_HOME}/.ssh/environment"
 
-		if [[ -d "${APP_DIR:-/var/www}/.git" ]]; then
-			su - $PHP_USER_NAME -c 'git config --global --add safe.directory "'${APP_DIR:-/var/www}'/.git"'
+		if [[ -d "${APP_DIR}/.git" ]]; then
+			su - "${PHP_USER_NAME}" -c "git config --global --add safe.directory \"${APP_DIR}/.git\""
 		fi
 
-		if which zsh; then
-			chsh -s $(which zsh) $PHP_USER_NAME
+		if zsh_path="$(command -v zsh)"; then
+			usermod -s "${zsh_path}" "${PHP_USER_NAME}"
 		fi
 
-		chown ${PHP_UID}:${PHP_GID} ${APP_DIR:-/var/www}
+		chown "${PHP_UID}:${PHP_GID}" "${APP_DIR}"
 
 		if [[ -d ${PHP_USER_HOME}/.cache/JetBrains ]]; then
 			JBR_VERSION="jbr-21.0.5"
@@ -71,14 +80,14 @@ if [[ -n $ORO_SSH_PUBLIC_KEY ]]; then
 				esac && \
 				JBR_URL="https://cache-redirector.jetbrains.com/intellij-jbr/${JBR_VERSION}-linux-musl-${JBR_ARCH}-${JBR_BUILD}.tar.gz" && \
 				echo "Downloading JBR from $JBR_URL" && \
-				mkdir -p ${JAVA_HOME} && \
-				curl -fSL "$JBR_URL" -o /tmp/jbr.tar.gz && \
-				tar -xzf /tmp/jbr.tar.gz -C ${JAVA_HOME} --strip-components=1 && \
-				rm /tmp/jbr.tar.gz
+					mkdir -p "${JAVA_HOME}" && \
+					curl -fSL "$JBR_URL" -o /tmp/jbr.tar.gz && \
+					tar -xzf /tmp/jbr.tar.gz -C "${JAVA_HOME}" --strip-components=1 && \
+					rm /tmp/jbr.tar.gz
 			fi
 
 			if [[ -f ${JAVA_HOME}/bin/java ]]; then
-				cat >> ${PHP_USER_HOME}/.profile <<- EOM
+				cat >> "${PHP_USER_HOME}/.profile" <<- EOM
 					export JAVA_HOME=${JAVA_HOME}
 				EOM
 
@@ -86,14 +95,14 @@ if [[ -n $ORO_SSH_PUBLIC_KEY ]]; then
 					JAVA_HOME=${JAVA_HOME}
 				EOM
 
-				cat >> ${PHP_USER_HOME}/.zshrc <<- EOM
+				cat >> "${PHP_USER_HOME}/.zshrc" <<- EOM
 					if ! echo $PATH | egrep '[^[:alnum:]_]${JAVA_HOME}/bin[^[:alnum:]_]' > /dev/null; then
 						export PATH="${JAVA_HOME}/bin:\${PATH}"
 					fi
 				EOM
 			fi
 
-			rm -rf rm -rf ${PHP_USER_HOME}/.cache/JetBrains/RemoteDev/dist/*/jbr
+			rm -rf "${PHP_USER_HOME}"/.cache/JetBrains/RemoteDev/dist/*/jbr
 		fi
 	fi
 fi

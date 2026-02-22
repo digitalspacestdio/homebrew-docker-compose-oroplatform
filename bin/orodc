@@ -3057,9 +3057,9 @@ if [[ -n "${DC_ORO_CONFIG_DIR:-}" ]]; then
     fi
   fi
 
-  # Include consumer service only for Oro Platform projects
-  if is_oro_project && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-consumer.yml" ]]; then
-    DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-consumer.yml"
+  # Include Oro-specific services (websocket, gotenberg, consumer) only for Oro Platform projects
+  if is_oro_project && [[ -f "${DC_ORO_CONFIG_DIR}/docker-compose-oro.yml" ]]; then
+    DOCKER_COMPOSE_BIN_CMD="${DOCKER_COMPOSE_BIN_CMD} -f ${DC_ORO_CONFIG_DIR}/docker-compose-oro.yml"
   fi
 
   # Include CMS-specific cron service (Ofelia)

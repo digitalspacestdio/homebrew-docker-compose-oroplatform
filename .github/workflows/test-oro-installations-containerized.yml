@@ -24,9 +24,9 @@ on:
   workflow_dispatch:
     inputs:
       test_applications:
-        description: 'Applications to test (comma-separated: orocrm,oroplatform,orocommerce,marello)'
+        description: 'Applications to test (comma-separated: orocommerce,marello)'
         required: false
-        default: 'orocrm,oroplatform,orocommerce,marello'
+        default: 'orocommerce,marello'
 
 env:
   # Homebrew settings
@@ -57,12 +57,6 @@ jobs:
             name: ARM64
             port_base: 400
         application:
-          - name: oroplatform
-            version: 6.1.4
-            repo_url: https://github.com/oroinc/platform-application.git
-          - name: orocrm
-            version: 6.1.4
-            repo_url: https://github.com/oroinc/crm-application.git
           - name: orocommerce
             version: 6.1.4
             repo_url: https://github.com/oroinc/orocommerce-application.git
@@ -345,7 +339,6 @@ jobs:
           echo "🔄 Stopping and removing test containers..."
           # Only remove containers from our CI builds (with run ID pattern)
           RUN_SHORT=$(echo "${{ github.run_id }}" | tail -c 6)
-          docker ps -aq --filter "name=oroplatform-${RUN_SHORT}" | xargs -r docker rm -f 2>/dev/null || true
           docker ps -aq --filter "name=orocommerce-${RUN_SHORT}" | xargs -r docker rm -f 2>/dev/null || true
           docker ps -aq --filter "name=marello-${RUN_SHORT}" | xargs -r docker rm -f 2>/dev/null || true
           
@@ -401,8 +394,6 @@ jobs:
           echo "- JUnit XML reports generated"
           echo ""
           echo "📦 **Applications Tested:**"
-          echo "- oroplatform (6.1.4)"
-          echo "- orocrm (6.1.4)"  
           echo "- orocommerce (6.1.4)"
           echo "- marello (6.1.0)"
           echo ""
@@ -424,4 +415,4 @@ jobs:
           echo "- 🏗️ **Isolation**: Each test runs in myoung34/github-runner container" >> $GITHUB_STEP_SUMMARY
           echo "- 🧪 **Testing**: Goss-based comprehensive verification with structured YAML tests" >> $GITHUB_STEP_SUMMARY
           echo "- 🔧 **Mode**: OroDC default mode with synchronized paths" >> $GITHUB_STEP_SUMMARY
-          echo "- 📦 **Applications**: oroplatform, orocrm, orocommerce, marello (all on X64 + ARM64)" >> $GITHUB_STEP_SUMMARY
+          echo "- 📦 **Applications**: orocommerce, marello (all on X64 + ARM64)" >> $GITHUB_STEP_SUMMARY

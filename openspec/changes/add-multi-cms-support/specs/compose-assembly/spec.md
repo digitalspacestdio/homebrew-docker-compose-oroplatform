@@ -11,7 +11,7 @@ The system SHALL assemble Docker Compose command with files in specific order to
   2. `docker-compose-default.yml` (sync mode, if applicable)
   3. `docker-compose-pgsql.yml` or `docker-compose-mysql.yml` (database-specific)
   4. `.docker-compose.user.yml` (user custom, if exists)
-- **AND** `docker-compose-consumer.yml`, `docker-compose-websocket.yml`, `docker-compose-cron.yml` SHALL NOT be included
+- **AND** `docker-compose-oro.yml`, `docker-compose-websocket.yml`, `docker-compose-cron.yml` SHALL NOT be included
 
 #### Scenario: Standard compose file order for Oro project
 - **WHEN** compose command is built for Oro CMS type with PostgreSQL
@@ -19,7 +19,7 @@ The system SHALL assemble Docker Compose command with files in specific order to
   1. `docker-compose.yml` (base services)
   2. `docker-compose-default.yml` (sync mode, if applicable)
   3. `docker-compose-pgsql.yml` or `docker-compose-mysql.yml` (database-specific)
-  4. `docker-compose-consumer.yml` (Oro consumer service)
+  4. `docker-compose-oro.yml` (Oro services, including consumer)
   5. `docker-compose-websocket.yml` (Oro websocket service)
   6. `.docker-compose.user.yml` (user custom, if exists)
 - **AND** `docker-compose-cron.yml` SHALL NOT be included
@@ -32,7 +32,7 @@ The system SHALL assemble Docker Compose command with files in specific order to
   3. `docker-compose-mysql.yml` (database-specific, typically MySQL for Magento)
   4. `docker-compose-cron.yml` (Magento cron service)
   5. `.docker-compose.user.yml` (user custom, if exists)
-- **AND** `docker-compose-consumer.yml` and `docker-compose-websocket.yml` SHALL NOT be included
+- **AND** `docker-compose-oro.yml` and `docker-compose-websocket.yml` SHALL NOT be included
 
 ## ADDED Requirements
 
@@ -110,6 +110,6 @@ The base `docker-compose.yml` file SHALL contain only core services that are com
   - `mq` (RabbitMQ, if applicable)
   - `mail` (MailHog for testing)
 - **AND** SHALL NOT contain:
-  - `consumer` service (moved to `docker-compose-consumer.yml`)
+  - `consumer` service (moved to `docker-compose-oro.yml`)
   - `websocket` service (moved to `docker-compose-websocket.yml`)
   - `cron` service (moved to `docker-compose-cron.yml`)

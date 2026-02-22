@@ -19,7 +19,7 @@
 
 - [ ] 3.1 Update `initialize_environment()` in `libexec/orodc/lib/environment.sh` to use `detect_cms_type()`
 - [ ] 3.2 Add logic to include `docker-compose-websocket.yml` for `oro` CMS type
-- [ ] 3.3 Add logic to include `docker-compose-consumer.yml` for `oro` CMS type (existing logic)
+- [ ] 3.3 Add logic to include `docker-compose-oro.yml` for `oro` CMS type (existing logic)
 - [ ] 3.4 Add logic to include `docker-compose-cron.yml` for `magento` CMS type
 - [ ] 3.5 Update compose file loading order documentation/comments
 - [ ] 3.6 Add debug logging for compose file inclusion decisions

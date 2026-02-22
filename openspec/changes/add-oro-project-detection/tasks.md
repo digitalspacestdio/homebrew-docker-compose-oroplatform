@@ -2,8 +2,8 @@
 
 - [x] 1.1 Create `is_oro_project()` function in `bin/orodc` that checks `composer.json` for Oro dependencies
 - [x] 1.2 Add `DC_ORO_IS_ORO_PROJECT` environment variable support for explicit override
-- [x] 1.3 Extract `consumer` service from `compose/docker-compose.yml` to new `compose/docker-compose-consumer.yml`
-- [x] 1.4 Update compose file assembly logic in `bin/orodc` to conditionally include `docker-compose-consumer.yml`
+- [x] 1.3 Extract `consumer` service from `compose/docker-compose.yml` to Oro-specific `compose/docker-compose-oro.yml`
+- [x] 1.4 Update compose file assembly logic in `bin/orodc` to conditionally include `docker-compose-oro.yml`
 - [x] 1.5 Update `show_interactive_menu()` to hide Oro-specific items (12, 17-18) when not Oro project
 - [x] 1.6 Update menu numbering/layout to handle conditional items gracefully
 
