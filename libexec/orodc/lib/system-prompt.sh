@@ -7,69 +7,79 @@
 get_cms_type() {
   local cms_type
   # Load from environment if available (from .env.orodc)
-  if [[ -n "${DC_ORO_CMS_TYPE:-}" ]]; then
+  if [[ -n "${DC_ORO_CMS_TYPE:-}" ]]
+  then
     cms_type="$(echo "${DC_ORO_CMS_TYPE}" | tr '[:upper:]' '[:lower:]')"
   else
     # Auto-detect using detect_application_kind function (includes marello)
     cms_type=$(detect_application_kind)
   fi
-  
+
   # Normalize: base -> php-generic
-  if [[ "$cms_type" == "base" ]]; then
+  if [[ "${cms_type}" == "base" ]]
+  then
     echo "php-generic"
   else
-    echo "$cms_type"
+    echo "${cms_type}"
   fi
 }
 
 # Get documentation context
 # Returns path to README.md (project or OroDC) or temp file with help output
 get_documentation_context() {
-  local project_dir="${DC_ORO_APPDIR:-$PWD}"
+  local project_dir="${DC_ORO_APPDIR:-${PWD}}"
   local orodc_readme=""
   local project_readme=""
   local help_output=""
-  
+
   # Try to find OroDC README.md (in installation directory)
   # Get bin/orodc path and find README relative to it
   local bin_orodc=""
-  if command -v orodc >/dev/null 2>&1; then
+  if command -v orodc >/dev/null 2>&1
+  then
     bin_orodc=$(command -v orodc)
   else
     # Try to find relative to libexec/orodc/lib/system-prompt.sh
     local lib_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    local libexec_dir="$(cd "$lib_dir/.." && pwd)"
-    if [[ -f "$libexec_dir/../../bin/orodc" ]]; then
-      bin_orodc="$(cd "$libexec_dir/../../bin" && pwd)/orodc"
+    local libexec_dir="$(cd "${lib_dir}/.." && pwd)"
+    if [[ -f "${libexec_dir}/../../bin/orodc" ]]
+    then
+      bin_orodc="$(cd "${libexec_dir}/../../bin" && pwd)/orodc"
     fi
   fi
-  
-  if [[ -n "$bin_orodc" ]]; then
-    local orodc_dir="$(cd "$(dirname "$bin_orodc")/.." && pwd)"
-    if [[ -f "${orodc_dir}/README.md" ]]; then
+
+  if [[ -n "${bin_orodc}" ]]
+  then
+    local orodc_dir="$(cd "$(dirname "${bin_orodc}")/.." && pwd)"
+    if [[ -f "${orodc_dir}/README.md" ]]
+    then
       orodc_readme="${orodc_dir}/README.md"
     fi
   fi
-  
+
   # Try to find project README.md
-  if [[ -f "${project_dir}/README.md" ]]; then
+  if [[ -f "${project_dir}/README.md" ]]
+  then
     project_readme="${project_dir}/README.md"
   fi
-  
+
   # Prefer project README, fallback to OroDC README, then help output
-  if [[ -n "$project_readme" ]]; then
-    echo "$project_readme"
-  elif [[ -n "$orodc_readme" ]]; then
-    echo "$orodc_readme"
+  if [[ -n "${project_readme}" ]]
+  then
+    echo "${project_readme}"
+  elif [[ -n "${orodc_readme}" ]]
+  then
+    echo "${orodc_readme}"
   else
     # Fallback: generate orodc help output
     help_output=$(mktemp /tmp/orodc-help.XXXXXX)
-    if [[ -n "$bin_orodc" ]]; then
-      "$bin_orodc" help > "$help_output" 2>&1 || true
+    if [[ -n "${bin_orodc}" ]]
+    then
+      "${bin_orodc}" help >"${help_output}" 2>&1 || true
     else
-      echo "OroDC help not available" > "$help_output"
+      echo "OroDC help not available" >"${help_output}"
     fi
-    echo "$help_output"
+    echo "${help_output}"
   fi
 }
 
@@ -82,45 +92,50 @@ generate_system_prompt() {
   local cms_type="$1"
   local doc_context="$2"
   local agents_source_dir="$3"
-  
+
   # Get project information if available
   local project_name="${DC_ORO_NAME:-${DC_ORO_PROJECT_NAME:-}}"
   local project_url=""
   local project_info=""
-  
-  if [[ -n "$project_name" ]]; then
+
+  if [[ -n "${project_name}" ]]
+  then
     project_url="https://${project_name}.docker.local"
     project_info="
-- Project Name: ${project_name} (${DC_ORO_PROJECT_NAME:-$project_name})
+- Project Name: ${project_name} (${DC_ORO_PROJECT_NAME:-${project_name}})
 - Application URL: ${project_url}
-- Project Directory: ${DC_ORO_APPDIR:-$PWD}"
-    
+- Project Directory: ${DC_ORO_APPDIR:-${PWD}}"
+
     # Add port information if available
-    if [[ -n "${DC_ORO_PORT_NGINX:-}" ]]; then
+    if [[ -n "${DC_ORO_PORT_NGINX:-}" ]]
+    then
       project_info="${project_info}
 - Local HTTP Port: ${DC_ORO_PORT_NGINX}"
     fi
   fi
-  
+
   # Normalize CMS type for file names (php-generic -> php-generic, base -> php-generic)
-  local cms_file_type="$cms_type"
-  if [[ "$cms_file_type" == "base" ]]; then
+  local cms_file_type="${cms_type}"
+  if [[ "${cms_file_type}" == "base" ]]
+  then
     cms_file_type="php-generic"
   fi
-  
+
   # Read common agents file content (for inclusion in main prompt)
   # Other files are accessed via orodc agents commands, not included directly
   # Read directly from source directory (passed as parameter) - no need to copy files
   local common_content=""
-  if [[ -f "${agents_source_dir}/AGENTS_common.md" ]]; then
+  if [[ -f "${agents_source_dir}/AGENTS_common.md" ]]
+  then
     common_content=$(cat "${agents_source_dir}/AGENTS_common.md")
   fi
-  
+
   # Generate application URLs based on CMS type
   local application_urls=""
-  if [[ -n "${DC_ORO_NAME:-}" ]]; then
-    case "$cms_type" in
-      oro|magento)
+  if [[ -n "${DC_ORO_NAME:-}" ]]
+  then
+    case "${cms_type}" in
+      oro | magento)
         application_urls="- Frontend: https://${DC_ORO_NAME}.docker.local
 - Admin Panel: https://${DC_ORO_NAME}.docker.local/admin"
         ;;
@@ -133,7 +148,7 @@ generate_system_prompt() {
         ;;
     esac
   fi
-  
+
   cat <<EOF
 You are an AI coding assistant specialized in helping developers work with OroDC projects.
 
@@ -469,18 +484,22 @@ EOF
 prepare_project_environment() {
   # Determine project directory (same logic as init.sh and initialize_environment)
   # AI agents work without full project initialization, but need DC_ORO_APPDIR for CMS detection
-  if [[ -z "${DC_ORO_APPDIR:-}" ]]; then
+  if [[ -z "${DC_ORO_APPDIR:-}" ]]
+  then
     PROJECT_DIR=$(find-up composer.json)
   fi
-  if [[ -z "$PROJECT_DIR" ]]; then
+  if [[ -z "${PROJECT_DIR}" ]]
+  then
     PROJECT_DIR=$(find-up .env.orodc)
   fi
-  
+
   # If still not found, check for global configuration by project name (directory name)
   # This allows working in a directory that has global config but no local files yet
-  if [[ -z "$PROJECT_DIR" ]]; then
-    local project_name=$(basename "$PWD")
-    if [[ "$project_name" == "$HOME" ]] || [[ -z "$project_name" ]] || [[ "$project_name" == "/" ]]; then
+  if [[ -z "${PROJECT_DIR}" ]]
+  then
+    local project_name=$(basename "${PWD}")
+    if [[ "${project_name}" == "${HOME}" ]] || [[ -z "${project_name}" ]] || [[ "${project_name}" == "/" ]]
+    then
       project_name="default"
     fi
     local global_config_file="${HOME}/.orodc/${project_name}/.env.orodc"
@@ -488,86 +507,100 @@ prepare_project_environment() {
     local old_global_config_file="${HOME}/.orodc/${project_name}.env.orodc"
     # Check for config directory (indicates project was initialized before)
     local config_dir="${HOME}/.orodc/${project_name}"
-    
-    if [[ -f "$global_config_file" ]] || [[ -f "$old_global_config_file" ]]; then
+
+    if [[ -f "${global_config_file}" ]] || [[ -f "${old_global_config_file}" ]]
+    then
       # Global config exists for this directory name, use current directory as project
-      PROJECT_DIR="$PWD"
-    elif [[ -d "$config_dir" ]]; then
+      PROJECT_DIR="${PWD}"
+    elif [[ -d "${config_dir}" ]]
+    then
       # Config directory exists (project was initialized), use current directory as project
-      PROJECT_DIR="$PWD"
+      PROJECT_DIR="${PWD}"
     else
       # Fallback to current directory if nothing found
-      PROJECT_DIR="$PWD"
+      PROJECT_DIR="${PWD}"
     fi
   fi
-  
-  export DC_ORO_APPDIR="$PROJECT_DIR"
-  
+
+  export DC_ORO_APPDIR="${PROJECT_DIR}"
+
   # Determine project name for config lookup
-  PROJECT_NAME=$(basename "$PROJECT_DIR")
-  if [[ "$PROJECT_NAME" == "$HOME" ]] || [[ -z "$PROJECT_NAME" ]] || [[ "$PROJECT_NAME" == "/" ]]; then
+  PROJECT_NAME=$(basename "${PROJECT_DIR}")
+  if [[ "${PROJECT_NAME}" == "${HOME}" ]] || [[ -z "${PROJECT_NAME}" ]] || [[ "${PROJECT_NAME}" == "/" ]]
+  then
     PROJECT_NAME="default"
   fi
-  
+
   # Load .env.orodc files to get DC_ORO_CMS_TYPE and other config
   # Priority: local > global (same as initialize_environment)
-  local_config_file="$PROJECT_DIR/.env.orodc"
+  local_config_file="${PROJECT_DIR}/.env.orodc"
   global_config_file="${HOME}/.orodc/${PROJECT_NAME}/.env.orodc"
-  
+
   # Load global config first (lower priority)
-  if [[ -f "$global_config_file" ]]; then
-    load_env_safe "$global_config_file"
+  if [[ -f "${global_config_file}" ]]
+  then
+    load_env_safe "${global_config_file}"
   fi
-  
+
   # Load local config last (higher priority, overrides global)
-  if [[ -f "$local_config_file" ]]; then
-    load_env_safe "$local_config_file"
+  if [[ -f "${local_config_file}" ]]
+  then
+    load_env_safe "${local_config_file}"
   fi
-  
+
   # Set DC_ORO_PROJECT_NAME variable for use in system prompt
-  export DC_ORO_PROJECT_NAME="$PROJECT_NAME"
+  export DC_ORO_PROJECT_NAME="${PROJECT_NAME}"
 }
 
 # Get project name for AGENTS.md file location
 get_project_name() {
   local project_name=""
-  if [[ -n "${DC_ORO_NAME:-}" ]]; then
-    project_name="$DC_ORO_NAME"
-  elif [[ -n "${DC_ORO_APPDIR:-}" ]]; then
-    project_name=$(basename "$DC_ORO_APPDIR")
+  if [[ -n "${DC_ORO_NAME:-}" ]]
+  then
+    project_name="${DC_ORO_NAME}"
+  elif [[ -n "${DC_ORO_APPDIR:-}" ]]
+  then
+    project_name=$(basename "${DC_ORO_APPDIR}")
   else
-    project_name=$(basename "$PWD")
+    project_name=$(basename "${PWD}")
   fi
-  
+
   # Normalize project name (same logic as initialize_environment)
-  if [[ "$project_name" == "$HOME" ]] || [[ -z "$project_name" ]] || [[ "$project_name" == "/" ]]; then
+  if [[ "${project_name}" == "${HOME}" ]] || [[ -z "${project_name}" ]] || [[ "${project_name}" == "/" ]]
+  then
     project_name="default"
   fi
-  
-  echo "$project_name"
+
+  echo "${project_name}"
 }
 
 # Export Docker and project context variables for AI agent
 export_environment_context() {
   # Pass Docker access to AI agent via environment variables
   # These variables are set by initialize_environment if project is initialized
-  if [[ -n "${DOCKER_BIN:-}" ]]; then
+  if [[ -n "${DOCKER_BIN:-}" ]]
+  then
     export DOCKER_BIN
   fi
-  if [[ -n "${DOCKER_HOST:-}" ]]; then
+  if [[ -n "${DOCKER_HOST:-}" ]]
+  then
     export DOCKER_HOST
   fi
-  if [[ -n "${DOCKER_COMPOSE_BIN_CMD:-}" ]]; then
+  if [[ -n "${DOCKER_COMPOSE_BIN_CMD:-}" ]]
+  then
     export DOCKER_COMPOSE_BIN_CMD
   fi
   # Pass project context for Docker operations
-  if [[ -n "${DC_ORO_NAME:-}" ]]; then
+  if [[ -n "${DC_ORO_NAME:-}" ]]
+  then
     export DC_ORO_NAME
   fi
-  if [[ -n "${DC_ORO_CONFIG_DIR:-}" ]]; then
+  if [[ -n "${DC_ORO_CONFIG_DIR:-}" ]]
+  then
     export DC_ORO_CONFIG_DIR
   fi
-  if [[ -n "${DC_ORO_APPDIR:-}" ]]; then
+  if [[ -n "${DC_ORO_APPDIR:-}" ]]
+  then
     export DC_ORO_APPDIR
   fi
 }

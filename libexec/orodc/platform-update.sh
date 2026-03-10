@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-if [ "$DEBUG" ]; then set -x; fi
+if [[ -n "${DEBUG}" ]]; then set -x; fi
 
 # Determine script directory and source libraries
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -13,4 +13,4 @@ check_in_project || exit 1
 
 # Execute platform update: clear cache and run oro:platform:update
 platform_update_cmd="${DOCKER_COMPOSE_BIN_CMD} run --rm cli bash -c \"rm -rf var/cache/* || true; php bin/console oro:platform:update --force $*\""
-run_with_spinner "Updating platform" "$platform_update_cmd" || exit $?
+run_with_spinner "Updating platform" "${platform_update_cmd}" || exit $?

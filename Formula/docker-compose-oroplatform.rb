@@ -30,9 +30,7 @@ class DockerComposeOroplatform < Formula
     (libexec/"orodc-find_free_port").chmod 0755
 
     # Copy entire libexec/orodc/ modular structure (includes all modules and main script)
-    if (tap_root/"libexec/orodc").exist?
-      cp_r (tap_root/"libexec/orodc"), libexec
-    end
+    cp_r (tap_root/"libexec/orodc"), libexec if (tap_root/"libexec/orodc").exist?
 
     # Copy main orodc dispatcher script to libexec root for backward compatibility
     (libexec/"orodc-main").write (tap_root/"bin/orodc").read

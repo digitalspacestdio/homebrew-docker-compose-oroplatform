@@ -6,4 +6,3 @@ set -e
 
 # Start mailpit
 exec "$@"
-

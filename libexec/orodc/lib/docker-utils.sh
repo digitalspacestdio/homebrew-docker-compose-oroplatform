@@ -11,11 +11,13 @@ setup_project_certificates() {
   rm -rf "${build_crt_dir}"
 
   # Check if project has certificates
-  if [[ -d "${project_crt_dir}" ]]; then
+  if [[ -d "${project_crt_dir}" ]]
+  then
     local cert_count
     cert_count=$(find "${project_crt_dir}" -type f \( -name "*.crt" -o -name "*.pem" \) 2>/dev/null | wc -l)
 
-    if [[ "${cert_count}" -gt 0 ]]; then
+    if [[ "${cert_count}" -gt 0 ]]
+    then
       msg_info "Found ${cert_count} certificate(s) in ${project_crt_dir}"
       echo "   Preparing project build context with custom certificates..."
 
@@ -41,7 +43,8 @@ setup_project_certificates() {
 # - Does NOT touch shared/base images (ghcr.io, docker.elastic.co, etc.)
 # Expects: DC_ORO_NAME is set (initialize_environment has been run)
 remove_project_images() {
-  if [[ -z "${DC_ORO_NAME:-}" ]]; then
+  if [[ -z "${DC_ORO_NAME:-}" ]]
+  then
     msg_warning "Skipping project image cleanup: DC_ORO_NAME is not set"
     return 1
   fi
@@ -55,22 +58,25 @@ remove_project_images() {
   # Find images by repository prefix matching the project name.
   # We then exclude known external/base image registries and common upstream images.
   local project_images=""
-  project_images=$(${docker_bin} images --format "{{.Repository}}:{{.Tag}}" 2>/dev/null | \
-    grep -E "^(${project_name_lower}|${DC_ORO_NAME})" | \
+  project_images=$(${docker_bin} images --format "{{.Repository}}:{{.Tag}}" 2>/dev/null |
+    grep -E "^(${project_name_lower}|${DC_ORO_NAME})" |
     grep -Ev '^(ghcr\.io|docker\.elastic\.co|opensearchproject|valkey|redis|mysql|rabbitmq|percona|xhgui|oroinc|busybox)(/|:)' || true)
 
-  if [[ -z "${project_images}" ]]; then
+  if [[ -z "${project_images}" ]]
+  then
     msg_info "No project images found to remove"
     return 0
   fi
 
   local removed=0
-  while read -r image_name; do
-    if [[ -n "${image_name}" ]]; then
+  while read -r image_name
+  do
+    if [[ -n "${image_name}" ]]
+    then
       ${docker_bin} rmi -f "${image_name}" 2>/dev/null || true
       removed=$((removed + 1))
     fi
-  done <<< "${project_images}"
+  done <<<"${project_images}"
 
   msg_ok "Project images removed (${removed})"
   return 0
@@ -83,21 +89,24 @@ generate_compose_config_if_needed() {
 
   # CRITICAL: Normalize ORO_MAILER_ENCRYPTION before generating compose.yml
   # orodc is the source of truth - normalize any "null" or empty values to starttls
-  if [[ -z "${ORO_MAILER_ENCRYPTION:-}" ]] || [[ "${ORO_MAILER_ENCRYPTION:-}" == "" ]] || [[ "${ORO_MAILER_ENCRYPTION:-}" == "null" ]]; then
+  if [[ -z "${ORO_MAILER_ENCRYPTION:-}" ]] || [[ "${ORO_MAILER_ENCRYPTION:-}" == "" ]] || [[ "${ORO_MAILER_ENCRYPTION:-}" == "null" ]]
+  then
     export ORO_MAILER_ENCRYPTION="starttls"
     debug_log "docker-utils: normalized ORO_MAILER_ENCRYPTION (set to starttls)"
   fi
 
   # Generate config file only if it doesn't exist or if it's a management command
-  if [[ ! -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]] || [[ "$compose_cmd" =~ ^(up|down|purge|build|pull|push|restart|start|stop|kill|rm|create|ps|doctor)$ ]]; then
+  if [[ ! -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]] || [[ "${compose_cmd}" =~ ^(up|down|purge|build|pull|push|restart|start|stop|kill|rm|create|ps|doctor)$ ]]
+  then
     # Generate compose.yml with all environment variables (ports, etc.) available
     # shellcheck disable=SC2154
-    eval "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} config" > "${DC_ORO_CONFIG_DIR}/compose.yml" 2>/dev/null || true
+    eval "${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} config" >"${DC_ORO_CONFIG_DIR}/compose.yml" 2>/dev/null || true
 
     # Register environment after creating compose.yml
-    if [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]] && [[ -n "${DC_ORO_NAME:-}" ]] && [[ -n "${DC_ORO_CONFIG_DIR:-}" ]]; then
-      debug_log "compose.yml created: Registering environment name='${DC_ORO_NAME}' path='$PWD' config='${DC_ORO_CONFIG_DIR}'"
-      register_environment "${DC_ORO_NAME}" "$PWD" "${DC_ORO_CONFIG_DIR}"
+    if [[ -f "${DC_ORO_CONFIG_DIR}/compose.yml" ]] && [[ -n "${DC_ORO_NAME:-}" ]] && [[ -n "${DC_ORO_CONFIG_DIR:-}" ]]
+    then
+      debug_log "compose.yml created: Registering environment name='${DC_ORO_NAME}' path='${PWD}' config='${DC_ORO_CONFIG_DIR}'"
+      register_environment "${DC_ORO_NAME}" "${PWD}" "${DC_ORO_CONFIG_DIR}"
     fi
   fi
 }
@@ -112,25 +121,27 @@ exec_compose_command() {
   # Note: Directory ownership is now handled in Dockerfile.project
 
   # For build command, use spinner
-  if [[ "$docker_cmd" == "build" ]]; then
+  if [[ "${docker_cmd}" == "build" ]]
+  then
     # shellcheck disable=SC2154
     full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${docker_cmd} ${right_flags[*]} ${right_options[*]} ${docker_services}"
-    run_with_spinner "Building Docker images" "$full_cmd"
+    run_with_spinner "Building Docker images" "${full_cmd}"
     return $?
   fi
 
   # For down command, use spinner
-  if [[ "$docker_cmd" == "down" ]]; then
+  if [[ "${docker_cmd}" == "down" ]]
+  then
     # shellcheck disable=SC2154
     full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${docker_cmd} ${right_flags[*]} ${right_options[*]} ${docker_services}"
-    run_with_spinner "Stopping services" "$full_cmd"
+    run_with_spinner "Stopping services" "${full_cmd}"
     return $?
   fi
 
   # For all other commands, run directly (variables are already exported)
   # shellcheck disable=SC2154
   full_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ${docker_cmd} ${right_flags[*]} ${right_options[*]} ${docker_services}"
-  eval "$full_cmd"
+  eval "${full_cmd}"
   return $?
 }
 
@@ -149,19 +160,22 @@ fix_empty_directory_ownership() {
 # Usage: ensure_appcode_volume
 ensure_appcode_volume() {
   # Skip for default mode (uses bind mount, no volume needed)
-  if [[ "${DC_ORO_MODE:-default}" == "default" ]]; then
+  if [[ "${DC_ORO_MODE:-default}" == "default" ]]
+  then
     return 0
   fi
 
   # Skip if DC_ORO_NAME is not set (project not initialized)
-  if [[ -z "${DC_ORO_NAME:-}" ]]; then
+  if [[ -z "${DC_ORO_NAME:-}" ]]
+  then
     return 0
   fi
 
   local volume_name="${DC_ORO_NAME}_appcode"
 
   # Check if volume exists - if yes, it's already created and synchronized
-  if ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep -q "^${volume_name}$"; then
+  if ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep -q "^${volume_name}$"
+  then
     return 0
   fi
 
@@ -171,9 +185,10 @@ ensure_appcode_volume() {
 
   # For mutagen/ssh modes, we need to sync files into the volume
   # Start SSH container first (needed for both modes)
-  if [[ "0" -eq $(${DOCKER_COMPOSE_BIN_CMD} ps -q ssh 2>/dev/null | wc -l 2> /dev/null) ]]; then
+  if [[ "0" -eq $(${DOCKER_COMPOSE_BIN_CMD} ps -q ssh 2>/dev/null | wc -l 2>/dev/null) ]]
+  then
     local ssh_up_cmd="${DOCKER_COMPOSE_BIN_CMD} up -d ssh"
-    run_with_spinner "Starting SSH sync container" "$ssh_up_cmd" || true
+    run_with_spinner "Starting SSH sync container" "${ssh_up_cmd}" || true
   fi
 
   # Wait for SSH container to be ready
@@ -181,35 +196,39 @@ ensure_appcode_volume() {
   local ssh_port
   ssh_port=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN_CMD} ps -q ssh 2>/dev/null | head -1) 2>/dev/null | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort' 2>/dev/null || echo "")
 
-  if [[ -z "${ssh_port}" ]]; then
+  if [[ -z "${ssh_port}" ]]
+  then
     msg_warning "Could not determine SSH port, skipping initial sync"
     return 0
   fi
 
   # Check if SSH key exists before attempting sync
-  if [[ ! -f "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" ]]; then
+  if [[ ! -f "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" ]]
+  then
     msg_warning "SSH key not found, skipping initial sync. Volume created but empty."
     return 0
   fi
 
   # Check if volume is empty and sync if needed
-  if [[ 0 -eq $(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o 'ForwardAgent no' -o IdentitiesOnly=yes -i "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" -p "${ssh_port}" ${ORO_DC_SSH_ARGS:-} ${DC_ORO_USER_NAME:-developer}@${ssh_host} sh -c 'ls "'${DC_ORO_APPDIR}'/"' 2>/dev/null | wc -l) ]]; then
+  if [[ 0 -eq $(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o 'ForwardAgent no' -o IdentitiesOnly=yes -i "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" -p "${ssh_port}" "${ORO_DC_SSH_ARGS:-}" "${DC_ORO_USER_NAME:-developer}"@"${ssh_host}" sh -c 'ls "'"${DC_ORO_APPDIR}"'/"' 2>/dev/null | wc -l) ]]
+  then
     # Use rsync to copy files into volume (works for both ssh and mutagen modes initially)
     local rsync_bin="${RSYNC_BIN:-rsync}"
     local rsync_cmd="${rsync_bin} --exclude var/cache --exclude vendor --exclude node_modules --links -e \"ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o 'ForwardAgent no' -o IdentitiesOnly=yes -i ${DC_ORO_CONFIG_DIR}/ssh_id_ed25519 -p ${ssh_port} ${ORO_DC_SSH_ARGS:-}\" --timeout=3 -r \"${DC_ORO_APPDIR}/\" ${DC_ORO_USER_NAME:-developer}@${ssh_host}:\"${DC_ORO_APPDIR}/\""
-    
-    if [[ -n "${DEBUG:-}" ]] || [[ -n "${VERBOSE:-}" ]]; then
+
+    if [[ -n "${DEBUG:-}" ]] || [[ -n "${VERBOSE:-}" ]]
+    then
       # Verbose mode: show progress
       msg_info "Copying source code to the '${volume_name}' docker volume"
       rsync_cmd="${rsync_cmd/--timeout=3/--timeout=3 --info=progress2}"
-      until eval "$rsync_cmd" 2>/dev/null; do
+      until eval "${rsync_cmd}" 2>/dev/null; do
         echo -n "."
         sleep 3
       done
       echo ""
     else
       # Quiet mode: use spinner
-      run_with_spinner "Syncing source code to '${volume_name}' volume" "until $rsync_cmd 2>/dev/null; do sleep 3; done"
+      run_with_spinner "Syncing source code to '${volume_name}' volume" "until ${rsync_cmd} 2>/dev/null; do sleep 3; done"
     fi
   fi
 
@@ -226,31 +245,36 @@ handle_compose_up() {
 
   # Check if we should skip build phase
   skip_build=false
-  if [[ " ${right_flags[*]} " =~ " --no-build " ]]; then
+  if [[ " ${right_flags[*]} " =~ " --no-build " ]]
+  then
     skip_build=true
   fi
 
   # If DEBUG or VERBOSE, run without timing wrapper
-  if [[ -n "${DEBUG:-}" ]] || [[ -n "${VERBOSE:-}" ]]; then
+  if [[ -n "${DEBUG:-}" ]] || [[ -n "${VERBOSE:-}" ]]
+  then
     # Ensure appcode volume exists and is synchronized before starting containers
     ensure_appcode_volume
 
     # Phase 1: Build images (unless --no-build is specified)
-    if [[ "$skip_build" == "false" ]]; then
+    if [[ "${skip_build}" == "false" ]]
+    then
       build_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} build ${docker_services}"
-      eval "$build_cmd" || exit $?
+      eval "${build_cmd}" || exit $?
     fi
 
     # Phase 2: Start services
     up_flags=()
-    for flag in "${right_flags[@]}"; do
-      if [[ "$flag" != "--build" ]]; then
-        up_flags+=("$flag")
+    for flag in "${right_flags[@]}"
+    do
+      if [[ "${flag}" != "--build" ]]
+      then
+        up_flags+=("${flag}")
       fi
     done
 
     up_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} up --remove-orphans ${up_flags[*]} ${right_options[*]} ${docker_services}"
-    eval "$up_cmd" || exit $?
+    eval "${up_cmd}" || exit $?
     show_service_urls
     exit 0
   fi
@@ -260,25 +284,29 @@ handle_compose_up() {
 
   # Pull all required images upfront so build/sync/start don't stall on pulls
   pull_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} pull --ignore-buildable --quiet ${docker_services}"
-  run_with_spinner "Pulling Docker images" "$pull_cmd" || true
+  run_with_spinner "Pulling Docker images" "${pull_cmd}" || true
 
   # Ensure appcode volume exists and is synchronized (ssh/mutagen modes)
   # Images are already pulled above, so SSH container start won't stall
   ensure_appcode_volume
 
   # Phase 1: Build images (unless --no-build is specified)
-  if [[ "$skip_build" == "false" ]]; then
+  if [[ "${skip_build}" == "false" ]]
+  then
     build_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} build ${docker_services}"
-    DC_ORO_NAME="$DC_ORO_NAME" run_with_spinner "Building Docker images" "$build_cmd" || exit $?
+    DC_ORO_NAME="${DC_ORO_NAME}" run_with_spinner "Building Docker images" "${build_cmd}" || exit $?
   fi
 
   # Phase 2: Start services
   up_flags=()
   has_wait_flag=false
-  for flag in "${right_flags[@]}"; do
-    if [[ "$flag" != "--build" ]]; then
-      up_flags+=("$flag")
-      if [[ "$flag" == "--wait" ]]; then
+  for flag in "${right_flags[@]}"
+  do
+    if [[ "${flag}" != "--build" ]]
+    then
+      up_flags+=("${flag}")
+      if [[ "${flag}" == "--wait" ]]
+      then
         has_wait_flag=true
       fi
     fi
@@ -286,7 +314,8 @@ handle_compose_up() {
 
   # Add --wait flag if -d is present and --wait is not already there
   # This ensures we wait for health checks before returning
-  if [[ " ${up_flags[*]} " =~ " -d " ]] && [[ "$has_wait_flag" == "false" ]]; then
+  if [[ " ${up_flags[*]} " =~ " -d " ]] && [[ "${has_wait_flag}" == "false" ]]
+  then
     up_flags+=("--wait")
   fi
 
@@ -294,33 +323,38 @@ handle_compose_up() {
   # This ensures spinner is visible and not overwritten by docker compose output
   has_quiet_pull=false
   has_quiet_build=false
-  for flag in "${up_flags[@]}"; do
-    if [[ "$flag" == "--quiet-pull" ]]; then
+  for flag in "${up_flags[@]}"
+  do
+    if [[ "${flag}" == "--quiet-pull" ]]
+    then
       has_quiet_pull=true
     fi
-    if [[ "$flag" == "--quiet-build" ]]; then
+    if [[ "${flag}" == "--quiet-build" ]]
+    then
       has_quiet_build=true
     fi
   done
-  
+
   # Add quiet flags if not already present (only when running with spinner, not in verbose mode)
   quiet_flags=()
-  if [[ "$has_quiet_pull" == "false" ]]; then
+  if [[ "${has_quiet_pull}" == "false" ]]
+  then
     quiet_flags+=("--quiet-pull")
   fi
-  if [[ "$has_quiet_build" == "false" ]]; then
+  if [[ "${has_quiet_build}" == "false" ]]
+  then
     quiet_flags+=("--quiet-build")
   fi
 
   up_cmd="${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} up --remove-orphans ${quiet_flags[*]} ${up_flags[*]} ${right_options[*]} ${docker_services}"
-  run_with_spinner "Starting containers and waiting for health checks" "$up_cmd" || exit $?
+  run_with_spinner "Starting containers and waiting for health checks" "${up_cmd}" || exit $?
 
   # Calculate total up time and save
   up_end_time=$(date +%s)
   up_duration=$((up_end_time - up_start_time))
 
   # Save timing
-  save_timing "up" "$up_duration"
+  save_timing "up" "${up_duration}"
 
   msg_ok "Services started in ${up_duration}s"
 
@@ -336,7 +370,7 @@ exec_in_cli() {
   local -a cmd_args=("$@")
 
   # Run command in CLI container
-  ${DOCKER_COMPOSE_BIN_CMD} run --rm cli "$cmd" "${cmd_args[@]}"
+  ${DOCKER_COMPOSE_BIN_CMD} run --rm cli "${cmd}" "${cmd_args[@]}"
 }
 
 # Show service URLs after successful 'up' command
@@ -345,33 +379,39 @@ show_service_urls() {
 
   # Check if proxy container is running
   local proxy_running=false
-  if ${DOCKER_BIN} ps --filter "name=proxy" --filter "status=running" --format "{{.Names}}" 2>/dev/null | grep -q "^proxy$"; then
+  if ${DOCKER_BIN} ps --filter "name=proxy" --filter "status=running" --format "{{.Names}}" 2>/dev/null | grep -q "^proxy$"
+  then
     proxy_running=true
   fi
 
   # Show domain URLs if proxy is running
-  if [[ "$proxy_running" == "true" ]]; then
+  if [[ "${proxy_running}" == "true" ]]
+  then
     # Main domain (bold green)
     # shellcheck disable=SC2059
     printf "\033[1;32m[${DC_ORO_NAME}] Application: https://${DC_ORO_NAME}.docker.local\033[0m\n"
-    
+
     # Additional domains from DC_ORO_EXTRA_HOSTS
-    if [[ -n "${DC_ORO_EXTRA_HOSTS:-}" ]]; then
-      IFS=',' read -ra HOSTS <<< "$DC_ORO_EXTRA_HOSTS"
-      for host in "${HOSTS[@]}"; do
+    if [[ -n "${DC_ORO_EXTRA_HOSTS:-}" ]]
+    then
+      IFS=',' read -ra HOSTS <<<"${DC_ORO_EXTRA_HOSTS}"
+      for host in "${HOSTS[@]}"
+      do
         # Trim whitespace
-        host=$(echo "$host" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
-        if [[ -n "$host" ]]; then
+        host=$(echo "${host}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+        if [[ -n "${host}" ]]
+        then
           # Auto-append .docker.local if host is a single word (no dots)
-          if [[ "$host" != *.* ]]; then
-            host="$host.docker.local"
+          if [[ "${host}" != *.* ]]
+          then
+            host="${host}.docker.local"
           fi
           # shellcheck disable=SC2059
           printf "\033[1;32m[${DC_ORO_NAME}] Application: https://${host}\033[0m\n"
         fi
       done
     fi
-    
+
     echo "" >&2
   fi
 
@@ -380,22 +420,25 @@ show_service_urls() {
   printf "\033[0;37m[${DC_ORO_NAME}] Application: http://localhost:${DC_ORO_PORT_NGINX}\033[0m\n"
   # shellcheck disable=SC2059
   printf "\033[0;37m[${DC_ORO_NAME}] Mailpit: http://localhost:${DC_ORO_PORT_MAIL_WEBGUI}\033[0m\n"
-  
+
   # Show Mailpit alternative entry point on main domain if proxy is running
-  if [[ "$proxy_running" == "true" ]]; then
+  if [[ "${proxy_running}" == "true" ]]
+  then
     # shellcheck disable=SC2059
     printf "\033[0;37m[${DC_ORO_NAME}] Mailpit: https://${DC_ORO_NAME}.docker.local/mailbox\033[0m\n"
   fi
-  
+
   # shellcheck disable=SC2059
   printf "\033[0;37m[${DC_ORO_NAME}] Elasticsearch: http://localhost:${DC_ORO_PORT_SEARCH}\033[0m\n"
   # shellcheck disable=SC2059
   printf "\033[0;37m[${DC_ORO_NAME}] Mq: http://localhost:${DC_ORO_PORT_MQ}\033[0m\n"
 
-  if [[ "${DC_ORO_DATABASE_SCHEMA}" == "pdo_pgsql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgresql" ]];then
+  if [[ "${DC_ORO_DATABASE_SCHEMA}" == "pdo_pgsql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgresql" ]]
+  then
     # shellcheck disable=SC2059
     printf "\033[0;37m[${DC_ORO_NAME}] Database: 127.0.0.1:${DC_ORO_PORT_PGSQL}\033[0m\n"
-  elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "pdo_mysql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]];then
+  elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "pdo_mysql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]]
+  then
     # shellcheck disable=SC2059
     printf "\033[0;37m[${DC_ORO_NAME}] Database: 127.0.0.1:${DC_ORO_PORT_MYSQL}\033[0m\n"
   fi
@@ -404,7 +447,8 @@ show_service_urls() {
   printf "\033[0;37m[${DC_ORO_NAME}] SSH: 127.0.0.1:${DC_ORO_PORT_SSH}\033[0m\n"
 
   # Show proxy hint if not running
-  if [[ "$proxy_running" == "false" ]]; then
+  if [[ "${proxy_running}" == "false" ]]
+  then
     echo "" >&2
     msg_info "Want to use custom domains and SSL? Start the proxy:"
     msg_info "  orodc proxy up -d"
