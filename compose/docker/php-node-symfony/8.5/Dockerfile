@@ -11,6 +11,7 @@ FROM composer:${COMPOSER_VERSION} AS composer_app
 
 # Use our base PHP image with all PHP modules pre-compiled
 FROM ghcr.io/digitalspacestdio/orodc-php:${PHP_VERSION}-alpine
+ARG NODE_VERSION
 
 # Set up user environment variables (base image uses root)
 ARG PHP_UID=1000
@@ -52,15 +53,14 @@ RUN apk add --no-cache libstdc++ gcompat
 COPY --from=app_node /usr/local /usr/local
 COPY --from=app_node /opt /opt
 
-# Install package managers and smoke test Node.js toolchain
-RUN case "${NODE_VERSION}" in \
-      14*) pnpm_version="7.33.5" ;; \
-      16*) pnpm_version="7.33.5" ;; \
-      *) pnpm_version="9.15.9" ;; \
-    esac \
-    && rm -f /usr/local/bin/yarn /usr/local/bin/yarnpkg /usr/local/bin/pnpm /usr/local/bin/pnpx \
-    && npm install -g yarn@1.22.22 "pnpm@${pnpm_version}" \
-    && node --version && npm --version && yarn --version && pnpm --version
+# Install supported package managers and smoke test Node.js toolchain
+RUN rm -f /usr/local/bin/yarn /usr/local/bin/yarnpkg /usr/local/bin/pnpm /usr/local/bin/pnpx \
+    && npm install -g yarn@1.22.22 \
+    && case "${NODE_VERSION}" in \
+      14*|16*) node --version && npm --version && yarn --version ;; \
+      *) npm install -g pnpm@9.15.9 \
+         && node --version && npm --version && yarn --version && pnpm --version ;; \
+    esac
 
 # Copy ofelia binary
 COPY --from=mcuadros/ofelia:latest /usr/bin/ofelia /usr/bin/ofelia
