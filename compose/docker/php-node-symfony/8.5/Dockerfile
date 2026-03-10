@@ -52,8 +52,9 @@ RUN apk add --no-cache libstdc++ gcompat
 COPY --from=app_node /usr/local /usr/local
 COPY --from=app_node /opt /opt
 
-# Install pnpm and smoke test for Node.js
-RUN corepack enable pnpm && node --version && npm --version && yarn --version && pnpm --version
+# Install a pnpm version compatible with the selected Node.js and smoke test
+RUN if [ "${NODE_VERSION}" = "16" ]; then npm install -g pnpm@8; else corepack enable pnpm; fi \
+    && node --version && npm --version && yarn --version && pnpm --version
 
 # Copy ofelia binary
 COPY --from=mcuadros/ofelia:latest /usr/bin/ofelia /usr/bin/ofelia
