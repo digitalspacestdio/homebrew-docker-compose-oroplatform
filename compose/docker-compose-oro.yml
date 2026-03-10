@@ -54,7 +54,7 @@ services:
         condition: service_healthy
 
   websocket:
-    container_name: "${DC_ORO_NAME:-unnamed}_websocket_${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}"
+    container_name: "${DC_ORO_NAME:-unnamed}_websocket_${DC_ORO_PHP_VERSION:-8.5}-${DC_ORO_NODE_VERSION:-24}-${DC_ORO_COMPOSER_VERSION:-2}"
     hostname: websocket.${DC_ORO_NAME:-unnamed}.docker.local
     dns:
       - 1.1.1.1
@@ -63,10 +63,10 @@ services:
       dockerfile: Dockerfile.project
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/project-php-node-symfony"
       args:
-        BASE_IMAGE: "ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.4}-node${DC_ORO_NODE_VERSION:-22}-composer${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}"
+        BASE_IMAGE: "ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.5}-node${DC_ORO_NODE_VERSION:-24}-composer${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}"
         APP_DIR: "${DC_ORO_APPDIR:-/var/www}"
-        PHP_VERSION: "${DC_ORO_PHP_VERSION:-8.4}"
-        NODE_VERSION: "${DC_ORO_NODE_VERSION:-22}"
+        PHP_VERSION: "${DC_ORO_PHP_VERSION:-8.5}"
+        NODE_VERSION: "${DC_ORO_NODE_VERSION:-24}"
         PHP_USER_NAME: "${DC_ORO_PHP_USER_NAME:-developer}"
         PHP_USER_GROUP: "${DC_ORO_PHP_USER_GROUP:-developer}"
         PHP_UID: "${DC_ORO_PHP_UID:-1000}"
@@ -154,7 +154,7 @@ services:
         max-size: "10m"
 
   consumer:
-    container_name: "${DC_ORO_NAME:-unnamed}_consumer_${DC_ORO_PHP_VERSION:-8.4}-${DC_ORO_NODE_VERSION:-22}-${DC_ORO_COMPOSER_VERSION:-2}"
+    container_name: "${DC_ORO_NAME:-unnamed}_consumer_${DC_ORO_PHP_VERSION:-8.5}-${DC_ORO_NODE_VERSION:-24}-${DC_ORO_COMPOSER_VERSION:-2}"
     hostname: consumer.${DC_ORO_NAME:-unnamed}.docker.local
     dns:
       - 1.1.1.1
@@ -163,10 +163,10 @@ services:
       dockerfile: Dockerfile.project
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/project-php-node-symfony"
       args:
-        BASE_IMAGE: "ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.4}-node${DC_ORO_NODE_VERSION:-22}-composer${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}"
+        BASE_IMAGE: "ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.5}-node${DC_ORO_NODE_VERSION:-24}-composer${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}"
         APP_DIR: "${DC_ORO_APPDIR:-/var/www}"
-        PHP_VERSION: "${DC_ORO_PHP_VERSION:-8.4}"
-        NODE_VERSION: "${DC_ORO_NODE_VERSION:-22}"
+        PHP_VERSION: "${DC_ORO_PHP_VERSION:-8.5}"
+        NODE_VERSION: "${DC_ORO_NODE_VERSION:-24}"
         PHP_USER_NAME: "${DC_ORO_PHP_USER_NAME:-developer}"
         PHP_USER_GROUP: "${DC_ORO_PHP_USER_GROUP:-developer}"
         PHP_UID: "${DC_ORO_PHP_UID:-1000}"

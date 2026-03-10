@@ -213,8 +213,8 @@ init_page_php() {
   local SELECTED_NODE
   local SELECTED_COMPOSER
   local SELECTED_PHP_IMAGE
-  SELECTED_PHP=$(wizard_get "SELECTED_PHP" "${EXISTING_PHP_VERSION:-8.4}")
-  SELECTED_NODE=$(wizard_get "SELECTED_NODE" "${EXISTING_NODE_VERSION:-22}")
+  SELECTED_PHP=$(wizard_get "SELECTED_PHP" "${EXISTING_PHP_VERSION:-8.5}")
+  SELECTED_NODE=$(wizard_get "SELECTED_NODE" "${EXISTING_NODE_VERSION:-24}")
   SELECTED_COMPOSER=$(wizard_get "SELECTED_COMPOSER" "${EXISTING_COMPOSER_VERSION:-2}")
   SELECTED_PHP_IMAGE=$(wizard_get "SELECTED_PHP_IMAGE" "$EXISTING_PHP_IMAGE")
   
@@ -232,13 +232,13 @@ init_page_php() {
       SELECTED_PHP_IMAGE="$EXISTING_PHP_IMAGE"
     fi
     # Extract versions from custom image if possible (or use defaults/existing)
-    SELECTED_PHP="${EXISTING_PHP_VERSION:-8.4}"
-    SELECTED_NODE="${EXISTING_NODE_VERSION:-22}"
+    SELECTED_PHP="${EXISTING_PHP_VERSION:-8.5}"
+    SELECTED_NODE="${EXISTING_NODE_VERSION:-24}"
     SELECTED_COMPOSER="${EXISTING_COMPOSER_VERSION:-2}"
   else
     # Select PHP version (sorted newest to oldest)
     PHP_VERSIONS=("8.5" "8.4" "8.3" "8.2" "8.1" "7.4" "7.3" "7.2" "7.1")
-    DEFAULT_PHP="${SELECTED_PHP:-${EXISTING_PHP_VERSION:-8.4}}"
+    DEFAULT_PHP="${SELECTED_PHP:-${EXISTING_PHP_VERSION:-8.5}}"
     SELECTED_PHP=$(prompt_select "Select PHP version:" "$DEFAULT_PHP" "${PHP_VERSIONS[@]}")
     
     # Select Node.js version (based on PHP compatibility)
@@ -311,13 +311,13 @@ if prompt_yes_no "Use custom PHP image?" "$([ "$USE_CUSTOM_PHP" = true ] && echo
     SELECTED_PHP_IMAGE="$EXISTING_PHP_IMAGE"
   fi
   # Extract versions from custom image if possible (or use defaults/existing)
-  SELECTED_PHP="${EXISTING_PHP_VERSION:-8.4}"
-  SELECTED_NODE="${EXISTING_NODE_VERSION:-22}"
+  SELECTED_PHP="${EXISTING_PHP_VERSION:-8.5}"
+  SELECTED_NODE="${EXISTING_NODE_VERSION:-24}"
   SELECTED_COMPOSER="${EXISTING_COMPOSER_VERSION:-2}"
 else
   # Select PHP version (sorted newest to oldest)
   PHP_VERSIONS=("8.5" "8.4" "8.3" "8.2" "8.1" "7.4" "7.3" "7.2" "7.1")
-  DEFAULT_PHP="${EXISTING_PHP_VERSION:-8.4}"
+  DEFAULT_PHP="${EXISTING_PHP_VERSION:-8.5}"
   SELECTED_PHP=$(prompt_select "Select PHP version:" "$DEFAULT_PHP" "${PHP_VERSIONS[@]}")
   
   if [[ -n "${DEBUG:-}" ]]; then
@@ -500,12 +500,12 @@ else
   
   # Select version based on type (sorted newest to oldest)
   if [[ "$SELECTED_SEARCH_TYPE" == "Elasticsearch" ]]; then
-    ELASTIC_VERSIONS=("8.15.0" "8.10.3" "7.17.0")
+    ELASTIC_VERSIONS=("9.2.0" "8.15.0" "8.10.3" "7.17.0")
     # Only use existing version if it's valid for Elasticsearch and type hasn't changed
     if [[ "$EXISTING_SEARCH_ENGINE" == "Elasticsearch" ]] && [[ " ${ELASTIC_VERSIONS[*]} " == *" ${EXISTING_SEARCH_VERSION} "* ]]; then
       DEFAULT_ELASTIC_VERSION="$EXISTING_SEARCH_VERSION"
     else
-      DEFAULT_ELASTIC_VERSION="8.15.0"
+      DEFAULT_ELASTIC_VERSION="9.2.0"
     fi
     SELECTED_SEARCH_VERSION=$(prompt_select "Select Elasticsearch version:" "$DEFAULT_ELASTIC_VERSION" "${ELASTIC_VERSIONS[@]}")
     SELECTED_SEARCH_IMAGE="docker.elastic.co/elasticsearch/elasticsearch:${SELECTED_SEARCH_VERSION}"
