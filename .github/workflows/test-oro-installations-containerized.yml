@@ -228,9 +228,9 @@ jobs:
             export DC_ORO_NAME="${UNIQUE_PROJECT_NAME}"
             export DC_ORO_PORT_PREFIX="${PORT_PREFIX}"
             export DC_ORO_MODE=default
-            export DC_ORO_CONFIG_DIR="/home/runner/.orodc/${UNIQUE_PROJECT_NAME}"
+            export DC_ORO_CONFIG_DIR="${TEST_BASE_DIR}/.orodc/${UNIQUE_PROJECT_NAME}"
             
-            # Create OroDC config directory outside workspace to avoid root-owned artifacts in test dir
+            # Keep OroDC config inside the workspace for writable CI mounts and runner access
             mkdir -p "${DC_ORO_CONFIG_DIR}"
             chown -R 1000:1000 "${DC_ORO_CONFIG_DIR}"
             chmod -R 755 "${DC_ORO_CONFIG_DIR}"
@@ -300,7 +300,6 @@ jobs:
           RUN_SHORT=$(echo "${{ github.run_id }}" | tail -c 6)
           cd ${{ github.workspace }}
           rm -rf test-${RUN_SHORT}-* 2>/dev/null || true
-          rm -rf /home/runner/.orodc/${{ matrix.application.name }}-${RUN_SHORT}-* 2>/dev/null || true
           
           # Cleanup Docker containers and volumes by build ID pattern
           echo "🐳 Cleaning up Docker containers for build ${{ github.run_id }}..."

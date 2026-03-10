@@ -13,10 +13,10 @@ services:
       dockerfile: Dockerfile.project
       context: "${DC_ORO_CONFIG_DIR:-.}/docker/project-php-node-symfony"
       args:
-        BASE_IMAGE: "ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.4}-node${DC_ORO_NODE_VERSION:-22}-composer${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}"
+        BASE_IMAGE: "ghcr.io/digitalspacestdio/orodc-php-node-symfony:${DC_ORO_PHP_VERSION:-8.5}-node${DC_ORO_NODE_VERSION:-24}-composer${DC_ORO_COMPOSER_VERSION:-2}-${DC_ORO_PHP_DIST:-alpine}"
         APP_DIR: "${DC_ORO_APPDIR:-/var/www}"
-        PHP_VERSION: "${DC_ORO_PHP_VERSION:-8.4}"
-        NODE_VERSION: "${DC_ORO_NODE_VERSION:-22}"
+        PHP_VERSION: "${DC_ORO_PHP_VERSION:-8.5}"
+        NODE_VERSION: "${DC_ORO_NODE_VERSION:-24}"
         PHP_USER_NAME: "${DC_ORO_PHP_USER_NAME:-developer}"
         PHP_USER_GROUP: "${DC_ORO_PHP_USER_GROUP:-developer}"
         PHP_UID: "${DC_ORO_PHP_UID:-1000}"

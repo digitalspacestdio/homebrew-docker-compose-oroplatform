@@ -5,12 +5,13 @@ set -e
 # Options: universal (default), legacy
 NGINX_CONFIG="${DC_ORO_NGINX_CONFIG:-universal}"
 
-if [ "$NGINX_CONFIG" = "legacy" ]; then
-    echo "[nginx] Using legacy Oro-specific config"
-    cp /etc/nginx/nginx-legacy.conf /etc/nginx/nginx.conf
+if [[ "${NGINX_CONFIG}" = "legacy" ]]
+then
+  echo "[nginx] Using legacy Oro-specific config"
+  cp /etc/nginx/nginx-legacy.conf /etc/nginx/nginx.conf
 else
-    echo "[nginx] Using universal multi-framework config"
-    cp /etc/nginx/nginx-universal.conf /etc/nginx/nginx.conf
+  echo "[nginx] Using universal multi-framework config"
+  cp /etc/nginx/nginx-universal.conf /etc/nginx/nginx.conf
 fi
 
 # Replace APP_DIR placeholder with actual path

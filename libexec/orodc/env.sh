@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-if [ "$DEBUG" ]; then set -x; fi
+if [[ -n "${DEBUG}" ]]; then set -x; fi
 
 # Determine script directory and source libraries
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -22,41 +22,45 @@ parse_compose_flags "$@"
 get_container_env() {
   local var_name="$1"
   local container_service="${2:-cli}"
-  
+
   # Check if docker-compose file exists
-  if ! ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} config >/dev/null 2>&1; then
+  if ! ${DOCKER_COMPOSE_BIN_CMD} "${left_flags[*]}" "${left_options[*]}" config >/dev/null 2>&1
+  then
     return 1
   fi
-  
+
   # Try to get from running container first
   local value=""
-  if ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ps --status running "$container_service" 2>/dev/null | grep -q "$container_service"; then
+  if ${DOCKER_COMPOSE_BIN_CMD} "${left_flags[*]}" "${left_options[*]}" ps --status running "${container_service}" 2>/dev/null | grep -q "${container_service}"
+  then
     # Container is running - use exec
-    value=$(${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} exec -T "$container_service" env 2>/dev/null | grep "^${var_name}=" | cut -d'=' -f2- | sed 's/^"//;s/"$//' || echo "")
+    value=$(${DOCKER_COMPOSE_BIN_CMD} "${left_flags[*]}" "${left_options[*]}" exec -T "${container_service}" env 2>/dev/null | grep "^${var_name}=" | cut -d'=' -f2- | sed 's/^"//;s/"$//' || echo "")
   else
     # Container is not running - get from environment variables already loaded
     # These are set by initialize_environment from .env files
     value="${!var_name:-}"
   fi
-  
-  echo "$value"
+
+  echo "${value}"
 }
 
 # Get all environment variables from container or config
 get_all_container_env() {
   local container_service="${1:-cli}"
-  
+
   # Check if docker-compose file exists
-  if ! ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} config >/dev/null 2>&1; then
+  if ! ${DOCKER_COMPOSE_BIN_CMD} "${left_flags[*]}" "${left_options[*]}" config >/dev/null 2>&1
+  then
     msg_error "Docker Compose configuration not found or invalid"
     msg_info "Please run 'orodc init' to initialize the project"
     return 1
   fi
-  
+
   # Try to get from running container first
-  if ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} ps --status running "$container_service" 2>/dev/null | grep -q "$container_service"; then
+  if ${DOCKER_COMPOSE_BIN_CMD} "${left_flags[*]}" "${left_options[*]}" ps --status running "${container_service}" 2>/dev/null | grep -q "${container_service}"
+  then
     # Container is running - use exec (fast operation, no spinner needed)
-    ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[*]} ${left_options[*]} exec -T "$container_service" env 2>/dev/null || echo ""
+    ${DOCKER_COMPOSE_BIN_CMD} "${left_flags[*]}" "${left_options[*]}" exec -T "${container_service}" env 2>/dev/null || echo ""
   else
     # Container is not running - get from environment variables with defaults
     # Show ORO_ variables from current environment (loaded by initialize_environment)
@@ -64,7 +68,7 @@ get_all_container_env() {
     {
       # Get ORO_ variables from current environment
       env | grep "^ORO_" | sort
-      
+
       # Add default values for common ORO_ variables if not already set
       # These defaults match docker-compose.yml defaults
       [[ -z "${ORO_DB_HOST:-}" ]] && echo "ORO_DB_HOST=${DC_ORO_DATABASE_HOST:-database}"
@@ -74,21 +78,21 @@ get_all_container_env() {
       [[ -z "${ORO_DB_PASSWORD:-}" ]] && echo "ORO_DB_PASSWORD=${DC_ORO_DATABASE_PASSWORD:-oro_db_pass}"
       [[ -z "${ORO_DB_URL:-}" ]] && {
         local db_schema="${DC_ORO_DATABASE_SCHEMA:-postgres}"
-        [[ "$db_schema" == "mysql" ]] && db_schema="mysql" || db_schema="postgres"
+        [[ "${db_schema}" == "mysql" ]] && db_schema="mysql" || db_schema="postgres"
         local db_user="${DC_ORO_DATABASE_USER:-oro_db_user}"
         local db_pass="${DC_ORO_DATABASE_PASSWORD:-oro_db_pass}"
         local db_host="${DC_ORO_DATABASE_HOST:-database}"
-        local db_port="${DC_ORO_DATABASE_PORT:-$([ "$db_schema" == "mysql" ] && echo "3306" || echo "5432")}"
+        local db_port="${DC_ORO_DATABASE_PORT:-$([[ "${db_schema}" == "mysql" ]] && echo "3306" || echo "5432")}"
         local db_name="${DC_ORO_DATABASE_DBNAME:-oro_db}"
         echo "ORO_DB_URL=${db_schema}://${db_user}:${db_pass}@${db_host}:${db_port}/${db_name}"
       }
       [[ -z "${ORO_DB_DSN:-}" ]] && {
         local db_schema="${DC_ORO_DATABASE_SCHEMA:-postgres}"
-        [[ "$db_schema" == "mysql" ]] && db_schema="mysql" || db_schema="postgres"
+        [[ "${db_schema}" == "mysql" ]] && db_schema="mysql" || db_schema="postgres"
         local db_user="${DC_ORO_DATABASE_USER:-oro_db_user}"
         local db_pass="${DC_ORO_DATABASE_PASSWORD:-oro_db_pass}"
         local db_host="${DC_ORO_DATABASE_HOST:-database}"
-        local db_port="${DC_ORO_DATABASE_PORT:-$([ "$db_schema" == "mysql" ] && echo "3306" || echo "5432")}"
+        local db_port="${DC_ORO_DATABASE_PORT:-$([[ "${db_schema}" == "mysql" ]] && echo "3306" || echo "5432")}"
         local db_name="${DC_ORO_DATABASE_DBNAME:-oro_db}"
         echo "ORO_DB_DSN=${db_schema}://${db_user}:${db_pass}@${db_host}:${db_port}/${db_name}"
       }
@@ -112,7 +116,8 @@ get_all_container_env() {
 # Cache container environment variables
 CONTAINER_ENV_CACHE=""
 load_container_env_cache() {
-  if [[ -z "$CONTAINER_ENV_CACHE" ]]; then
+  if [[ -z "${CONTAINER_ENV_CACHE}" ]]
+  then
     CONTAINER_ENV_CACHE=$(get_all_container_env "cli")
   fi
 }
@@ -121,7 +126,7 @@ load_container_env_cache() {
 get_cached_env() {
   local var_name="$1"
   load_container_env_cache
-  echo "$CONTAINER_ENV_CACHE" | grep "^${var_name}=" | cut -d'=' -f2- | sed 's/^"//;s/"$//' || echo ""
+  echo "${CONTAINER_ENV_CACHE}" | grep "^${var_name}=" | cut -d'=' -f2- | sed 's/^"//;s/"$//' || echo ""
 }
 
 # Print section header
@@ -135,110 +140,117 @@ print_section() {
 print_var() {
   local key="$1"
   local value="${2:-}"
-  if [[ -n "$value" ]]; then
-    printf "  %-35s %s\n" "$key:" "$value"
+  if [[ -n "${value}" ]]
+  then
+    printf "  %-35s %s\n" "${key}:" "${value}"
   else
-    printf "  %-35s %s\n" "$key:" "(not set)"
+    printf "  %-35s %s\n" "${key}:" "(not set)"
   fi
 }
-
 
 # Main function
 main() {
   local format="${1:-human}"
-  
-  case "$format" in
-    human|"")
+
+  case "${format}" in
+    human | "")
       # Human-readable format - get variables from container
       # Load container environment cache once
       load_container_env_cache
-      
+
       # Get all ORO_ variables from container
-      local oro_vars=$(echo "$CONTAINER_ENV_CACHE" | grep "^ORO_" | sort)
-      
-      if [[ -z "$oro_vars" ]]; then
+      local oro_vars=$(echo "${CONTAINER_ENV_CACHE}" | grep "^ORO_" | sort)
+
+      if [[ -z "${oro_vars}" ]]
+      then
         msg_warning "No ORO_ variables found in container"
         exit 0
       fi
-      
+
       print_section "Oro Environment Variables (from container)"
       echo ""
-      
+
       # Print all ORO_ variables
-      while IFS='=' read -r var_name var_value; do
+      while IFS='=' read -r var_name var_value
+      do
         # Skip empty lines
-        [[ -z "$var_name" ]] && continue
-        
-        print_var "$var_name" "$var_value"
-      done <<< "$oro_vars"
+        [[ -z "${var_name}" ]] && continue
+
+        print_var "${var_name}" "${var_value}"
+      done <<<"${oro_vars}"
       ;;
-      
-    export|bash)
+
+    export | bash)
       # Export format (for bash sourcing) - get variables from container
       load_container_env_cache
-      
+
       echo "# ORO_ environment variables from container (cli service)"
       echo "# Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
       echo ""
-      
+
       # Get all ORO_ variables from container
-      local oro_vars=$(echo "$CONTAINER_ENV_CACHE" | grep "^ORO_" | sort)
-      
-      if [[ -z "$oro_vars" ]]; then
+      local oro_vars=$(echo "${CONTAINER_ENV_CACHE}" | grep "^ORO_" | sort)
+
+      if [[ -z "${oro_vars}" ]]
+      then
         echo "# No ORO_ variables found in container"
         exit 0
       fi
-      
+
       # Export all ORO_ variables
-      while IFS='=' read -r var_name var_value; do
+      while IFS='=' read -r var_name var_value
+      do
         # Skip empty lines
-        [[ -z "$var_name" ]] && continue
-        
+        [[ -z "${var_name}" ]] && continue
+
         # Escape quotes in value
-        var_value=$(echo "$var_value" | sed 's/"/\\"/g')
+        var_value=$(echo "${var_value}" | sed 's/"/\\"/g')
         echo "export ${var_name}=\"${var_value}\""
-      done <<< "$oro_vars"
+      done <<<"${oro_vars}"
       ;;
-      
+
     json)
       # JSON format - get variables from container
       load_container_env_cache
-      
+
       # Get all ORO_ variables from container
-      local oro_vars=$(echo "$CONTAINER_ENV_CACHE" | grep "^ORO_" | sort)
-      
-      if [[ -z "$oro_vars" ]]; then
+      local oro_vars=$(echo "${CONTAINER_ENV_CACHE}" | grep "^ORO_" | sort)
+
+      if [[ -z "${oro_vars}" ]]
+      then
         echo "{}"
         exit 0
       fi
-      
+
       echo "{"
-      
+
       local first=true
-      while IFS='=' read -r var_name var_value; do
+      while IFS='=' read -r var_name var_value
+      do
         # Skip empty lines
-        [[ -z "$var_name" ]] && continue
-        
+        [[ -z "${var_name}" ]] && continue
+
         # Add comma if not first item
-        if [[ "$first" == "true" ]]; then
+        if [[ "${first}" == "true" ]]
+        then
           first=false
         else
           echo ","
         fi
-        
+
         # Escape quotes and backslashes for JSON
-        var_value=$(echo "$var_value" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g')
+        var_value=$(echo "${var_value}" | sed 's/\\/\\\\/g' | sed 's/"/\\"/g')
         # Convert variable name to lowercase with underscores (JSON key format)
-        local json_key=$(echo "$var_name" | tr '[:upper:]' '[:lower:]')
-        printf "  \"%s\": \"%s\"" "$json_key" "$var_value"
-      done <<< "$oro_vars"
-      
+        local json_key=$(echo "${var_name}" | tr '[:upper:]' '[:lower:]')
+        printf "  \"%s\": \"%s\"" "${json_key}" "${var_value}"
+      done <<<"${oro_vars}"
+
       echo ""
       echo "}"
       ;;
-      
+
     *)
-      msg_error "Unknown format: $format"
+      msg_error "Unknown format: ${format}"
       echo ""
       msg_info "Available formats: human (default), export, bash, json"
       exit 1

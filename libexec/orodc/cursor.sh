@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-if [ "$DEBUG" ]; then set -x; fi
+if [[ -n "${DEBUG}" ]]; then set -x; fi
 
 # Determine script directory and source libraries
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -10,40 +10,46 @@ source "${SCRIPT_DIR}/lib/environment.sh"
 
 # Determine project directory (same logic as init.sh and initialize_environment)
 # Cursor works without full project initialization, but needs DC_ORO_APPDIR for CMS detection
-if [[ -z "${DC_ORO_APPDIR:-}" ]]; then
+if [[ -z "${DC_ORO_APPDIR:-}" ]]
+then
   PROJECT_DIR=$(find-up composer.json)
 fi
-if [[ -z "$PROJECT_DIR" ]]; then
+if [[ -z "${PROJECT_DIR}" ]]
+then
   PROJECT_DIR=$(find-up .env.orodc)
 fi
-if [[ -z "$PROJECT_DIR" ]]; then
-  PROJECT_DIR="$PWD"
+if [[ -z "${PROJECT_DIR}" ]]
+then
+  PROJECT_DIR="${PWD}"
 fi
-export DC_ORO_APPDIR="$PROJECT_DIR"
+export DC_ORO_APPDIR="${PROJECT_DIR}"
 
 # Determine project name for b.,config lookup
-PROJECT_NAME=$(basename "$PROJECT_DIR")
-if [[ "$PROJECT_NAME" == "$HOME" ]] || [[ -z "$PROJECT_NAME" ]] || [[ "$PROJECT_NAME" == "/" ]]; then
+PROJECT_NAME=$(basename "${PROJECT_DIR}")
+if [[ "${PROJECT_NAME}" == "${HOME}" ]] || [[ -z "${PROJECT_NAME}" ]] || [[ "${PROJECT_NAME}" == "/" ]]
+then
   PROJECT_NAME="default"
 fi
 
 # Load .env.orodc files to get DC_ORO_CMS_TYPE and other config
 # Priority: local > global (same as initialize_environment)
-local_config_file="$PROJECT_DIR/.env.orodc"
+local_config_file="${PROJECT_DIR}/.env.orodc"
 global_config_file="${HOME}/.orodc/${PROJECT_NAME}/.env.orodc"
 
 # Load global config first (lower priority)
-if [[ -f "$global_config_file" ]]; then
-  load_env_safe "$global_config_file"
+if [[ -f "${global_config_file}" ]]
+then
+  load_env_safe "${global_config_file}"
 fi
 
 # Load local config last (higher priority, overrides global)
-if [[ -f "$local_config_file" ]]; then
-  load_env_safe "$local_config_file"
+if [[ -f "${local_config_file}" ]]
+then
+  load_env_safe "${local_config_file}"
 fi
 
 # Set DC_ORO_PROJECT_NAME variable for use in system prompt
-export DC_ORO_PROJECT_NAME="$PROJECT_NAME"
+export DC_ORO_PROJECT_NAME="${PROJECT_NAME}"
 
 # Check if Cursor CLI is installed
 # Cursor CLI command is 'agent', not 'cursor'
@@ -53,63 +59,73 @@ CURSOR_BIN=$(resolve_bin "agent" "Cursor CLI is required. Install from: https://
 get_cms_type_for_cursor() {
   local cms_type
   # Load from environment if available (from .env.orodc)
-  if [[ -n "${DC_ORO_CMS_TYPE:-}" ]]; then
+  if [[ -n "${DC_ORO_CMS_TYPE:-}" ]]
+  then
     cms_type="$(echo "${DC_ORO_CMS_TYPE}" | tr '[:upper:]' '[:lower:]')"
   else
     # Auto-detect using detect_application_kind function (includes marello)
     cms_type=$(detect_application_kind)
   fi
-  
+
   # Normalize: base -> php-generic for Cursor
-  if [[ "$cms_type" == "base" ]]; then
+  if [[ "${cms_type}" == "base" ]]
+  then
     echo "php-generic"
   else
-    echo "$cms_type"
+    echo "${cms_type}"
   fi
 }
 
 # Get documentation context for Cursor
 get_documentation_context() {
-  local project_dir="${DC_ORO_APPDIR:-$PWD}"
+  local project_dir="${DC_ORO_APPDIR:-${PWD}}"
   local orodc_readme=""
   local project_readme=""
   local help_output=""
-  
+
   # Try to find OroDC README.md (in installation directory)
   # Get bin/orodc path and find README relative to it
   local bin_orodc=""
-  if command -v orodc >/dev/null 2>&1; then
+  if command -v orodc >/dev/null 2>&1
+  then
     bin_orodc=$(command -v orodc)
-  elif [[ -f "${SCRIPT_DIR}/../../bin/orodc" ]]; then
+  elif [[ -f "${SCRIPT_DIR}/../../bin/orodc" ]]
+  then
     bin_orodc="${SCRIPT_DIR}/../../bin/orodc"
   fi
-  
-  if [[ -n "$bin_orodc" ]]; then
-    local orodc_dir="$(cd "$(dirname "$bin_orodc")/.." && pwd)"
-    if [[ -f "${orodc_dir}/README.md" ]]; then
+
+  if [[ -n "${bin_orodc}" ]]
+  then
+    local orodc_dir="$(cd "$(dirname "${bin_orodc}")/.." && pwd)"
+    if [[ -f "${orodc_dir}/README.md" ]]
+    then
       orodc_readme="${orodc_dir}/README.md"
     fi
   fi
-  
+
   # Try to find project README.md
-  if [[ -f "${project_dir}/README.md" ]]; then
+  if [[ -f "${project_dir}/README.md" ]]
+  then
     project_readme="${project_dir}/README.md"
   fi
-  
+
   # Prefer project README, fallback to OroDC README, then help output
-  if [[ -n "$project_readme" ]]; then
-    echo "$project_readme"
-  elif [[ -n "$orodc_readme" ]]; then
-    echo "$orodc_readme"
+  if [[ -n "${project_readme}" ]]
+  then
+    echo "${project_readme}"
+  elif [[ -n "${orodc_readme}" ]]
+  then
+    echo "${orodc_readme}"
   else
     # Fallback: generate orodc help output
     help_output=$(mktemp /tmp/orodc-help.XXXXXX)
-    if [[ -n "$bin_orodc" ]]; then
-      "$bin_orodc" help > "$help_output" 2>&1 || true
+    if [[ -n "${bin_orodc}" ]]
+    then
+      "${bin_orodc}" help >"${help_output}" 2>&1 || true
     else
-      echo "OroDC help not available" > "$help_output"
+      echo "OroDC help not available" >"${help_output}"
     fi
-    echo "$help_output"
+    echo "${help_output}"
   fi
 }
 
@@ -118,45 +134,50 @@ generate_system_prompt() {
   local cms_type="$1"
   local doc_context="$2"
   local agents_source_dir="$3"
-  
+
   # Get project information if available
   local project_name="${DC_ORO_NAME:-${DC_ORO_PROJECT_NAME:-}}"
   local project_url=""
   local project_info=""
-  
-  if [[ -n "$project_name" ]]; then
+
+  if [[ -n "${project_name}" ]]
+  then
     project_url="https://${project_name}.docker.local"
     project_info="
-- Project Name: ${project_name} (${DC_ORO_PROJECT_NAME:-$project_name})
+- Project Name: ${project_name} (${DC_ORO_PROJECT_NAME:-${project_name}})
 - Application URL: ${project_url}
-- Project Directory: ${DC_ORO_APPDIR:-$PWD}"
-    
+- Project Directory: ${DC_ORO_APPDIR:-${PWD}}"
+
     # Add port information if available
-    if [[ -n "${DC_ORO_PORT_NGINX:-}" ]]; then
+    if [[ -n "${DC_ORO_PORT_NGINX:-}" ]]
+    then
       project_info="${project_info}
 - Local HTTP Port: ${DC_ORO_PORT_NGINX}"
     fi
   fi
-  
+
   # Normalize CMS type for file names (php-generic -> php-generic, base -> php-generic)
-  local cms_file_type="$cms_type"
-  if [[ "$cms_file_type" == "base" ]]; then
+  local cms_file_type="${cms_type}"
+  if [[ "${cms_file_type}" == "base" ]]
+  then
     cms_file_type="php-generic"
   fi
-  
+
   # Read common agents file content (for inclusion in main prompt)
   # Other files are accessed via orodc agents commands, not included directly
   # Read directly from source directory (passed as parameter) - no need to copy files
   local common_content=""
-  if [[ -f "${agents_source_dir}/AGENTS_common.md" ]]; then
+  if [[ -f "${agents_source_dir}/AGENTS_common.md" ]]
+  then
     common_content=$(cat "${agents_source_dir}/AGENTS_common.md")
   fi
-  
+
   # Generate application URLs based on CMS type
   local application_urls=""
-  if [[ -n "${DC_ORO_NAME:-}" ]]; then
-    case "$cms_type" in
-      oro|magento)
+  if [[ -n "${DC_ORO_NAME:-}" ]]
+  then
+    case "${cms_type}" in
+      oro | magento)
         application_urls="- Frontend: https://${DC_ORO_NAME}.docker.local
 - Admin Panel: https://${DC_ORO_NAME}.docker.local/admin"
         ;;
@@ -169,7 +190,7 @@ generate_system_prompt() {
         ;;
     esac
   fi
-  
+
   cat <<EOF
 You are an AI coding assistant specialized in helping developers work with OroDC projects.
 
@@ -466,157 +487,176 @@ EOF
 main() {
   # Detect CMS type
   local cms_type=$(get_cms_type_for_cursor)
-  msg_info "Detected CMS type: $cms_type"
-  
+  msg_info "Detected CMS type: ${cms_type}"
+
   # Get documentation context
   local doc_context=$(get_documentation_context)
-  if [[ -f "$doc_context" ]]; then
-    msg_info "Using documentation: $doc_context"
+  if [[ -f "${doc_context}" ]]
+  then
+    msg_info "Using documentation: ${doc_context}"
   else
     msg_info "Using orodc help output as documentation"
   fi
-  
+
   # Determine project name for AGENTS.md file location
   local project_name=""
-  if [[ -n "${DC_ORO_NAME:-}" ]]; then
-    project_name="$DC_ORO_NAME"
-  elif [[ -n "${DC_ORO_APPDIR:-}" ]]; then
-    project_name=$(basename "$DC_ORO_APPDIR")
+  if [[ -n "${DC_ORO_NAME:-}" ]]
+  then
+    project_name="${DC_ORO_NAME}"
+  elif [[ -n "${DC_ORO_APPDIR:-}" ]]
+  then
+    project_name=$(basename "${DC_ORO_APPDIR}")
   else
-    project_name=$(basename "$PWD")
+    project_name=$(basename "${PWD}")
   fi
-  
+
   # Normalize project name (same logic as initialize_environment)
-  if [[ "$project_name" == "$HOME" ]] || [[ -z "$project_name" ]] || [[ "$project_name" == "/" ]]; then
+  if [[ "${project_name}" == "${HOME}" ]] || [[ -z "${project_name}" ]] || [[ "${project_name}" == "/" ]]
+  then
     project_name="default"
   fi
-  
+
   # Create AGENTS.md file in ~/.orodc/{project_name}/ directory
   local agents_dir="${HOME}/.orodc/${project_name}"
   local agents_file="${agents_dir}/AGENTS.md"
-  mkdir -p "$agents_dir"
-  
+  mkdir -p "${agents_dir}"
+
   # Normalize CMS type for file names (php-generic -> php-generic, base -> php-generic)
-  local cms_file_type="$cms_type"
-  if [[ "$cms_file_type" == "base" ]]; then
+  local cms_file_type="${cms_type}"
+  if [[ "${cms_file_type}" == "base" ]]
+  then
     cms_file_type="php-generic"
   fi
-  
+
   # No need to copy agent files - orodc agents command reads directly from source directory
   # Only generate system prompt file (AGENTS.md) which references orodc agents commands
   local agents_source_dir="${SCRIPT_DIR}/agents"
-  generate_system_prompt "$cms_type" "$doc_context" "$agents_source_dir" > "$agents_file"
-  msg_info "Created system prompt file: $agents_file"
-  
+  generate_system_prompt "${cms_type}" "${doc_context}" "${agents_source_dir}" >"${agents_file}"
+  msg_info "Created system prompt file: ${agents_file}"
+
   # Track temp files for cleanup (only help output, not AGENTS.md - it should persist)
   local temp_files=()
-  if [[ ! -f "$doc_context" ]] || [[ "$doc_context" == /tmp/orodc-help.* ]]; then
-    temp_files+=("$doc_context")
+  if [[ ! -f "${doc_context}" ]] || [[ "${doc_context}" == /tmp/orodc-help.* ]]
+  then
+    temp_files+=("${doc_context}")
   fi
-  
+
   # Cleanup temp files on exit (AGENTS.md is not in temp_files, so it will persist)
-  if [[ ${#temp_files[@]} -gt 0 ]]; then
+  if [[ ${#temp_files[@]} -gt 0 ]]
+  then
     cleanup_temp_files() {
       rm -f "${temp_files[@]}"
     }
     trap cleanup_temp_files EXIT
   fi
-  
+
   # Execute Cursor CLI with all passed arguments
   # Cursor CLI accepts [query..] as positional arguments for initial prompt
   # System prompt is passed via .cursorrules file or environment variable
   # Based on Cursor CLI documentation, we'll use .cursorrules file in project directory
-  msg_info "Launching Cursor CLI with CMS type: $cms_type"
-  
+  msg_info "Launching Cursor CLI with CMS type: ${cms_type}"
+
   # Pass Docker access to Cursor CLI via environment variables
   # These variables are set by initialize_environment if project is initialized
-  if [[ -n "${DOCKER_BIN:-}" ]]; then
+  if [[ -n "${DOCKER_BIN:-}" ]]
+  then
     export DOCKER_BIN
   fi
-  if [[ -n "${DOCKER_HOST:-}" ]]; then
+  if [[ -n "${DOCKER_HOST:-}" ]]
+  then
     export DOCKER_HOST
   fi
-  if [[ -n "${DOCKER_COMPOSE_BIN_CMD:-}" ]]; then
+  if [[ -n "${DOCKER_COMPOSE_BIN_CMD:-}" ]]
+  then
     export DOCKER_COMPOSE_BIN_CMD
   fi
   # Pass project context for Docker operations
-  if [[ -n "${DC_ORO_NAME:-}" ]]; then
+  if [[ -n "${DC_ORO_NAME:-}" ]]
+  then
     export DC_ORO_NAME
   fi
-  if [[ -n "${DC_ORO_CONFIG_DIR:-}" ]]; then
+  if [[ -n "${DC_ORO_CONFIG_DIR:-}" ]]
+  then
     export DC_ORO_CONFIG_DIR
   fi
-  if [[ -n "${DC_ORO_APPDIR:-}" ]]; then
+  if [[ -n "${DC_ORO_APPDIR:-}" ]]
+  then
     export DC_ORO_APPDIR
   fi
-  
+
   # Create .cursorrules file in project directory with system prompt
   # Cursor CLI reads .cursorrules from the current working directory
-  local project_dir="${DC_ORO_APPDIR:-$PWD}"
+  local project_dir="${DC_ORO_APPDIR:-${PWD}}"
   local cursorrules_file="${project_dir}/.cursorrules"
-  
+
   # Backup existing .cursorrules if it exists
   local cursorrules_backup=""
-  if [[ -f "$cursorrules_file" ]]; then
+  if [[ -f "${cursorrules_file}" ]]
+  then
     cursorrules_backup="${cursorrules_file}.orodc-backup-$(date +%s)"
-    cp "$cursorrules_file" "$cursorrules_backup"
-    msg_info "Backed up existing .cursorrules to: $cursorrules_backup"
+    cp "${cursorrules_file}" "${cursorrules_backup}"
+    msg_info "Backed up existing .cursorrules to: ${cursorrules_backup}"
   fi
-  
+
   # Write system prompt to .cursorrules file
-  generate_system_prompt "$cms_type" "$doc_context" "$agents_source_dir" > "$cursorrules_file"
-  msg_info "Created .cursorrules file: $cursorrules_file"
-  
+  generate_system_prompt "${cms_type}" "${doc_context}" "${agents_source_dir}" >"${cursorrules_file}"
+  msg_info "Created .cursorrules file: ${cursorrules_file}"
+
   # Cleanup function to restore original .cursorrules if needed
   cleanup_cursorrules() {
-    if [[ -n "$cursorrules_backup" ]] && [[ -f "$cursorrules_backup" ]]; then
-      mv "$cursorrules_backup" "$cursorrules_file"
+    if [[ -n "${cursorrules_backup}" ]] && [[ -f "${cursorrules_backup}" ]]
+    then
+      mv "${cursorrules_backup}" "${cursorrules_file}"
       msg_info "Restored original .cursorrules file"
-    elif [[ -f "$cursorrules_file" ]]; then
+    elif [[ -f "${cursorrules_file}" ]]
+    then
       # Only remove if we created it (no backup means it didn't exist before)
-      if [[ -z "$cursorrules_backup" ]]; then
-        rm -f "$cursorrules_file"
+      if [[ -z "${cursorrules_backup}" ]]
+      then
+        rm -f "${cursorrules_file}"
         msg_info "Removed temporary .cursorrules file"
       fi
     fi
   }
-  
+
   # Set trap to restore .cursorrules on exit (but don't restore - let user keep it)
   # Actually, we should keep the .cursorrules file for the user, so we won't restore it
   # Only restore if there was a backup (user had existing .cursorrules)
   # But actually, let's keep it - it's useful for the user
-  
+
   # Pass context via environment variables (for reference)
-  export CURSOR_SYSTEM_PROMPT="$(cat "$agents_file")"
-  export CURSOR_CMS_TYPE="$cms_type"
-  export CURSOR_DOC_CONTEXT="$doc_context"
-  
+  export CURSOR_SYSTEM_PROMPT="$(cat "${agents_file}")"
+  export CURSOR_CMS_TYPE="${cms_type}"
+  export CURSOR_DOC_CONTEXT="${doc_context}"
+
   # Build Cursor CLI arguments
   # Cursor CLI uses positional arguments for user prompt
   local cursor_args=()
-  
+
   # Change to project directory if available (Cursor CLI works in current directory)
-  if [[ -n "${DC_ORO_APPDIR:-}" ]] && [[ -d "${DC_ORO_APPDIR}" ]]; then
+  if [[ -n "${DC_ORO_APPDIR:-}" ]] && [[ -d "${DC_ORO_APPDIR}" ]]
+  then
     cd "${DC_ORO_APPDIR}" || true
   fi
-  
+
   # If user provided arguments, pass them as positional prompt arguments
   # System prompt is already set via .cursorrules file
-  if [[ $# -gt 0 ]]; then
+  if [[ $# -gt 0 ]]
+  then
     # User provided a prompt - pass all arguments as positional prompt
     cursor_args+=("$@")
   fi
-  
+
   # Execute cursor with arguments
   # System prompt is set via .cursorrules file in project directory
   # User prompt (if provided) is passed as positional arguments
-  
+
   # Print command being executed (dark gray text)
-  msg_debug "Executing: $CURSOR_BIN ${cursor_args[*]}"
-  msg_debug "System prompt file: $cursorrules_file"
-  msg_debug "Working directory: $PWD"
-  
-  exec "$CURSOR_BIN" "${cursor_args[@]}"
+  msg_debug "Executing: ${CURSOR_BIN} ${cursor_args[*]}"
+  msg_debug "System prompt file: ${cursorrules_file}"
+  msg_debug "Working directory: ${PWD}"
+
+  exec "${CURSOR_BIN}" "${cursor_args[@]}"
 }
 
 main "$@"

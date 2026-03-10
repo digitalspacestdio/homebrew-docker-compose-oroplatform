@@ -5,7 +5,8 @@
 set -e
 version=$(mysql -u root -p"${MYSQL_ROOT_PASSWORD}" -sN -e "SELECT @@version;" 2>/dev/null || echo "0")
 major=${version%%.*}
-if [[ "$major" -ge 8 && "$major" -lt 9 ]]; then
+if [[ "${major}" -ge 8 && "${major}" -lt 9 ]]
+then
   mysql -u root -p"${MYSQL_ROOT_PASSWORD}" -e \
     "ALTER USER '${MYSQL_USER}'@'%' IDENTIFIED WITH mysql_native_password BY '${MYSQL_PASSWORD}'; FLUSH PRIVILEGES;"
 fi

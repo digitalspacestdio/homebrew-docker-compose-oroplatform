@@ -15,12 +15,15 @@ DOCKER_BIN=$(resolve_bin "docker" "Docker is required. Install from https://docs
 BREW_PREFIX="$(brew --prefix 2>/dev/null || echo "/home/linuxbrew/.linuxbrew")"
 
 # Find compose directory
-if [[ -d "${BREW_PREFIX}/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform/compose" ]]; then
+if [[ -d "${BREW_PREFIX}/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform/compose" ]]
+then
   DC_ORO_COMPOSE_DIR="${BREW_PREFIX}/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform/compose"
-elif [[ -d "${BREW_PREFIX}/share/docker-compose-oroplatform/compose" ]]; then
+elif [[ -d "${BREW_PREFIX}/share/docker-compose-oroplatform/compose" ]]
+then
   DC_ORO_COMPOSE_DIR="${BREW_PREFIX}/share/docker-compose-oroplatform/compose"
-elif [[ -d "$SCRIPT_DIR/../../compose" ]]; then
-  DC_ORO_COMPOSE_DIR="$SCRIPT_DIR/../../compose"
+elif [[ -d "${SCRIPT_DIR}/../../compose" ]]
+then
+  DC_ORO_COMPOSE_DIR="${SCRIPT_DIR}/../../compose"
 else
   msg_error "Could not find OroDC compose directory"
   exit 1
@@ -37,24 +40,30 @@ PUSH_IMAGES=false
 PG_VERSION=""
 MYSQL_VERSION=""
 
-for arg in "${@:2}"; do
-  case "$arg" in
+for arg in "${@:2}"
+do
+  case "${arg}" in
     --no-cache) NO_CACHE_FLAG="--no-cache" ;;
     --push) PUSH_IMAGES=true ;;
     --version=*)
-      if [[ "$BUILD_TARGET" == "pgsql" ]]; then
+      if [[ "${BUILD_TARGET}" == "pgsql" ]]
+      then
         PG_VERSION="${arg#*=}"
-      elif [[ "$BUILD_TARGET" == "mysql" ]]; then
+      elif [[ "${BUILD_TARGET}" == "mysql" ]]
+      then
         MYSQL_VERSION="${arg#*=}"
       fi
       ;;
     *)
       # Could be pg version without flag
-      if [[ "$arg" =~ ^[0-9]+\.[0-9]+ ]]; then
-        if [[ "$BUILD_TARGET" == "pgsql" && -z "$PG_VERSION" ]]; then
-          PG_VERSION="$arg"
-        elif [[ "$BUILD_TARGET" == "mysql" && -z "$MYSQL_VERSION" ]]; then
-          MYSQL_VERSION="$arg"
+      if [[ "${arg}" =~ ^[0-9]+\.[0-9]+ ]]
+      then
+        if [[ "${BUILD_TARGET}" == "pgsql" && -z "${PG_VERSION}" ]]
+        then
+          PG_VERSION="${arg}"
+        elif [[ "${BUILD_TARGET}" == "mysql" && -z "${MYSQL_VERSION}" ]]
+        then
+          MYSQL_VERSION="${arg}"
         fi
       fi
       ;;
@@ -70,8 +79,9 @@ build_image() {
   shift 4
   local build_args=("$@")
 
-  if [[ ! -f "$dockerfile" ]]; then
-    msg_error "Dockerfile not found: $dockerfile"
+  if [[ ! -f "${dockerfile}" ]]
+  then
+    msg_error "Dockerfile not found: ${dockerfile}"
     return 1
   fi
 
@@ -79,20 +89,24 @@ build_image() {
   msg_info "  Tag: ${tag}"
 
   local build_cmd="${DOCKER_BIN} build ${NO_CACHE_FLAG}"
-  for arg in "${build_args[@]}"; do
+  for arg in "${build_args[@]}"
+  do
     build_cmd+=" --build-arg ${arg}"
   done
   build_cmd+=" -f ${dockerfile} -t ${tag} ${context}"
 
   BUILD_START=$(date +%s)
-  if eval "$build_cmd"; then
+  if eval "${build_cmd}"
+  then
     BUILD_END=$(date +%s)
     BUILD_DURATION=$((BUILD_END - BUILD_START))
     msg_ok "${name} built in ${BUILD_DURATION}s"
 
-    if [[ "$PUSH_IMAGES" == "true" ]]; then
+    if [[ "${PUSH_IMAGES}" == "true" ]]
+    then
       msg_info "Pushing ${tag}..."
-      if ${DOCKER_BIN} push "${tag}"; then
+      if ${DOCKER_BIN} push "${tag}"
+      then
         msg_ok "Pushed ${tag}"
       else
         msg_warning "Failed to push ${tag}"
@@ -105,8 +119,8 @@ build_image() {
   fi
 }
 
-case "$BUILD_TARGET" in
-  list|"")
+case "${BUILD_TARGET}" in
+  list | "")
     msg_header "OroDC Docker Images"
     msg_info ""
     msg_info "Available images to build:"
@@ -165,15 +179,17 @@ case "$BUILD_TARGET" in
     msg_header "Building PostgreSQL Image"
 
     # Default versions if not specified
-    if [[ -z "$PG_VERSION" ]]; then
+    if [[ -z "${PG_VERSION}" ]]
+    then
       PG_VERSIONS=("15.1" "16.6" "17.4")
       msg_info "Building all PostgreSQL versions: ${PG_VERSIONS[*]}"
     else
-      PG_VERSIONS=("$PG_VERSION")
+      PG_VERSIONS=("${PG_VERSION}")
     fi
 
     FAILED=0
-    for ver in "${PG_VERSIONS[@]}"; do
+    for ver in "${PG_VERSIONS[@]}"
+    do
       msg_info ""
       build_image \
         "${DOCKER_DIR}/pgsql/Dockerfile" \
@@ -183,24 +199,27 @@ case "$BUILD_TARGET" in
         "PG_VERSION=${ver}" || FAILED=1
     done
 
-    exit $FAILED
+    exit "${FAILED}"
     ;;
 
   mysql)
     msg_header "Building MySQL Image"
 
-    if [[ -z "$MYSQL_VERSION" ]]; then
+    if [[ -z "${MYSQL_VERSION}" ]]
+    then
       MYSQL_VERSIONS=("5.7" "8.0" "8.4")
       msg_info "Building all MySQL versions: ${MYSQL_VERSIONS[*]}"
     else
-      MYSQL_VERSIONS=("$MYSQL_VERSION")
+      MYSQL_VERSIONS=("${MYSQL_VERSION}")
     fi
 
     FAILED=0
-    for ver in "${MYSQL_VERSIONS[@]}"; do
+    for ver in "${MYSQL_VERSIONS[@]}"
+    do
       msg_info ""
       mysql_dockerfile="${DOCKER_DIR}/mysql/Dockerfile"
-      if [[ "$ver" == "5.7" ]]; then
+      if [[ "${ver}" == "5.7" ]]
+      then
         mysql_dockerfile="${DOCKER_DIR}/mysql/Dockerfile.5.7"
       fi
       build_image \
@@ -211,7 +230,7 @@ case "$BUILD_TARGET" in
         "MYSQL_VERSION=${ver}" || FAILED=1
     done
 
-    exit $FAILED
+    exit "${FAILED}"
     ;;
 
   all)
@@ -224,10 +243,11 @@ case "$BUILD_TARGET" in
     # Nginx
     msg_info "=== Nginx ==="
     if build_image \
-      "${DOCKER_DIR}/nginx/Dockerfile" \
-      "${DOCKER_DIR}/nginx/" \
-      "ghcr.io/digitalspacestdio/orodc-nginx:latest" \
-      "Nginx"; then
+       "${DOCKER_DIR}/nginx/Dockerfile" \
+       "${DOCKER_DIR}/nginx/" \
+       "ghcr.io/digitalspacestdio/orodc-nginx:latest" \
+       "Nginx"
+    then
       BUILT+=("nginx")
     else
       FAILED+=("nginx")
@@ -238,10 +258,11 @@ case "$BUILD_TARGET" in
     # Mail
     msg_info "=== Mailpit ==="
     if build_image \
-      "${DOCKER_DIR}/mail/Dockerfile" \
-      "${DOCKER_DIR}/mail/" \
-      "ghcr.io/digitalspacestdio/orodc-mail:latest" \
-      "Mailpit"; then
+       "${DOCKER_DIR}/mail/Dockerfile" \
+       "${DOCKER_DIR}/mail/" \
+       "ghcr.io/digitalspacestdio/orodc-mail:latest" \
+       "Mailpit"
+    then
       BUILT+=("mail")
     else
       FAILED+=("mail")
@@ -251,13 +272,15 @@ case "$BUILD_TARGET" in
 
     # PostgreSQL (all versions)
     msg_info "=== PostgreSQL ==="
-    for ver in 15.1 16.6 17.4; do
+    for ver in 15.1 16.6 17.4
+    do
       if build_image \
-        "${DOCKER_DIR}/pgsql/Dockerfile" \
-        "${DOCKER_DIR}/pgsql/" \
-        "ghcr.io/digitalspacestdio/orodc-pgsql:${ver}" \
-        "PostgreSQL ${ver}" \
-        "PG_VERSION=${ver}"; then
+         "${DOCKER_DIR}/pgsql/Dockerfile" \
+         "${DOCKER_DIR}/pgsql/" \
+         "ghcr.io/digitalspacestdio/orodc-pgsql:${ver}" \
+         "PostgreSQL ${ver}" \
+         "PG_VERSION=${ver}"
+      then
         BUILT+=("pgsql:${ver}")
       else
         FAILED+=("pgsql:${ver}")
@@ -268,17 +291,20 @@ case "$BUILD_TARGET" in
 
     # MySQL (all versions)
     msg_info "=== MySQL ==="
-    for ver in 5.7 8.0 8.4; do
+    for ver in 5.7 8.0 8.4
+    do
       mysql_dockerfile="${DOCKER_DIR}/mysql/Dockerfile"
-      if [[ "$ver" == "5.7" ]]; then
+      if [[ "${ver}" == "5.7" ]]
+      then
         mysql_dockerfile="${DOCKER_DIR}/mysql/Dockerfile.5.7"
       fi
       if build_image \
-        "${mysql_dockerfile}" \
-        "${DOCKER_DIR}/mysql/" \
-        "ghcr.io/digitalspacestdio/orodc-mysql:${ver}" \
-        "MySQL ${ver}" \
-        "MYSQL_VERSION=${ver}"; then
+         "${mysql_dockerfile}" \
+         "${DOCKER_DIR}/mysql/" \
+         "ghcr.io/digitalspacestdio/orodc-mysql:${ver}" \
+         "MySQL ${ver}" \
+         "MYSQL_VERSION=${ver}"
+      then
         BUILT+=("mysql:${ver}")
       else
         FAILED+=("mysql:${ver}")
@@ -289,11 +315,13 @@ case "$BUILD_TARGET" in
     msg_info ""
     msg_header "Build Summary"
 
-    if [[ ${#BUILT[@]} -gt 0 ]]; then
+    if [[ ${#BUILT[@]} -gt 0 ]]
+    then
       msg_ok "Built: ${BUILT[*]}"
     fi
 
-    if [[ ${#FAILED[@]} -gt 0 ]]; then
+    if [[ ${#FAILED[@]} -gt 0 ]]
+    then
       msg_error "Failed: ${FAILED[*]}"
       exit 1
     fi

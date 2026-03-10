@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-if [ "$DEBUG" ]; then set -x; fi
+if [[ -n "${DEBUG}" ]]; then set -x; fi
 
 # Determine script directory and source libraries
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

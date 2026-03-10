@@ -1,6 +1,6 @@
 #!/bin/bash
 set -e
-if [ "$DEBUG" ]; then set -x; fi
+if [[ -n "${DEBUG}" ]]; then set -x; fi
 
 # Determine script directory and source libraries
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -22,7 +22,8 @@ compose_cmd="${args[0]:-}"
 docker_services="${args[*]:1}"
 
 # Validate that a compose command was provided
-if [[ -z "$compose_cmd" ]]; then
+if [[ -z "${compose_cmd}" ]]
+then
   msg_error "No Docker Compose command specified"
   echo ""
   msg_info "Usage: orodc compose <command> [options] [services]"
@@ -45,7 +46,7 @@ if [[ -z "$compose_cmd" ]]; then
 fi
 
 # Debug logging
-debug_log "compose.sh: command='$compose_cmd' services='$docker_services'"
+debug_log "compose.sh: command='${compose_cmd}' services='${docker_services}'"
 debug_log "compose.sh: left_flags=(${left_flags[*]})"
 debug_log "compose.sh: left_options=(${left_options[*]})"
 debug_log "compose.sh: right_flags=(${right_flags[*]})"
@@ -53,14 +54,15 @@ debug_log "compose.sh: right_options=(${right_options[*]})"
 
 # Generate compose.yml config file if needed
 # This creates the merged config from all compose files
-generate_compose_config_if_needed "$compose_cmd"
+generate_compose_config_if_needed "${compose_cmd}"
 
 # Special handling for 'up' command - two-phase build+start
-if [[ "$compose_cmd" == "up" ]]; then
+if [[ "${compose_cmd}" == "up" ]]
+then
   handle_compose_up
   exit $?
 fi
 
 # For all other commands, execute directly
-exec_compose_command "$compose_cmd" "$docker_services"
+exec_compose_command "${compose_cmd}" "${docker_services}"
 exit $?
