@@ -52,8 +52,10 @@ RUN apk add --no-cache libstdc++ gcompat
 COPY --from=app_node /usr/local /usr/local
 COPY --from=app_node /opt /opt
 
-# Install a pnpm version compatible with the selected Node.js and smoke test
-RUN if [ "${NODE_VERSION}" = "16" ]; then npm install -g pnpm@8; else corepack enable pnpm; fi \
+# Install package managers and smoke test Node.js toolchain
+RUN if [ "${NODE_VERSION}" = "14" ]; then npm install -g yarn@1.22.22 pnpm@7.33.5; \
+    elif [ "${NODE_VERSION}" = "16" ]; then npm install -g yarn@1.22.22 pnpm@8.15.9; \
+    else npm install -g yarn@1.22.22 pnpm@9.15.9; fi \
     && node --version && npm --version && yarn --version && pnpm --version
 
 # Copy ofelia binary
