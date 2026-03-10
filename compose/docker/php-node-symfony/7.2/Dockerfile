@@ -52,9 +52,13 @@ COPY --from=app_node /usr/local /usr/local
 COPY --from=app_node /opt /opt
 
 # Install package managers and smoke test Node.js toolchain
-RUN if [ "${NODE_VERSION}" = "14" ]; then npm install -g yarn@1.22.22 pnpm@7.33.5; \
-    elif [ "${NODE_VERSION}" = "16" ]; then npm install -g yarn@1.22.22 pnpm@8.15.9; \
-    else npm install -g yarn@1.22.22 pnpm@9.15.9; fi \
+RUN case "${NODE_VERSION}" in \
+      14*) pnpm_version="7.33.5" ;; \
+      16*) pnpm_version="8.15.9" ;; \
+      *) pnpm_version="9.15.9" ;; \
+    esac \
+    && rm -f /usr/local/bin/yarn /usr/local/bin/yarnpkg /usr/local/bin/pnpm /usr/local/bin/pnpx \
+    && npm install -g yarn@1.22.22 "pnpm@${pnpm_version}" \
     && node --version && npm --version && yarn --version && pnpm --version
 
 # Set compiler flags for node-sass compatibility
