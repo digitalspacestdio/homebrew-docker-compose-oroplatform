@@ -69,6 +69,13 @@ git checkout -b fix/descriptive-task-name
 - ❌ `git push origin master`
 - ✅ Push to feature branch, create PR
 
+## 3.1. If User Says "Conflict" - Fix Branch Against Upstream
+
+- ✅ If the user says there is a conflict, do not debate whether the conflict exists
+- ✅ Rebase or rebuild the working branch against the latest `main/master` from `digitalspacestdio/homebrew-docker-compose-oroplatform`
+- ✅ Prefer fixing the actual branch from the repository the PR targets, not just a local or fork-only base
+- ❌ Do not argue with the user about conflict status before checking and fixing the branch
+
 ## 4. Never Reset - Use Stash
 
 - ❌ `git reset --hard`
