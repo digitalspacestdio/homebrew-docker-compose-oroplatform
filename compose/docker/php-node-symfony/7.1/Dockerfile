@@ -51,8 +51,8 @@ RUN apk add --no-cache libstdc++
 COPY --from=app_node /usr/local /usr/local
 COPY --from=app_node /opt /opt
 
-# Install pnpm and smoke test for Node.js
-RUN npm install -g pnpm && node --version && npm --version && yarn --version && pnpm --version
+# Install pnpm@7 (last version supporting Node 14) and smoke test for Node.js
+RUN npm install -g pnpm@7 && node --version && npm --version && yarn --version && pnpm --version
 
 # Set compiler flags for node-sass compatibility
 ENV CXXFLAGS="-std=c++14"
