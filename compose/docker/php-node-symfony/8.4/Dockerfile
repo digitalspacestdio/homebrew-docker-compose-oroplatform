@@ -54,7 +54,7 @@ COPY --from=app_node /opt /opt
 # Install package managers and smoke test Node.js toolchain
 RUN case "${NODE_VERSION}" in \
       14*) pnpm_version="7.33.5" ;; \
-      16*) pnpm_version="8.15.9" ;; \
+      16*) pnpm_version="7.33.5" ;; \
       *) pnpm_version="9.15.9" ;; \
     esac \
     && rm -f /usr/local/bin/yarn /usr/local/bin/yarnpkg /usr/local/bin/pnpm /usr/local/bin/pnpx \
