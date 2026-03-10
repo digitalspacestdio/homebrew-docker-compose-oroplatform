@@ -52,7 +52,7 @@ COPY --from=app_node /usr/local /usr/local
 COPY --from=app_node /opt /opt
 
 # Install a pnpm version compatible with the selected Node.js and smoke test
-RUN if [ "${NODE_VERSION}" = "16" ]; then npm install -g pnpm@8; else corepack enable pnpm; fi \
+RUN if [ "${NODE_VERSION}" = "16" ]; then corepack enable pnpm && corepack prepare pnpm@8.15.8 --activate; else corepack enable pnpm; fi \
     && node --version && npm --version && yarn --version && pnpm --version
 
 # Copy ofelia binary
