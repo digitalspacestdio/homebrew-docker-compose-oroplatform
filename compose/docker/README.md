@@ -377,7 +377,7 @@ COPY --from=app_node /usr/local /usr/local
 COPY --from=app_node /opt /opt
 
 # 3. NOW smoke test will work
-RUN node --version && npm --version && yarn --version
+RUN corepack enable pnpm && node --version && npm --version && yarn --version && pnpm --version
 
 # ❌ WRONG ORDER (old broken version)
 # Copy Node.js first, then install libs later in build.sh

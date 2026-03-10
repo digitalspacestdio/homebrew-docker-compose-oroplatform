@@ -52,8 +52,8 @@ RUN apk add --no-cache libstdc++ gcompat
 COPY --from=app_node /usr/local /usr/local
 COPY --from=app_node /opt /opt
 
-# Smoke test for Node.js
-RUN node --version && npm --version && yarn --version
+# Install pnpm and smoke test for Node.js
+RUN corepack enable pnpm && node --version && npm --version && yarn --version && pnpm --version
 
 # Copy ofelia binary
 COPY --from=mcuadros/ofelia:latest /usr/bin/ofelia /usr/bin/ofelia
