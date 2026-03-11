@@ -58,6 +58,8 @@ RUN rm -f /usr/local/bin/yarn /usr/local/bin/yarnpkg /usr/local/bin/pnpm /usr/lo
     && npm install -g yarn@1.22.22 \
     && case "${NODE_VERSION}" in \
       14*|16*) node --version && npm --version && yarn --version ;; \
+      24*) npm install -g pnpm@10.32.0 \
+         && node --version && npm --version && yarn --version && pnpm --version ;; \
       *) npm install -g pnpm@9.15.9 \
          && node --version && npm --version && yarn --version && pnpm --version ;; \
     esac
