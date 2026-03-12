@@ -947,6 +947,14 @@ orodc agents symfony          # Symfony
 - **Need coding guidelines?** → Run `orodc agents rules` for complete standards
 - **CMS-specific commands?** → Run `orodc agents <cms-type>` for framework-specific instructions
 
+#### 📦 Install Skill: `docker-dev-env-php`
+
+Install the repository skill with:
+
+```bash
+npx skills add https://github.com/digitalspacestdio/homebrew-docker-compose-oroplatform.git --skill docker-dev-env-php
+```
+
 #### 🚀 AI Proxy Commands: `orodc codex`, `orodc gemini`, `orodc cursor`
 
 Launch AI coding assistants with OroDC context automatically configured:
