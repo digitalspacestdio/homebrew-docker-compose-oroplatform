@@ -15,10 +15,11 @@ Use this skill only for this repository.
 
 Use these entrypoints in this order:
 
+- `orodc status`: first command to understand project state
 - `orodc help`: general documentation and command overview
 - `orodc agents`: agent-focused guidance, CMS-specific instructions, coding rules, and installation steps
 
-If it is unclear where to start, run `orodc help` first, then `orodc agents`.
+If it is unclear where to start, run `orodc status` first, then `orodc help`, then `orodc agents`.
 
 ## If `orodc` Is Missing
 
@@ -38,12 +39,11 @@ orodc help
 
 ## `orodc agents`
 
-Run `orodc agents` from the real application project root.
+Run `orodc status` first to understand whether you are in a real application project root and what state the environment is in.
 
-Expected project root markers:
+Then run `orodc agents` from the real application project root.
 
-- `composer.json`
-- `.env.orodc`
+Do not treat a missing `.env.orodc` by itself as a problem. Use `orodc status` to determine project state instead of guessing from individual files.
 
 Do not rely on `orodc agents` from the tap repository itself or from an arbitrary non-project directory.
 
@@ -70,6 +70,7 @@ Agent rule:
 
 ## Usage Rules
 
+- Run `orodc status` first when starting work in a project.
 - Run `orodc agents ...` from the target project root when agent documentation is needed.
 - Run environment and PHP-related commands from the target project root.
 - Prefer `orodc` over raw `php`, `docker compose`, or ad-hoc container commands when the task is about the managed local environment.
@@ -107,6 +108,7 @@ Notes:
 Run these commands from the application root:
 
 ```bash
+orodc status
 orodc up -d
 orodc ps
 orodc config
@@ -114,6 +116,7 @@ orodc config
 
 Use `orodc` as the default entrypoint for local development:
 
+- Check project state: `orodc status`
 - Start services: `orodc up -d`
 - Stop services: `orodc down`
 - Check status: `orodc ps`
