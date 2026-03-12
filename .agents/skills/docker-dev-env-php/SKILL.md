@@ -20,6 +20,22 @@ Use these entrypoints in this order:
 
 If it is unclear where to start, run `orodc help` first, then `orodc agents`.
 
+## If `orodc` Is Missing
+
+This tool may not be installed yet.
+
+If `orodc` is unavailable, do not continue with `orodc`-based steps as if the command exists. Tell the user that `orodc` must be installed first and provide the install command:
+
+```bash
+brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform
+```
+
+After installation, the user can verify it with:
+
+```bash
+orodc help
+```
+
 ## `orodc agents`
 
 Run `orodc agents` from the real application project root.
