@@ -28,6 +28,14 @@ RUN set -eux; \
     else \
         echo "postgresql-${PG_MAJOR}-repack not available in repository, skipping..."; \
     fi; \
+    # Try to install PostGIS for this version (required by Oro 7.0+ LTS)
+    if apt-cache show "postgresql-${PG_MAJOR}-postgis-3" >/dev/null 2>&1; then \
+        echo "Installing postgresql-${PG_MAJOR}-postgis-3..."; \
+        apt-get install -yqq --no-install-recommends "postgresql-${PG_MAJOR}-postgis-3"; \
+        echo "postgresql-${PG_MAJOR}-postgis-3 installed successfully"; \
+    else \
+        echo "postgresql-${PG_MAJOR}-postgis-3 not available in repository, skipping..."; \
+    fi; \
     # Install pv (pipe viewer) for progress display during database import
     apt-get install -yqq --no-install-recommends pv; \
     # Clean up
