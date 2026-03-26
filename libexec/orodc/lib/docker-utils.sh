@@ -319,10 +319,15 @@ handle_compose_up() {
     up_flags+=("--wait")
   fi
 
-  # Add quiet flags to suppress output when running with spinner
-  # This ensures spinner is visible and not overwritten by docker compose output
+  # Add quiet flags only if current docker compose supports them.
+  # Some compose versions (e.g. v5.x) do not support --quiet-build for `up`.
+  # shellcheck disable=SC2154
+  up_help=$(${DOCKER_COMPOSE_BIN_CMD} up --help 2>/dev/null || true)
+
   has_quiet_pull=false
   has_quiet_build=false
+  supports_quiet_pull=false
+  supports_quiet_build=false
   for flag in "${up_flags[@]}"
   do
     if [[ "${flag}" == "--quiet-pull" ]]
@@ -335,13 +340,22 @@ handle_compose_up() {
     fi
   done
 
-  # Add quiet flags if not already present (only when running with spinner, not in verbose mode)
+  if echo "${up_help}" | grep -q -- "--quiet-pull"
+  then
+    supports_quiet_pull=true
+  fi
+  if echo "${up_help}" | grep -q -- "--quiet-build"
+  then
+    supports_quiet_build=true
+  fi
+
+  # Add supported quiet flags if not already present.
   quiet_flags=()
-  if [[ "${has_quiet_pull}" == "false" ]]
+  if [[ "${has_quiet_pull}" == "false" ]] && [[ "${supports_quiet_pull}" == "true" ]]
   then
     quiet_flags+=("--quiet-pull")
   fi
-  if [[ "${has_quiet_build}" == "false" ]]
+  if [[ "${has_quiet_build}" == "false" ]] && [[ "${supports_quiet_build}" == "true" ]]
   then
     quiet_flags+=("--quiet-build")
   fi
