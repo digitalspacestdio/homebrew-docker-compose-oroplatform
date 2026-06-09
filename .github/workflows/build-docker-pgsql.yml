@@ -9,9 +9,9 @@ on:
   workflow_dispatch:
     inputs:
       pg_versions:
-        description: 'PostgreSQL versions to build (comma-separated, e.g., "15.1,16.1,17.4")'
+        description: 'PostgreSQL versions to build (comma-separated, e.g., "15.1,16.6,17.4,18.4")'
         required: false
-        default: '15.1,16.6,17.4'
+        default: '15.1,16.6,17.4,18.4'
 
 permissions:
   contents: read
@@ -31,7 +31,7 @@ jobs:
             VERSIONS="${{ github.event.inputs.pg_versions }}"
           else
             # Default versions for push events
-            VERSIONS="15.1,16.6,17.4"
+            VERSIONS="15.1,16.6,17.4,18.4"
           fi
           # Convert comma-separated string to JSON array
           JSON_VERSIONS=$(echo "$VERSIONS" | jq -R -c 'split(",")')

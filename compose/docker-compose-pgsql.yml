@@ -1,6 +1,6 @@
 services:
   database:
-    image: ghcr.io/digitalspacestdio/orodc-pgsql:${DC_ORO_PGSQL_VERSION:-15.1}
+    image: ghcr.io/digitalspacestdio/orodc-pgsql:${DC_ORO_PGSQL_VERSION:-18.4}
     hostname: database.${DC_ORO_NAME:-unnamed}.docker.local
     container_name: ${DC_ORO_NAME:-unnamed}_database
     dns:
@@ -34,7 +34,7 @@ services:
         max-size: "10m"
 
   database-cli:
-    image: ghcr.io/digitalspacestdio/orodc-pgsql:${DC_ORO_PGSQL_VERSION:-15.1}
+    image: ghcr.io/digitalspacestdio/orodc-pgsql:${DC_ORO_PGSQL_VERSION:-18.4}
     hostname: database-cli.${DC_ORO_NAME:-unnamed}.docker.local
     container_name: ${DC_ORO_NAME:-unnamed}_database_cli
     dns:

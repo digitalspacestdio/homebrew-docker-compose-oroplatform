@@ -100,7 +100,7 @@ The system SHALL display versions in descending order (newest first).
 
 #### Scenario: Database versions sorted newest to oldest
 - **WHEN** displaying PostgreSQL versions
-- **THEN** versions SHALL be ordered: 17.4, 16.6, 15.1
+- **THEN** versions SHALL be ordered: 18.4, 17.4, 16.6, 15.1
 - **WHEN** displaying MySQL versions
 - **THEN** versions SHALL be ordered: 9.0, 8.4, 8.0, 5.7
 

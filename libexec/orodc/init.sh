@@ -487,13 +487,13 @@ else
   # Select version based on type (sorted newest to oldest)
   if [[ "${SELECTED_DB_TYPE}" == "PostgreSQL" ]]
   then
-    PGSQL_VERSIONS=("17.4" "16.6" "15.1")
+    PGSQL_VERSIONS=("18.4" "17.4" "16.6" "15.1")
     # Only use existing version if it's valid for PostgreSQL and schema hasn't changed
     if [[ "${EXISTING_DB_SCHEMA}" == "pgsql" ]] && [[ " ${PGSQL_VERSIONS[*]} " == *" ${EXISTING_DB_VERSION} "* ]]
     then
       DEFAULT_PGSQL_VERSION="${EXISTING_DB_VERSION}"
     else
-      DEFAULT_PGSQL_VERSION="17.4"
+      DEFAULT_PGSQL_VERSION="18.4"
     fi
     SELECTED_DB_VERSION=$(prompt_select "Select PostgreSQL version:" "${DEFAULT_PGSQL_VERSION}" "${PGSQL_VERSIONS[@]}")
     SELECTED_DB_SCHEMA="pgsql"
@@ -823,6 +823,9 @@ EOF
   then
     update_env_var "${TARGET_ENV_FILE}" "DC_ORO_MYSQL_IMAGE" "${SELECTED_DB_IMAGE}"
     update_env_var "${TARGET_ENV_FILE}" "DC_ORO_MYSQL_VERSION" "${SELECTED_DB_VERSION}"
+  elif [[ "${SELECTED_DB_SCHEMA}" == "pgsql" ]]
+  then
+    update_env_var "${TARGET_ENV_FILE}" "DC_ORO_PGSQL_VERSION" "${SELECTED_DB_VERSION}"
   fi
 
   # Search Engine Configuration
