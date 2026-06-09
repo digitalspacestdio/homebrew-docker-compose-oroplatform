@@ -726,10 +726,23 @@ initialize_environment() {
       debug_log "initialize_environment: derived DC_ORO_MYSQL_IMAGE from DC_ORO_DATABASE_IMAGE (backward compat)"
     fi
     # PostgreSQL: Backward compat - derive DC_ORO_PGSQL_VERSION from DC_ORO_DATABASE_* (compose uses PGSQL_ vars)
-    if [[ "${DC_ORO_DATABASE_SCHEMA:-}" == "pgsql" ]] && [[ -z "${DC_ORO_PGSQL_VERSION:-}" ]] && [[ -n "${DC_ORO_DATABASE_VERSION:-}" ]]
+    if [[ "${DC_ORO_DATABASE_SCHEMA:-}" =~ ^(pgsql|postgres|postgresql|pdo_pgsql)$ ]] && [[ -z "${DC_ORO_PGSQL_VERSION:-}" ]] && [[ -n "${DC_ORO_DATABASE_VERSION:-}" ]]
     then
       export DC_ORO_PGSQL_VERSION="${DC_ORO_DATABASE_VERSION}"
       debug_log "initialize_environment: derived DC_ORO_PGSQL_VERSION from DC_ORO_DATABASE_VERSION (backward compat)"
+    fi
+    if [[ "${DC_ORO_DATABASE_SCHEMA:-}" =~ ^(pgsql|postgres|postgresql|pdo_pgsql)$ ]] && [[ -z "${DC_ORO_PGSQL_DATA_VOLUME_TARGET:-}" ]]
+    then
+      local pgsql_major
+      pgsql_major="${DC_ORO_PGSQL_VERSION:-${DC_ORO_DATABASE_VERSION:-18.4}}"
+      pgsql_major="${pgsql_major%%.*}"
+      if [[ "${pgsql_major}" -ge 18 ]]
+      then
+        export DC_ORO_PGSQL_DATA_VOLUME_TARGET="/var/lib/postgresql"
+      else
+        export DC_ORO_PGSQL_DATA_VOLUME_TARGET="/var/lib/postgresql/data"
+      fi
+      debug_log "initialize_environment: DC_ORO_PGSQL_DATA_VOLUME_TARGET=${DC_ORO_PGSQL_DATA_VOLUME_TARGET}"
     fi
     # MySQL: Select config file by version (my-5.7.cnf for <8, my-8.cnf for 8+)
     if [[ "${DC_ORO_DATABASE_SCHEMA:-}" == "mysql" ]] && [[ -z "${DC_ORO_MYSQL_CONF:-}" ]]

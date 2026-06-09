@@ -852,6 +852,12 @@ EOF
   elif [[ "${SELECTED_DB_SCHEMA}" == "pgsql" ]]
   then
     update_env_var "${TARGET_ENV_FILE}" "DC_ORO_PGSQL_VERSION" "${SELECTED_DB_VERSION}"
+    if [[ "${SELECTED_DB_VERSION%%.*}" -ge 18 ]]
+    then
+      update_env_var "${TARGET_ENV_FILE}" "DC_ORO_PGSQL_DATA_VOLUME_TARGET" "/var/lib/postgresql"
+    else
+      update_env_var "${TARGET_ENV_FILE}" "DC_ORO_PGSQL_DATA_VOLUME_TARGET" "/var/lib/postgresql/data"
+    fi
   fi
 
   # Search Engine Configuration
