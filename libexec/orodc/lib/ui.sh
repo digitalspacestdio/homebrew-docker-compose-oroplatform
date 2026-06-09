@@ -433,7 +433,6 @@ confirm_yes_no() {
   local prompt="$1"
   local default="${2:-no}"
   local answer=""
-  local char
   local input_source="/dev/tty"
 
   if [[ ! -r /dev/tty ]]
@@ -449,6 +448,11 @@ confirm_yes_no() {
     input_source="/dev/stdin"
   fi
 
+  # Ensure terminal is in normal line mode so input stays aligned with other
+  # prompts (prompt_select reads full lines). Reading char-by-char here caused
+  # desynchronized input and skipped steps when input was buffered.
+  stty sane 2>/dev/null || true
+
   while true
   do
     if [[ "${default}" == "yes" ]]
@@ -458,35 +462,15 @@ confirm_yes_no() {
       printf "\033[1;33m%s [y/N]: \033[0m" "${prompt}" >&2
     fi
 
-    # Read input character by character, filtering only Latin letters and digits
-    answer=""
-    while IFS= read -rsn1 char <"${input_source}" 2>/dev/null || IFS= read -rsn1 char
-    do
-      # Handle Enter key (empty char or newline)
-      if [[ -z "${char}" ]] || [[ "${char}" == $'\n' ]] || [[ "${char}" == $'\r' ]]
-      then
-        break
-      fi
-      # Handle Backspace (^H, \177, \b) and Delete
-      if [[ "${char}" == $'\177' ]] || [[ "${char}" == $'\b' ]] || [[ "${char}" == $'\x7f' ]]
-      then
-        if [[ ${#answer} -gt 0 ]]
-        then
-          # Remove last character from answer
-          answer="${answer%?}"
-          # Move cursor back, print space, move cursor back again
-          printf "\b \b" >&2
-        fi
-        continue
-      fi
-      # Only accept Latin letters and digits - ignore all other characters silently
-      if [[ "${char}" =~ ^[a-zA-Z0-9]$ ]]
-      then
-        answer+="${char}"
-        printf "%s" "${char}" >&2
-      fi
-      # Ignore all other characters without any feedback
-    done
+    # Read a full line (waits for Enter). Consistent with prompt_select.
+    if ! IFS= read -r answer <"${input_source}" 2>/dev/null
+    then
+      IFS= read -r answer || answer=""
+    fi
+
+    # Trim surrounding whitespace
+    answer="${answer#"${answer%%[![:space:]]*}"}"
+    answer="${answer%"${answer##*[![:space:]]}"}"
 
     # Use default if empty input
     if [[ -z "${answer}" ]]
@@ -498,9 +482,6 @@ confirm_yes_no() {
         answer="n"
       fi
     fi
-
-    # Always add newline after input
-    echo "" >&2
 
     # Accept: y, yes, Y, YES, n, no, N, NO
     answer_lower="$(echo "${answer}" | tr '[:upper:]' '[:lower:]')"

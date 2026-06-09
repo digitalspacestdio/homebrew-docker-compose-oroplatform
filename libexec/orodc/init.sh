@@ -107,6 +107,32 @@ then
       DC_ORO_DATABASE_SCHEMA) EXISTING_DB_SCHEMA="${value}" ;;
       DC_ORO_DATABASE_VERSION) EXISTING_DB_VERSION="${value}" ;;
       DC_ORO_DATABASE_IMAGE) EXISTING_DB_IMAGE="${value}" ;;
+      DC_ORO_MYSQL_IMAGE)
+        if [[ -z "${EXISTING_DB_IMAGE}" ]]
+        then
+          EXISTING_DB_IMAGE="${value}"
+        fi
+        ;;
+      DC_ORO_MYSQL_VERSION)
+        if [[ -z "${EXISTING_DB_VERSION}" ]]
+        then
+          EXISTING_DB_VERSION="${value}"
+        fi
+        if [[ -z "${EXISTING_DB_SCHEMA}" ]]
+        then
+          EXISTING_DB_SCHEMA="mysql"
+        fi
+        ;;
+      DC_ORO_PGSQL_VERSION)
+        if [[ -z "${EXISTING_DB_VERSION}" ]]
+        then
+          EXISTING_DB_VERSION="${value}"
+        fi
+        if [[ -z "${EXISTING_DB_SCHEMA}" ]]
+        then
+          EXISTING_DB_SCHEMA="pgsql"
+        fi
+        ;;
       DC_ORO_SEARCH_ENGINE) EXISTING_SEARCH_ENGINE="${value}" ;;
       DC_ORO_SEARCH_VERSION) EXISTING_SEARCH_VERSION="${value}" ;;
       DC_ORO_SEARCH_IMAGE) EXISTING_SEARCH_IMAGE="${value}" ;;
@@ -428,7 +454,7 @@ msg_header "2. Database Configuration"
 
 # Determine if using custom database image
 USE_CUSTOM_DB=false
-if [[ -n "${EXISTING_DB_IMAGE}" ]] && [[ ! "${EXISTING_DB_IMAGE}" =~ ^(ghcr\.io/digitalspacestdio/orodc-pgsql:|mysql:) ]]
+if [[ -n "${EXISTING_DB_IMAGE}" ]] && [[ ! "${EXISTING_DB_IMAGE}" =~ ^(ghcr\.io/digitalspacestdio/orodc-pgsql:|ghcr\.io/digitalspacestdio/orodc-mysql:|mysql:) ]]
 then
   USE_CUSTOM_DB=true
 fi
