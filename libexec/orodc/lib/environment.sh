@@ -725,6 +725,12 @@ initialize_environment() {
       export DC_ORO_MYSQL_VERSION="${DC_ORO_DATABASE_VERSION:-8.4}"
       debug_log "initialize_environment: derived DC_ORO_MYSQL_IMAGE from DC_ORO_DATABASE_IMAGE (backward compat)"
     fi
+    # PostgreSQL: Backward compat - derive DC_ORO_PGSQL_VERSION from DC_ORO_DATABASE_* (compose uses PGSQL_ vars)
+    if [[ "${DC_ORO_DATABASE_SCHEMA:-}" == "pgsql" ]] && [[ -z "${DC_ORO_PGSQL_VERSION:-}" ]] && [[ -n "${DC_ORO_DATABASE_VERSION:-}" ]]
+    then
+      export DC_ORO_PGSQL_VERSION="${DC_ORO_DATABASE_VERSION}"
+      debug_log "initialize_environment: derived DC_ORO_PGSQL_VERSION from DC_ORO_DATABASE_VERSION (backward compat)"
+    fi
     # MySQL: Select config file by version (my-5.7.cnf for <8, my-8.cnf for 8+)
     if [[ "${DC_ORO_DATABASE_SCHEMA:-}" == "mysql" ]] && [[ -z "${DC_ORO_MYSQL_CONF:-}" ]]
     then

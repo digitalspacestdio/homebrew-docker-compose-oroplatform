@@ -128,7 +128,7 @@ case "${BUILD_TARGET}" in
     msg_info "  nginx     - Nginx web server (orodc-nginx:latest)"
     msg_info "  mail      - Mailpit mail catcher (orodc-mail:latest)"
     msg_info "  pgsql     - PostgreSQL database (orodc-pgsql:VERSION)"
-    msg_info "              Versions: 15.1, 16.6, 17.4"
+    msg_info "              Versions: 15.1, 16.6, 17.4, 18.4"
     msg_info "  mysql     - MySQL database (orodc-mysql:VERSION)"
     msg_info "              Versions: 8.0, 8.4"
     msg_info "  all       - Build all images above"
@@ -181,7 +181,7 @@ case "${BUILD_TARGET}" in
     # Default versions if not specified
     if [[ -z "${PG_VERSION}" ]]
     then
-      PG_VERSIONS=("15.1" "16.6" "17.4")
+      PG_VERSIONS=("15.1" "16.6" "17.4" "18.4")
       msg_info "Building all PostgreSQL versions: ${PG_VERSIONS[*]}"
     else
       PG_VERSIONS=("${PG_VERSION}")
@@ -272,7 +272,7 @@ case "${BUILD_TARGET}" in
 
     # PostgreSQL (all versions)
     msg_info "=== PostgreSQL ==="
-    for ver in 15.1 16.6 17.4
+    for ver in 15.1 16.6 17.4 18.4
     do
       if build_image \
          "${DOCKER_DIR}/pgsql/Dockerfile" \

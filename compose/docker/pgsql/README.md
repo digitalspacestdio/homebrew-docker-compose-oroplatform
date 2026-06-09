@@ -10,9 +10,9 @@ This directory contains a custom Dockerfile for PostgreSQL with automatic pgpool
 
 ## Build Arguments
 
-- `PG_VERSION`: PostgreSQL version to use (default: `15.1`)
-  - Examples: `15.1`, `16.2`, `17.4`
-  - The Dockerfile will automatically extract the major version (15, 16, 17) for pgpool2 package selection
+- `PG_VERSION`: PostgreSQL version to use (default: `18.4`)
+  - Examples: `15.1`, `16.6`, `17.4`, `18.4`
+  - The Dockerfile will automatically extract the major version (15, 16, 17, 18) for pgpool2 package selection
 
 ## Usage
 
@@ -23,7 +23,7 @@ The image is automatically built when using `docker-compose up` with the pgsql p
 Control the PostgreSQL version via environment variable:
 
 ```bash
-export DC_ORO_PGSQL_VERSION=17.4
+export DC_ORO_PGSQL_VERSION=18.4
 orodc up -d
 ```
 
@@ -49,6 +49,7 @@ docker build --build-arg PG_VERSION=17.4 -t ghcr.io/digitalspacestdio/orodc-pgsq
 - PostgreSQL 15: `postgresql-15-pgpool2` ✅
 - PostgreSQL 16: `postgresql-16-pgpool2` ✅
 - PostgreSQL 17: `postgresql-17-pgpool2` ✅
+- PostgreSQL 18: `postgresql-18-pgpool2` (depends on Debian packages in base image)
 - PostgreSQL 14: `postgresql-14-pgpool2` ✅
 
 Note: Package availability depends on the Debian/Ubuntu version in the base postgres image.
