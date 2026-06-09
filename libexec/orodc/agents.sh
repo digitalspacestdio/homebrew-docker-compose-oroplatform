@@ -8,7 +8,7 @@ source "${SCRIPT_DIR}/lib/common.sh"
 source "${SCRIPT_DIR}/lib/ui.sh"
 source "${SCRIPT_DIR}/lib/environment.sh"
 
-# Determine project directory (same logic as codex.sh)
+# Determine project directory
 if [[ -z "${DC_ORO_APPDIR:-}" ]]
 then
   PROJECT_DIR=$(find-up composer.json)

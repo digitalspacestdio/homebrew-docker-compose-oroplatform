@@ -148,7 +148,7 @@ wizard_init "OroDC Interactive Configuration"
 # 0. CMS Type Configuration (first question)
 echo ""
 msg_header "0. CMS Type Configuration"
-msg_info "This helps tools like Codex CLI understand your project structure."
+msg_info "This helps AI coding agents understand your project structure."
 msg_info "CMS type will be auto-detected if not set."
 
 # Use detected CMS type (determined at the beginning)

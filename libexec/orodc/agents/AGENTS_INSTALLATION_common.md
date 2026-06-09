@@ -41,7 +41,7 @@
 - OroDC must be installed: `brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform`
 - Docker must be running
 - Empty project directory (or directory with only `.git` if using version control)
-- **IMPORTANT**: User must run `orodc init` manually in terminal BEFORE using `orodc codex` agent
+- **IMPORTANT**: User must run `orodc init` manually in terminal BEFORE the agent continues with environment actions
 
 ## Step-by-Step Installation Process
 
@@ -60,7 +60,7 @@ orodc init
 ```
 
 **IMPORTANT**: 
-- `orodc init` must be executed by user manually in terminal BEFORE launching `orodc codex`
+- `orodc init` must be executed by user manually in terminal BEFORE continuing with environment actions
 - `orodc init` is NOT interactive - it requires user to run it manually
 - This command will:
   - Detect PHP, Node.js, Composer versions
