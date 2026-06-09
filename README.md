@@ -683,9 +683,6 @@ orodc agents installation        # Show installation guide (common + CMS-specifi
 orodc agents rules               # Show coding rules (common + CMS-specific)
 orodc agents common              # Show common instructions
 orodc agents <cms-type>          # Show CMS-specific instructions (oro, magento, etc.)
-orodc codex                      # Launch Codex CLI with OroDC context
-orodc gemini                     # Launch Gemini CLI with OroDC context
-orodc cursor                     # Launch Cursor AI with OroDC context
 
 # Cleanup and maintenance
 orodc purge                      # Complete cleanup
@@ -912,7 +909,7 @@ orodc proxy purge                    # Remove proxy and volumes
 
 ### 🤖 AI Assistant Integration
 
-OroDC provides seamless integration with AI coding assistants (Codex, Gemini, Cursor) and a dedicated command for accessing agent documentation.
+OroDC provides a dedicated command for accessing AI agent documentation, installation guides, and coding rules.
 
 #### 📚 Agent Documentation: `orodc agents`
 
@@ -955,88 +952,7 @@ Install the repository skill with:
 npx skills add https://github.com/digitalspacestdio/homebrew-docker-compose-oroplatform.git --skill docker-dev-env-php
 ```
 
-#### 🚀 AI Proxy Commands: `orodc codex`, `orodc gemini`, `orodc cursor`
-
-Launch AI coding assistants with OroDC context automatically configured:
-
-```bash
-# Launch Codex CLI with OroDC context
-orodc codex
-
-# Launch Gemini CLI with OroDC context
-orodc gemini
-
-# Launch Cursor AI with OroDC context
-orodc cursor
-```
-
-**What These Commands Do:**
-
-1. **Detect CMS type** from project files or `.env.orodc`
-2. **Copy agent files** to `~/.orodc/{project_name}/`
-3. **Generate system prompt** with:
-   - Common instructions (from `AGENTS_common.md`)
-   - References to CMS-specific instructions via `orodc agents` commands
-   - Project context (name, URL, directory)
-   - Environment information
-4. **Launch AI agent** with the generated system prompt
-
-**CMS Type Detection:**
-
-Automatically detects CMS type:
-- **Oro Platform**: Detects `oro/platform`, `oro/commerce`, `oro/crm`, etc. in `composer.json`
-- **Magento**: Detects `magento/product-*` packages or Magento-specific files
-- **Symfony**: Detects `symfony/symfony` or `symfony/framework-bundle`
-- **Laravel**: Detects `laravel/framework`
-- **PHP Generic**: Default for other PHP projects
-
-**Configuration:**
-
-You can explicitly set CMS type in `.env.orodc`:
-```bash
-DC_ORO_CMS_TYPE=oro          # Force Oro Platform
-DC_ORO_CMS_TYPE=magento      # Force Magento
-DC_ORO_CMS_TYPE=symfony      # Force Symfony
-DC_ORO_CMS_TYPE=laravel      # Force Laravel
-DC_ORO_CMS_TYPE=php-generic  # Force generic PHP
-```
-
-**Features:**
-
-- ✅ Auto-detects CMS type from project files
-- ✅ Provides OroDC documentation context to AI agents
-- ✅ Constrains AI agents to use only OroDC commands
-- ✅ CMS-aware system prompts for better assistance
-- ✅ Works with or without explicit CMS type configuration
-- ✅ On-demand documentation access via `orodc agents` commands
-
-**Example:**
-
-```bash
-# In an OroCommerce project
-cd ~/orocommerce
-
-# Get installation guide
-orodc agents installation
-
-# Launch AI assistant with context
-orodc codex
-# AI assistant receives:
-# - CMS type: oro
-# - OroDC documentation context
-# - Instructions to use orodc commands
-# - References to `orodc agents` for detailed docs
-
-# Ask AI questions about your OroDC project
-# AI will suggest orodc commands instead of direct Docker commands
-```
-
-**Installation:**
-
-AI CLI tools must be installed separately:
-- **Codex CLI**: Check [Codex CLI documentation](https://github.com/context7/codex-cli) for installation
-- **Gemini CLI**: Check Gemini CLI documentation for installation
-- **Cursor**: Usually pre-installed with Cursor IDE
+The skill explains how to install OroDC and how to fetch all required instructions via `orodc agents` (installation guides, coding rules, CMS-specific instructions).
 
 ### 🔌 Reverse Proxy Management
 

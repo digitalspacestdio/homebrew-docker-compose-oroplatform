@@ -2206,13 +2206,6 @@ case "$1" in
     # status: read-only command, should not initialize or create files
     # agents: documentation-only, has own project detection logic
     ;;
-  codex|gemini|cursor)
-    # Codex/Gemini/Cursor need project context but should work gracefully without project
-    # These commands use prepare_project_environment from their own scripts
-    # which doesn't require full initialize_environment (avoids starting Docker Compose)
-    # All three agents (codex.sh, gemini.sh, cursor.sh) use prepare_project_environment
-    # which only loads config and detects CMS type, without starting Docker services
-    ;;
   *)
     # Initialize environment for all other commands (including menu when no args)
     # For menu, allow initialization to fail gracefully if not in project
@@ -3019,7 +3012,7 @@ fi
 
 if [[ -z ${ORO_SSH_PUBLIC_KEY} ]]; then
   # DC_ORO_CONFIG_DIR must be set (validated by validate_project for non-excluded commands)
-  # For excluded commands (init, codex, etc.), skip SSH key creation if DC_ORO_CONFIG_DIR is not set
+  # For excluded commands (init, etc.), skip SSH key creation if DC_ORO_CONFIG_DIR is not set
   if [[ -z "${DC_ORO_CONFIG_DIR:-}" ]]; then
     # Skip SSH key creation for commands that don't require project initialization
     # These commands are excluded from validation and don't need SSH key
@@ -3765,7 +3758,7 @@ is_docker_compose_command() {
 is_special_orodc_command() {
   local cmd="$1"
   case "$cmd" in
-    ssh|cli|pgsql|psql|mysql|database-cli|install|purge|test|tests|bash|help|man|init|codex|gemini|cursor|agents|status|proxy|image|docker-build|compose|database|db|conf|search|cache|platform-update|doctor|exec|php|composer|env)
+    ssh|cli|pgsql|psql|mysql|database-cli|install|purge|test|tests|bash|help|man|init|agents|status|proxy|image|docker-build|compose|database|db|conf|search|cache|platform-update|doctor|exec|php|composer|env)
       return 0
       ;;
     *)
@@ -4640,33 +4633,6 @@ case "$1" in
     # Alias: orodc cli -> orodc database cli
     shift
     exec "${LIBEXEC_DIR}/database/cli.sh" "$@"
-    ;;
-
-  codex)
-    shift
-    if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
-      execute_with_menu_return "${LIBEXEC_DIR}/ai/codex.sh" "$@"
-    else
-      exec "${LIBEXEC_DIR}/ai/codex.sh" "$@"
-    fi
-    ;;
-
-  gemini)
-    shift
-    if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
-      execute_with_menu_return "${LIBEXEC_DIR}/ai/gemini.sh" "$@"
-    else
-      exec "${LIBEXEC_DIR}/ai/gemini.sh" "$@"
-    fi
-    ;;
-
-  cursor)
-    shift
-    if [[ -n "${DC_ORO_IS_INTERACTIVE_MENU:-}" ]]; then
-      execute_with_menu_return "${LIBEXEC_DIR}/ai/cursor.sh" "$@"
-    else
-      exec "${LIBEXEC_DIR}/ai/cursor.sh" "$@"
-    fi
     ;;
 
   # ERROR: Old syntax for some Docker Compose commands

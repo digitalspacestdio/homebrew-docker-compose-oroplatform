@@ -1,6 +1,6 @@
 ---
 name: docker-dev-env-php
-description: Use `orodc help` for general documentation and `orodc agents` for CMS-specific agent guidance, then use `orodc` for local PHP Docker environment actions.
+description: Manage the local PHP Docker dev environment (Oro, Magento, Symfony, Laravel, generic PHP) in this repository via `orodc`. Use when starting/stopping services, running PHP/Composer/`bin/console`/`bin/magento` commands, accessing the database, installing or setting up a CMS, configuring `*.docker.local` access, or whenever a task needs `orodc help` or `orodc agents` guidance.
 license: MIT
 metadata:
   author: local
@@ -9,7 +9,7 @@ metadata:
 
 # PHP Docker Dev Env
 
-Use this skill only for this repository.
+Use this skill only for this repository. It is a thin router; read the internal reference file that matches the task instead of duplicating its content here.
 
 ## Entry Points
 
@@ -21,52 +21,26 @@ Use these entrypoints in this order:
 
 If it is unclear where to start, run `orodc status` first, then `orodc help`, then `orodc agents`.
 
-## If `orodc` Is Missing
+## When `orodc` Is Missing
 
-This tool may not be installed yet.
+If `orodc help` reports command not found, `orodc` is not installed. Do not run `orodc`-based steps as if the command exists.
 
-If `orodc` is unavailable, do not continue with `orodc`-based steps as if the command exists. Tell the user that `orodc` must be installed first and provide the install command:
+The quick install command is:
 
 ```bash
 brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform
 ```
 
-After installation, the user can verify it with:
+For the full install flow (Docker requirement, `*.docker.local` infrastructure, platform-specific proxy setup, certificates, and project bootstrap), read [references/installation.md](references/installation.md).
 
-```bash
-orodc help
-```
+## Internal References
 
-## `orodc agents`
+Read the file that matches the task; do not preload them all:
 
-Run `orodc status` first to understand whether you are in a real application project root and what state the environment is in.
-
-Then run `orodc agents` from the real application project root.
-
-Do not treat a missing `.env.orodc` by itself as a problem. Use `orodc status` to determine project state instead of guessing from individual files.
-
-Do not rely on `orodc agents` from the tap repository itself or from an arbitrary non-project directory.
-
-Main commands:
-
-```bash
-orodc agents common
-orodc agents rules
-orodc agents installation
-orodc agents <cms-type>
-```
-
-How to use them:
-
-- `orodc agents common`: shared guidance for all projects
-- `orodc agents rules`: coding rules for the detected CMS
-- `orodc agents installation`: installation guide for the detected CMS
-- `orodc agents <cms-type>`: CMS-specific instructions such as `oro`, `magento`, `symfony`, `laravel`, `wintercms`, or `php-generic`
-
-Agent rule:
-
-- Start with `orodc agents` when the task depends on project conventions or CMS-specific behavior.
-- If the user asks to install, set up, deploy, or create a CMS project, read `orodc agents installation` first and follow it step by step.
+- [references/installation.md](references/installation.md): install `orodc` + infrastructure, bootstrap a project, set up `*.docker.local`.
+- [references/agents.md](references/agents.md): `orodc agents` (CMS conventions, coding rules, installation guides).
+- [references/workflow.md](references/workflow.md): local dev, PHP/app commands, database actions, platform defaults, Oro URLs.
+- [references/proxy.md](references/proxy.md): proxy and domain troubleshooting for `*.docker.local`.
 
 ## Usage Rules
 
@@ -74,98 +48,8 @@ Agent rule:
 - Run `orodc agents ...` from the target project root when agent documentation is needed.
 - Run environment and PHP-related commands from the target project root.
 - Prefer `orodc` over raw `php`, `docker compose`, or ad-hoc container commands when the task is about the managed local environment.
-- Do not duplicate large parts of `orodc help` inside this skill; use the skill as a short guide to the right entrypoints and workflows.
-
-## Proxy And Domains
-
-Access via `https://<project>.docker.local` requires reverse proxy and local DNS setup. Without proxy, project domains will not open in the browser.
-
-For Docker-based proxy management use:
-
-```bash
-orodc proxy up -d
-orodc proxy install-certs
-orodc proxy down
-orodc proxy purge
-```
-
-Use this flow:
-
-- Start proxy: `orodc proxy up -d`
-- Install local certificates for HTTPS: `orodc proxy install-certs`
-- Stop proxy without removing volumes: `orodc proxy down`
-- Remove proxy completely: `orodc proxy purge`
-
-Notes:
-
-- `orodc proxy up -d` is the key command when domains like `*.docker.local` do not resolve through the local proxy.
-- This is especially important on macOS and WSL2 with Docker Desktop.
-- If proxy is not running, access by custom project domains will fail even if app containers are healthy.
-- For full host infrastructure setup of Traefik, Dnsmasq, and local CA, see `README.md`.
-
-## Local Development Workflow
-
-Run these commands from the application root:
-
-```bash
-orodc status
-orodc up -d
-orodc ps
-orodc config
-```
-
-Use `orodc` as the default entrypoint for local development:
-
-- Check project state: `orodc status`
-- Start services: `orodc up -d`
-- Stop services: `orodc down`
-- Check status: `orodc ps`
-- Inspect merged configuration: `orodc config`
-- Open shell in container: `orodc ssh`
-- Read logs: `orodc logs [service]`
-- Debug startup problems: `DEBUG=1 orodc up -d`
-
-For Oro-based projects, the default local URLs are usually:
-
-- App: `https://<project-folder-name>.docker.local`
-- Admin: `https://<project-folder-name>.docker.local/admin`
-- Admin credentials: `admin` / `12345678` or `$ecretPassw0rd`
-- If Authelia appears: `oro` / `oro`
-
-## PHP And App Commands
-
-Use `orodc` for PHP and application commands instead of calling `php` directly:
-
-```bash
-orodc --version
-orodc bin/console cache:clear
-orodc composer install
-orodc script.php
-```
-
-Important:
-
-- Do not use `orodc cli php ...` for normal PHP commands.
-- `orodc` auto-detects PHP flags, `.php` files, and common entrypoints like `bin/console`, `bin/phpunit`, and `bin/magento`.
-
-## Database And Environment Actions
-
-Prefer `orodc` for environment actions:
-
-```bash
-orodc psql
-orodc mysql
-orodc importdb dump.sql.gz
-orodc databaseexport
-```
-
-Use the repository CLI before reaching for direct Docker commands.
-
-## Platform Defaults
-
-- Linux and WSL2: use `DC_ORO_MODE=default`
-- macOS: use `DC_ORO_MODE=mutagen`
-- CI: keep `DC_ORO_CONFIG_DIR` inside the workspace
+- If the user asks to install, set up, deploy, or create a CMS project, read `references/agents.md` and run `orodc agents installation` first, then follow it step by step.
+- Do not duplicate large parts of `orodc help` inside this skill; keep it a short router to the right entrypoints and reference files.
 
 ## Useful References
 

@@ -305,11 +305,11 @@ orodc config
 
 ---
 
-# AI Agents and Proxy Integration
+# AI Agents Documentation
 
 ## Overview
 
-OroDC provides integration with AI coding assistants (Codex, Gemini) through proxy commands (`orodc codex`, `orodc gemini`) and a dedicated command for accessing agent documentation (`orodc agents`).
+OroDC provides a dedicated command for accessing agent documentation (`orodc agents`).
 
 ## Architecture
 
@@ -318,8 +318,6 @@ OroDC provides integration with AI coding assistants (Codex, Gemini) through pro
 ```
 libexec/orodc/
 ├── agents.sh              # Command handler for `orodc agents`
-├── codex.sh               # Codex AI proxy integration
-├── gemini.sh              # Gemini AI proxy integration
 └── agents/                # Agent documentation files
     ├── AGENTS_common.md                    # Common instructions for all projects
     ├── AGENTS_oro.md                       # Oro Platform-specific instructions
@@ -329,21 +327,6 @@ libexec/orodc/
     ├── AGENTS_INSTALLATION_common.md       # Common installation guide
     └── AGENTS_INSTALLATION_oro.md          # Oro-specific installation guide
 ```
-
-### System Prompt Generation
-
-When you run `orodc codex` or `orodc gemini`, the system:
-
-1. **Detects CMS type** - Automatically detects project CMS type (oro, magento, laravel, etc.)
-2. **Copies agent files** - Copies relevant agent documentation files to `~/.orodc/{project_name}/`
-3. **Generates system prompt** - Creates `~/.orodc/{project_name}/AGENTS.md` with:
-   - Common instructions (from `AGENTS_common.md`)
-   - References to CMS-specific instructions via `orodc agents` commands
-   - Project context (name, URL, directory)
-   - Environment information
-4. **Launches AI agent** - Starts Codex/Gemini with the generated system prompt
-
-**Important:** The system prompt does NOT include full content of CMS-specific files. Instead, it references them via `orodc agents` commands, allowing agents to access documentation on-demand without exceeding token limits.
 
 ## Command: `orodc agents`
 
@@ -425,61 +408,6 @@ The smart detection ensures:
 - **No duplication** of information
 - **Flexible documentation** structure
 
-## Proxy Commands: `orodc codex` and `orodc gemini`
-
-### How They Work
-
-1. **Environment Detection:**
-   - Detects CMS type from project files or `.env.orodc`
-   - Loads project configuration
-
-2. **File Preparation:**
-   - Copies agent files to `~/.orodc/{project_name}/`
-   - Normalizes CMS type (e.g., `base` → `php-generic`)
-
-3. **System Prompt Generation:**
-   - Includes `AGENTS_common.md` content directly
-   - References CMS-specific files via `orodc agents` commands:
-     - `orodc agents {cms-type}` for CMS-specific instructions
-     - `orodc agents rules` for coding rules
-     - `orodc agents installation` for installation guides
-
-4. **AI Agent Launch:**
-   - Passes system prompt via `model_instructions_file` config
-   - Sets working directory to project directory
-   - Exports Docker and project context variables
-
-### System Prompt Structure
-
-The generated system prompt includes:
-
-```
-# COMMON INSTRUCTIONS
-[Full content of AGENTS_common.md]
-
-# CMS-SPECIFIC INSTRUCTIONS
-**CMS Type:** {cms-type}
-
-**For CMS-specific instructions, run:** `orodc agents {cms-type}`
-- This command shows detailed instructions, commands, and best practices specific to {cms-type} projects
-
-# CODING RULES
-**For coding rules, run:** `orodc agents rules`
-- This command shows general coding guidelines and CMS-specific coding rules
-
-# INSTALLATION GUIDES
-**For installation guides, run:** `orodc agents installation`
-- This command shows common installation steps and CMS-specific installation steps
-- It automatically combines AGENTS_INSTALLATION_common.md and AGENTS_INSTALLATION_{cms-type}.md
-```
-
-### Why References Instead of Full Content?
-
-1. **Token Limits** - AI models have token limits; including all files would exceed them
-2. **On-Demand Access** - Agents can access specific documentation when needed
-3. **Modularity** - Documentation can be updated independently
-4. **Flexibility** - Different agents can access different parts as needed
-
 ## Adding New CMS Support
 
 To add support for a new CMS:
@@ -496,9 +424,9 @@ To add support for a new CMS:
    - Add CMS type to available types list in help output
    - Ensure CMS type normalization (if needed)
 
-3. **Update system prompt generation:**
-   - Files are automatically detected and included
-   - No changes needed if following naming convention
+3. **No extra wiring needed:**
+   - Files are automatically detected by `orodc agents`
+   - No changes needed if following the naming convention
 
 4. **Test:**
    ```bash
