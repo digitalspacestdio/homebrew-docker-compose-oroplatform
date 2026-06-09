@@ -39,6 +39,34 @@ msg_error() {
   >&2 echo -e "\033[31m==> Error: $1\033[0m"
 }
 
+ensure_sync_ssh_container_started() {
+  local output
+  local exit_code=0
+
+  output=$(bash -c "${DOCKER_COMPOSE_BIN_CMD} up -d ssh" 2>&1) || exit_code=$?
+  if [[ $exit_code -ne 0 ]]; then
+    msg_error "Unable to start the ssh service required for ${DC_ORO_MODE} sync."
+    if [[ -n "$output" ]]; then
+      printf "%s\n" "$output" >&2
+    fi
+    msg_info "Run the same command with DEBUG=1 for full Docker Compose output."
+    exit $exit_code
+  fi
+
+  local ssh_container_id
+  ssh_container_id=$(${DOCKER_COMPOSE_BIN_CMD} ps -q ssh 2>/dev/null || true)
+  if [[ -z "$ssh_container_id" ]]; then
+    msg_error "Docker Compose did not create the ssh service container required for ${DC_ORO_MODE} sync."
+    if [[ -n "$output" ]]; then
+      printf "%s\n" "$output" >&2
+    fi
+    msg_info "Check dependent services such as database, then retry with DEBUG=1 if needed."
+    exit 1
+  fi
+
+  printf "%s\n" "$ssh_container_id"
+}
+
 # Function to display header messages (bold blue)
 msg_header() {
   >&2 echo -e "\033[1;34m==> $1\033[0m"
@@ -3257,10 +3285,9 @@ if [[ "${DC_ORO_MODE}" == "mutagen" ]] || [[ "${DC_ORO_MODE}" == "ssh" ]]; then
     if [[ ${args[0]} != "down" ]] && [[ ${args[0]} != "purge" ]] && [[ ${args[0]} != "init" ]]; then
       ${DOCKER_BIN} volume ls | awk '{ print $2 }' | tail +2 | grep '^'${DC_ORO_NAME}'_appcode$' > /dev/null 2>&1 || {
         ${DOCKER_BIN} volume create "${DC_ORO_NAME}_appcode"  > /dev/null
-        # Start SSH container silently (dependencies will start automatically)
-        bash -c "${DOCKER_COMPOSE_BIN_CMD} up -d ssh" >/dev/null 2>&1 || true
+        SSH_CONTAINER_ID=$(ensure_sync_ssh_container_started)
         SSH_HOST=${DC_ORO_SSH_BIND_HOST:-127.0.0.1}
-        SSH_PORT=$(${DOCKER_BIN} inspect $(${DOCKER_COMPOSE_BIN_CMD} ps | grep ssh | awk '{ print $1 }') | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
+        SSH_PORT=$(${DOCKER_BIN} inspect "$SSH_CONTAINER_ID" | jq -r '.[0].NetworkSettings.Ports["22/tcp"][0].HostPort')
         if [[ 0 -eq $(ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o 'ForwardAgent no' -o IdentitiesOnly=yes -i "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" -p ${SSH_PORT} ${ORO_DC_SSH_ARGS} ${DC_ORO_USER_NAME}@${SSH_HOST} sh -c 'ls "'${DC_ORO_APPDIR}'/"' 2>/dev/null | wc -l) ]]; then
           rsync_cmd="${RSYNC_BIN} --exclude var/cache --exclude vendor --exclude node_modules --links -e \"ssh -o UserKnownHostsFile=/dev/null -o StrictHostKeyChecking=no -o 'ForwardAgent no' -o IdentitiesOnly=yes -i ${DC_ORO_CONFIG_DIR}/ssh_id_ed25519 -p ${SSH_PORT} ${ORO_DC_SSH_ARGS}\" --timeout=3 -r '${DC_ORO_APPDIR}/' ${DC_ORO_USER_NAME}@${SSH_HOST}:'${DC_ORO_APPDIR}/'"
           if [[ -n "${DEBUG:-}" ]] || [[ -n "${VERBOSE:-}" ]]; then
@@ -3296,11 +3323,15 @@ if [[ "${DC_ORO_MODE}" == "mutagen" ]] && [[ -n "${DC_ORO_APPDIR:-}" ]] && [[ -n
     fi
     WAIT_SYNC=""
   elif ! echo "$first_non_flag_arg" | grep -i '^\(build\|pull\|config\|init\)' > /dev/null 2>&1; then
-    if [[ "0" -eq $(${DOCKER_COMPOSE_BIN_CMD} ps -q ssh  2> /dev/null | wc -l 2> /dev/null) ]]; then
-      # Start SSH container silently (dependencies will start automatically)
-      bash -c "${DOCKER_COMPOSE_BIN_CMD} up -d ssh" >/dev/null 2>&1 || true
+    SSH_CONTAINER_ID=$(${DOCKER_COMPOSE_BIN_CMD} ps -q ssh 2>/dev/null || true)
+    if [[ -z "$SSH_CONTAINER_ID" ]]; then
+      SSH_CONTAINER_ID=$(ensure_sync_ssh_container_started)
     fi
-    DOCKER_CONTAINER_NAME_MUTAGEN=$(${DOCKER_BIN} inspect -f '{{.Name}}' $(bash -c "${DOCKER_COMPOSE_BIN_CMD} ps -q ssh") | cut -c2-)
+    DOCKER_CONTAINER_NAME_MUTAGEN=$(${DOCKER_BIN} inspect -f '{{.Name}}' "$SSH_CONTAINER_ID" | cut -c2-)
+    if [[ -z "$DOCKER_CONTAINER_NAME_MUTAGEN" ]]; then
+      msg_error "Unable to resolve the ssh service container name required for Mutagen sync."
+      exit 1
+    fi
     if ! mutagen sync list | grep -i "Name: ${MUTAGEN_SESSION_NAME}" > /dev/null 2>&1; then
       # Create mutagen sync session with spinner (unless verbose mode)
       mutagen_create_cmd="mutagen sync create --sync-mode=two-way-resolved \
