@@ -52,6 +52,39 @@ The system SHALL preserve the existing public `orodc` command surface during the
 - **WHEN** the interactive menu selects a different environment and re-invokes the CLI with `DC_ORO_SELECTED_ENV_NAME`, `DC_ORO_SELECTED_ENV_PATH`, and `DC_ORO_SELECTED_ENV_CONFIG`
 - **THEN** the CLI SHALL resolve the project name, app directory, and config directory from those values when the current directory matches the selected path
 
+### Requirement: Fuzzy Command Matching Compatibility
+The system SHALL preserve pattern-matched command spellings accepted by the current router.
+
+#### Scenario: Database import/export spelling variants
+- **WHEN** user runs a recognized variant such as `orodc importdb`, `orodc dbimport`, `orodc databaseimport`, `orodc exportdb`, or `orodc dbexport`
+- **THEN** the CLI SHALL route to the matching database import or export behavior
+
+#### Scenario: Platform update and cache spelling variants
+- **WHEN** user runs a recognized variant such as `orodc platformupdate`, `orodc updateplatform`, or a `cache:*` console command
+- **THEN** the CLI SHALL route to the platform update or cache behavior used by the current implementation
+
+### Requirement: Compose File Stack Assembly
+The system SHALL assemble the Docker Compose `-f` file stack from runtime context as the current CLI does.
+
+#### Scenario: Select files by sync mode, database schema, and CMS
+- **WHEN** compose configuration is generated or compose commands run
+- **THEN** the stack SHALL include the base compose file
+- **AND** include `docker-compose-default.yml` only in `default` sync mode
+- **AND** include `docker-compose-pgsql.yml` or `docker-compose-mysql.yml` according to the detected or persisted database schema
+- **AND** include `docker-compose-oro.yml` only for Oro projects
+- **AND** include the CMS-matching cron compose file when applicable
+
+#### Scenario: Persisted schema detection from existing config
+- **WHEN** `~/.orodc/<project>/` already contains a database-specific compose file
+- **THEN** the CLI SHALL keep using the matching database schema instead of re-deriving it from project files
+
+### Requirement: Composer Authentication Forwarding
+The system SHALL forward Composer authentication into containers and SSH sessions.
+
+#### Scenario: Derive COMPOSER_AUTH from Composer home
+- **WHEN** neither `DC_ORO_COMPOSER_AUTH` nor `COMPOSER_AUTH` is set and `~/.composer/auth.json` exists
+- **THEN** the CLI SHALL export its compacted JSON content as `COMPOSER_AUTH` for container execution and SSH `SendEnv`
+
 ### Requirement: Source Code Synchronization Modes
 The system SHALL preserve the existing source-code sync modes and their default selection.
 
@@ -116,6 +149,29 @@ The system SHALL load project and OroDC configuration files with the same preced
 - **WHEN** `~/.orodc/<project>.env.orodc` exists and `~/.orodc/<project>/.env.orodc` does not exist
 - **THEN** the CLI SHALL migrate the old file to the directory-based location
 - **AND** subsequent loads SHALL use `~/.orodc/<project>/.env.orodc`
+
+#### Scenario: Parse application connection URIs
+- **WHEN** loaded environment files provide database, search, message queue, or Redis connection URIs
+- **THEN** the CLI SHALL parse each URI into normalized host, port, user, password, and database/path components
+- **AND** expose them as the same `DC_ORO_*` values the current CLI derives for compose generation
+
+### Requirement: Persisted Project Runtime State
+The system SHALL preserve project-scoped runtime state managed by the current CLI between invocations.
+
+#### Scenario: Persist Xdebug mode
+- **WHEN** the user changes the Xdebug mode
+- **THEN** the CLI SHALL persist `XDEBUG_MODE*` values in the project configuration
+- **AND** restore them on subsequent command invocations
+
+#### Scenario: Cache compose profiles
+- **WHEN** compose profiles are selected for a project
+- **THEN** the CLI SHALL cache the selection
+- **AND** reuse the cached profiles on subsequent compose invocations until they are changed
+
+#### Scenario: Set up project certificates
+- **WHEN** up or proxy workflows require TLS for project domains
+- **THEN** the CLI SHALL set up project certificates using the mkcert-based flow of the current implementation
+- **AND** store them where the proxy and compose configuration expect them
 
 ### Requirement: Asset Resolution
 The system SHALL resolve static OroDC assets consistently in development and installed environments.
@@ -189,10 +245,11 @@ The system SHALL install the rewritten CLI and required assets through the Homeb
 - **THEN** `compose/` assets and other runtime data files SHALL be copied to the installed package location
 - **AND** the CLI SHALL locate those assets without relying on the source tap checkout
 
-#### Scenario: Handle companion binaries
+#### Scenario: Companion binaries are removed
 - **WHEN** the formula installs OroDC
-- **THEN** free-port discovery and source-sync helpers SHALL be available either as bundled companion binaries or as reimplemented TypeScript services
-- **AND** any retained companion binary SHALL be resolvable by the asset resolver and invoked through the shared process runner
+- **THEN** free-port discovery SHALL be provided by the TypeScript ports service with Docker-aware collision checks
+- **AND** the formula SHALL NOT install `orodc-find_free_port` or `orodc-sync`
+- **AND** the vendored osync script (`bin/orodc-sync`) SHALL be removed from the repository
 
 #### Scenario: Formula smoke test
 - **WHEN** Homebrew runs the formula test

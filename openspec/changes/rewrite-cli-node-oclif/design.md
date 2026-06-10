@@ -73,18 +73,33 @@ OroDC selects a source-code sync mode through `DC_ORO_MODE`, defaulting to `muta
 
 This behavior is OS-sensitive and must keep the same default selection, environment variables, and idempotent session/volume management.
 
+### Preserve compose file stack assembly
+
+Compose configuration is not a single file: the CLI assembles a `-f` file stack in the project config dir based on runtime context — `docker-compose.yml` plus `docker-compose-default.yml` (only in `default` sync mode), `docker-compose-pgsql.yml` or `docker-compose-mysql.yml` (by detected/persisted database schema), `docker-compose-oro.yml` (only for Oro projects), and `docker-compose-cron-oro.yml`/`docker-compose-cron-magento.yml` (ofelia cron, by CMS type). The schema is also re-detected from existing files in `~/.orodc/<project>/` so an environment keeps its database engine across upgrades. The TypeScript `compose` service must reproduce this selection logic, and compose profile selections are cached and reloaded between runs.
+
+### Preserve fuzzy command matching
+
+Beyond exact routes and aliases, the router accepts pattern-matched command spellings: `importdb`/`dbimport`/`databaseimport`-style names, `exportdb`/`dump database` variants, `platformupdate`/`update platform` variants, `cache:*` console commands, "set/update url" phrases, and "composer install" phrases. These are part of the public contract and must be inventoried and preserved (or explicitly deprecated with helpful errors) in the oclif router via a pre-parse hook or fallback handler.
+
+### Preserve environment side-channels
+
+Several behaviors flow through environment preparation rather than commands and must be kept:
+
+- `COMPOSER_AUTH`: when neither `DC_ORO_COMPOSER_AUTH` nor `COMPOSER_AUTH` is set, read `~/.composer/auth.json` (Composer home), compact it with JSON parsing, and export it to containers and over SSH (`SendEnv COMPOSER_AUTH`).
+- SSH access: the config dir holds a generated `ssh_id_ed25519` key used by `orodc ssh`; the SSH port is discovered from the running `ssh` service container.
+- Certificates: project TLS certificates are set up (mkcert-based) during up/proxy flows.
+- No-args behavior: with no arguments in an interactive TTY, the CLI shows the menu; outside a project it first tries to switch to the last-used registered environment; `DC_ORO_NO_MENU` suppresses the menu.
+
 ### Resolve dynamic host ports
 
 OroDC derives service host ports from `DC_ORO_PORT_PREFIX` (e.g. nginx, database, search, mq, redis, mail, ssh, gotenberg, xhgui) and falls back to free-port discovery to avoid collisions. The current implementation shells out to the `orodc-find_free_port` companion binary. The rewrite must preserve the same default port mapping, per-service env overrides, and free-port fallback.
 
 ### Handle companion binaries
 
-The formula currently installs two companion executables alongside `orodc`: `orodc-find_free_port` and `orodc-sync`. The rewrite must decide their fate explicitly:
+The formula currently installs two companion executables alongside `orodc`:
 
-- Reimplement free-port discovery inside the TypeScript `ports` service or keep `orodc-find_free_port` as a bundled binary invoked through the process runner.
-- Keep `orodc-sync` as a bundled asset/binary if it is still required, or remove it if the new `sync` service fully replaces it.
-
-Whatever is kept must remain installable through the formula and resolvable by the asset resolver.
+- `orodc-find_free_port`: a Bash script that discovers free host ports and is Docker-aware — it inspects existing container port bindings (including stopped containers) so allocated ports do not collide with other OroDC environments. It will be reimplemented as the TypeScript `ports` service, which must preserve this Docker-aware collision check, not just a plain TCP bind probe.
+- `orodc-sync`: a vendored third-party osync v1.3.0 (rsync-based two-way sync engine). It is dead weight: no runtime code in `bin/orodc` or `libexec/orodc/` invokes it — the formula merely installs it. Its only intended consumer is the unstarted `restore-ssh-rsync-sync` change. Decision: remove `orodc-sync` from the repository and formula as part of the rewrite; the `ssh` sync mode keeps using plain rsync seeding.
 
 ### Preserve static assets as package data
 
@@ -138,5 +153,4 @@ Rollback strategy:
 - Should generated shell completions be installed by the formula in the first release or deferred until command behavior stabilizes?
 - Should the first Node release require Node.js from Homebrew, or should a bundled executable be prepared before public release?
 - Which Docker integration tests are mandatory for release gating versus nightly validation?
-- Should `orodc-find_free_port` and `orodc-sync` be reimplemented in TypeScript or kept as bundled binaries invoked through the process runner?
 - Should the menu-driven environment switch (`DC_ORO_SELECTED_ENV_*`) and the `v`/`verbose` toggle keep their current shell-state semantics, or be redesigned for the Node CLI?

@@ -24,6 +24,12 @@ The public `orodc` entry point SHALL delegate routing to oclif command discovery
 - **THEN** oclif SHALL invoke the corresponding TypeScript command module
 - **AND** all remaining arguments SHALL be passed to the command parser or pass-through handler according to the command contract
 
+#### Scenario: No arguments shows interactive menu
+- **GIVEN** user executes `orodc` with no arguments in an interactive terminal
+- **WHEN** `DC_ORO_NO_MENU` is not set
+- **THEN** the CLI SHALL display the interactive menu
+- **AND** when the current directory is not a project, the CLI SHALL first attempt to switch to the last-used registered environment
+
 #### Scenario: Unknown commands show error
 - **GIVEN** user executes an unknown command
 - **WHEN** command does not match any route or smart PHP command detection rule
