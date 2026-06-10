@@ -256,6 +256,12 @@ The system SHALL install the rewritten CLI and required assets through the Homeb
 - **THEN** the test SHALL execute a non-Docker command such as `orodc --help`
 - **AND** the command SHALL complete successfully
 
+#### Scenario: CI validates Homebrew installation
+- **WHEN** changes to the formula or CLI are proposed
+- **THEN** CI SHALL install the formula from the tap checkout on Linux and macOS
+- **AND** run `brew test` and a non-Docker `orodc` command
+- **AND** fail the build if installation or the smoke command fails
+
 ### Requirement: Regression Test Contract
 The system SHALL include tests that verify the rewritten CLI preserves current public behavior.
 
