@@ -7,6 +7,16 @@ global:
 entryPoints:
   web:
     address: ":80"
+    # Trust X-Forwarded-* from host Traefik (macOS dual-proxy setup).
+    # Host Traefik terminates TLS and forwards HTTP to :8880 with
+    # X-Forwarded-Proto: https; without this, Traefik overwrites it to http
+    # and Symfony/Oro redirects to HTTPS in an infinite loop.
+    forwardedHeaders:
+      trustedIPs:
+        - "127.0.0.1/32"
+        - "172.0.0.0/8"
+        - "10.0.0.0/8"
+        - "192.168.0.0/16"
     # Optional: HTTP to HTTPS redirect (commented out by default)
     # http:
     #   redirections:
