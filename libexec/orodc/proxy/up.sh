@@ -197,8 +197,8 @@ else
   export TRAEFIK_LOG_LEVEL="WARNING"
 fi
 
-# Pass all remaining arguments to docker compose up
-proxy_cmd="${DOCKER_COMPOSE_BIN} -p proxy -f \"${PROXY_COMPOSE_FILE}\" up $*"
+# Pass all remaining arguments to docker compose up (--build picks up traefik.yml changes)
+proxy_cmd="${DOCKER_COMPOSE_BIN} -p proxy -f \"${PROXY_COMPOSE_FILE}\" up --build $*"
 
 # Use spinner for detached mode
 if [[ "$*" == *"-d"* ]]
@@ -239,7 +239,7 @@ else
   msg_info "Starting proxy services (press Ctrl+C to stop)..."
   msg_info ""
 
-  ${DOCKER_COMPOSE_BIN} -p proxy -f "${PROXY_COMPOSE_FILE}" up "$@" || {
+  ${DOCKER_COMPOSE_BIN} -p proxy -f "${PROXY_COMPOSE_FILE}" up --build "$@" || {
     msg_error "Failed to start proxy services"
     exit 1
   }
