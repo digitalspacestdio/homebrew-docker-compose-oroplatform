@@ -1,5 +1,17 @@
 #!/bin/bash
 set -x
+
+configure_dns() {
+	local resolv_conf="/etc/resolv.conf"
+	[[ -w "${resolv_conf}" ]] || return 0
+
+	cat > "${resolv_conf}" <<'EOF'
+nameserver 1.1.1.1
+nameserver 8.8.8.8
+EOF
+}
+configure_dns
+
 if [[ -f /etc/ssh/sshd_config.backup ]]; then
 	cp /etc/ssh/sshd_config.backup /etc/ssh/sshd_config
 else
