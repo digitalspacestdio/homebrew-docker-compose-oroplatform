@@ -113,6 +113,16 @@ shellcheck script.sh
 
 No Bash changes without shellcheck!
 
+**Preserve executable bits on shell scripts:**
+
+The formula installs `libexec/orodc/` with `cp_r`, so git file mode is copied as-is into Cellar. If an executable script is committed as `100644`, `orodc` fails at runtime with `Permission denied`.
+
+- ✅ Scripts invoked directly (`bin/orodc`, `libexec/orodc/**/*.sh` command handlers) must stay `100755` in git
+- ✅ After editing any `.sh` file, verify mode: `git ls-files -s path/to/script.sh` → `100755`
+- ✅ If mode is wrong: `chmod +x path/to/script.sh && git update-index --chmod=+x path/to/script.sh`
+- ✅ Before commit, check for accidental mode drops: `git diff --summary` (watch for `mode change 100755 => 100644`)
+- ❌ Do not commit new or modified command scripts without the executable bit
+
 **CRITICAL: `local` keyword can ONLY be used inside functions!**
 - ❌ `local var="value"` in main script body → causes "local can only be used in a function" error
 - ✅ `var="value"` in main script body
