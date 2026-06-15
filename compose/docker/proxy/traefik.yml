@@ -26,9 +26,6 @@ entryPoints:
   
   default:
     address: ":443"
-    http:
-      tls:
-        certResolver: default
 
 # API and Dashboard
 api:
