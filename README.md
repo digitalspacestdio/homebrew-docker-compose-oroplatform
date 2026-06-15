@@ -944,12 +944,12 @@ orodc agents symfony          # Symfony
 - **Need coding guidelines?** → Run `orodc agents rules` for complete standards
 - **CMS-specific commands?** → Run `orodc agents <cms-type>` for framework-specific instructions
 
-#### 📦 Install Skill: `docker-dev-env-php`
+#### 📦 Install Skill: `orodc-docker-dev-env`
 
 Install the repository skill with:
 
 ```bash
-npx skills add https://github.com/digitalspacestdio/homebrew-docker-compose-oroplatform.git --skill docker-dev-env-php
+npx skills add https://github.com/digitalspacestdio/homebrew-docker-compose-oroplatform.git --skill orodc-docker-dev-env
 ```
 
 The skill explains how to install OroDC and how to fetch all required instructions via `orodc agents` (installation guides, coding rules, CMS-specific instructions).
