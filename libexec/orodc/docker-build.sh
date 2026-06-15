@@ -127,6 +127,7 @@ case "${BUILD_TARGET}" in
     msg_info ""
     msg_info "  nginx     - Nginx web server (orodc-nginx:latest)"
     msg_info "  mail      - Mailpit mail catcher (orodc-mail:latest)"
+    msg_info "  proxy     - Traefik reverse proxy (orodc-proxy:latest)"
     msg_info "  pgsql     - PostgreSQL database (orodc-pgsql:VERSION)"
     msg_info "              Versions: 15.1, 16.6, 17.4, 18.4"
     msg_info "  mysql     - MySQL database (orodc-mysql:VERSION)"
@@ -149,6 +150,7 @@ case "${BUILD_TARGET}" in
     msg_info "  orodc docker-build mysql --version=8.0"
     msg_info "  orodc docker-build all --no-cache"
     msg_info "  orodc docker-build mail --push"
+    msg_info "  orodc docker-build proxy --push"
     msg_info ""
     msg_info "Note: PHP images use 'orodc image build' (multi-stage interactive)"
     msg_info ""
@@ -172,6 +174,16 @@ case "${BUILD_TARGET}" in
       "${DOCKER_DIR}/mail/" \
       "ghcr.io/digitalspacestdio/orodc-mail:latest" \
       "Mailpit"
+    exit $?
+    ;;
+
+  proxy)
+    msg_header "Building Proxy Image"
+    build_image \
+      "${DOCKER_DIR}/proxy/Dockerfile" \
+      "${DOCKER_DIR}/proxy/" \
+      "ghcr.io/digitalspacestdio/orodc-proxy:latest" \
+      "Proxy"
     exit $?
     ;;
 
@@ -266,6 +278,21 @@ case "${BUILD_TARGET}" in
       BUILT+=("mail")
     else
       FAILED+=("mail")
+    fi
+
+    msg_info ""
+
+    # Proxy
+    msg_info "=== Proxy ==="
+    if build_image \
+       "${DOCKER_DIR}/proxy/Dockerfile" \
+       "${DOCKER_DIR}/proxy/" \
+       "ghcr.io/digitalspacestdio/orodc-proxy:latest" \
+       "Proxy"
+    then
+      BUILT+=("proxy")
+    else
+      FAILED+=("proxy")
     fi
 
     msg_info ""

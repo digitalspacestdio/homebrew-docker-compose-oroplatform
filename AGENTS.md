@@ -210,6 +210,7 @@ orodc docker-build list
 # Build specific images
 orodc docker-build nginx        # Nginx web server
 orodc docker-build mail         # Mailpit email catcher
+orodc docker-build proxy        # Traefik reverse proxy
 orodc docker-build pgsql        # All PostgreSQL versions (15.1, 16.6, 17.4)
 orodc docker-build pgsql 17.4   # Specific PostgreSQL version
 orodc docker-build all          # Build all images
@@ -233,6 +234,7 @@ orodc image build              # Interactive builder for PHP images
 |-------|-----------|---------------|----------|
 | Nginx | `compose/docker/nginx/Dockerfile` | `compose/docker/nginx/` | `ghcr.io/digitalspacestdio/orodc-nginx:latest` |
 | Mail | `compose/docker/mail/Dockerfile` | `compose/docker/mail/` | `ghcr.io/digitalspacestdio/orodc-mail:latest` |
+| Proxy | `compose/docker/proxy/Dockerfile` | `compose/docker/proxy/` | `ghcr.io/digitalspacestdio/orodc-proxy:latest` |
 | PostgreSQL | `compose/docker/pgsql/Dockerfile` | `compose/docker/pgsql/` | `ghcr.io/digitalspacestdio/orodc-pgsql:VERSION` |
 | PHP Base | `compose/docker/php/Dockerfile.X.X.alpine` | `compose/docker/php/` | `ghcr.io/digitalspacestdio/orodc-php:X.X-alpine` |
 | PHP Final | `compose/docker/php-node-symfony/Dockerfile.X.X.alpine` | `compose/docker/php-node-symfony/` | `ghcr.io/digitalspacestdio/orodc-php-node-symfony:X.X-alpine` |
