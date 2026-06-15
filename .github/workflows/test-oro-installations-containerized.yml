@@ -33,6 +33,7 @@ env:
   HOMEBREW_NO_AUTO_UPDATE: 1
   HOMEBREW_NO_INSTALL_CLEANUP: 1
   HOMEBREW_NO_ANALYTICS: 1
+  HOMEBREW_NO_ASK: 1
   # OroDC containerized mode with path sync
   DC_ORO_MODE: default
   # Disable interactive prompts in CI
@@ -60,9 +61,11 @@ jobs:
           - name: orocommerce
             version: 6.1.4
             repo_url: https://github.com/oroinc/orocommerce-application.git
+            pgsql_version: "16.6"
           - name: marello
             version: 6.1.0
             repo_url: https://github.com/marellocommerce/marello-application.git
+            pgsql_version: "16.6"
     
     # Use containerized runner with Docker-in-Docker + Path Sync
     container:
@@ -72,6 +75,7 @@ jobs:
         HOMEBREW_NO_AUTO_UPDATE: 1
         HOMEBREW_NO_INSTALL_CLEANUP: 1
         HOMEBREW_NO_ANALYTICS: 1
+        HOMEBREW_NO_ASK: 1
         DC_ORO_MODE: default
         DC_ORO_PURGE_FORCE: 1
     
@@ -122,68 +126,77 @@ jobs:
           echo "Fixed workspace permissions for UID=1000"
           
       - name: Install Homebrew and OroDC
-        run: |
-          echo "🍺 Installing Homebrew in isolated container..."
-          
-          # Ensure we have proper HOME and OroDC cache directory with correct ownership
-          export HOME="${HOME:-/home/runner}"
-          mkdir -p "$HOME" "$HOME/.cache" 2>/dev/null || true
-          # OroDC config directories will be created per-project in TEST_DIR
-          echo "OroDC configs will be project-local for Docker compatibility"
-          
-          # Install Homebrew if not present (as runner user with UID=1000)
-          if ! command -v /home/linuxbrew/.linuxbrew/bin/brew &> /dev/null; then
-            echo "Installing Homebrew as UID=1000 user..."
-            su -c 'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"' runner
+        uses: nick-fields/retry@v3
+        with:
+          timeout_minutes: 10
+          max_attempts: 5
+          retry_wait_seconds: 40
+          command: |
+            set -e
             
-            # Setup Homebrew environment for runner user
-            su -c 'echo '\''eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"'\'' >> /home/runner/.profile' runner
-            echo "Homebrew PATH configured for runner user"
-          fi
-          
-          # Setup Homebrew PATH for current shell
-          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
-          export PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:$PATH"
-          echo "PATH=$PATH" >> $GITHUB_ENV
-          
-          # Verify Homebrew is accessible
-          which brew && brew --version
-          
-          # Install OroDC tap (with proper environment)
-          echo "📦 Installing OroDC tap..."
-          su -c 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && brew tap digitalspacestdio/docker-compose-oroplatform' runner
-          
-          # Preemptively fix git ownership issues for tap directory
-          TAP_DIR="/home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform"
-          echo "🔧 Configuring git safe directories..."
-          git config --global --add safe.directory "$TAP_DIR" || true
-          su -c "git config --global --add safe.directory '$TAP_DIR'" runner || true
-          
-          # Copy current source to tap directory for testing
-          TAP_DIR="/home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform"
-          echo "📁 Copying source to: $TAP_DIR"
-          cp -r "$GITHUB_WORKSPACE"/* "$TAP_DIR/"
-          
-          # SECURITY: Fix ownership of entire tap directory to ensure no sharing between containers
-          # This prevents permission issues and ensures complete isolation between parallel test runs
-          echo "🔐 Setting proper ownership of tap directory..."
-          chown -R runner:runner "$TAP_DIR"
-          chmod -R 755 "$TAP_DIR"
-          
-          # Fix git ownership issues in CI environment (for both root and runner users)
-          echo "🔍 Configuring git ownership for tap directory..."
-          cd "$TAP_DIR"
-          git config --global --add safe.directory "$TAP_DIR"
-          su -c "git config --global --add safe.directory '$TAP_DIR'" runner || true
-          echo "✅ Using copied source code for testing"
-          
-          # Install OroDC (with proper environment)
-          echo "🔧 Installing OroDC..."
-          su -c 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform' runner
-          
-          # Verify installation
-          su -c 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc version' runner
-          echo "✅ OroDC installation completed"
+            echo "🍺 Installing Homebrew in isolated container..."
+            
+            # Ensure we have proper HOME and OroDC cache directory with correct ownership
+            export HOME="${HOME:-/home/runner}"
+            mkdir -p "$HOME" "$HOME/.cache" 2>/dev/null || true
+            echo "OroDC configs will be project-local for Docker compatibility"
+            
+            # Install Homebrew if not present (as runner user with UID=1000)
+            if ! command -v /home/linuxbrew/.linuxbrew/bin/brew &> /dev/null; then
+              echo "Installing Homebrew as UID=1000 user..."
+              su -c 'NONINTERACTIVE=1 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"' runner
+              su -c 'echo '\''eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"'\'' >> /home/runner/.profile' runner
+              echo "Homebrew PATH configured for runner user"
+            fi
+            
+            eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+            export PATH="/home/linuxbrew/.linuxbrew/bin:/home/linuxbrew/.linuxbrew/sbin:$PATH"
+            if ! grep -q 'linuxbrew' "${GITHUB_ENV}" 2>/dev/null; then
+              echo "PATH=${PATH}" >> "${GITHUB_ENV}"
+            fi
+            
+            which brew && brew --version
+            
+            TAP_DIR="/home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform"
+            
+            # Drop broken/partial tap clones left by flaky git/network (Broken pipe)
+            if [ -d "${TAP_DIR}" ] && ! git -C "${TAP_DIR}" rev-parse HEAD >/dev/null 2>&1; then
+              echo "⚠️ Removing broken tap directory before retry..."
+              rm -rf "${TAP_DIR}"
+            fi
+            
+            run_brew_as_runner() {
+              su - runner -c "bash -lc 'eval \"\$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)\" && HOMEBREW_NO_AUTO_UPDATE=1 ${1}'" 2>&1 | cat
+              return "${PIPESTATUS[0]}"
+            }
+            
+            echo "📦 Installing OroDC tap..."
+            run_brew_as_runner "brew tap digitalspacestdio/docker-compose-oroplatform"
+            
+            echo "🔐 Trusting OroDC tap..."
+            run_brew_as_runner "brew trust digitalspacestdio/docker-compose-oroplatform"
+            
+            echo "🔧 Configuring git safe directories..."
+            git config --global --add safe.directory "${TAP_DIR}" || true
+            su - runner -c "git config --global --add safe.directory '${TAP_DIR}'" || true
+            
+            echo "📁 Copying source to: ${TAP_DIR}"
+            cp -r "${GITHUB_WORKSPACE}"/* "${TAP_DIR}/"
+            
+            echo "🔐 Setting proper ownership of tap directory..."
+            chown -R runner:runner "${TAP_DIR}"
+            chmod -R 755 "${TAP_DIR}"
+            
+            cd "${TAP_DIR}"
+            git config --global --add safe.directory "${TAP_DIR}"
+            su - runner -c "git config --global --add safe.directory '${TAP_DIR}'" || true
+            echo "✅ Using copied source code for testing"
+            
+            echo "🔧 Installing OroDC..."
+            run_brew_as_runner "brew install --yes digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform"
+            
+            run_brew_as_runner "orodc version"
+            echo "✅ OroDC installation completed"
           
       - name: Install and test ${{ matrix.application.name }}
         uses: nick-fields/retry@v3
@@ -230,10 +243,13 @@ jobs:
             export DC_ORO_MODE=default
             # Container-local path avoids bind-mount permission issues on self-hosted runners
             export DC_ORO_CONFIG_DIR="/home/runner/.orodc/${UNIQUE_PROJECT_NAME}"
+            # Oro 6.x needs uuid-ossp from initdb.d; PG 18 default breaks oro:migration:data:load
+            PGSQL_VERSION="${{ matrix.application.pgsql_version }}"
+            ORODC_ENV="DC_ORO_NAME=\"${UNIQUE_PROJECT_NAME}\" DC_ORO_PORT_PREFIX=\"${PORT_PREFIX}\" DC_ORO_MODE=default DC_ORO_CONFIG_DIR=\"${DC_ORO_CONFIG_DIR}\" DC_ORO_PURGE_FORCE=1 DC_ORO_PGSQL_VERSION=${PGSQL_VERSION} DC_ORO_DATABASE_VERSION=${PGSQL_VERSION}"
             
             # Create config and SSH key as runner (root chown on workspace mount is unreliable on ARM64)
             su - runner -c "mkdir -p '${DC_ORO_CONFIG_DIR}' && chmod 700 '${DC_ORO_CONFIG_DIR}'"
-            su - runner -c "[[ -f '${DC_ORO_CONFIG_DIR}/ssh_id_ed25519' ]] || ssh-keygen -t ed25519 -f '${DC_ORO_CONFIG_DIR}/ssh_id_ed25519' -N '' -q"
+            su - runner -c "test -f '${DC_ORO_CONFIG_DIR}/ssh_id_ed25519' || ssh-keygen -t ed25519 -f '${DC_ORO_CONFIG_DIR}/ssh_id_ed25519' -N '' -q"
             
             # Cleanup Docker networks
             docker network prune -f 2>/dev/null || true
@@ -245,13 +261,13 @@ jobs:
             chmod -R 755 "$PROJECT_DIR"
             
             # Purge any existing installation to ensure clean state
-            su - runner -c 'cd "'"$PROJECT_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && DC_ORO_NAME="'"$UNIQUE_PROJECT_NAME"'" DC_ORO_PORT_PREFIX="'"$PORT_PREFIX"'" DC_ORO_MODE=default DC_ORO_CONFIG_DIR="'"$DC_ORO_CONFIG_DIR"'" DC_ORO_PURGE_FORCE=1 orodc purge' || true
+            su - runner -c 'cd "'"$PROJECT_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && '"$ORODC_ENV"' orodc purge' || true
             
             # Install fresh with proper environment  
-            su - runner -c 'cd "'"$PROJECT_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && DC_ORO_NAME="'"$UNIQUE_PROJECT_NAME"'" DC_ORO_PORT_PREFIX="'"$PORT_PREFIX"'" DC_ORO_MODE=default DC_ORO_CONFIG_DIR="'"$DC_ORO_CONFIG_DIR"'" DC_ORO_PURGE_FORCE=1 orodc install'
+            su - runner -c 'cd "'"$PROJECT_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && '"$ORODC_ENV"' orodc install'
             
             echo "🚀 Starting services..."  
-            su - runner -c 'cd "'"$PROJECT_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && DC_ORO_NAME="'"$UNIQUE_PROJECT_NAME"'" DC_ORO_PORT_PREFIX="'"$PORT_PREFIX"'" DC_ORO_MODE=default DC_ORO_CONFIG_DIR="'"$DC_ORO_CONFIG_DIR"'" DC_ORO_PURGE_FORCE=1 orodc up -d'
+            su - runner -c 'cd "'"$PROJECT_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && '"$ORODC_ENV"' orodc up -d'
             
             # Wait for nginx container to be running (it depends on fpm which depends on database+gotenberg)
             echo "⏳ Waiting for services to start (max 5 minutes)..."
@@ -271,7 +287,7 @@ jobs:
               echo "❌ Services failed to start within timeout"
               echo "📋 All containers (including exited):"
               docker ps -a --filter "name=${UNIQUE_PROJECT_NAME}" --format "{{.Names}}: {{.Status}}"
-              su - runner -c 'cd "'"$PROJECT_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && DC_ORO_NAME="'"$UNIQUE_PROJECT_NAME"'" DC_ORO_PORT_PREFIX="'"$PORT_PREFIX"'" DC_ORO_MODE=default DC_ORO_CONFIG_DIR="'"$DC_ORO_CONFIG_DIR"'" DC_ORO_PURGE_FORCE=1 orodc logs --tail=20'
+              su - runner -c 'cd "'"$PROJECT_DIR"'" && eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && '"$ORODC_ENV"' orodc logs --tail=20'
               exit 1
             }
             
