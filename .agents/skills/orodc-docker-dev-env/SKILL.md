@@ -1,5 +1,5 @@
 ---
-name: docker-dev-env-php
+name: orodc-docker-dev-env
 description: Manage the local PHP Docker dev environment (Oro, Magento, Symfony, Laravel, generic PHP) in this repository via `orodc`. Use when starting/stopping services, running PHP/Composer/`bin/console`/`bin/magento` commands, accessing the database, installing or setting up a CMS, configuring `*.docker.local` access, or whenever a task needs `orodc help` or `orodc agents` guidance.
 license: MIT
 metadata:
@@ -7,7 +7,7 @@ metadata:
   scope: project
 ---
 
-# PHP Docker Dev Env
+# Docker Dev Env
 
 Use this skill only for this repository. It is a thin router; read the internal reference file that matches the task instead of duplicating its content here.
 
