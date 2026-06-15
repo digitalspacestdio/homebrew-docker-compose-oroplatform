@@ -33,6 +33,7 @@ env:
   HOMEBREW_NO_AUTO_UPDATE: 1
   HOMEBREW_NO_INSTALL_CLEANUP: 1
   HOMEBREW_NO_ANALYTICS: 1
+  HOMEBREW_NO_ASK: 1
   # OroDC containerized mode with path sync
   DC_ORO_MODE: default
   # Disable interactive prompts in CI
@@ -72,6 +73,7 @@ jobs:
         HOMEBREW_NO_AUTO_UPDATE: 1
         HOMEBREW_NO_INSTALL_CLEANUP: 1
         HOMEBREW_NO_ANALYTICS: 1
+        HOMEBREW_NO_ASK: 1
         DC_ORO_MODE: default
         DC_ORO_PURGE_FORCE: 1
     
@@ -153,6 +155,10 @@ jobs:
           echo "📦 Installing OroDC tap..."
           su -c 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && brew tap digitalspacestdio/docker-compose-oroplatform' runner
           
+          # Homebrew 5.x+ requires explicit tap trust for non-official taps (no TTY in CI)
+          echo "🔐 Trusting OroDC tap..."
+          su -c 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && brew trust digitalspacestdio/docker-compose-oroplatform' runner
+          
           # Preemptively fix git ownership issues for tap directory
           TAP_DIR="/home/linuxbrew/.linuxbrew/Homebrew/Library/Taps/digitalspacestdio/homebrew-docker-compose-oroplatform"
           echo "🔧 Configuring git safe directories..."
@@ -179,7 +185,7 @@ jobs:
           
           # Install OroDC (with proper environment)
           echo "🔧 Installing OroDC..."
-          su -c 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform' runner
+          su -c 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && brew install --yes digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform' runner
           
           # Verify installation
           su -c 'eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)" && orodc version' runner
@@ -233,7 +239,7 @@ jobs:
             
             # Create config and SSH key as runner (root chown on workspace mount is unreliable on ARM64)
             su - runner -c "mkdir -p '${DC_ORO_CONFIG_DIR}' && chmod 700 '${DC_ORO_CONFIG_DIR}'"
-            su - runner -c "[[ -f '${DC_ORO_CONFIG_DIR}/ssh_id_ed25519' ]] || ssh-keygen -t ed25519 -f '${DC_ORO_CONFIG_DIR}/ssh_id_ed25519' -N '' -q"
+            su - runner -c "test -f '${DC_ORO_CONFIG_DIR}/ssh_id_ed25519' || ssh-keygen -t ed25519 -f '${DC_ORO_CONFIG_DIR}/ssh_id_ed25519' -N '' -q"
             
             # Cleanup Docker networks
             docker network prune -f 2>/dev/null || true
