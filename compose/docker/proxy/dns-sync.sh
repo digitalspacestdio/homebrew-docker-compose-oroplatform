@@ -175,7 +175,7 @@ main() {
     # Use docker CLI if available
     docker events --filter 'type=container' --filter 'event=start' \
       --filter 'event=stop' --filter 'event=die' \
-      --format '{{.Status}}' 2>/dev/null | while read -r event; do
+      --format '{{.Action}}' | while read -r event; do
       log "Event: ${event}"
       update_hosts
     done
