@@ -16,12 +16,12 @@ RUN apk add --no-cache \
 
 # Set architecture variables for multi-arch support
 ARG TARGETARCH
+ARG TRAEFIK_VERSION=3.7.5
 ENV ARCH=${TARGETARCH:-amd64}
 
-# Download Traefik v3 (latest)
-RUN TRAEFIK_VERSION=$(curl -s https://api.github.com/repos/traefik/traefik/releases/latest | grep tag_name | cut -d '"' -f 4) && \
-    wget -O /tmp/traefik.tar.gz \
-    "https://github.com/traefik/traefik/releases/download/${TRAEFIK_VERSION}/traefik_${TRAEFIK_VERSION}_linux_${ARCH}.tar.gz" && \
+# Download pinned Traefik v3 release (updated via Dockerfile TRAEFIK_VERSION)
+RUN wget -O /tmp/traefik.tar.gz \
+    "https://github.com/traefik/traefik/releases/download/v${TRAEFIK_VERSION}/traefik_v${TRAEFIK_VERSION}_linux_${ARCH}.tar.gz" && \
     tar -xzf /tmp/traefik.tar.gz -C /usr/local/bin && \
     chmod +x /usr/local/bin/traefik && \
     rm /tmp/traefik.tar.gz

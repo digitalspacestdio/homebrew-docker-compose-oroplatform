@@ -1,6 +1,8 @@
 services:
   proxy:
     hostname: proxy.docker.local
+    image: ${ORODC_PROXY_IMAGE:-ghcr.io/digitalspacestdio/orodc-proxy:latest}
+    pull_policy: always
     build:
       context: ./docker/proxy
       args:
