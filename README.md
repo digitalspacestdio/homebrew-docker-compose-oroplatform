@@ -86,7 +86,7 @@
 brew install digitalspacestdio/docker-compose-oroplatform/docker-compose-oroplatform
 
 # Clone and setup OroCommerce
-git clone --single-branch --branch 6.1.4 https://github.com/oroinc/orocommerce-application.git ~/orocommerce
+git clone --single-branch --branch 7.0.3 https://github.com/oroinc/orocommerce-application.git ~/orocommerce
 cd ~/orocommerce
 
 # Install and start (one command!)
