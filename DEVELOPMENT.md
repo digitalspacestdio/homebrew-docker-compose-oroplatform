@@ -208,7 +208,7 @@ orodc config                      # Final merged compose.yml
 orodc config | grep -A 20 "database:"
 orodc ps                          # Container status
 orodc logs [service]              # Service logs  
-orodc ssh                         # Container access
+orodc ssh                         # Container access (forwards host ssh-agent)
 ```
 
 ## DC_ORO_CONFIG_DIR
@@ -287,5 +287,9 @@ shellcheck .github/scripts/*.sh
 | Platform Update | `orodc platformupdate` | After DB import |
 | Update URLs | `orodc updateurl` | Fix local URLs |
 | Debug | `DEBUG=1 orodc [command]` | Verbose |
-| SSH | `orodc ssh` | Container access |
+| SSH | `orodc ssh` | Container access; login via project key, host ssh-agent forwarded |
+
+### SSH access
+
+`orodc ssh` authenticates with `~/.orodc/<project>/ssh_id_ed25519` and forwards the host `ssh-agent` for outbound git/SSH inside the container. Ensure `ssh-agent` is running and keys are loaded (`ssh-add -l`) before connecting.
 

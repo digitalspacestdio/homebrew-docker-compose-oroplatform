@@ -5,6 +5,7 @@ license: MIT
 metadata:
   author: local
   scope: project
+  internal: true
 ---
 
 # Custom PostgreSQL Image

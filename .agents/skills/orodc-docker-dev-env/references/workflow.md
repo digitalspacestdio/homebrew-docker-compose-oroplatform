@@ -46,6 +46,36 @@ Use the repository CLI before reaching for direct Docker commands.
 - macOS: `DC_ORO_MODE=mutagen`
 - CI: keep `DC_ORO_CONFIG_DIR` inside the workspace
 
+## SSH access
+
+`orodc ssh` opens a shell in the `ssh` service container.
+
+**Authentication:** always uses the project key `~/.orodc/<project>/ssh_id_ed25519` (`IdentitiesOnly=yes`). Host keys from `ssh-agent` are not used to log in.
+
+**SSH agent forwarding:** the host `ssh-agent` is forwarded into the container (`ForwardAgent=yes`). Use this for `git clone`/`git pull` over SSH, deploy keys, and other outbound SSH from inside the container.
+
+**Prerequisites on the host:**
+
+```bash
+eval "$(ssh-agent -s)"   # if agent is not running yet
+ssh-add ~/.ssh/id_ed25519   # or your key path
+ssh-add -l                  # verify keys are loaded
+```
+
+**Verify inside the container:**
+
+```bash
+orodc ssh
+ssh-add -l                  # should list the same keys as on the host
+git ls-remote git@github.com:org/repo.git
+```
+
+**Notes:**
+
+- `COMPOSER_AUTH` is also sent into the container (`SendEnv=COMPOSER_AUTH`).
+- Project key is created automatically on first `orodc ssh` if missing.
+- To pass extra SSH client options, use `ORO_DC_SSH_ARGS` in `.env.orodc`.
+
 ## Oro default URLs
 
 - App: `https://<project-folder-name>.docker.local`

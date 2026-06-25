@@ -108,3 +108,56 @@ command:
     exec: "nginx -t 2>&1"
     exit-status: 0
 ```
+
+## Agent Skills
+
+This repository publishes one public agent skill for end users: `orodc-docker-dev-env`.
+Additional skills in `.agents/skills/` (image builds, proxy setup, OpenSpec workflow) are
+marked `metadata.internal: true` and are intended for repository development only.
+
+### Install the Public Skill
+
+Always pass `--skill orodc-docker-dev-env` explicitly. Without it, older `skills` CLI
+versions may install every discovered skill from the repository.
+
+```bash
+# List public skills only
+npx skills add https://github.com/digitalspacestdio/homebrew-docker-compose-oroplatform.git --list
+
+# Install only the end-user skill (recommended)
+npx skills add https://github.com/digitalspacestdio/homebrew-docker-compose-oroplatform.git \
+  --skill orodc-docker-dev-env
+
+# Non-interactive install for Cursor (global)
+npx skills add https://github.com/digitalspacestdio/homebrew-docker-compose-oroplatform.git \
+  --skill orodc-docker-dev-env -g -a cursor -y
+```
+
+Direct path to a single skill also works:
+
+```bash
+npx skills add https://github.com/digitalspacestdio/homebrew-docker-compose-oroplatform.git/tree/master/.agents/skills/orodc-docker-dev-env
+```
+
+### Internal Skills (Repository Contributors)
+
+Internal skills are hidden from `npx skills add --list` unless
+`INSTALL_INTERNAL_SKILLS=1` is set:
+
+```bash
+INSTALL_INTERNAL_SKILLS=1 npx skills add . --list
+
+INSTALL_INTERNAL_SKILLS=1 npx skills add . \
+  --skill orodc-docker-build-pgsql -a cursor -y
+```
+
+Available internal skills:
+
+| Skill | Purpose |
+|-------|---------|
+| `orodc-docker-build-pgsql` | Build custom PostgreSQL images |
+| `orodc-docker-build-php-node` | Build custom PHP+Node images |
+| `orodc-docker-build-elasticsearch` | Switch Elasticsearch/OpenSearch version |
+| `orodc-docker-build-rabbitmq` | Switch RabbitMQ version |
+| `orodc-docker-proxy-setup` | Traefik proxy setup and troubleshooting |
+| `openspec-*` | OpenSpec change workflow (`.cursor/skills/`, etc.) |
