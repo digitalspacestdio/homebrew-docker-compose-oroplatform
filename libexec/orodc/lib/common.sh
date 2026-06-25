@@ -75,6 +75,19 @@ update_env_var() {
   fi
 }
 
+# Returns "yes" or "no" for ssh -o ForwardAgent (default: yes).
+# Set DC_ORO_SSH_FORWARD_AGENT=no in .env.orodc to use container keys only.
+orodc_ssh_forward_agent() {
+  case "${DC_ORO_SSH_FORWARD_AGENT:-yes}" in
+    0|false|no|off|disabled)
+      echo "no"
+      ;;
+    *)
+      echo "yes"
+      ;;
+  esac
+}
+
 # Function to resolve binary location with error handling
 # Usage: resolve_bin "binary_name" ["install_instructions"]
 resolve_bin() {

@@ -965,7 +965,7 @@ The skill explains how to install OroDC and how to fetch all required instructio
 | Aspect | Behavior |
 |--------|----------|
 | Login | Project key `~/.orodc/<project>/ssh_id_ed25519` only (`IdentitiesOnly=yes`) |
-| Agent forwarding | Host `ssh-agent` is forwarded (`ForwardAgent=yes`) |
+| Agent forwarding | Host `ssh-agent` is forwarded by default (`ForwardAgent=yes`); disable with `DC_ORO_SSH_FORWARD_AGENT=no` |
 | Composer auth | `COMPOSER_AUTH` env var is sent (`SendEnv=COMPOSER_AUTH`) |
 
 **Host setup (required for agent forwarding):**
@@ -985,6 +985,15 @@ git clone git@github.com:org/private-repo.git
 ```
 
 The project SSH key is auto-generated on first connect. Extra SSH client options: `ORO_DC_SSH_ARGS` in `.env.orodc`.
+
+**Disable host agent forwarding** (use your own keys inside the container instead):
+
+```bash
+# In ~/.orodc/<project>/.env.orodc or project .env.orodc
+DC_ORO_SSH_FORWARD_AGENT=no
+```
+
+Accepted disable values: `no`, `0`, `false`, `off`, `disabled`. Default is `yes`. One-shot: `DC_ORO_SSH_FORWARD_AGENT=no orodc ssh`.
 
 ### 🔌 Reverse Proxy Management
 

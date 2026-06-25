@@ -25,6 +25,13 @@
 - Variables contain service connection details (database, cache, search, etc.)
 - Trust these variables - they reflect actual configured services
 
+**SSH Access:**
+- `orodc ssh` opens a shell in the `ssh` service container
+- Login uses the project key only: `~/.orodc/<project>/ssh_id_ed25519` (`IdentitiesOnly=yes`)
+- Host `ssh-agent` is forwarded by default for outbound git/SSH inside the container
+- To use container-local SSH keys instead, set `DC_ORO_SSH_FORWARD_AGENT=no` in `.env.orodc` (values: `no`, `0`, `false`, `off`, `disabled`)
+- Extra SSH client options: `ORO_DC_SSH_ARGS` in `.env.orodc`
+
 **Environment Workflow:**
 - `orodc init` is a one-time setup done by user to configure environment (Docker configuration)
   - User runs `orodc init` once to set up PHP version, database, cache, search engine, etc.

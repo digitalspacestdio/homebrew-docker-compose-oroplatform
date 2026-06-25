@@ -245,14 +245,15 @@ fi
 # Connect via SSH to the container
 # Use same options as old implementation:
 # - IdentitiesOnly=yes: Use only the specified key (don't try other keys)
-# - ForwardAgent=yes: Forward host SSH agent for git/remote access inside container
+# - ForwardAgent: host ssh-agent forwarding (default yes; DC_ORO_SSH_FORWARD_AGENT=no to disable)
 # - IdentitiesOnly=yes + -i: authenticate with project key only (not agent keys)
 # - SendEnv=COMPOSER_AUTH: Send COMPOSER_AUTH environment variable
+SSH_FORWARD_AGENT=$(orodc_ssh_forward_agent)
 exec ssh \
   -o SendEnv=COMPOSER_AUTH \
   -o UserKnownHostsFile=/dev/null \
   -o StrictHostKeyChecking=no \
-  -o 'ForwardAgent yes' \
+  -o "ForwardAgent ${SSH_FORWARD_AGENT}" \
   -o IdentitiesOnly=yes \
   -i "${SSH_KEY}" \
   -p "${DC_ORO_PORT_SSH}" \

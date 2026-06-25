@@ -52,7 +52,19 @@ Use the repository CLI before reaching for direct Docker commands.
 
 **Authentication:** always uses the project key `~/.orodc/<project>/ssh_id_ed25519` (`IdentitiesOnly=yes`). Host keys from `ssh-agent` are not used to log in.
 
-**SSH agent forwarding:** the host `ssh-agent` is forwarded into the container (`ForwardAgent=yes`). Use this for `git clone`/`git pull` over SSH, deploy keys, and other outbound SSH from inside the container.
+**SSH agent forwarding:** the host `ssh-agent` is forwarded into the container by default (`ForwardAgent=yes`). Use this for `git clone`/`git pull` over SSH, deploy keys, and other outbound SSH from inside the container.
+
+**Disable agent forwarding** when you need container-local keys (different from the host agent):
+
+```bash
+# In ~/.orodc/<project>/.env.orodc or project .env.orodc
+DC_ORO_SSH_FORWARD_AGENT=no
+
+# Or one-shot
+DC_ORO_SSH_FORWARD_AGENT=no orodc ssh
+```
+
+Disable values: `no`, `0`, `false`, `off`, `disabled`. Default: `yes`.
 
 **Prerequisites on the host:**
 
@@ -75,6 +87,7 @@ git ls-remote git@github.com:org/repo.git
 - `COMPOSER_AUTH` is also sent into the container (`SendEnv=COMPOSER_AUTH`).
 - Project key is created automatically on first `orodc ssh` if missing.
 - To pass extra SSH client options, use `ORO_DC_SSH_ARGS` in `.env.orodc`.
+- To disable host agent forwarding, use `DC_ORO_SSH_FORWARD_AGENT=no` in `.env.orodc`.
 
 ## Oro default URLs
 
