@@ -63,7 +63,7 @@ services:
       - 'ORO_SECRET=${ORO_SECRET-ThisTokenIsNotSoSecretChangeIt}'
       - 'ORO_ENABLE_PRICE_SHARDING=${ORO_ENABLE_PRICE_SHARDING:-0}'
       - 'COMPOSER_AUTH=${DC_ORO_COMPOSER_AUTH}'
-      - 'NODE_OPTIONS="--max-old-space-size=4048"'
+      - 'NODE_OPTIONS=${NODE_OPTIONS:---max-old-space-size=4048}'
       - 'XDEBUG_MODE=${XDEBUG_MODE_FPM:-off}'
     restart: "no"
     deploy:
@@ -193,7 +193,7 @@ services:
       - 'ORO_MAILER_PORT=${DC_ORO_TEST_MAILER_PORT:-${ORO_MAILER_PORT:-1025}}'
       - 'ORO_SECRET=${DC_ORO_TEST_SECRET:-${ORO_SECRET-ThisTokenIsNotSoSecretChangeIt}}'
       - 'COMPOSER_AUTH=${DC_ORO_COMPOSER_AUTH}'
-      - 'NODE_OPTIONS="--max-old-space-size=4048"'
+      - 'NODE_OPTIONS=${NODE_OPTIONS:---max-old-space-size=4048}'
       - 'SYMFONY_ENV=test'
       - 'ORO_ENV=test'
       - 'XDEBUG_MODE=${XDEBUG_MODE_CLI:-off}'
@@ -266,7 +266,7 @@ services:
       - 'ORO_MAILER_PORT=${DC_ORO_TEST_MAILER_PORT:-${ORO_MAILER_PORT:-1025}}'
       - 'ORO_SECRET=${DC_ORO_TEST_SECRET:-${ORO_SECRET-ThisTokenIsNotSoSecretChangeIt}}'
       - 'COMPOSER_AUTH=${DC_ORO_COMPOSER_AUTH}'
-      - 'NODE_OPTIONS="--max-old-space-size=4048"'
+      - 'NODE_OPTIONS=${NODE_OPTIONS:---max-old-space-size=4048}'
       - 'XDEBUG_MODE=${XDEBUG_MODE_CONSUMER:-off}'
     depends_on:
       database:
