@@ -7,6 +7,7 @@ metadata:
   author: openspec
   version: "1.0"
   generatedBy: "1.3.0"
+  internal: true
 ---
 
 Archive multiple completed changes in a single operation.

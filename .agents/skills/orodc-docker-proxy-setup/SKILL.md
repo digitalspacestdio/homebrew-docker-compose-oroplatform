@@ -5,6 +5,7 @@ license: MIT
 metadata:
   author: local
   scope: project
+  internal: true
 ---
 
 # Local Proxy Container Setup

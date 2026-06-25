@@ -946,13 +946,45 @@ orodc agents symfony          # Symfony
 
 #### 📦 Install Skill: `orodc-docker-dev-env`
 
-Install the repository skill with:
+Install the repository skill with `--skill orodc-docker-dev-env` (required — other skills
+in this repo are internal and hidden from default discovery):
 
 ```bash
 npx skills add https://github.com/digitalspacestdio/homebrew-docker-compose-oroplatform.git --skill orodc-docker-dev-env
 ```
 
-The skill explains how to install OroDC and how to fetch all required instructions via `orodc agents` (installation guides, coding rules, CMS-specific instructions).
+See [compose/docker/doctor/README.md](compose/docker/doctor/README.md#agent-skills) for
+full install options and contributor-only internal skills.
+
+The skill explains how to install OroDC and how to fetch all required instructions via `orodc agents` (installation guides, coding rules, CMS-specific instructions). It also documents SSH access with host agent forwarding for git and remote operations inside containers.
+
+### 🔐 SSH Access
+
+`orodc ssh` connects to the `ssh` service container as the project user.
+
+| Aspect | Behavior |
+|--------|----------|
+| Login | Project key `~/.orodc/<project>/ssh_id_ed25519` only (`IdentitiesOnly=yes`) |
+| Agent forwarding | Host `ssh-agent` is forwarded (`ForwardAgent=yes`) |
+| Composer auth | `COMPOSER_AUTH` env var is sent (`SendEnv=COMPOSER_AUTH`) |
+
+**Host setup (required for agent forwarding):**
+
+```bash
+eval "$(ssh-agent -s)"      # start agent if needed
+ssh-add ~/.ssh/id_ed25519   # load your key
+ssh-add -l                  # confirm keys are present
+orodc ssh
+```
+
+**Inside the container:**
+
+```bash
+ssh-add -l                  # same keys as on the host
+git clone git@github.com:org/private-repo.git
+```
+
+The project SSH key is auto-generated on first connect. Extra SSH client options: `ORO_DC_SSH_ARGS` in `.env.orodc`.
 
 ### 🔌 Reverse Proxy Management
 

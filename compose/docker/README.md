@@ -160,7 +160,7 @@ COPY --from=mcuadros/ofelia:latest /usr/bin/ofelia /usr/bin/ofelia
 #### 5. **Helper Scripts**
 - `docker-entrypoint.sh` - Container initialization
 - `docker-healthcheck.sh` - Health monitoring
-- `docker-sshd.sh` - SSH daemon manager
+- `docker-sshd.sh` - SSH daemon manager (enables `AllowAgentForwarding` for `orodc ssh` agent forwarding)
 - `docker-psql.sh` - PostgreSQL client wrapper
 - `docker-mysql.sh` - MySQL client wrapper
 

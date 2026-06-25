@@ -39,7 +39,7 @@ Read the file that matches the task; do not preload them all:
 
 - [references/installation.md](references/installation.md): install `orodc` + infrastructure, bootstrap a project, set up `*.docker.local`.
 - [references/agents.md](references/agents.md): `orodc agents` (CMS conventions, coding rules, installation guides).
-- [references/workflow.md](references/workflow.md): local dev, PHP/app commands, database actions, platform defaults, Oro URLs.
+- [references/workflow.md](references/workflow.md): local dev, PHP/app commands, database actions, SSH access with agent forwarding, platform defaults, Oro URLs.
 - [references/proxy.md](references/proxy.md): proxy and domain troubleshooting for `*.docker.local`.
 
 ## Usage Rules
