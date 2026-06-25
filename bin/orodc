@@ -3761,7 +3761,7 @@ if [ $# -eq 0 ] || [ "${args[0]}" = "ssh" ]; then
     -o SendEnv=COMPOSER_AUTH \
     -o UserKnownHostsFile=/dev/null \
     -o StrictHostKeyChecking=no \
-    -o 'ForwardAgent no' \
+    -o 'ForwardAgent yes' \
     -o IdentitiesOnly=yes \
     -i "${DC_ORO_CONFIG_DIR}/ssh_id_ed25519" \
     -p "${SSH_PORT}" \
