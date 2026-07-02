@@ -206,6 +206,20 @@ Always check `bin/orodc` first before analyzing individual scripts.
 - User: "почему это происходит?" → ✅ Explain the reason, ❌ Don't "fix" it
 - User: "где находится конфиг?" → ✅ Show the location, ❌ Don't move it
 
+## 13.1. Suspected Input, Configuration, or Environment Issue = Analyze and Clarify First
+
+**CRITICAL:** If an error likely comes from a mistyped command, missing prefix, wrong working directory, incorrect configuration, missing dependency, broken Docker/Homebrew setup, stale generated files, permissions, networking, or another local/global environment issue, do **NOT** jump to code changes.
+
+- ✅ First analyze the visible evidence: container/service name, command path, router behavior, logs, and documented command syntax
+- ✅ If the likely cause is incorrect input, configuration, or environment state, clearly state it as a hypothesis, not a confirmed bug
+- ✅ Ask the user what exact command they ran, what they were trying to do, and which project/environment they ran it in
+- ✅ Gather relevant diagnostics first: `orodc status`, `orodc ps`, `.env.orodc`, generated compose config, Docker/Homebrew versions, and recent logs when applicable
+- ✅ Gather the full picture before proposing or making any fix
+- ❌ Do not modify router logic, aliases, docs, command behavior, compose files, or defaults until the user confirms this is a product issue to fix
+- ❌ Do not treat every runtime error as a code defect
+
+**Example:** If output shows `*-cli-run-*` and `/usr/local/bin/docker-php-entrypoint: exec: ... import: Permission denied`, first check whether the user ran a bare `orodc import` instead of `orodc database import` or `orodc importdb`. Ask for the exact command before changing code.
+
 ## 14. Docker Image Building
 
 **CRITICAL:** Never manually build Docker images - use `orodc docker-build`!
