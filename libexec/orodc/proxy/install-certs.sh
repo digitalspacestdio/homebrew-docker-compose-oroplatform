@@ -59,7 +59,6 @@ then
   if sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain "${CERT_OUTPUT_PATH}" 2>/dev/null
   then
     msg_ok "Certificate installed to macOS System Keychain"
-    rm -f "${CERT_OUTPUT_PATH}"
   else
     msg_warning "Failed to install certificate automatically. Manual installation required:"
     msg_info "  sudo security add-trusted-cert -d -r trustRoot -k /Library/Keychains/System.keychain ${CERT_OUTPUT_PATH}"
@@ -116,7 +115,6 @@ else
        sudo update-ca-certificates 2>/dev/null
     then
       msg_ok "Certificate installed to system trust store"
-      rm -f "${CERT_OUTPUT_PATH}"
     else
       msg_warning "Failed to install certificate automatically. Manual installation required:"
       msg_info "  sudo cp ${CERT_OUTPUT_PATH} /usr/local/share/ca-certificates/"
@@ -129,7 +127,6 @@ else
        sudo update-ca-trust 2>/dev/null
     then
       msg_ok "Certificate installed to system trust store"
-      rm -f "${CERT_OUTPUT_PATH}"
     else
       msg_warning "Failed to install certificate automatically. Manual installation required:"
       msg_info "  sudo cp ${CERT_OUTPUT_PATH} /etc/pki/ca-trust/source/anchors/"
@@ -152,7 +149,6 @@ else
     if certutil -d sql:"${HOME}/.pki/nssdb" -A -t "C,," -n "OroDC Docker Local CA" -i "${CERT_OUTPUT_PATH}" 2>/dev/null
     then
       msg_ok "Certificate installed to NSS database"
-      rm -f "${CERT_OUTPUT_PATH}"
     fi
   else
     msg_info "For Chrome/Node.js support, install libnss3-tools:"
@@ -163,4 +159,5 @@ else
   fi
 fi
 
+msg_info "Exported CA certificate kept at: ${CERT_OUTPUT_PATH}"
 msg_ok "Certificate installation complete!"
