@@ -42,8 +42,10 @@ services:
       # Traefik routing
       traefik.enable: 'true'
       
-      # Dashboard access via PathPrefix (for localhost:8880/traefik/dashboard)
-      traefik.http.routers.traefik-api-path.rule: 'PathPrefix(`/traefik/dashboard`) || PathPrefix(`/api`)'
+      # Dashboard access via PathPrefix (for localhost:8880/traefik/dashboard).
+      # /api is only for Traefik dashboard XHR (Referer must contain /traefik/dashboard),
+      # so project Host rules keep their own /api routes.
+      traefik.http.routers.traefik-api-path.rule: 'PathPrefix(`/traefik/dashboard`) || (PathPrefix(`/api`) && HeaderRegexp(`Referer`, `.*/traefik/dashboard`))'
       traefik.http.routers.traefik-api-path.priority: 8000
       traefik.http.routers.traefik-api-path.entrypoints: "web"
       traefik.http.routers.traefik-api-path.service: "api@internal"
@@ -57,7 +59,7 @@ services:
       traefik.http.routers.traefik-api-host.service: "api@internal"
       
       # Default entrypoint versions (TLS is terminated by proxy entrypoint)
-      traefik.http.routers.traefik-api-path-default.rule: 'PathPrefix(`/traefik/dashboard`) || PathPrefix(`/api`)'
+      traefik.http.routers.traefik-api-path-default.rule: 'PathPrefix(`/traefik/dashboard`) || (PathPrefix(`/api`) && HeaderRegexp(`Referer`, `.*/traefik/dashboard`))'
       traefik.http.routers.traefik-api-path-default.priority: 8000
       traefik.http.routers.traefik-api-path-default.entrypoints: "default"
       traefik.http.routers.traefik-api-path-default.service: "api@internal"
