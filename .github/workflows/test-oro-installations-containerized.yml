@@ -1,27 +1,7 @@
 name: Test Oro Installations (Containerized)
 
 on:
-  push:
-    branches: [ main, master, develop ]
-    paths:
-      - 'compose/**'
-      - 'bin/**'
-      - '!compose/docker/**'  # Exclude docker files - they trigger via workflow_run
-  
-  # Run after Docker images are successfully built
-  workflow_run:
-    workflows: 
-      - "Build & Publish PHP Base and PHP+Node.js multi-arch images to GHCR"
-      - "Build & Publish nginx multi-arch images to GHCR"
-      - "Build & Publish PostgreSQL multi-arch images to GHCR"
-    types:
-      - completed
-    branches: [ master ]
-  
-  # Daily run temporarily disabled
-  # schedule:
-  #   # Run tests daily at 2 AM UTC
-  #   - cron: '0 2 * * *'
+  # Manual run only
   workflow_dispatch:
     inputs:
       test_applications:
@@ -43,19 +23,15 @@ env:
 jobs:
   # Test installations in isolated containers - Universal (X64 + ARM64)
   test-installations:
-    # Skip if triggered by workflow_run but build was not successful
-    if: |
-      github.event_name != 'workflow_run' || 
-      github.event.workflow_run.conclusion == 'success'
     runs-on: ${{ matrix.arch.runner }}
     strategy:
       fail-fast: false
       matrix:
         arch:
-          - runner: [self-hosted, Linux, X64]
+          - runner: ubuntu-24.04
             name: X64
             port_base: 300
-          - runner: [self-hosted, Linux, ARM64] 
+          - runner: ubuntu-24.04-arm
             name: ARM64
             port_base: 400
         application:
@@ -242,7 +218,7 @@ jobs:
             export DC_ORO_NAME="${UNIQUE_PROJECT_NAME}"
             export DC_ORO_PORT_PREFIX="${PORT_PREFIX}"
             export DC_ORO_MODE=default
-            # Container-local path avoids bind-mount permission issues on self-hosted runners
+            # Container-local path avoids bind-mount permission issues on the runner host
             export DC_ORO_CONFIG_DIR="/home/runner/.orodc/${UNIQUE_PROJECT_NAME}"
             # Oro 6.x needs uuid-ossp from initdb.d; PG 18 default breaks oro:migration:data:load
             PGSQL_VERSION="${{ matrix.application.pgsql_version }}"
@@ -334,65 +310,10 @@ jobs:
           
           echo "✅ Cleanup completed for ${{ matrix.application.name }} [${{ matrix.arch.name }}]"
   
-  # Cleanup workers after all tests complete
-  cleanup-workers:
-    needs: [test-installations] 
-    if: always()
-    strategy:
-      fail-fast: false
-      matrix:
-        runner: 
-          - [self-hosted, Linux, X64]
-          - [self-hosted, Linux, ARM64]
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
-    name: Cleanup Docker Resources [${{ matrix.runner[2] }}]
-    
-    steps:
-      - name: Cleanup Docker Resources
-        run: |
-          echo "🧹 Cleaning up Docker resources on ${{ matrix.runner[2] }} worker..."
-          
-          # Stop and remove only test-related containers (safer approach)
-          echo "🔄 Stopping and removing test containers..."
-          # Only remove containers from our CI builds (with run ID pattern)
-          RUN_SHORT=$(echo "${{ github.run_id }}" | tail -c 6)
-          docker ps -aq --filter "name=orocommerce-${RUN_SHORT}" | xargs -r docker rm -f 2>/dev/null || true
-          docker ps -aq --filter "name=marello-${RUN_SHORT}" | xargs -r docker rm -f 2>/dev/null || true
-          
-          # Remove unused networks (keep default ones)
-          echo "🌐 Cleaning up unused networks..."
-          docker network prune -f 2>/dev/null || true
-          
-          # Remove unused volumes 
-          echo "📁 Cleaning up unused volumes..."
-          docker volume prune -f 2>/dev/null || true
-          
-          # Remove unused images (keep base images, remove dangling)
-          echo "🖼️ Cleaning up unused images..."
-          docker image prune -f 2>/dev/null || true
-          
-          # Clean build cache
-          echo "🔨 Cleaning up build cache..."
-          docker builder prune -f 2>/dev/null || true
-          
-          # System cleanup (comprehensive but safe)
-          echo "🧽 Final system cleanup..."
-          docker system prune -f 2>/dev/null || true
-          
-          # Show final stats
-          echo "📊 Final Docker resource usage:"
-          echo "Containers: $(docker ps -aq | wc -l) total"
-          echo "Images: $(docker images -aq | wc -l) total" 
-          echo "Volumes: $(docker volume ls -q | wc -l) total"
-          echo "Networks: $(docker network ls -q | wc -l) total"
-          
-          echo "✅ Docker cleanup completed on ${{ matrix.runner[2] }}"
-
   # Test summary for all architectures
   test-summary:
     timeout-minutes: 30
-    needs: [test-installations, cleanup-workers]
+    needs: [test-installations]
     runs-on: ubuntu-latest
     if: always()
     
