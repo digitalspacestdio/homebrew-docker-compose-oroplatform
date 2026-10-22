@@ -15,7 +15,7 @@ permissions:
 jobs:
   build-mail-amd64:
     name: Build Mailpit AMD64
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -43,7 +43,7 @@ jobs:
 
   build-mail-arm64:
     name: Build Mailpit ARM64
-    runs-on: [self-hosted, Linux, ARM64]
+    runs-on: ubuntu-24.04-arm
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

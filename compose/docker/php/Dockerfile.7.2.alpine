@@ -1,6 +1,6 @@
 ARG ALPINE_VERSION=3.12
 ARG PHP_VERSION=7.2
-FROM php:${PHP_VERSION}-fpm-alpine${ALPINE_VERSION} AS app_php
+FROM ghcr.io/digitalspacestdio/php-legacy:${PHP_VERSION}-fpm-alpine${ALPINE_VERSION} AS app_php
 ARG STABILITY="stable"
 ENV STABILIT=${STABILITY}
 ARG EXT_REDIS_VERSION=5.3.7

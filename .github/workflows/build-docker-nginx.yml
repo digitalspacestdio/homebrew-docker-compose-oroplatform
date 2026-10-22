@@ -14,7 +14,7 @@ permissions:
 jobs:
   build-nginx-amd64:
     name: Build Nginx AMD64
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ubuntu-24.04
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -39,7 +39,7 @@ jobs:
 
   build-nginx-arm64:
     name: Build Nginx ARM64
-    runs-on: [self-hosted, Linux, ARM64]
+    runs-on: ubuntu-24.04-arm
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
