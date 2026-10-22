@@ -8,7 +8,17 @@ SHELL ["/bin/bash", "-o", "pipefail", "-c"]
 # The script automatically detects the major version and installs the appropriate packages
 # hadolint ignore=DL3008
 RUN set -eux; \
-    apt-get update -yqq; \
+    # EOL Debian releases (e.g. bullseye used by postgres:15.1) are moved to archive.debian.org
+    # and dropped from apt.postgresql.org, so fall back to both archives (the PGDG one is HTTPS-only)
+    if ! apt-get update -yqq; then \
+        find /etc/apt -name 'sources.list' -o -name 'debian.sources' | xargs sed -i 's#http://deb.debian.org/#http://archive.debian.org/#'; \
+        mv /etc/apt/sources.list.d/pgdg.list /tmp/pgdg.list; \
+        apt-get update -yqq -o Acquire::Check-Valid-Until=false; \
+        apt-get install -yqq --no-install-recommends ca-certificates; \
+        sed 's#http://apt.postgresql.org/#https://apt-archive.postgresql.org/#' /tmp/pgdg.list > /etc/apt/sources.list.d/pgdg.list; \
+        rm /tmp/pgdg.list; \
+        apt-get update -yqq -o Acquire::Check-Valid-Until=false -o APT::Update::Error-Mode=any; \
+    fi; \
     # Extract major version from pg_config
     PG_MAJOR=$(pg_config --version | sed 's/^PostgreSQL \([0-9]\+\).*/\1/'); \
     echo "Detected PostgreSQL major version: $PG_MAJOR"; \

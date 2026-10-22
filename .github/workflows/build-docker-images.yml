@@ -198,8 +198,13 @@ jobs:
         run: |
           IMAGE="ghcr.io/${{ github.repository_owner }}/orodc-php:${{ matrix.php }}-alpine-${{ matrix.arch_name }}"
           
-          # Calculate hash of build context (version-specific files only, exclude other versions)
-          HASH=$(find compose/docker/php -type f -name "Dockerfile.${{ matrix.php }}.alpine" -o -type f ! -name "Dockerfile.*.alpine" | sort | xargs cat 2>/dev/null | sha256sum | cut -d' ' -f1)
+          # Calculate hash of build context (version-specific files only, exclude other versions) + upstream base image digest
+          DOCKERFILE="compose/docker/php/Dockerfile.${{ matrix.php }}.alpine"
+          ALPINE_VERSION=$(sed -n 's/^ARG ALPINE_VERSION=//p' "${DOCKERFILE}")
+          BASE_IMAGE=$(sed -n 's/^FROM \([^ ]*\) AS app_php$/\1/p' "${DOCKERFILE}" | sed "s/\${PHP_VERSION}/${{ matrix.php_version }}/; s/\${ALPINE_VERSION}/${ALPINE_VERSION}/")
+          BASE_DIGEST=$(docker buildx imagetools inspect "${BASE_IMAGE}" --format '{{json .Manifest.Digest}}' 2>/dev/null || echo "")
+          echo "[INFO] Base image ${BASE_IMAGE}: ${BASE_DIGEST:-unknown}"
+          HASH=$( { find compose/docker/php -type f -name "Dockerfile.${{ matrix.php }}.alpine" -o -type f ! -name "Dockerfile.*.alpine" | sort | xargs cat 2>/dev/null; echo "${BASE_DIGEST}"; } | sha256sum | cut -d' ' -f1)
           echo "hash=${HASH}" >> $GITHUB_OUTPUT
           
           # Check if image exists with same hash

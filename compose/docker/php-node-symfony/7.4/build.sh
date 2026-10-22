@@ -49,6 +49,10 @@ fi
 # Create /var/run/php directory
 mkdir -p /var/run/php
 
+# Install Python 3 for Node.js modules (python2 is not available since Alpine 3.16)
+# before adding edge repositories: edge python3 is incompatible with this musl
+apk add --no-cache python3
+
 # Add edge repositories for additional packages
 echo "http://dl-2.alpinelinux.org/alpine/edge/main" >>/etc/apk/repositories
 echo "http://dl-2.alpinelinux.org/alpine/edge/community" >>/etc/apk/repositories
@@ -61,9 +65,6 @@ apk add --no-cache \
 # Install sudo and configure permissions
 apk add --no-cache sudo
 echo "developer ALL=(ALL) NOPASSWD: ALL" >>/etc/sudoers
-
-# Install Python 2 for Node.js modules
-apk add --no-cache python2
 
 # Install and configure Zsh + Starship
 apk add --no-cache zsh
