@@ -41,7 +41,7 @@ jobs:
   build-pgsql-amd64:
     name: Build PostgreSQL ${{ matrix.version }} AMD64
     needs: prepare-matrix
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         version: ${{ fromJson(needs.prepare-matrix.outputs.versions) }}
@@ -76,7 +76,7 @@ jobs:
   build-pgsql-arm64:
     name: Build PostgreSQL ${{ matrix.version }} ARM64
     needs: prepare-matrix
-    runs-on: [self-hosted, Linux, ARM64]
+    runs-on: ubuntu-24.04-arm
     strategy:
       matrix:
         version: ${{ fromJson(needs.prepare-matrix.outputs.versions) }}
