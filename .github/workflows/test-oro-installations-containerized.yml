@@ -87,14 +87,16 @@ jobs:
               useradd -u 1000 -g 1000 -m -s /bin/bash runner 2>/dev/null || true
             }
             
-            # Ensure docker group exists and add runner to it
-            getent group docker >/dev/null || groupadd docker
-            usermod -aG docker runner
-            
-            # Fix Docker socket permissions for runner user
-            chown root:docker /var/run/docker.sock
-            chmod 660 /var/run/docker.sock
-            
+            # Give runner access to the host Docker socket via a group with the socket's GID.
+            # Do not chown/chmod the socket: it is the host's, and the runner host would lose access to Docker.
+            DOCKER_GID=$(stat -c '%g' /var/run/docker.sock)
+            DOCKER_GROUP=$(getent group "${DOCKER_GID}" | cut -d: -f1)
+            if [ -z "${DOCKER_GROUP}" ]; then
+              DOCKER_GROUP=docker-host
+              groupadd -g "${DOCKER_GID}" "${DOCKER_GROUP}"
+            fi
+            usermod -aG "${DOCKER_GROUP}" runner
+
             echo "Created runner user with UID=1000 and Docker access"
           fi
           
