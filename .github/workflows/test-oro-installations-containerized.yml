@@ -85,7 +85,7 @@ jobs:
     
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
         with:
           clean: false  # Don't clean .orodc mounted volume
         
@@ -127,7 +127,7 @@ jobs:
           echo "Fixed workspace permissions for UID=1000"
           
       - name: Install Homebrew and OroDC
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         with:
           timeout_minutes: 10
           max_attempts: 5
@@ -200,7 +200,7 @@ jobs:
             echo "✅ OroDC installation completed"
           
       - name: Install and test ${{ matrix.application.name }}
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@v4
         with:
           timeout_minutes: 15
           max_attempts: 5
