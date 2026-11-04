@@ -158,14 +158,16 @@ install_goss() {
   local os_type=$(docker exec "${container_name}" sh -c "cat /etc/os-release 2>/dev/null | grep '^ID=' | cut -d= -f2 | tr -d '\"' || echo 'alpine'" 2>/dev/null || echo "alpine")
   local arch=$(docker exec "${container_name}" sh -c "uname -m 2>/dev/null || echo 'amd64'" 2>/dev/null || echo "amd64")
 
-  # Map architecture to Goss binary name
-  local goss_arch="amd64"
+  # Map architecture to Goss archive name (goreleaser layout since v0.4.10)
+  local goss_version="0.4.10"
+  local goss_arch="x86_64"
   case "${arch}" in
-    x86_64) goss_arch="amd64" ;;
+    x86_64) goss_arch="x86_64" ;;
     aarch64 | arm64) goss_arch="arm64" ;;
-    armv7l | armv6l) goss_arch="arm" ;;
-    *) goss_arch="amd64" ;;
+    armv7l | armv6l) goss_arch="armv6" ;;
+    *) goss_arch="x86_64" ;;
   esac
+  local goss_url="https://github.com/goss-org/goss/releases/download/v${goss_version}/goss_${goss_version}_linux_${goss_arch}.tar.gz"
 
   case "${os_type}" in
     alpine)
@@ -173,8 +175,8 @@ install_goss() {
       docker exec "${container_name}" sh -c "
         if ! command -v goss >/dev/null 2>&1
         then
-          apk add --no-cache curl ca-certificates >/dev/null 2>&1 || true
-          curl -fsSL https://github.com/goss-org/goss/releases/latest/download/goss-linux-${goss_arch} -o /usr/local/bin/goss 2>/dev/null || true
+          apk add --no-cache curl ca-certificates tar >/dev/null 2>&1 || true
+          curl -fsSL '${goss_url}' | tar -xz -C /usr/local/bin goss 2>/dev/null || true
           chmod +x /usr/local/bin/goss 2>/dev/null || true
         fi
       " 2>/dev/null || true
@@ -185,8 +187,8 @@ install_goss() {
         if ! command -v goss >/dev/null 2>&1
         then
           apt-get update >/dev/null 2>&1 || true
-          apt-get install -y curl ca-certificates >/dev/null 2>&1 || true
-          curl -fsSL https://github.com/goss-org/goss/releases/latest/download/goss-linux-${goss_arch} -o /usr/local/bin/goss 2>/dev/null || true
+          apt-get install -y curl ca-certificates tar >/dev/null 2>&1 || true
+          curl -fsSL '${goss_url}' | tar -xz -C /usr/local/bin goss 2>/dev/null || true
           chmod +x /usr/local/bin/goss 2>/dev/null || true
         fi
       " 2>/dev/null || true
@@ -196,7 +198,7 @@ install_goss() {
       docker exec "${container_name}" sh -c "
         if ! command -v goss >/dev/null 2>&1
         then
-          curl -fsSL https://github.com/goss-org/goss/releases/latest/download/goss-linux-${goss_arch} -o /usr/local/bin/goss 2>/dev/null || true
+          curl -fsSL '${goss_url}' | tar -xz -C /usr/local/bin goss 2>/dev/null || true
           chmod +x /usr/local/bin/goss 2>/dev/null || true
         fi
       " 2>/dev/null || true
