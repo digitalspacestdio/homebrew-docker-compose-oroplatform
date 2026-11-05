@@ -91,7 +91,7 @@ compose/docker/
 
 **Key Build Arguments:**
 ```dockerfile
-ARG ALPINE_VERSION=3.21           # Alpine Linux version
+ARG ALPINE_VERSION=3.23           # Alpine Linux version
 ARG PHP_VERSION=8.3                # PHP version
 ARG EXT_REDIS_VERSION=6.2.0        # Redis extension version
 ARG EXT_IGBINARY_VERSION=3.2.15    # Igbinary version
@@ -317,25 +317,25 @@ docker build -f Dockerfile.8.3.alpine -t orodc-php-node-symfony:8.3-alpine .
 **Problem:** Different PHP versions require different Alpine versions, and Node.js base image MUST match the PHP Alpine version to avoid `libstdc++` incompatibility (especially on ARM64).
 
 **Solution:**
-- PHP 7.4: Alpine 3.15
-- PHP 8.1-8.2: Alpine 3.18
-- PHP 8.3-8.5: Alpine 3.21
+- PHP 7.4: Alpine 3.15 (php-legacy)
+- PHP 8.1: Alpine 3.22 (php-legacy)
+- PHP 8.2-8.5: Alpine 3.23 (official `php:` images; Node 18 dropped — no alpine>3.21 tags)
 
 **CRITICAL:** The `php-node-symfony` Dockerfiles MUST use the SAME Alpine version as the base PHP image:
 
 ```dockerfile
 # ✅ CORRECT - Alpine versions match
 # In Dockerfile.8.5.alpine (base PHP)
-ARG ALPINE_VERSION=3.21
+ARG ALPINE_VERSION=3.23
 FROM php:${PHP_VERSION}-fpm-alpine${ALPINE_VERSION}
 
 # In php-node-symfony/8.5/Dockerfile (final image)
-ARG ALPINE_VERSION=3.21
+ARG ALPINE_VERSION=3.23
 FROM node:${NODE_VERSION}-alpine${ALPINE_VERSION} AS app_node
 FROM ghcr.io/digitalspacestdio/orodc-php:${PHP_VERSION}-alpine
 
 # ❌ WRONG - Mismatched Alpine versions
-# Base uses 3.21, but Node stage uses 3.18
+# Base uses 3.23, but Node stage uses 3.18
 # Causes: Error relocating /usr/local/bin/node: symbol not found
 ```
 
@@ -350,11 +350,11 @@ FROM ghcr.io/digitalspacestdio/orodc-php:${PHP_VERSION}-alpine
 | PHP Version | Alpine Version | Base Dockerfile | Node Dockerfile |
 |-------------|----------------|-----------------|-----------------|
 | 7.4         | 3.15           | `Dockerfile.7.4.alpine` | `php-node-symfony/7.4/Dockerfile` |
-| 8.1         | 3.18           | `Dockerfile.8.1.alpine` | `php-node-symfony/8.1/Dockerfile` |
-| 8.2         | 3.18           | `Dockerfile.8.2.alpine` | `php-node-symfony/8.2/Dockerfile` |
-| 8.3         | 3.21           | `Dockerfile.8.3.alpine` | `php-node-symfony/8.3/Dockerfile` |
-| 8.4         | 3.21           | `Dockerfile.8.4.alpine` | `php-node-symfony/8.4/Dockerfile` |
-| 8.5         | 3.21           | `Dockerfile.8.5.alpine` | `php-node-symfony/8.5/Dockerfile` |
+| 8.1         | 3.22           | `Dockerfile.8.1.alpine` | `php-node-symfony/8.1/Dockerfile` |
+| 8.2         | 3.23           | `Dockerfile.8.2.alpine` | `php-node-symfony/8.2/Dockerfile` |
+| 8.3         | 3.23           | `Dockerfile.8.3.alpine` | `php-node-symfony/8.3/Dockerfile` |
+| 8.4         | 3.23           | `Dockerfile.8.4.alpine` | `php-node-symfony/8.4/Dockerfile` |
+| 8.5         | 3.23           | `Dockerfile.8.5.alpine` | `php-node-symfony/8.5/Dockerfile` |
 
 **Dockerfile Build Order Fix (ARM64):**
 
@@ -494,12 +494,12 @@ COPY --from=composer_app /usr/bin/composer /usr/bin/composer
 
 | PHP Version | Alpine | Node.js | Status | Notes |
 |-------------|--------|---------|--------|-------|
-| 7.4 | 3.16 | 18 | Legacy | Built-in IMAP, Python 2 available |
-| 8.1 | 3.18 | 18 | Stable | Built-in IMAP, no Python 2 |
-| 8.2 | 3.18 | 18 | Stable | Built-in IMAP, no Python 2 |
-| 8.3 | 3.18 | 18 | Stable | Built-in IMAP, no Python 2 |
-| 8.4 | 3.18 | 20 | Stable | PECL IMAP, no Python 2 |
-| 8.5 | 3.21 | 22 | RC/Beta | PECL IMAP, git commit versions |
+| 7.4 | 3.16 | 18 | Legacy | php-legacy base; Built-in IMAP |
+| 8.1 | 3.22 | 18–22 | Stable | php-legacy base; Built-in IMAP |
+| 8.2 | 3.23 | 20, 22 | Stable | Official `php:` base; Built-in IMAP |
+| 8.3 | 3.23 | 20, 22 | Stable | Official `php:` base; Built-in IMAP |
+| 8.4 | 3.23 | 20, 22 | Stable | Official `php:` base; PECL IMAP |
+| 8.5 | 3.23 | 22, 24 | Stable | Official `php:` base; PECL IMAP |
 
 ---
 
