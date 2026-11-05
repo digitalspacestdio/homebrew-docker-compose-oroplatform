@@ -68,6 +68,11 @@ ENV CFLAGS="-std=c++14"
 # Copy ofelia binary
 COPY --from=mcuadros/ofelia:latest /usr/bin/ofelia /usr/bin/ofelia
 
+# Install Goss for orodc doctor checks (baked into php-node image, not project layer)
+COPY --chmod=0755 shared/install-goss.sh /tmp/install-goss.sh
+ARG GOSS_VERSION=0.4.10
+RUN GOSS_VERSION=${GOSS_VERSION} /tmp/install-goss.sh && rm -f /tmp/install-goss.sh
+
 # Install composer
 # https://getcomposer.org/doc/03-cli.md#composer-allow-superuser
 ENV COMPOSER_ALLOW_SUPERUSER=1
