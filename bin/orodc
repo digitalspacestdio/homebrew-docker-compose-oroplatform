@@ -3376,8 +3376,11 @@ if [[ "${DC_ORO_MODE}" == "mutagen" ]] && [[ -n "${DC_ORO_APPDIR:-}" ]] && [[ -n
   fi
 fi
 
-if [[ ${DOCKER_COMPOSE_VERSION} -gt 1 ]]; then
+if [[ ${DOCKER_COMPOSE_VERSION} -gt 1 ]] && [[ -t 0 ]]; then
   DOCKER_COMPOSE_RUN_CMD="${DOCKER_COMPOSE_BIN_CMD} run -i --rm"
+elif [[ ${DOCKER_COMPOSE_VERSION} -gt 1 ]]; then
+  # stdin is not a terminal (CI, pipes, agents): disable pseudo-TTY allocation
+  DOCKER_COMPOSE_RUN_CMD="${DOCKER_COMPOSE_BIN_CMD} run -T --rm"
 else
   DOCKER_COMPOSE_RUN_CMD="${DOCKER_COMPOSE_BIN_CMD} run --rm"
 fi
@@ -3390,7 +3393,7 @@ build_docker_compose_run_cmd() {
   # Check if this is a composer command - use -T flag for non-interactive mode
   # For interactive commands, use -it (both stdin and TTY)
   local use_tty_flag="-it"
-  if [[ "$first_non_flag_arg" == "composer" ]]; then
+  if [[ "$first_non_flag_arg" == "composer" ]] || [[ ! -t 0 ]]; then
     use_tty_flag="-T"
   fi
   
@@ -3433,7 +3436,13 @@ is_container_running() {
 execute_in_container() {
   local service="$1"
   local cmd_args=("${@:2}")
-  
+
+  # Allocate a pseudo-TTY only when stdin is a terminal
+  local run_tty_flag="-T"
+  if [[ -t 0 ]]; then
+    run_tty_flag="-it"
+  fi
+
   # Handle external PHP files for exec vs run scenarios
   local external_files=()
   local updated_cmd_args=()
@@ -3443,6 +3452,10 @@ execute_in_container() {
     if [[ $arg == *.php ]]; then
       PHPFILE_PATH=$(echo $arg | grep -oE '.+\.php' | sed s~.\*=~~)
       PHPFILE_DIR=$(dirname "${PHPFILE_PATH}")
+      # Resolve relative paths against the current directory before comparing with DC_ORO_APPDIR
+      if [[ $PHPFILE_DIR != /* ]] && [[ -d $PHPFILE_DIR ]]; then
+        PHPFILE_DIR=$(cd "$PHPFILE_DIR" && pwd -P)
+      fi
       
       # Check if file is outside project directory
       if [[ -z $DC_ORO_APPDIR ]] || [[ $PHPFILE_DIR != '.' && $PHPFILE_DIR != $DC_ORO_APPDIR && $PHPFILE_DIR != $DC_ORO_APPDIR/* ]]; then
@@ -3474,7 +3487,7 @@ execute_in_container() {
         else
           if [ "$DEBUG" ]; then echo "DEBUG: Failed to copy $file to SSH container, falling back to CLI run" >&2; fi
           # Fall back to CLI run with volume mount
-          exec ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} run -it --rm -v "$(dirname "$file"):$(dirname "$file"):ro" "$service" "${cmd_args[@]}" "${right_flags[@]}" "${right_options[@]}"
+          exec ${DOCKER_COMPOSE_BIN_CMD} ${left_flags[@]} ${left_options[@]} run "${run_tty_flag}" --rm -v "$(dirname "$file"):$(dirname "$file"):ro" "$service" "${cmd_args[@]}" "${right_flags[@]}" "${right_options[@]}"
         fi
       done
     fi
