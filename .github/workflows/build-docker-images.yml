@@ -479,13 +479,7 @@ jobs:
             arch: ARM64
             arch_name: arm64
             platform: linux/arm64
-          # PHP 8.2 + Node 18, 20, 22 + Composer 2 (amd64)
-          - php: "8.2"
-            node: "18"
-            composer: "2"
-            arch: X64
-            arch_name: amd64
-            platform: linux/amd64
+          # PHP 8.2 + Node 20, 22 + Composer 2 (amd64)
           - php: "8.2"
             node: "20"
             composer: "2"
@@ -498,13 +492,7 @@ jobs:
             arch: X64
             arch_name: amd64
             platform: linux/amd64
-          # PHP 8.2 + Node 18, 20, 22 + Composer 2 (arm64)
-          - php: "8.2"
-            node: "18"
-            composer: "2"
-            arch: ARM64
-            arch_name: arm64
-            platform: linux/arm64
+          # PHP 8.2 + Node 20, 22 + Composer 2 (arm64)
           - php: "8.2"
             node: "20"
             composer: "2"
@@ -517,13 +505,7 @@ jobs:
             arch: ARM64
             arch_name: arm64
             platform: linux/arm64
-          # PHP 8.3 + Node 18, 20, 22 + Composer 2 (amd64)
-          - php: "8.3"
-            node: "18"
-            composer: "2"
-            arch: X64
-            arch_name: amd64
-            platform: linux/amd64
+          # PHP 8.3 + Node 20, 22 + Composer 2 (amd64)
           - php: "8.3"
             node: "20"
             composer: "2"
@@ -536,13 +518,7 @@ jobs:
             arch: X64
             arch_name: amd64
             platform: linux/amd64
-          # PHP 8.3 + Node 18, 20, 22 + Composer 2 (arm64)
-          - php: "8.3"
-            node: "18"
-            composer: "2"
-            arch: ARM64
-            arch_name: arm64
-            platform: linux/arm64
+          # PHP 8.3 + Node 20, 22 + Composer 2 (arm64)
           - php: "8.3"
             node: "20"
             composer: "2"
@@ -555,13 +531,7 @@ jobs:
             arch: ARM64
             arch_name: arm64
             platform: linux/arm64
-          # PHP 8.4 + Node 18, 20, 22 + Composer 2 (amd64)
-          - php: "8.4"
-            node: "18"
-            composer: "2"
-            arch: X64
-            arch_name: amd64
-            platform: linux/amd64
+          # PHP 8.4 + Node 20, 22 + Composer 2 (amd64)
           - php: "8.4"
             node: "20"
             composer: "2"
@@ -574,13 +544,7 @@ jobs:
             arch: X64
             arch_name: amd64
             platform: linux/amd64
-          # PHP 8.4 + Node 18, 20, 22 + Composer 2 (arm64)
-          - php: "8.4"
-            node: "18"
-            composer: "2"
-            arch: ARM64
-            arch_name: arm64
-            platform: linux/arm64
+          # PHP 8.4 + Node 20, 22 + Composer 2 (arm64)
           - php: "8.4"
             node: "20"
             composer: "2"
@@ -781,30 +745,21 @@ jobs:
           - php: "8.1"
             node: "22"
             composer: "2"
-          # PHP 8.2 + Node 18, 20, 22 + Composer 2
-          - php: "8.2"
-            node: "18"
-            composer: "2"
+          # PHP 8.2 + Node 20, 22 + Composer 2
           - php: "8.2"
             node: "20"
             composer: "2"
           - php: "8.2"
             node: "22"
             composer: "2"
-          # PHP 8.3 + Node 18, 20, 22 + Composer 2
-          - php: "8.3"
-            node: "18"
-            composer: "2"
+          # PHP 8.3 + Node 20, 22 + Composer 2
           - php: "8.3"
             node: "20"
             composer: "2"
           - php: "8.3"
             node: "22"
             composer: "2"
-          # PHP 8.4 + Node 18, 20, 22 + Composer 2
-          - php: "8.4"
-            node: "18"
-            composer: "2"
+          # PHP 8.4 + Node 20, 22 + Composer 2
           - php: "8.4"
             node: "20"
             composer: "2"
