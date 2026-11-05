@@ -20,7 +20,7 @@ permissions:
 jobs:
   prepare-matrix:
     name: Prepare build matrix
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     outputs:
       versions: ${{ steps.set-matrix.outputs.versions }}
     steps:
@@ -111,7 +111,7 @@ jobs:
   create-pgsql-manifest:
     name: Create multi-arch manifest for PostgreSQL ${{ matrix.version }}
     needs: [prepare-matrix, build-pgsql-amd64, build-pgsql-arm64]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         version: ${{ fromJson(needs.prepare-matrix.outputs.versions) }}
