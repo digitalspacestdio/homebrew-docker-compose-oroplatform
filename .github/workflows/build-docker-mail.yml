@@ -72,7 +72,7 @@ jobs:
   create-mail-manifest:
     name: Create multi-arch manifest
     needs: [build-mail-amd64, build-mail-arm64]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Log in to GHCR
         uses: docker/login-action@v4

@@ -266,7 +266,7 @@ jobs:
   create-php-base-manifests:
     name: PHP-${{ matrix.version }} (Manifest)
     needs: [build-php-base]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         version: ["7.1", "7.2", "7.3", "7.4", "8.1", "8.2", "8.3", "8.4", "8.5"]
@@ -694,7 +694,7 @@ jobs:
   create-php-node-manifests:
     name: PHP-${{ matrix.php }}+NODE-${{ matrix.node }}+COMPOSER-${{ matrix.composer }} (Manifest)
     needs: [build-php-node]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       matrix:
         include:

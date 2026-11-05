@@ -72,7 +72,7 @@ jobs:
   create-proxy-manifest:
     name: Create multi-arch manifest
     needs: [build-proxy-amd64, build-proxy-arm64]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - name: Log in to GHCR
         uses: docker/login-action@v4
