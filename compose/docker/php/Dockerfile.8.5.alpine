@@ -87,7 +87,8 @@ RUN set -eux; \
   docker-php-ext-configure zip; \
   docker-php-ext-configure gd --with-freetype --with-webp --with-jpeg; \
   \
-  mkdir -p /usr/src/php/ext/imap; \
+  # PHP 8.4+ source still ships an empty/stub ext/imap after extract; remove it before PECL clone
+  rm -rf /usr/src/php/ext/imap; \
   git clone --recursive --branch $EXT_IMAP_VERSION --depth 1 https://github.com/php/pecl-mail-imap.git /usr/src/php/ext/imap; \
   docker-php-ext-configure imap --with-imap --with-imap-ssl; \
   docker-php-ext-install -j$(printf "2\n$(nproc)" | sort -g | head -n1) imap; \
