@@ -8,6 +8,7 @@ services:
       - 'ORO_WEBSOCKET_BACKEND_DSN=${DC_ORO_WEBSOCKET_BACKEND_DSN:-tcp://websocket:8080}'
       - 'GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
       - 'ORO_GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
+      - 'ORO_PDF_GENERATOR_GOTENBERG_API_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
     depends_on:
       database:
         condition: service_healthy
@@ -21,6 +22,7 @@ services:
       - 'ORO_WEBSOCKET_BACKEND_DSN=${DC_ORO_WEBSOCKET_BACKEND_DSN:-tcp://websocket:8080}'
       - 'GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
       - 'ORO_GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
+      - 'ORO_PDF_GENERATOR_GOTENBERG_API_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
     depends_on:
       database:
         condition: service_healthy
@@ -39,6 +41,7 @@ services:
     environment:
       - 'GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
       - 'ORO_GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
+      - 'ORO_PDF_GENERATOR_GOTENBERG_API_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
     depends_on:
       database:
         condition: service_healthy
@@ -139,6 +142,7 @@ services:
       - 'XDEBUG_MODE=${XDEBUG_MODE_WEBSOCKET:-off}'
       - 'GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
       - 'ORO_GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
+      - 'ORO_PDF_GENERATOR_GOTENBERG_API_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
     depends_on:
       database:
         condition: service_healthy
@@ -223,6 +227,7 @@ services:
       - 'XDEBUG_MODE=${XDEBUG_MODE_CONSUMER:-off}'
       - 'GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
       - 'ORO_GOTENBERG_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
+      - 'ORO_PDF_GENERATOR_GOTENBERG_API_URL=${DC_ORO_GOTENBERG_URL:-http://gotenberg:3000}'
     depends_on:
       database:
         condition: service_healthy
