@@ -1,0 +1,15 @@
+#!/bin/bash
+# Reject commit messages that carry AI attribution lines
+# ("Co-Authored-By: Claude ...", "Generated with Claude Code").
+set -euo pipefail
+
+msg_file="$1"
+pattern='^[[:space:]]*(co-authored-by:.*(claude|anthropic\.com)|.*generated with \[?claude code)'
+
+# Git drops comment lines later, so do not check them.
+found=$(grep -v '^#' "${msg_file}" | grep -iE "${pattern}" || true)
+if [[ -n "${found}" ]]; then
+  echo "commit-msg: remove the AI attribution line(s) from the commit message:" >&2
+  echo "${found}" >&2
+  exit 1
+fi

@@ -42,3 +42,16 @@ git commit --no-verify
 - ✅ Colorized output
 - ✅ Graceful handling if shellcheck not installed
 - ✅ Clear error messages
+
+## Commit-msg Hook
+
+The `commit-msg` hook rejects commit messages that carry AI attribution lines,
+such as `Co-Authored-By: Claude ...` or `Generated with Claude Code`.
+Co-author lines of people are not affected.
+
+### Installation
+
+```bash
+cp hooks/commit-msg .git/hooks/commit-msg
+chmod +x .git/hooks/commit-msg
+```
