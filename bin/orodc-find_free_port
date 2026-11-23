@@ -16,12 +16,12 @@ load_docker_containers_cache() {
     __DOCKER_CONTAINERS_CACHE=$(docker ps -a --format '{{.Names}} {{.Ports}}' | grep -v '^k8s_')
     
     # Get all container names and create inspect cache
-    local container_names
-    container_names=$(echo "$__DOCKER_CONTAINERS_CACHE" | awk '{print $1}' | tr '\n' ' ')
+    local container_names=()
+    read -ra container_names <<< "$(echo "$__DOCKER_CONTAINERS_CACHE" | awk '{print $1}' | tr '\n' ' ')"
     
-    if [[ -n "$container_names" ]]; then
+    if [[ ${#container_names[@]} -gt 0 ]]; then
       # Single docker inspect call for all containers
-      __DOCKER_INSPECT_CACHE=$(docker inspect --format '{{.Name}}|{{ index .Config.Labels "com.docker.compose.project" }}|{{ index .Config.Labels "com.docker.compose.service" }}' $container_names 2>/dev/null)
+      __DOCKER_INSPECT_CACHE=$(docker inspect --format '{{.Name}}|{{ index .Config.Labels "com.docker.compose.project" }}|{{ index .Config.Labels "com.docker.compose.service" }}' "${container_names[@]}" 2>/dev/null)
     fi
     
     __DOCKER_CACHE_LOADED=true
@@ -113,9 +113,9 @@ get_port_usage_info() {
   done <<< "$__DOCKER_CONTAINERS_CACHE"
   
   # Check local processes (only LISTEN state)
-  if lsof -t -i tcp:$port -sTCP:LISTEN > /dev/null 2>&1; then
+  if lsof -t -i "tcp:${port}" -sTCP:LISTEN > /dev/null 2>&1; then
     local process_info
-    process_info=$(lsof -i tcp:$port -P -n -sTCP:LISTEN | tail -n +2 | head -1 | awk '{print $1 " (PID: " $2 ")"}')
+    process_info=$(lsof -i "tcp:${port}" -P -n -sTCP:LISTEN | tail -n +2 | head -1 | awk '{print $1 " (PID: " $2 ")"}')
     if [[ -n "$process_info" ]]; then
       echo "local process: $process_info"
     else
@@ -244,6 +244,7 @@ is_port_used_batch() {
   # First check Docker containers using cached data to see if it's used by our project
   local found=1
   local used_by_our_project=false
+  local used_by_same_service=false
   while read -r name ports; do
     [[ -z "$name" ]] && continue
     
@@ -265,11 +266,13 @@ is_port_used_batch() {
           fi
           if [[ "$host_port" != *"-"* ]] && [[ "$host_port" == "$p" ]]; then
             used_by_our_project=true
+            [[ "$container_service" == "$SERVICE_NAME" ]] && used_by_same_service=true
             break 2
           fi
         else
           if [[ "$part" != *"-"* ]] && [[ "$part" == "$p" ]]; then
             used_by_our_project=true
+            [[ "$container_service" == "$SERVICE_NAME" ]] && used_by_same_service=true
             break 2
           fi
         fi
@@ -295,11 +298,20 @@ is_port_used_batch() {
   
   # Method 3: lsof (additional check, but less reliable for Docker ports)
   if [[ "$port_in_use" == "false" ]] && command -v lsof >/dev/null 2>&1; then
-    if lsof -t -i tcp:$p -sTCP:LISTEN > /dev/null 2>&1; then
+    if lsof -t -i "tcp:${p}" -sTCP:LISTEN > /dev/null 2>&1; then
       port_in_use=true
     fi
   fi
   
+  # The port is held by this same service of our project (running or stopped): keep it.
+  # Treating it as taken made every orodc call alternate the port (e.g. 30132 <-> 30133),
+  # and the changed published port made Compose recreate the container each time.
+  # Compose stops the old container before it starts the new one, so the port can be rebound.
+  if [[ "$used_by_same_service" == "true" ]]; then
+    [[ "$DEBUG" == "1" ]] && echo "DEBUG: Port $p is held by our own $SERVICE_NAME container ($PROJECT_NAME), keeping it" >&2
+    return 1
+  fi
+
   # CRITICAL: Always check port_in_use first - port cannot be rebound if already listening
   # Even our own container holds the port during recreate, causing "port already allocated"
   if [[ "$port_in_use" == "true" ]]; then
@@ -326,9 +338,6 @@ is_port_used_batch() {
     if [[ "$container_project" == "$PROJECT_NAME" ]]; then
       continue
     fi
-    
-    # Debug: show which project is using the port
-    local port_conflict=false
     
     for part in ${ports//,/ }; do
       part="${part%/tcp}"
@@ -383,7 +392,7 @@ find_free_port() {
     local p=$1
     
     # Method 1: lsof (works for most processes)
-    if lsof -t -i tcp:$p -sTCP:LISTEN > /dev/null 2>&1; then
+    if lsof -t -i "tcp:${p}" -sTCP:LISTEN > /dev/null 2>&1; then
       return 0
     fi
     
