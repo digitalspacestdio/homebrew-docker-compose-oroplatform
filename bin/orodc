@@ -4043,6 +4043,21 @@ if [[ "$first_non_flag_arg" == "tests" ]]; then
   # services to stop them properly. By creating a merged compose.yml, these commands
   # can find and stop test containers even after the test session ends.
   
+  # Resolve the test database settings BEFORE merging: `docker compose config` interpolates
+  # variables into compose.yml, so anything defined later never reaches the test services
+  # (they would fall back to the app_db_test defaults while install creates <db>_test).
+  # Define test-specific variables with fallbacks to main variables
+  DC_ORO_TEST_DATABASE_HOST="${DC_ORO_TEST_DATABASE_HOST:-${DC_ORO_DATABASE_HOST:-database}}"
+  DC_ORO_TEST_DATABASE_PORT="${DC_ORO_TEST_DATABASE_PORT:-${DC_ORO_DATABASE_PORT:-5432}}"
+  DC_ORO_TEST_DATABASE_USER="${DC_ORO_TEST_DATABASE_USER:-${DC_ORO_DATABASE_USER:-oro_db_user}}"
+  DC_ORO_TEST_DATABASE_PASSWORD="${DC_ORO_TEST_DATABASE_PASSWORD:-${DC_ORO_DATABASE_PASSWORD:-oro_db_pass}}"
+  DC_ORO_TEST_DATABASE_DBNAME="${DC_ORO_TEST_DATABASE_DBNAME:-${DC_ORO_DATABASE_DBNAME:-oro_db}_test}"
+  
+  # Create test database URI using parse_dsn_uri function
+  TEST_DB_URI="postgres://${DC_ORO_TEST_DATABASE_USER}:${DC_ORO_TEST_DATABASE_PASSWORD}@${DC_ORO_TEST_DATABASE_HOST}:${DC_ORO_TEST_DATABASE_PORT}/${DC_ORO_TEST_DATABASE_DBNAME}"
+  parse_dsn_uri "$TEST_DB_URI" "database" "DC_ORO_TEST"
+  # Function creates DC_ORO_TEST_DATABASE_URI automatically
+
   # Reuse existing compose command logic and add test file
   # DOCKER_COMPOSE_BIN_CMD already contains: base + database + user compose files
   TEST_AWARE_COMPOSE_CMD="${DOCKER_COMPOSE_BIN_CMD}"
@@ -4076,17 +4091,6 @@ EOF
   # Use test-cli container for test commands
   CLI_SERVICE="test-cli"
   
-  # Define test-specific variables with fallbacks to main variables
-  DC_ORO_TEST_DATABASE_HOST="${DC_ORO_TEST_DATABASE_HOST:-${DC_ORO_DATABASE_HOST:-database}}"
-  DC_ORO_TEST_DATABASE_PORT="${DC_ORO_TEST_DATABASE_PORT:-${DC_ORO_DATABASE_PORT:-5432}}"
-  DC_ORO_TEST_DATABASE_USER="${DC_ORO_TEST_DATABASE_USER:-${DC_ORO_DATABASE_USER:-oro_db_user}}"
-  DC_ORO_TEST_DATABASE_PASSWORD="${DC_ORO_TEST_DATABASE_PASSWORD:-${DC_ORO_DATABASE_PASSWORD:-oro_db_pass}}"
-  DC_ORO_TEST_DATABASE_DBNAME="${DC_ORO_TEST_DATABASE_DBNAME:-${DC_ORO_DATABASE_DBNAME:-oro_db}_test}"
-  
-  # Create test database URI using parse_dsn_uri function
-  TEST_DB_URI="postgres://${DC_ORO_TEST_DATABASE_USER}:${DC_ORO_TEST_DATABASE_PASSWORD}@${DC_ORO_TEST_DATABASE_HOST}:${DC_ORO_TEST_DATABASE_PORT}/${DC_ORO_TEST_DATABASE_DBNAME}"
-  parse_dsn_uri "$TEST_DB_URI" "database" "DC_ORO_TEST"
-  # Function creates DC_ORO_TEST_DATABASE_URI automatically
   
   # Handle different test subcommands
   case "${args[1]}" in
@@ -4122,6 +4126,11 @@ EOF
             echo "Failed to create test database"
             exit 1
           }
+          # initdb.d adds uuid-ossp only to the main database; Oro requires it in every database it uses
+          ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "PGPASSWORD=${DC_ORO_TEST_DATABASE_PASSWORD} psql -h ${DC_ORO_TEST_DATABASE_HOST} -p ${DC_ORO_TEST_DATABASE_PORT} -U ${DC_ORO_TEST_DATABASE_USER} -d ${DC_ORO_TEST_DATABASE_DBNAME} -c 'CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";'" || {
+            echo "Failed to create the uuid-ossp extension in the test database"
+            exit 1
+          }
         elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "mariadb" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]]; then
           # MySQL/MariaDB commands using environment variables like existing mysql command
           ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "MYSQL_PWD=\$DC_ORO_DATABASE_PASSWORD mysql -h\$DC_ORO_DATABASE_HOST -P\$DC_ORO_DATABASE_PORT -u\$DC_ORO_DATABASE_USER \$DC_ORO_DATABASE_DBNAME -e 'DROP DATABASE IF EXISTS ${DC_ORO_TEST_DATABASE_DBNAME};'" 2>/dev/null || true
@@ -4138,6 +4147,10 @@ EOF
         echo "Running cache clear in 'test-cli' service..."
         ${TEST_COMPOSE_CMD} run --rm test-cli bash -c "rm -rf var/cache/test" 2>/dev/null || true
         echo "Running oro:install in 'test-cli' service..."
+        # Set when we kill the consumer that oro:install starts as its last step: oro:install then
+        # exits with 137 although the installation itself is complete.
+        consumer_stopped_marker="${DC_ORO_CONFIG_DIR}/.tests-install-consumer-stopped"
+        rm -f "$consumer_stopped_marker"
         # Run oro:install in background and monitor output for consumer messages
         ${TEST_COMPOSE_CMD} run --rm test-cli bin/console oro:install --disabled-listeners=all 2>&1 | while IFS= read -r line; do
           echo "$line"
@@ -4147,6 +4160,7 @@ EOF
             for i in {1..10}; do
               if ${TEST_COMPOSE_CMD} exec -T test-cli bash -c "ps aux | grep 'oro:message-queue:consume' | grep -v grep >/dev/null 2>&1"; then
                 echo "Consumer processes found, stopping them..."
+                touch "$consumer_stopped_marker"
                 ${TEST_COMPOSE_CMD} exec -T test-cli bash -c "pids=\$(ps aux | grep 'oro:message-queue:consume' | grep -v grep | awk '{print \$2}'); [ -n \"\$pids\" ] && echo \$pids | xargs kill -9" 2>/dev/null || true
                 break
               fi
@@ -4155,6 +4169,23 @@ EOF
             done
           fi
         done
+        install_status=${PIPESTATUS[0]}
+        if [[ "$install_status" -ne 0 ]] && [[ -f "$consumer_stopped_marker" ]]; then
+          msg_warning "oro:install exited with ${install_status} after its consumer was stopped on purpose; treating the installation as complete"
+          install_status=0
+        fi
+        rm -f "$consumer_stopped_marker"
+        if [[ "$install_status" -ne 0 ]]; then
+          # The database already exists at this point; drop it, otherwise the next
+          # `orodc tests install` sees it and silently skips oro:install.
+          msg_error "oro:install failed (exit code ${install_status}); dropping test database ${DC_ORO_TEST_DATABASE_DBNAME}"
+          if [[ "${DC_ORO_DATABASE_SCHEMA}" == "pgsql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgresql" ]]; then
+            ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "PGPASSWORD=${DC_ORO_TEST_DATABASE_PASSWORD} psql -h ${DC_ORO_TEST_DATABASE_HOST} -p ${DC_ORO_TEST_DATABASE_PORT} -U ${DC_ORO_TEST_DATABASE_USER} -d \$DC_ORO_DATABASE_DBNAME -c 'DROP DATABASE IF EXISTS ${DC_ORO_TEST_DATABASE_DBNAME};'" >/dev/null 2>&1 || true
+          elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "mariadb" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]]; then
+            ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "MYSQL_PWD=\$DC_ORO_DATABASE_PASSWORD mysql -h\$DC_ORO_DATABASE_HOST -P\$DC_ORO_DATABASE_PORT -u\$DC_ORO_DATABASE_USER \$DC_ORO_DATABASE_DBNAME -e 'DROP DATABASE IF EXISTS ${DC_ORO_TEST_DATABASE_DBNAME};'" >/dev/null 2>&1 || true
+          fi
+          exit "$install_status"
+        fi
       else
         echo "Oro test environment already installed, skipping oro:install..."
       fi
