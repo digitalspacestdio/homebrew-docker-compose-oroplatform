@@ -1,0 +1,6 @@
+#!/bin/bash
+# Commit-msg hook: reject commit messages that carry AI attribution.
+# Install: cp hooks/commit-msg hooks/check-ai-attribution.sh .git/hooks/ && chmod +x .git/hooks/commit-msg .git/hooks/check-ai-attribution.sh
+set -euo pipefail
+
+"$(dirname "$0")/check-ai-attribution.sh" "$1"

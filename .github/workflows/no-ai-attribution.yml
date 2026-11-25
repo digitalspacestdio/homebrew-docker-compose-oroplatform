@@ -1,0 +1,43 @@
+name: No AI attribution
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Check PR title, description and commits
+        env:
+          # Passed through env, never expanded into the script, because the text is user input.
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          dir=$(mktemp -d)
+          # The squash-merge commit message is built from the PR, so check it too.
+          printf '%s\n\n%s\n' "${PR_TITLE}" "${PR_BODY}" > "${dir}/pull-request"
+          files=("${dir}/pull-request")
+          for sha in $(git rev-list "${BASE_SHA}..${HEAD_SHA}"); do
+            git log -1 --format='%B%nAuthor: %an <%ae>%nCommitter: %cn <%ce>' "${sha}" > "${dir}/commit-${sha}"
+            files+=("${dir}/commit-${sha}")
+          done
+          # Run the checker from the base branch, so a PR cannot weaken the check for itself.
+          # Fall back to the PR version only while the base branch has no checker yet.
+          if git cat-file -e "${BASE_SHA}:hooks/check-ai-attribution.sh" 2>/dev/null; then
+            git show "${BASE_SHA}:hooks/check-ai-attribution.sh" > "${dir}/check.sh"
+          else
+            cp hooks/check-ai-attribution.sh "${dir}/check.sh"
+          fi
+          bash "${dir}/check.sh" "${files[@]}"
