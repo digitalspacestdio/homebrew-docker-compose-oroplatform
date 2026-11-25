@@ -42,3 +42,18 @@ git commit --no-verify
 - ✅ Colorized output
 - ✅ Graceful handling if shellcheck not installed
 - ✅ Clear error messages
+
+## Commit-msg Hook
+
+The `commit-msg` hook rejects commit messages with AI attribution:
+`Co-Authored-By:` lines naming an AI tool, "Generated with ..." lines, and bot
+addresses such as `noreply@anthropic.com`. The check lives in
+`check-ai-attribution.sh`; the `No AI attribution` GitHub workflow runs the same
+script on every pull request (title, description and all commits).
+
+### Installation
+
+```bash
+cp hooks/commit-msg hooks/check-ai-attribution.sh .git/hooks/
+chmod +x .git/hooks/commit-msg .git/hooks/check-ai-attribution.sh
+```

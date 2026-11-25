@@ -53,6 +53,7 @@ Instructions for AI agents working with homebrew-docker-compose-oroplatform.
 - ❌ Auto-push as part of "fix" or "implement" workflow
 - ✅ Commit locally, then **ASK**: "Push to remote?"
 - ✅ Push only if user says: "push", "create PR", "запушь"
+- ❌ No AI attribution in commits or PRs: no `Co-Authored-By: <AI tool>`, no "Generated with ...". The `No AI attribution` workflow fails such PRs; install `hooks/commit-msg` to catch it locally.
 
 ## 2. New Task = New Branch
 
