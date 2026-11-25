@@ -7,7 +7,13 @@
 set -euo pipefail
 
 tools='claude|anthropic|copilot|openai|chatgpt|codex|cursor|gemini|aider'
-pattern="co-authored-by:.*(${tools})|generated (with|by) .*(${tools})|noreply@anthropic\.com|cursoragent@cursor\.com"
+bots='noreply@anthropic\.com|cursoragent@cursor\.com'
+# Anchored to the line start, as trailers are, so text that merely quotes them
+# (like this PR's own description) does not match. "Generated with" lines may
+# start with an emoji or bullet; the Author/Committer lines come from the workflow.
+pattern="^[[:space:]]*co-authored-by:.*(${tools})"
+pattern+="|^[^[:alnum:]]*generated (with|by) .*(${tools})"
+pattern+="|^(author|committer): .*(${bots})"
 
 status=0
 for file in "$@"; do
