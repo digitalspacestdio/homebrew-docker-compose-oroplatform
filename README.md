@@ -111,7 +111,7 @@ orodc -r 'echo "Hello OroDC!";'    # Run PHP code directly
 orodc psql -l                      # List databases directly
 orodc psql -c "SELECT version();"  # Execute SQL commands
 orodc tests bin/phpunit --testsuite=unit # Run PHPUnit tests
-orodc tests bin/behat --available-suites # Run Behat behavior tests
+orodc tests behat-install && orodc tests behat --available-suites # Run Behat behavior tests
 ```
 
 ## 🎯 Supported Applications
