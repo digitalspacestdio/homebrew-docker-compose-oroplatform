@@ -171,6 +171,9 @@ find_and_export_ports() {
   debug_log "find_and_export_ports: batch results='${BATCH_PORTS}'"
 
   # Parse batch results and override with found free ports
+  # The batch is called with "database" twice: first for MySQL (PREFIX06), then for
+  # PostgreSQL (PREFIX32). Map them by order of appearance.
+  local database_index=0
   while IFS=':' read -r service port
   do
     [[ -z "${service}" ]] && continue
@@ -186,7 +189,10 @@ find_and_export_ports() {
         export DC_ORO_PORT_XHGUI="${port}"
         ;;
       database)
-        if [[ -z "${DC_ORO_PORT_MYSQL}" ]] || [[ "${DC_ORO_PORT_MYSQL}" == "${DC_ORO_PORT_PREFIX}06" ]]
+        # DC_ORO_PORT_MYSQL is always pre-set to PREFIX06 above, so checking its value
+        # sent both results to MySQL and PostgreSQL never got a free port.
+        database_index=$((database_index + 1))
+        if [[ ${database_index} -eq 1 ]]
         then
           export DC_ORO_PORT_MYSQL="${port}"
         else
