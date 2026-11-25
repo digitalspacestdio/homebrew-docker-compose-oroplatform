@@ -184,7 +184,9 @@ find_free_ports_batch() {
         # Port is occupied - check if it's used by our project
         local usage_info
         usage_info=$(get_port_usage_info "$SELECTED_PORT" "$PROJECT_NAME")
-        if [[ "$usage_info" == *"$PROJECT_NAME"* ]]; then
+        # Match the exact project name: a plain substring match treats e.g. project
+        # "shop70" as our own when PROJECT_NAME is "shop" and steals its port.
+        if [[ "$usage_info" == "project '${PROJECT_NAME}' "* ]]; then
           # Port is used by our project - use it
           port_found="$SELECTED_PORT"
         else
