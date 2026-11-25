@@ -150,12 +150,22 @@ orodc tests bin/phpunit --testsuite=functional --filter=ApiTest
 ```
 
 ### Behat Tests
+Behat runs against a production-like application in the `behat_test` environment, so it has its own
+database (`<db>_behat`), installed once with `orodc tests behat-install`. Rerun `behat-install` after
+configuration changes: it rebuilds the `behat_test` cache. `orodc tests purge` drops both test databases.
+
 ```bash
-orodc tests bin/behat --available-suites
-orodc tests bin/behat --suite=OroUserBundle
-orodc tests bin/behat --suite=OroCustomerBundle
-orodc tests bin/behat features/user.feature
+orodc tests behat-install
+orodc tests behat --available-suites
+orodc tests behat --suite=OroUserBundle
+orodc tests bin/behat vendor/oro/platform/src/Oro/Bundle/UserBundle/Tests/Behat/Features/user_back_office_login.feature
 ```
+
+Behat commands run in the `test-behat-cli` service with Oro's `chromedriver` profile (headless Chromium
+flags that work in containers) unless you pass `--profile`. The browser runs in `test-selenium`
+(chromedriver on port 9515, amd64 and arm64), and the application is served by `test-fpm`/`test-nginx`
+at `http://test-nginx`. The application must not force HTTPS in the `behat_test` environment, because
+`test-nginx` serves plain HTTP.
 
 ### Test Coverage
 ```bash

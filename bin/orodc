@@ -2218,6 +2218,7 @@ if [[ "$1" == "help" ]] || [[ "$1" == "man" ]]; then
     echo "   orodc --version                  # Check PHP version"
     echo "   orodc psql -l                    # List databases"
     echo "   orodc tests install              # Setup test environment"
+    echo "   orodc tests behat-install        # Setup Behat test environment"
     echo "   orodc config-refresh             # Clear cached configs and force resync"
     echo
     echo "💡 For full documentation, run: brew info docker-compose-oroplatform"
@@ -3839,9 +3840,10 @@ fi
 
 if [[ "$is_docker_compose_cmd" != "true" ]]; then
   # Check if any argument contains a .php file
+  # (not for `orodc tests ...`: `orodc tests bin/phpunit path/SomeTest.php` must reach the tests handler)
   has_php_file=false
   for arg in "${args[@]}" "${right_flags[@]}" "${right_options[@]}"; do
-    if [[ "$arg" == *.php ]]; then
+    if [[ "$arg" == *.php ]] && [[ "$first_non_flag_arg" != "tests" ]]; then
       has_php_file=true
       break
     fi
@@ -4058,6 +4060,12 @@ if [[ "$first_non_flag_arg" == "tests" ]]; then
   parse_dsn_uri "$TEST_DB_URI" "database" "DC_ORO_TEST"
   # Function creates DC_ORO_TEST_DATABASE_URI automatically
 
+  # Behat runs in the behat_test environment, which cannot share the PHPUnit database installed in
+  # the test environment, so it gets its own database (used by test-behat-cli and test-fpm).
+  DC_ORO_TEST_BEHAT_DATABASE_DBNAME="${DC_ORO_TEST_BEHAT_DATABASE_DBNAME:-${DC_ORO_DATABASE_DBNAME:-oro_db}_behat}"
+  TEST_BEHAT_DB_URI="postgres://${DC_ORO_TEST_DATABASE_USER}:${DC_ORO_TEST_DATABASE_PASSWORD}@${DC_ORO_TEST_DATABASE_HOST}:${DC_ORO_TEST_DATABASE_PORT}/${DC_ORO_TEST_BEHAT_DATABASE_DBNAME}"
+  parse_dsn_uri "$TEST_BEHAT_DB_URI" "database" "DC_ORO_TEST_BEHAT"
+
   # Reuse existing compose command logic and add test file
   # DOCKER_COMPOSE_BIN_CMD already contains: base + database + user compose files
   TEST_AWARE_COMPOSE_CMD="${DOCKER_COMPOSE_BIN_CMD}"
@@ -4090,7 +4098,60 @@ EOF
   
   # Use test-cli container for test commands
   CLI_SERVICE="test-cli"
-  
+
+  is_pgsql_schema() {
+    [[ "${DC_ORO_DATABASE_SCHEMA}" == "pgsql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgresql" ]]
+  }
+
+  is_mysql_schema() {
+    [[ "${DC_ORO_DATABASE_SCHEMA}" == "mariadb" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]]
+  }
+
+  # Usage: tests_database_exists <dbname>
+  tests_database_exists() {
+    local dbname="$1"
+    if is_pgsql_schema; then
+      ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "PGPASSWORD=\$DC_ORO_DATABASE_PASSWORD psql -h \$DC_ORO_DATABASE_HOST -p \$DC_ORO_DATABASE_PORT -U \$DC_ORO_DATABASE_USER -d \$DC_ORO_DATABASE_DBNAME -c 'SELECT 1 FROM pg_database WHERE datname = '\''${dbname}'\'';'" 2>/dev/null | grep -q "1 row"
+    elif is_mysql_schema; then
+      ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "MYSQL_PWD=\$DC_ORO_DATABASE_PASSWORD mysql -h\$DC_ORO_DATABASE_HOST -P\$DC_ORO_DATABASE_PORT -u\$DC_ORO_DATABASE_USER \$DC_ORO_DATABASE_DBNAME -e 'SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '\''${dbname}'\'';'" 2>/dev/null | grep -q "${dbname}"
+    else
+      return 1
+    fi
+  }
+
+  # Usage: tests_drop_database <dbname>
+  tests_drop_database() {
+    local dbname="$1"
+    if is_pgsql_schema; then
+      ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "PGPASSWORD=${DC_ORO_TEST_DATABASE_PASSWORD} psql -h ${DC_ORO_TEST_DATABASE_HOST} -p ${DC_ORO_TEST_DATABASE_PORT} -U ${DC_ORO_TEST_DATABASE_USER} -d \$DC_ORO_DATABASE_DBNAME -c 'SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '\''${dbname}'\'';'" >/dev/null 2>&1 || true
+      ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "PGPASSWORD=${DC_ORO_TEST_DATABASE_PASSWORD} psql -h ${DC_ORO_TEST_DATABASE_HOST} -p ${DC_ORO_TEST_DATABASE_PORT} -U ${DC_ORO_TEST_DATABASE_USER} -d \$DC_ORO_DATABASE_DBNAME -c 'DROP DATABASE IF EXISTS ${dbname};'" >/dev/null 2>&1 || true
+    elif is_mysql_schema; then
+      ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "MYSQL_PWD=\$DC_ORO_DATABASE_PASSWORD mysql -h\$DC_ORO_DATABASE_HOST -P\$DC_ORO_DATABASE_PORT -u\$DC_ORO_DATABASE_USER \$DC_ORO_DATABASE_DBNAME -e 'DROP DATABASE IF EXISTS ${dbname};'" >/dev/null 2>&1 || true
+    fi
+  }
+
+  # Usage: tests_create_database <dbname>  (drops an existing database with the same name first)
+  tests_create_database() {
+    local dbname="$1"
+    tests_drop_database "$dbname"
+    if is_pgsql_schema; then
+      ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "PGPASSWORD=${DC_ORO_TEST_DATABASE_PASSWORD} psql -h ${DC_ORO_TEST_DATABASE_HOST} -p ${DC_ORO_TEST_DATABASE_PORT} -U ${DC_ORO_TEST_DATABASE_USER} -d \$DC_ORO_DATABASE_DBNAME -c 'CREATE DATABASE ${dbname};'" || {
+        echo "Failed to create database ${dbname}"
+        return 1
+      }
+      # initdb.d adds uuid-ossp only to the main database; Oro requires it in every database it uses
+      ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "PGPASSWORD=${DC_ORO_TEST_DATABASE_PASSWORD} psql -h ${DC_ORO_TEST_DATABASE_HOST} -p ${DC_ORO_TEST_DATABASE_PORT} -U ${DC_ORO_TEST_DATABASE_USER} -d ${dbname} -c 'CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";'" || {
+        echo "Failed to create the uuid-ossp extension in ${dbname}"
+        return 1
+      }
+    elif is_mysql_schema; then
+      ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "MYSQL_PWD=\$DC_ORO_DATABASE_PASSWORD mysql -h\$DC_ORO_DATABASE_HOST -P\$DC_ORO_DATABASE_PORT -u\$DC_ORO_DATABASE_USER \$DC_ORO_DATABASE_DBNAME -e 'CREATE DATABASE ${dbname};'" || {
+        echo "Failed to create database ${dbname}"
+        return 1
+      }
+    fi
+  }
+
   
   # Handle different test subcommands
   case "${args[1]}" in
@@ -4102,45 +4163,17 @@ EOF
       
       # Check if test database already exists
       DB_EXISTS=false
-      if [[ "${DC_ORO_DATABASE_SCHEMA}" == "pgsql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgresql" ]]; then
-        # Check PostgreSQL database existence
-        if ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "PGPASSWORD=\$DC_ORO_DATABASE_PASSWORD psql -h \$DC_ORO_DATABASE_HOST -p \$DC_ORO_DATABASE_PORT -U \$DC_ORO_DATABASE_USER -d \$DC_ORO_DATABASE_DBNAME -c 'SELECT 1 FROM pg_database WHERE datname = '\''${DC_ORO_TEST_DATABASE_DBNAME}'\'';'" 2>/dev/null | grep -q "1 row"; then
-          DB_EXISTS=true
-        fi
-      elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "mariadb" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]]; then
-        # Check MySQL/MariaDB database existence
-        if ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "MYSQL_PWD=\$DC_ORO_DATABASE_PASSWORD mysql -h\$DC_ORO_DATABASE_HOST -P\$DC_ORO_DATABASE_PORT -u\$DC_ORO_DATABASE_USER \$DC_ORO_DATABASE_DBNAME -e 'SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '\''${DC_ORO_TEST_DATABASE_DBNAME}'\'';'" 2>/dev/null | grep -q "${DC_ORO_TEST_DATABASE_DBNAME}"; then
-          DB_EXISTS=true
-        fi
+      if tests_database_exists "${DC_ORO_TEST_DATABASE_DBNAME}"; then
+        DB_EXISTS=true
       fi
-      
+
       if [[ "$DB_EXISTS" == "true" ]]; then
         echo "Test database ${DC_ORO_TEST_DATABASE_DBNAME} already exists, skipping database setup..."
       else
         echo "Creating test database ${DC_ORO_TEST_DATABASE_DBNAME}..."
-        if [[ "${DC_ORO_DATABASE_SCHEMA}" == "pgsql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgresql" ]]; then
-          # PostgreSQL commands using test-specific environment variables
-          ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "PGPASSWORD=${DC_ORO_TEST_DATABASE_PASSWORD} psql -h ${DC_ORO_TEST_DATABASE_HOST} -p ${DC_ORO_TEST_DATABASE_PORT} -U ${DC_ORO_TEST_DATABASE_USER} -d \$DC_ORO_DATABASE_DBNAME -c 'SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '\''${DC_ORO_TEST_DATABASE_DBNAME}'\'';'" 2>/dev/null || true
-          ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "PGPASSWORD=${DC_ORO_TEST_DATABASE_PASSWORD} psql -h ${DC_ORO_TEST_DATABASE_HOST} -p ${DC_ORO_TEST_DATABASE_PORT} -U ${DC_ORO_TEST_DATABASE_USER} -d \$DC_ORO_DATABASE_DBNAME -c 'DROP DATABASE IF EXISTS ${DC_ORO_TEST_DATABASE_DBNAME};'" 2>/dev/null || true
-          ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "PGPASSWORD=${DC_ORO_TEST_DATABASE_PASSWORD} psql -h ${DC_ORO_TEST_DATABASE_HOST} -p ${DC_ORO_TEST_DATABASE_PORT} -U ${DC_ORO_TEST_DATABASE_USER} -d \$DC_ORO_DATABASE_DBNAME -c 'CREATE DATABASE ${DC_ORO_TEST_DATABASE_DBNAME};'" || {
-            echo "Failed to create test database"
-            exit 1
-          }
-          # initdb.d adds uuid-ossp only to the main database; Oro requires it in every database it uses
-          ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "PGPASSWORD=${DC_ORO_TEST_DATABASE_PASSWORD} psql -h ${DC_ORO_TEST_DATABASE_HOST} -p ${DC_ORO_TEST_DATABASE_PORT} -U ${DC_ORO_TEST_DATABASE_USER} -d ${DC_ORO_TEST_DATABASE_DBNAME} -c 'CREATE EXTENSION IF NOT EXISTS \"uuid-ossp\";'" || {
-            echo "Failed to create the uuid-ossp extension in the test database"
-            exit 1
-          }
-        elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "mariadb" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]]; then
-          # MySQL/MariaDB commands using environment variables like existing mysql command
-          ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "MYSQL_PWD=\$DC_ORO_DATABASE_PASSWORD mysql -h\$DC_ORO_DATABASE_HOST -P\$DC_ORO_DATABASE_PORT -u\$DC_ORO_DATABASE_USER \$DC_ORO_DATABASE_DBNAME -e 'DROP DATABASE IF EXISTS ${DC_ORO_TEST_DATABASE_DBNAME};'" 2>/dev/null || true
-          ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "MYSQL_PWD=\$DC_ORO_DATABASE_PASSWORD mysql -h\$DC_ORO_DATABASE_HOST -P\$DC_ORO_DATABASE_PORT -u\$DC_ORO_DATABASE_USER \$DC_ORO_DATABASE_DBNAME -e 'CREATE DATABASE ${DC_ORO_TEST_DATABASE_DBNAME};'" || {
-            echo "Failed to create test database"
-            exit 1
-          }
-        fi
+        tests_create_database "${DC_ORO_TEST_DATABASE_DBNAME}" || exit 1
       fi
-      
+
       # Clear test cache and install (only if database was created)
       if [[ "$DB_EXISTS" == "false" ]]; then
         msg_info "Setting up Oro test environment..."
@@ -4179,11 +4212,7 @@ EOF
           # The database already exists at this point; drop it, otherwise the next
           # `orodc tests install` sees it and silently skips oro:install.
           msg_error "oro:install failed (exit code ${install_status}); dropping test database ${DC_ORO_TEST_DATABASE_DBNAME}"
-          if [[ "${DC_ORO_DATABASE_SCHEMA}" == "pgsql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgresql" ]]; then
-            ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "PGPASSWORD=${DC_ORO_TEST_DATABASE_PASSWORD} psql -h ${DC_ORO_TEST_DATABASE_HOST} -p ${DC_ORO_TEST_DATABASE_PORT} -U ${DC_ORO_TEST_DATABASE_USER} -d \$DC_ORO_DATABASE_DBNAME -c 'DROP DATABASE IF EXISTS ${DC_ORO_TEST_DATABASE_DBNAME};'" >/dev/null 2>&1 || true
-          elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "mariadb" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]]; then
-            ${TEST_COMPOSE_CMD} run --rm database-cli bash -c "MYSQL_PWD=\$DC_ORO_DATABASE_PASSWORD mysql -h\$DC_ORO_DATABASE_HOST -P\$DC_ORO_DATABASE_PORT -u\$DC_ORO_DATABASE_USER \$DC_ORO_DATABASE_DBNAME -e 'DROP DATABASE IF EXISTS ${DC_ORO_TEST_DATABASE_DBNAME};'" >/dev/null 2>&1 || true
-          fi
+          tests_drop_database "${DC_ORO_TEST_DATABASE_DBNAME}"
           exit "$install_status"
         fi
       else
@@ -4195,64 +4224,46 @@ EOF
       echo "Warming up test cache..."
       ${TEST_COMPOSE_CMD} run --rm test-cli bin/console cache:warmup --env=test 2>/dev/null || true
 
-      # Generate behat.yml with correct URLs for test environment
-      msg_info "Generating behat.yml with test environment URLs..."
-      BEHAT_DIST_FILE="${DC_ORO_APPDIR}/vendor/oro/platform/src/Oro/Bundle/TestFrameworkBundle/Resources/config/behat.yml.dist"
-      BEHAT_CONFIG_FILE="${DC_ORO_APPDIR}/behat.yml"
-      
-      if [[ -f "$BEHAT_DIST_FILE" ]]; then
-        # Copy behat.yml.dist and replace URLs with sed for test environment
-        cp "$BEHAT_DIST_FILE" "$BEHAT_CONFIG_FILE"
-        
-        # Replace localhost:4444 with test-selenium:4444 for WebDriver host
-        sed -i '' "s|localhost:4444|test-selenium:4444|g" "$BEHAT_CONFIG_FILE" 2>/dev/null || sed -i "s|localhost:4444|test-selenium:4444|g" "$BEHAT_CONFIG_FILE"
-        # Replace localhost:9515 with test-selenium:9515 for ChromeDriver host  
-        sed -i '' "s|localhost:9515|test-selenium:9515|g" "$BEHAT_CONFIG_FILE" 2>/dev/null || sed -i "s|localhost:9515|test-selenium:9515|g" "$BEHAT_CONFIG_FILE"
-        
-        # Note: OroCommerce admin panel is accessible at root path, not /admin/
-        echo "Keeping base_url as root path for admin panel access"
-        
-        # Add necessary Chrome arguments for Docker environment to the main sessions (port 4444)
-        # This fixes the "DevToolsActivePort file doesn't exist" error
-        if grep -q -- '--load-extension.*chrome-extension' "$BEHAT_CONFIG_FILE"; then
-          # Create temporary file with the Chrome arguments to add
-          TEMP_CHROME_ARGS=$(mktemp)
-          cat > "$TEMP_CHROME_ARGS" << 'EOF'
-                                        - "--no-sandbox"
-                                        - "--disable-gpu"
-                                        - "--headless"
-                                        - "--disable-dev-shm-usage"
-                                        - "--no-first-run"
-                                        - "--disable-extensions"
-                                        - "--disable-renderer-backgrounding"
-EOF
-          
-          # Use awk to insert the Chrome arguments after the line containing chrome-extension
-          awk '
-            /--load-extension.*chrome-extension/ {
-              print $0
-              while ((getline line < "'"$TEMP_CHROME_ARGS"'") > 0) print line
-              close("'"$TEMP_CHROME_ARGS"'")
-              next
-            }
-            { print }
-          ' "$BEHAT_CONFIG_FILE" > "${BEHAT_CONFIG_FILE}.tmp" && mv "${BEHAT_CONFIG_FILE}.tmp" "$BEHAT_CONFIG_FILE"
-          
-          # Clean up temporary file
-          rm -f "$TEMP_CHROME_ARGS"
-        fi
-        
-        echo "Generated behat.yml with test environment URLs and Docker-compatible Chrome options"
-      else
-        echo "Warning: behat.yml.dist not found, skipping behat.yml generation"
-      fi
-      
       # Start test services including test-consumer
       ${TEST_COMPOSE_CMD} up -d test-fpm test-nginx test-selenium test-consumer
       echo "Test environment setup completed!"
       exit 0
       ;;
       
+    "behat-install")
+      msg_info "Installing Behat test environment and database ${DC_ORO_TEST_BEHAT_DATABASE_DBNAME}..."
+      ${TEST_COMPOSE_CMD} up -d >/dev/null 2>&1
+
+      if tests_database_exists "${DC_ORO_TEST_BEHAT_DATABASE_DBNAME}"; then
+        echo "Behat database ${DC_ORO_TEST_BEHAT_DATABASE_DBNAME} already exists, skipping oro:install (run 'orodc tests purge' to reinstall)..."
+        # Rebuild the behat_test cache so configuration changes since the install are picked up
+        ${TEST_COMPOSE_CMD} run --rm test-behat-cli bin/console cache:clear || exit 1
+      else
+        tests_create_database "${DC_ORO_TEST_BEHAT_DATABASE_DBNAME}" || exit 1
+        ${TEST_COMPOSE_CMD} run --rm test-behat-cli bash -c "rm -rf var/cache/behat_test" 2>/dev/null || true
+        # Behat fixtures and features expect admin/admin and the ORO organization
+        if ! ${TEST_COMPOSE_CMD} run --rm test-behat-cli bin/console oro:install -n --timeout=0 \
+          --application-url="${DC_ORO_TEST_BEHAT_BASE_URL:-http://test-nginx}" \
+          --organization-name=ORO --user-name=admin --user-email=admin@example.com \
+          --user-firstname=John --user-lastname=Doe --user-password=admin \
+          --sample-data=n --language=en --formatting-code=en_US \
+          "${args[@]:2}"; then
+          msg_error "oro:install failed; dropping Behat database ${DC_ORO_TEST_BEHAT_DATABASE_DBNAME}"
+          tests_drop_database "${DC_ORO_TEST_BEHAT_DATABASE_DBNAME}"
+          exit 1
+        fi
+        # Process the messages the install queued (Oro does the same for the test environment),
+        # so the first Behat run does not start with a backlog
+        ${TEST_COMPOSE_CMD} run --rm test-behat-cli bin/console oro:message-queue:consume \
+          --stop-when-unique-jobs-processed --time-limit='+5 minutes' || true
+      fi
+
+      # test-fpm serves the behat_test application to the browser in test-selenium
+      ${TEST_COMPOSE_CMD} up -d --force-recreate test-fpm test-nginx test-selenium
+      echo "Behat test environment setup completed! Run: orodc tests bin/behat <feature or --suite=...>"
+      exit 0
+      ;;
+
     "purge"|"destroy")
       echo "Purging test environment..."
       
@@ -4283,17 +4294,10 @@ EOF
       
       # Drop test database using the same approach as existing database commands
       # Test database name = main database name + _test suffix
-      echo "Dropping test database ${DC_ORO_TEST_DATABASE_DBNAME}..."
-      
-      if [[ "${DC_ORO_DATABASE_SCHEMA}" == "pgsql" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgres" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "postgresql" ]]; then
-        # PostgreSQL commands using test-specific environment variables
-        ${MAIN_COMPOSE_CMD} run --rm database-cli bash -c "PGPASSWORD=${DC_ORO_TEST_DATABASE_PASSWORD} psql -h ${DC_ORO_TEST_DATABASE_HOST} -p ${DC_ORO_TEST_DATABASE_PORT} -U ${DC_ORO_TEST_DATABASE_USER} -d \$DC_ORO_DATABASE_DBNAME -c 'SELECT pg_terminate_backend(pid) FROM pg_stat_activity WHERE datname = '\''${DC_ORO_TEST_DATABASE_DBNAME}'\'';'" 2>/dev/null || true
-        ${MAIN_COMPOSE_CMD} run --rm database-cli bash -c "PGPASSWORD=${DC_ORO_TEST_DATABASE_PASSWORD} psql -h ${DC_ORO_TEST_DATABASE_HOST} -p ${DC_ORO_TEST_DATABASE_PORT} -U ${DC_ORO_TEST_DATABASE_USER} -d \$DC_ORO_DATABASE_DBNAME -c 'DROP DATABASE ${DC_ORO_TEST_DATABASE_DBNAME};'" 2>/dev/null || true
-      elif [[ "${DC_ORO_DATABASE_SCHEMA}" == "mariadb" ]] || [[ "${DC_ORO_DATABASE_SCHEMA}" == "mysql" ]]; then
-        # MySQL/MariaDB commands using environment variables like existing mysql command
-        ${MAIN_COMPOSE_CMD} run --rm database-cli bash -c "MYSQL_PWD=\$DC_ORO_DATABASE_PASSWORD mysql -h\$DC_ORO_DATABASE_HOST -P\$DC_ORO_DATABASE_PORT -u\$DC_ORO_DATABASE_USER \$DC_ORO_DATABASE_DBNAME -e 'DROP DATABASE IF EXISTS ${DC_ORO_TEST_DATABASE_DBNAME};'" 2>/dev/null || true
-      fi
-      
+      echo "Dropping test databases ${DC_ORO_TEST_DATABASE_DBNAME} and ${DC_ORO_TEST_BEHAT_DATABASE_DBNAME}..."
+      tests_drop_database "${DC_ORO_TEST_DATABASE_DBNAME}"
+      tests_drop_database "${DC_ORO_TEST_BEHAT_DATABASE_DBNAME}"
+
       # Remove merged compose.yml to restore original configuration
       # IMPORTANT: This cleanup prevents the merged compose.yml from interfering 
       # with normal operations. The merged file should only exist during test sessions.
@@ -4307,7 +4311,7 @@ EOF
       ${TEST_COMPOSE_CMD} ps test-fpm test-nginx test-selenium
       echo ""
       echo "Test application: Available in Docker network (test-nginx)"
-      echo "Selenium WebDriver: Available in Docker network (test-selenium:4444)"
+      echo "ChromeDriver: Available in Docker network (test-selenium:9515)"
       exit 0
       ;;
       
@@ -4344,6 +4348,25 @@ EOF
       # For tests command, use arguments after 'tests' without parsing
       # Skip 'tests' (first argument) and use everything else as-is
       test_command_args=("${args[@]:1}")
+      # Behat needs the behat_test application (see test-behat-cli); its maintenance-mode isolator
+      # writes the lock file into var/maintenance, which a fresh checkout may not have.
+      # A bare `behat` resolves to the project's bin/behat or vendor/bin/behat.
+      if [[ "${test_command_args[0]##*/}" == "behat" ]]; then
+        # shellcheck disable=SC2016 # expanded by bash inside the container
+        exec ${TEST_COMPOSE_CMD} run --rm test-behat-cli bash -c '
+          mkdir -p var/maintenance
+          cmd="$1"; shift
+          if [[ "$cmd" == "behat" ]]; then
+            for candidate in bin/behat vendor/bin/behat; do
+              [[ -x "$candidate" ]] && cmd="$candidate" && break
+            done
+          fi
+          # Default to the chromedriver profile: its headless Chrome flags work in containers
+          for arg in "$@"; do
+            [[ "$arg" == -p* || "$arg" == --profile* ]] && exec "$cmd" "$@"
+          done
+          exec "$cmd" --profile=chromedriver "$@"' behat "${test_command_args[@]}"
+      fi
       exec ${TEST_COMPOSE_CMD} run --rm test-cli "${test_command_args[@]}"
       ;;
   esac

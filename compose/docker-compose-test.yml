@@ -29,31 +29,31 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       - 'APP_DIR=${DC_ORO_APPDIR:-/var/www}'
-      - 'ORO_ENV=test'
-      - 'SYMFONY_ENV=test'
+      - 'ORO_ENV=behat_test'
+      - 'SYMFONY_ENV=behat_test'
       - 'DC_ORO_APPDIR=${DC_ORO_APPDIR:-/var/www}'
       - 'DC_ORO_DATABASE_HOST=${DC_ORO_DATABASE_HOST:-database}'
       - 'DC_ORO_DATABASE_PORT=${DC_ORO_DATABASE_PORT:-5432}'
       - 'DC_ORO_DATABASE_USER=${DC_ORO_DATABASE_USER:-oro_db_user}'
       - 'DC_ORO_DATABASE_PASSWORD=${DC_ORO_DATABASE_PASSWORD:-oro_db_pass}'
-      - 'DC_ORO_DATABASE_DBNAME=${DC_ORO_TEST_DATABASE_DBNAME:-oro_db_test}'
-      - 'ORO_DB_URL=${DC_ORO_TEST_DATABASE_URI:-postgres://oro_db_user:oro_db_pass@database:5432/oro_db_test}'
-      - 'ORO_DB_DSN=${DC_ORO_TEST_DATABASE_URI:-postgres://oro_db_user:oro_db_pass@database:5432/oro_db_test}'
+      - 'DC_ORO_DATABASE_DBNAME=${DC_ORO_TEST_BEHAT_DATABASE_DBNAME:-oro_db_behat}'
+      - 'ORO_DB_URL=${DC_ORO_TEST_BEHAT_DATABASE_URI:-postgres://oro_db_user:oro_db_pass@database:5432/oro_db_behat}'
+      - 'ORO_DB_DSN=${DC_ORO_TEST_BEHAT_DATABASE_URI:-postgres://oro_db_user:oro_db_pass@database:5432/oro_db_behat}'
       - 'ORO_DB_HOST=${DC_ORO_DATABASE_HOST:-database}'
       - 'ORO_DB_PORT=${DC_ORO_DATABASE_PORT:-5432}'
-      - 'ORO_DB_NAME=${DC_ORO_TEST_DATABASE_DBNAME:-oro_db_test}'
+      - 'ORO_DB_NAME=${DC_ORO_TEST_BEHAT_DATABASE_DBNAME:-oro_db_behat}'
       - 'ORO_DB_USER=${DC_ORO_DATABASE_USER:-oro_db_user}'
       - 'ORO_DB_PASSWORD=${DC_ORO_DATABASE_PASSWORD:-oro_db_pass}'
       - 'ORO_SEARCH_URL=${DC_ORO_SEARCH_URI:-elastic-search://search:9200}'
       - 'ORO_SEARCH_DSN=${DC_ORO_SEARCH_URI:-elastic-search://search:9200}'
-      - 'ORO_SEARCH_ENGINE_DSN=${DC_ORO_SEARCH_URI:-elastic-search://search:9200}?prefix=oro_search_test'
-      - 'ORO_WEBSITE_SEARCH_ENGINE_DSN=${DC_ORO_SEARCH_URI:-elastic-search://search:9200}?prefix=oro_website_search_test'
+      - 'ORO_SEARCH_ENGINE_DSN=${DC_ORO_SEARCH_URI:-elastic-search://search:9200}?prefix=oro_search_behat'
+      - 'ORO_WEBSITE_SEARCH_ENGINE_DSN=${DC_ORO_SEARCH_URI:-elastic-search://search:9200}?prefix=oro_website_search_behat'
       - 'ORO_MQ_DSN=${DC_ORO_MQ_URI:-""}'
       - 'ORO_REDIS_URL=${DC_ORO_REDIS_URI:-""}'
-      - 'ORO_SESSION_DSN=${DC_ORO_REDIS_URI:-""}/10'
-      - 'ORO_REDIS_CACHE_DSN=${DC_ORO_REDIS_URI:-""}/11'
-      - 'ORO_REDIS_DOCTRINE_DSN=${DC_ORO_REDIS_URI:-""}/12'
-      - 'ORO_REDIS_LAYOUT_DSN=${DC_ORO_REDIS_URI:-""}/13'
+      - 'ORO_SESSION_DSN=${DC_ORO_REDIS_URI:-""}/6'
+      - 'ORO_REDIS_CACHE_DSN=${DC_ORO_REDIS_URI:-""}/7'
+      - 'ORO_REDIS_DOCTRINE_DSN=${DC_ORO_REDIS_URI:-""}/8'
+      - 'ORO_REDIS_LAYOUT_DSN=${DC_ORO_REDIS_URI:-""}/9'
       - 'ORO_MAILER_DRIVER=${ORO_MAILER_DRIVER:-smtp}'
       - 'ORO_MAILER_HOST=${ORO_MAILER_HOST:-mail}'
       - 'ORO_MAILER_PORT=${ORO_MAILER_PORT:-1025}'
@@ -125,24 +125,27 @@ services:
         max-size: "10m"
 
   test-selenium:
-    image: selenium/standalone-chrome:3.141.59-20210607
+    # Multi-arch (amd64/arm64) Chromium with a current chromedriver. Oro's Behat driver speaks the legacy
+    # JSON Wire protocol, which Selenium 4 rejects, so the container runs chromedriver directly; Oro's
+    # `chromedriver` Behat profile connects to it.
+    image: selenium/standalone-chromium:4.52.0-20261101
+    entrypoint: ["/usr/bin/chromedriver"]
+    command: ["--port=9515", "--allowed-ips=", "--allowed-origins=*"]
     hostname: test-selenium.${DC_ORO_NAME:-unnamed}.docker.local
     container_name: ${DC_ORO_NAME:-unnamed}_test_selenium
     dns:
       - 1.1.1.1
       - 8.8.8.8
     #ports:
-    #  - "4444:4444"
+    #  - "9515:9515"
     shm_size: "2g"
     restart: "no"
     deploy:
       resources:
         limits:
           memory: 7G
-    # environment:
-      # - SE_OPTS=--log-level FINE  # Not supported in Selenium 3.x
     healthcheck:
-      test: "curl -f http://localhost:4444/wd/hub/status || exit 1"
+      test: "curl -f http://localhost:9515/status || exit 1"
       start_period: 10s
       interval: 10s
       retries: 10
@@ -212,6 +215,32 @@ services:
       driver: "json-file"
       options:
         max-size: "10m"
+
+  # Behat runs against a production-like application (the behat_test environment), which cannot share
+  # the PHPUnit database installed in the test environment: it uses its own database, search index
+  # prefixes and Redis databases. test-fpm serves the same environment to the browser.
+  test-behat-cli:
+    extends:
+      service: test-cli
+    container_name: "${DC_ORO_NAME:-unnamed}_test_behat_cli_${DC_ORO_PHP_VERSION:-8.5}-${DC_ORO_NODE_VERSION:-24}-${DC_ORO_COMPOSER_VERSION:-2}"
+    hostname: test-behat-cli.${DC_ORO_NAME:-unnamed}.docker.local
+    environment:
+      - 'APP_ENV=behat_test'
+      - 'ORO_ENV=behat_test'
+      - 'SYMFONY_ENV=behat_test'
+      - 'DC_ORO_DATABASE_DBNAME=${DC_ORO_TEST_BEHAT_DATABASE_DBNAME:-app_db_behat}'
+      - 'ORO_DB_URL=${DC_ORO_TEST_BEHAT_DATABASE_URI:-postgres://app_db_test_user:app_db_test_pass@database:5432/app_db_behat}'
+      - 'ORO_DB_DSN=${DC_ORO_TEST_BEHAT_DATABASE_URI:-postgres://app_db_test_user:app_db_test_pass@database:5432/app_db_behat}'
+      - 'ORO_DB_NAME=${DC_ORO_TEST_BEHAT_DATABASE_DBNAME:-app_db_behat}'
+      - 'ORO_SEARCH_ENGINE_DSN=${DC_ORO_TEST_SEARCH_URI:-${DC_ORO_SEARCH_URI:-elastic-search://search:9200}}?prefix=oro_search_behat'
+      - 'ORO_WEBSITE_SEARCH_ENGINE_DSN=${DC_ORO_TEST_SEARCH_URI:-${DC_ORO_SEARCH_URI:-elastic-search://search:9200}}?prefix=oro_website_search_behat'
+      - 'ORO_SESSION_DSN=${DC_ORO_TEST_REDIS_URI:-${DC_ORO_REDIS_URI:-""}}/6'
+      - 'ORO_REDIS_CACHE_DSN=${DC_ORO_TEST_REDIS_URI:-${DC_ORO_REDIS_URI:-""}}/7'
+      - 'ORO_REDIS_DOCTRINE_DSN=${DC_ORO_TEST_REDIS_URI:-${DC_ORO_REDIS_URI:-""}}/8'
+      - 'ORO_REDIS_LAYOUT_DSN=${DC_ORO_TEST_REDIS_URI:-${DC_ORO_REDIS_URI:-""}}/9'
+      - 'ORO_BEHAT_BASE_URL=${DC_ORO_TEST_BEHAT_BASE_URL:-http://test-nginx}'
+      # Oro's `chromedriver` Behat profile (headless Chrome flags that work in containers) uses this URL
+      - 'ORO_CHROMEDRIVER_URL=${DC_ORO_TEST_BEHAT_CHROMEDRIVER_URL:-http://test-selenium:9515}'
 
   test-consumer:
     container_name: "${DC_ORO_NAME:-unnamed}_test_consumer_${DC_ORO_PHP_VERSION:-8.5}-${DC_ORO_NODE_VERSION:-24}-${DC_ORO_COMPOSER_VERSION:-2}"
