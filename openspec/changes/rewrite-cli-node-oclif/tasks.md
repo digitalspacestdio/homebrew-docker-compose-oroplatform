@@ -99,5 +99,6 @@
 - [ ] 8.7 Verify Homebrew install/reinstall/upgrade from a development tap checkout, including config compatibility for an environment created by the Bash CLI.
 - [ ] 8.8 Run shellcheck/bash syntax checks for remaining shell assets that still execute as Docker entrypoints or static helpers.
 - [ ] 8.9 Update CI: add Node build/lint/test workflow and adjust `test-oro-installations-containerized.yml` to exercise the new CLI.
+- [ ] 8.12 Add a CI job that validates Homebrew installation on Linux and macOS: `brew install` from the tap checkout, `brew test`, and a non-Docker `orodc` command, gating every change to the formula or CLI.
 - [ ] 8.10 Update developer documentation for the TypeScript architecture, dev-checkout workflow, and contribution conventions.
 - [ ] 8.11 Run the repository-required verification command before requesting review.
